@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>37 — store.getState()</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">37 / 100</span>
+      store.getState() — чтение текущего state
+    </div>
+    <nav class="site-header__nav">
+      <a href="../36-create-store/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">37</span>
+      <a href="../38-store-dispatch/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: getState -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — getState() после каждого dispatch</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-increment">+1</button>
+            <button class="btn" id="btn-decrement">−1</button>
+            <button class="btn" id="btn-reset">Сброс</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Проверка ссылочного равенства</div>
+            <pre id="ref-check" style="color: var(--text-primary); font-size: 0.85rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — store.getState()</div>
+      <div class="theory__body">
+        <h3>Что возвращает getState()?</h3>
+        <p>
+          Метод <code>store.getState()</code> возвращает текущее дерево состояния (state tree)
+          приложения. Это то же самое значение, которое вернул последний вызов reducer.
+        </p>
+
+        <div class="quote">
+          «Returns the current state tree of your application. It is equal to the last value
+          returned by the store's reducer.»
+          <br>— <a href="https://redux.js.org/api/store#getstate" target="_blank">Redux API Reference: Store — getState()</a>
+        </div>
+
+        <h3>getState() возвращает ту же ссылку</h3>
+        <p>
+          Важно: <code>getState()</code> <strong>не создаёт копию</strong> state.
+          Он возвращает <strong>ту же самую ссылку</strong>, которую вернул reducer.
+          Если reducer вернул тот же объект (например, в <code>default</code> case),
+          повторные вызовы <code>getState()</code> вернут <code>=== true</code>.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> stateBefore = store.<span class="fn">getState</span>()
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+<span class="kw">const</span> stateAfter = store.<span class="fn">getState</span>()
+
+<span class="fn">console.log</span>(stateBefore === stateAfter) <span class="cm">// false — reducer вернул НОВЫЙ объект</span>
+        </div>
+
+        <div class="code-block">
+<span class="kw">const</span> stateA = store.<span class="fn">getState</span>()
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'unknown/action'</span> })
+<span class="kw">const</span> stateB = store.<span class="fn">getState</span>()
+
+<span class="fn">console.log</span>(stateA === stateB) <span class="cm">// true — default case вернул ТОТ ЖЕ объект</span>
+        </div>
+
+        <h3>Без защитного копирования</h3>
+        <p>
+          Redux <strong>не делает</strong> защитное копирование (defensive copy) при вызове
+          <code>getState()</code>. Это значит, что мутация возвращённого объекта
+          изменит state store напрямую — именно поэтому reducer должен возвращать
+          <strong>новый объект</strong> при каждом изменении.
+        </p>
+
+        <div class="warning">
+          Никогда не мутируйте объект, полученный от <code>getState()</code>!
+          Это нарушит принцип иммутабельности и сломает React-Redux, DevTools
+          и любой код, зависящий от ссылочного сравнения.
+        </div>
+
+        <h3>Когда вызывать getState()</h3>
+        <ul>
+          <li><strong>В subscribe callback</strong> — чтобы узнать новый state после dispatch</li>
+          <li><strong>В обработчиках событий</strong> — чтобы прочитать текущий state перед dispatch</li>
+          <li><strong>В middleware</strong> — для доступа к state при обработке action</li>
+        </ul>
+
+        <div class="tip">
+          Нажмите кнопки выше и посмотрите, как <code>getState()</code> вызывается после
+          каждого dispatch. Обратите внимание на проверку ссылочного равенства — при реальном
+          изменении ссылка всегда новая (<code>=== false</code>).
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>getState()</code> возвращает текущее дерево state</li>
+          <li>Возвращается <strong>та же ссылка</strong>, что вернул reducer — не копия</li>
+          <li>После dispatch с реальным изменением → <code>===</code> будет <code>false</code></li>
+          <li>После dispatch без изменения (default case) → <code>===</code> будет <code>true</code></li>
+          <li>Никогда не мутируйте результат <code>getState()</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

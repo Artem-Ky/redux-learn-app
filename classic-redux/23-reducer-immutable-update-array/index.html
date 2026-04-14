@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>23 — Иммутабельное обновление массива</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">23 / 100</span>
+      Иммутабельное обновление массива в reducer
+    </div>
+    <nav class="site-header__nav">
+      <a href="../22-reducer-immutable-update-object/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">23</span>
+      <a href="../24-reducer-immutable-nested/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Список покупок (массив)</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--accent-cyan); margin-bottom: 12px;">Добавить элемент (spread)</h3>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+              <input type="text" id="input-add" placeholder="Новый элемент..." value="Хлеб">
+              <button class="btn btn--accent" id="btn-add">Добавить</button>
+            </div>
+
+            <h3 style="color: var(--accent-orange); margin-bottom: 12px;">Удалить элемент (filter)</h3>
+            <div class="btn-group" style="margin-bottom: 16px;">
+              <button class="btn btn--danger" id="btn-remove-first">Удалить первый</button>
+              <button class="btn btn--danger" id="btn-remove-last">Удалить последний</button>
+            </div>
+
+            <h3 style="color: var(--accent-yellow); margin-bottom: 12px;">Обновить элемент (map)</h3>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+              <button class="btn" id="btn-upper-first">Первый → UPPERCASE</button>
+              <button class="btn" id="btn-mark-done">Пометить всё «✔»</button>
+            </div>
+
+            <button class="btn" id="btn-reset">Сбросить список</button>
+          </div>
+
+          <div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Текущий State (массив)</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">Список</div>
+              <div id="list-display" style="color: var(--text-primary); font-size: 0.9rem;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Иммутабельные паттерны для массивов</div>
+      <div class="theory__body">
+        <h3>Добавление элемента: spread</h3>
+        <p>
+          Вместо <code>push()</code> (мутация) используем spread-оператор для создания нового массива:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ Мутация</span>
+state.<span class="fn">push</span>(newItem)
+<span class="kw">return</span> state
+
+<span class="cm">// ✔ Иммутабельно</span>
+<span class="kw">return</span> [...state, newItem]           <span class="cm">// добавить в конец</span>
+<span class="kw">return</span> [newItem, ...state]           <span class="cm">// добавить в начало</span>
+        </div>
+
+        <h3>Удаление элемента: filter</h3>
+        <p>
+          Вместо <code>splice()</code> (мутация) используем <code>filter()</code> — он возвращает новый массив:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ Мутация</span>
+state.<span class="fn">splice</span>(index, <span class="num">1</span>)
+<span class="kw">return</span> state
+
+<span class="cm">// ✔ Иммутабельно</span>
+<span class="kw">return</span> state.<span class="fn">filter</span>((_, i) => i !== indexToRemove)
+<span class="kw">return</span> state.<span class="fn">filter</span>(item => item.<span class="prop">id</span> !== idToRemove)
+        </div>
+
+        <h3>Обновление элемента: map</h3>
+        <p>
+          <code>map()</code> возвращает новый массив, где можно заменить нужный элемент:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ Мутация</span>
+state[index].<span class="prop">text</span> = newText
+<span class="kw">return</span> state
+
+<span class="cm">// ✔ Иммутабельно</span>
+<span class="kw">return</span> state.<span class="fn">map</span>((item, i) =>
+  i === index ? { ...item, <span class="prop">text</span>: newText } : item
+)
+        </div>
+
+        <div class="quote">
+          «You can only make copies of the original values, and then mutate the copies.
+          We can use the JavaScript array / object spread operators, as well as array
+          methods that return new copies of the array.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#rules-of-reducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Запрещённые методы (мутирующие)</h3>
+        <div class="warning">
+          В reducer <strong>нельзя</strong> использовать мутирующие методы массива:
+          <code>push</code>, <code>pop</code>, <code>shift</code>, <code>unshift</code>,
+          <code>splice</code>, <code>sort</code>, <code>reverse</code>.
+          Вместо них — <code>concat</code>/<code>spread</code>, <code>filter</code>,
+          <code>map</code>, <code>slice</code>, <code>[...arr].sort()</code>.
+        </div>
+
+        <h3>Шпаргалка</h3>
+        <ul>
+          <li><strong>Добавить:</strong> <code>[...state, newItem]</code> или <code>state.concat(newItem)</code></li>
+          <li><strong>Удалить:</strong> <code>state.filter(item => condition)</code></li>
+          <li><strong>Обновить:</strong> <code>state.map(item => condition ? updatedItem : item)</code></li>
+          <li><strong>Вставить:</strong> <code>[...state.slice(0, i), newItem, ...state.slice(i)]</code></li>
+          <li>Все эти методы возвращают <strong>новый массив</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

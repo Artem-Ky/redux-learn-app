@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>32 — combineReducers at scale: три слайса</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">32 / 100</span>
+      combineReducers на масштабе — три слайса
+    </div>
+    <nav class="site-header__nav">
+      <a href="../31-combine-reducers/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">32</span>
+      <a href="../33-reducer-higher-order/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Three slices -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Три слайса: users, posts, comments</div>
+      <div class="demo-section__body">
+        <div style="max-width: 650px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div>
+              <h3 style="color: var(--accent-cyan); margin-bottom: 8px; font-size: 0.9rem;">👤 Users</h3>
+              <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+                <input type="text" id="user-input" placeholder="Имя..." style="flex: 1; font-size: 0.8rem;">
+                <button class="btn" id="btn-add-user" style="font-size: 0.8rem;">+</button>
+              </div>
+              <div class="state-display">
+                <div class="state-display__label">users: <span id="user-count">0</span></div>
+                <ul id="user-list" style="list-style: none; padding: 4px 0; font-size: 0.8rem;"></ul>
+              </div>
+            </div>
+
+            <div>
+              <h3 style="color: var(--accent-orange); margin-bottom: 8px; font-size: 0.9rem;">📝 Posts</h3>
+              <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+                <input type="text" id="post-input" placeholder="Заголовок..." style="flex: 1; font-size: 0.8rem;">
+                <button class="btn" id="btn-add-post" style="font-size: 0.8rem;">+</button>
+              </div>
+              <div class="state-display">
+                <div class="state-display__label">posts: <span id="post-count">0</span></div>
+                <ul id="post-list" style="list-style: none; padding: 4px 0; font-size: 0.8rem;"></ul>
+              </div>
+            </div>
+
+            <div>
+              <h3 style="color: var(--success); margin-bottom: 8px; font-size: 0.9rem;">💬 Comments</h3>
+              <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+                <input type="text" id="comment-input" placeholder="Текст..." style="flex: 1; font-size: 0.8rem;">
+                <button class="btn" id="btn-add-comment" style="font-size: 0.8rem;">+</button>
+              </div>
+              <div class="state-display">
+                <div class="state-display__label">comments: <span id="comment-count">0</span></div>
+                <ul id="comment-list" style="list-style: none; padding: 4px 0; font-size: 0.8rem;"></ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-top: 16px;">
+            <div class="state-display__label">Полный State Tree</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem; max-height: 300px; overflow-y: auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — combineReducers на масштабе</div>
+      <div class="theory__body">
+        <h3>Масштабирование reducer'ов</h3>
+        <p>
+          В реальных приложениях state содержит множество независимых «доменов» данных:
+          пользователи, посты, комментарии, уведомления и т.д. Каждый домен — это
+          отдельный слайс со своим reducer'ом.
+        </p>
+
+        <div class="quote">
+          «The key concept is that each slice reducer "owns" its slice of state.
+          It is responsible for managing that slice, and not any other slices.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#combinereducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Три слайса — три reducer'а</h3>
+        <p>
+          Каждый слайс-reducer полностью независим: он не знает о существовании
+          других слайсов и управляет только своей частью state.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> rootReducer = <span class="fn">combineReducers</span>({
+  <span class="prop">users</span>: usersReducer,
+  <span class="prop">posts</span>: postsReducer,
+  <span class="prop">comments</span>: commentsReducer
+})
+
+<span class="cm">// state = {</span>
+<span class="cm">//   users: [...]     ← usersReducer</span>
+<span class="cm">//   posts: [...]     ← postsReducer</span>
+<span class="cm">//   comments: [...]  ← commentsReducer</span>
+<span class="cm">// }</span>
+        </div>
+
+        <h3>Форма state зеркалит combineReducers</h3>
+        <p>
+          Структура объекта, переданного в <code>combineReducers</code>, <strong>точно
+          повторяется</strong> в итоговом state. Если вы передали три ключа — в state
+          будет три ключа с теми же именами.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Ключи combineReducers...</span>
+<span class="fn">combineReducers</span>({ <span class="prop">users</span>, <span class="prop">posts</span>, <span class="prop">comments</span> })
+
+<span class="cm">// ...становятся ключами state:</span>
+store.<span class="fn">getState</span>()
+<span class="cm">// → { users: [...], posts: [...], comments: [...] }</span>
+        </div>
+
+        <h3>Каждый слайс независим</h3>
+        <p>
+          При dispatch любого action <code>combineReducers</code> вызывает
+          <strong>все</strong> слайс-reducer'ы. Каждый из них решает, нужно ли
+          ему реагировать на этот action. Если нет — возвращает state без изменений.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// dispatch({ type: 'users/userAdded', ... })</span>
+<span class="cm">// → usersReducer: обрабатывает ✓</span>
+<span class="cm">// → postsReducer: возвращает state (default) ✗</span>
+<span class="cm">// → commentsReducer: возвращает state (default) ✗</span>
+        </div>
+
+        <h3>Когда создавать новый слайс?</h3>
+        <p>
+          Новый слайс стоит создать, когда:
+        </p>
+        <ul>
+          <li>Данные представляют <strong>отдельный домен</strong> (пользователи ≠ посты)</li>
+          <li>Данные <strong>обновляются независимо</strong> от других частей state</li>
+          <li>У данных свой набор actions и своя логика обработки</li>
+          <li>Reducer текущего слайса становится слишком большим</li>
+        </ul>
+
+        <div class="tip">
+          Добавьте данные в каждый из трёх слайсов в демо выше и наблюдайте,
+          как state tree растёт. Каждый слайс полностью независим — изменения
+          в одном не влияют на другие.
+        </div>
+
+        <div class="warning">
+          Не создавайте слишком мелкие слайсы. Если два типа данных всегда
+          обновляются вместе и тесно связаны — лучше держать их в одном слайсе.
+          <code>combineReducers</code> — для <strong>логически независимых</strong> частей state.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>combineReducers</code> масштабируется на любое количество слайсов</li>
+          <li>Каждый слайс-reducer <strong>независим</strong> и изолирован</li>
+          <li>Форма state <strong>зеркалит</strong> ключи combineReducers</li>
+          <li>При dispatch вызываются <strong>все</strong> слайс-reducer'ы</li>
+          <li>Новый слайс = новый домен данных с независимой логикой</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

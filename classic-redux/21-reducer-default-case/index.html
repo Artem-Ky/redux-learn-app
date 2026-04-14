@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>21 — Default case в reducer</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">21 / 100</span>
+      Default case — возврат текущего state
+    </div>
+    <nav class="site-header__nav">
+      <a href="../20-reducer-switch-vs-if/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">21</span>
+      <a href="../22-reducer-immutable-update-object/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Известные и неизвестные экшены</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Счётчик</h3>
+            <div class="counter">
+              <button class="btn" id="btn-dec">−</button>
+              <div class="counter__value" id="counter-value">0</div>
+              <button class="btn" id="btn-inc">+</button>
+            </div>
+            <div class="btn-group" style="margin-top: 16px; flex-direction: column;">
+              <button class="btn btn--success" id="btn-known">
+                Dispatch известный экшен
+                <span class="tag tag--good">known</span>
+              </button>
+              <button class="btn btn--danger" id="btn-unknown">
+                Dispatch неизвестный экшен
+                <span class="tag tag--bad">unknown</span>
+              </button>
+              <button class="btn btn--danger" id="btn-unknown2">
+                Dispatch { type: 'banana/peel' }
+                <span class="tag tag--bad">unknown</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 1rem;"></pre>
+            </div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Последний Action</div>
+              <pre id="action-display" style="color: var(--accent-orange); font-size: 0.85rem;">—</pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">State изменился?</div>
+              <pre id="change-display" style="font-size: 0.9rem;">—</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Почему default case критически важен</div>
+      <div class="theory__body">
+        <h3>Reducer ОБЯЗАН вернуть state для неизвестных экшенов</h3>
+        <p>
+          Когда reducer получает экшен, <code>type</code> которого он не распознаёт,
+          он <strong>должен вернуть текущий state без изменений</strong>.
+          Это правило — не рекомендация, а <em>обязательное требование</em>.
+        </p>
+
+        <div class="quote">
+          «Every reducer should handle the default case. The reducer must always return
+          the existing state for any unknown actions. If the reducer doesn't recognize
+          the action type, it should return the existing state unchanged.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#rules-of-reducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Что произойдёт БЕЗ default case?</h3>
+        <div class="code-block">
+<span class="cm">// ❌ ПЛОХО — нет default</span>
+<span class="kw">function</span> <span class="fn">badReducer</span>(state = initialState, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'counter/incremented'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> + <span class="num">1</span> }
+  }
+  <span class="cm">// Если type не совпал — функция возвращает undefined!</span>
+  <span class="cm">// Redux заменит ваш state на undefined</span>
+}
+        </div>
+
+        <div class="warning">
+          Без <code>default: return state</code> reducer вернёт <code>undefined</code>
+          для любого неизвестного экшена. Это <strong>уничтожит ваш state</strong>!
+          Redux даже выбросит ошибку при инициализации, если reducer вернёт undefined.
+        </div>
+
+        <h3>Правильная реализация</h3>
+        <div class="code-block">
+<span class="cm">// ✔ ПРАВИЛЬНО — есть default</span>
+<span class="kw">function</span> <span class="fn">goodReducer</span>(state = initialState, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'counter/incremented'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> + <span class="num">1</span> }
+    <span class="kw">case</span> <span class="str">'counter/decremented'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> - <span class="num">1</span> }
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state  <span class="cm">// ← неизвестный экшен — возвращаем state</span>
+  }
+}
+        </div>
+
+        <h3>Почему приходят «неизвестные» экшены?</h3>
+        <ul>
+          <li>Redux сам отправляет <code>@@INIT</code> при создании store</li>
+          <li>В реальном приложении бывает несколько reducer (combineReducers) — каждый получает <em>все</em> экшены</li>
+          <li>Middleware и сторонние библиотеки могут отправлять свои экшены</li>
+        </ul>
+
+        <div class="tip">
+          <strong>Правило:</strong> default case — это «сеть безопасности» вашего reducer.
+          Если тип экшена не распознан — просто верните state как есть.
+          Это гарантирует, что state никогда не станет <code>undefined</code>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>default: return state</code> — обязательный паттерн</li>
+          <li>Без default reducer вернёт <code>undefined</code> для неизвестных экшенов</li>
+          <li>Все reducer получают <strong>все</strong> экшены в приложении</li>
+          <li>Redux отправляет <code>@@INIT</code> — reducer должен его корректно обработать</li>
+          <li>DevTools: diff для неизвестного экшена покажет «Без изменений»</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

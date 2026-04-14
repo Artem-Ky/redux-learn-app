@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>24 — Иммутабельное обновление вложенных объектов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">24 / 100</span>
+      Иммутабельное обновление вложенных объектов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../23-reducer-immutable-update-array/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">24</span>
+      <a href="../25-reducer-todo-add/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Оргструктура компании (вложенные объекты)</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Обновить данные</h3>
+            <div class="btn-group" style="flex-direction: column;">
+              <button class="btn" id="btn-salary">
+                Зарплата сотрудника → 150 000
+              </button>
+              <button class="btn" id="btn-employee-name">
+                Имя сотрудника → «Алексей»
+              </button>
+              <button class="btn" id="btn-dept-name">
+                Название отдела → «Frontend»
+              </button>
+              <button class="btn" id="btn-company-name">
+                Название компании → «ТехноСофт»
+              </button>
+              <button class="btn" id="btn-reset">Сбросить</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.78rem;"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Каскадное копирование вложенных структур</div>
+      <div class="theory__body">
+        <h3>Проблема: глубокая вложенность</h3>
+        <p>
+          Чтобы иммутабельно обновить поле на N-м уровне вложенности,
+          нужно создать <strong>копию каждого уровня</strong> от корня до целевого поля.
+          Это называется «каскадное копирование» (cascading copies).
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Структура: company → department → employee → salary</span>
+<span class="kw">const</span> state = {
+  <span class="prop">company</span>: {
+    <span class="prop">name</span>: <span class="str">'Рога и Копыта'</span>,
+    <span class="prop">department</span>: {
+      <span class="prop">name</span>: <span class="str">'Разработка'</span>,
+      <span class="prop">employee</span>: {
+        <span class="prop">name</span>: <span class="str">'Иван'</span>,
+        <span class="prop">salary</span>: <span class="num">120000</span>       <span class="cm">// ← хотим изменить ЭТО</span>
+      }
+    }
+  }
+}
+        </div>
+
+        <h3>Каскад spread-операторов</h3>
+        <div class="code-block">
+<span class="cm">// Для обновления salary нужно скопировать КАЖДЫЙ уровень:</span>
+<span class="kw">return</span> {
+  ...state,                                 <span class="cm">// копия корня</span>
+  <span class="prop">company</span>: {
+    ...state.<span class="prop">company</span>,                       <span class="cm">// копия company</span>
+    <span class="prop">department</span>: {
+      ...state.<span class="prop">company</span>.<span class="prop">department</span>,           <span class="cm">// копия department</span>
+      <span class="prop">employee</span>: {
+        ...state.<span class="prop">company</span>.<span class="prop">department</span>.<span class="prop">employee</span>, <span class="cm">// копия employee</span>
+        <span class="prop">salary</span>: <span class="num">150000</span>                      <span class="cm">// ← новое значение</span>
+      }
+    }
+  }
+}
+        </div>
+
+        <div class="warning">
+          Каждый уровень вложенности добавляет ещё один spread. При 4-5 уровнях
+          код становится <strong>трудночитаемым</strong> и <strong>хрупким</strong>.
+          Это одна из главных болевых точек классического Redux и основная мотивация
+          для создания библиотеки <strong>Immer</strong>.
+        </div>
+
+        <h3>Что происходит со ссылками?</h3>
+        <p>При правильном иммутабельном обновлении salary:</p>
+        <div class="code-block">
+state === newState                                        <span class="cm">// false ← новый корень</span>
+state.<span class="prop">company</span> === newState.<span class="prop">company</span>                       <span class="cm">// false ← скопирован</span>
+state.<span class="prop">company</span>.<span class="prop">department</span> === newState.<span class="prop">company</span>.<span class="prop">department</span>   <span class="cm">// false ← скопирован</span>
+state.<span class="prop">company</span>.<span class="prop">department</span>.<span class="prop">employee</span> === ...               <span class="cm">// false ← скопирован</span>
+        </div>
+
+        <div class="quote">
+          «Unfortunately, the process of correctly applying immutable updates to
+          deeply nested state is verbose and hard to read. Immutable update logic
+          like this is one of the main reasons why Redux Toolkit exists,
+          and why we recommend using it.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/immutable-update-patterns" target="_blank">Redux: Immutable Update Patterns</a>
+        </div>
+
+        <h3>Решение: Immer (забегая вперёд)</h3>
+        <div class="code-block">
+<span class="cm">// С Immer (используется в Redux Toolkit):</span>
+<span class="kw">case</span> <span class="str">'employee/salaryUpdated'</span>:
+  state.<span class="prop">company</span>.<span class="prop">department</span>.<span class="prop">employee</span>.<span class="prop">salary</span> = action.<span class="prop">payload</span>
+  <span class="cm">// Immer сам создаст все копии за кулисами!</span>
+        </div>
+
+        <div class="tip">
+          Сейчас мы учим классический подход, чтобы понимать, <em>что</em> делает Immer
+          «под капотом». В реальных проектах используйте Redux Toolkit — он включает Immer
+          и избавляет от каскадного копирования.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Для вложенных обновлений нужен spread на <strong>каждом уровне</strong></li>
+          <li>Чем глубже вложенность — тем больше кода</li>
+          <li>Все изменённые уровни получают <strong>новые ссылки</strong></li>
+          <li>Это боль классического Redux → мотивация для Immer</li>
+          <li>Redux Toolkit (createSlice) решает эту проблему автоматически</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

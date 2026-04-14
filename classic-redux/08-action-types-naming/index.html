@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>08 — Именование Action Types</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">08 / 100</span>
+      Именование Action Types — domain/eventName
+    </div>
+    <nav class="site-header__nav">
+      <a href="../07-action-object/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">08</span>
+      <a href="../09-action-payload/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Action type naming -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Генератор имён экшенов</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Собери имя экшена</h3>
+            <div style="display: flex; gap: 8px; align-items: flex-end; margin-bottom: 16px;">
+              <div style="flex: 1;">
+                <label style="color: var(--text-muted); font-size: 0.75rem;">domain (домен)</label>
+                <input type="text" id="input-domain" value="counter" placeholder="counter" style="margin-top: 2px;">
+              </div>
+              <div style="flex: 1;">
+                <label style="color: var(--text-muted); font-size: 0.75rem;">eventName (событие)</label>
+                <input type="text" id="input-event" value="incremented" placeholder="incremented" style="margin-top: 2px;">
+              </div>
+              <button class="btn btn--accent" id="btn-generate">Dispatch</button>
+            </div>
+
+            <div class="state-display" style="margin-bottom: 16px;">
+              <div class="state-display__label">Сгенерированный Action Type</div>
+              <pre id="generated-type" style="color: var(--accent-cyan); font-size: 1.1rem;">counter/incremented</pre>
+            </div>
+
+            <div class="state-display">
+              <div class="state-display__label">Последний отправленный Action</div>
+              <pre id="action-display" style="color: var(--accent-orange); font-size: 0.85rem;">—</pre>
+            </div>
+          </div>
+
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Хорошие vs плохие имена</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border);">
+                  <th style="text-align: left; padding: 8px; color: var(--success);">✔ Хорошо</th>
+                  <th style="text-align: left; padding: 8px; color: var(--error);">✖ Плохо</th>
+                </tr>
+              </thead>
+              <tbody id="naming-table">
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 6px 8px;"><code>todos/todoAdded</code></td>
+                  <td style="padding: 6px 8px;"><code>ADD_TODO</code></td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 6px 8px;"><code>filters/statusChanged</code></td>
+                  <td style="padding: 6px 8px;"><code>SET_FILTER</code></td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 6px 8px;"><code>counter/incremented</code></td>
+                  <td style="padding: 6px 8px;"><code>INCREMENT</code></td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 6px 8px;"><code>users/userLoggedIn</code></td>
+                  <td style="padding: 6px 8px;"><code>LOGIN_USER</code></td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 8px;"><code>cart/itemRemoved</code></td>
+                  <td style="padding: 6px 8px;"><code>REMOVE_ITEM</code></td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="state-display" style="margin-top: 16px;">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.9rem;"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Именование Action Types</div>
+      <div class="theory__body">
+        <h3>Соглашение «domain/eventName»</h3>
+        <p>
+          В Redux принято именовать action type в формате <code>"domain/eventName"</code>,
+          где <strong>domain</strong> — это функциональная область (feature, slice), а
+          <strong>eventName</strong> — описание того, что произошло.
+        </p>
+
+        <div class="quote">
+          «The type field should be a string that gives this action a descriptive name,
+          like "todos/todoAdded". We usually write that type string like "domain/eventName",
+          where the first part is the feature or category that this action belongs to,
+          and the second part is the specific thing that happened.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#actions" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Почему именно слэш «/»?</h3>
+        <p>
+          Слэш визуально разделяет домен и событие, делая action type читаемым. Он работает
+          как <em>namespace</em> — при большом количестве экшенов легко понять, к какой части
+          приложения относится каждый.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Современный стиль — domain/eventName</span>
+<span class="str">'todos/todoAdded'</span>
+<span class="str">'filters/statusChanged'</span>
+<span class="str">'users/userLoggedIn'</span>
+
+<span class="cm">// Старый стиль — SCREAMING_SNAKE_CASE</span>
+<span class="str">'ADD_TODO'</span>       <span class="cm">// ← непонятно к какому домену</span>
+<span class="str">'SET_FILTER'</span>    <span class="cm">// ← звучит как команда, а не событие</span>
+<span class="str">'LOGIN_USER'</span>    <span class="cm">// ← нет группировки</span>
+        </div>
+
+        <h3>Старый стиль: SCREAMING_SNAKE_CASE</h3>
+        <p>
+          В ранних версиях Redux использовался стиль <code>SCREAMING_SNAKE_CASE</code>:
+          <code>ADD_TODO</code>, <code>INCREMENT_COUNTER</code> и т.д. Это работает, но имеет
+          недостатки:
+        </p>
+        <ul>
+          <li>Не видна принадлежность к конкретной области приложения</li>
+          <li>Формулировка «команда» (<code>ADD_TODO</code>) вместо «событие» (<code>todoAdded</code>)</li>
+          <li>Легко получить конфликт имён в большом приложении</li>
+        </ul>
+
+        <h3>Правила хорошего именования</h3>
+        <ul>
+          <li><strong>Описывайте событие</strong>, а не команду: <code>todoAdded</code>, не <code>addTodo</code></li>
+          <li><strong>Используйте camelCase</strong> для eventName: <code>statusChanged</code></li>
+          <li><strong>Домен = feature/slice</strong>: <code>counter</code>, <code>todos</code>, <code>auth</code></li>
+          <li><strong>Будьте конкретны</strong>: <code>counter/incrementByAmount</code> лучше, чем <code>counter/update</code></li>
+        </ul>
+
+        <div class="tip">
+          В Redux Toolkit action types генерируются автоматически из имени slice и имени reducer-функции.
+          Например, slice <code>counter</code> с reducer <code>incremented</code> создаёт
+          тип <code>"counter/incremented"</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

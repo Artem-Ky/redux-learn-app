@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>39 — store.subscribe(listener) и unsubscribe</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">39 / 100</span>
+      store.subscribe(listener) — подписка на изменения
+    </div>
+    <nav class="site-header__nav">
+      <a href="../38-store-dispatch/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">39</span>
+      <a href="../40-store-subscribe-multiple/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: subscribe / unsubscribe -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — subscribe, unsubscribe, re-subscribe</div>
+      <div class="demo-section__body">
+        <div style="max-width: 550px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-increment">+1</button>
+            <button class="btn" id="btn-decrement">−1</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">
+              Отображение из subscribe callback
+              <span id="sub-status" style="margin-left: 8px; font-size: 0.75rem; color: var(--success);">● подписан</span>
+            </div>
+            <div id="counter-display" style="font-size: 2rem; font-weight: 700; color: var(--accent-cyan); text-align: center; padding: 16px;">
+              0
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn" id="btn-unsubscribe" style="color: var(--accent-red);">Отписаться (unsubscribe)</button>
+            <button class="btn" id="btn-resubscribe" style="color: var(--success);" disabled>Подписаться заново</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">store.getState() — реальный state</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+
+          <button class="btn" id="btn-check-state" style="margin-top: 8px;">
+            Проверить getState() вручную
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — store.subscribe(listener)</div>
+      <div class="theory__body">
+        <h3>Подписка на изменения state</h3>
+        <p>
+          Метод <code>store.subscribe(listener)</code> добавляет callback-функцию, которая
+          вызывается после <strong>каждого</strong> dispatch. Внутри listener можно вызвать
+          <code>getState()</code>, чтобы получить обновлённый state.
+        </p>
+
+        <div class="quote">
+          «Adds a change listener. It will be called any time an action is dispatched,
+          and some part of the state tree may potentially have changed. You may then call
+          getState() to read the current state tree inside the callback.»
+          <br>— <a href="https://redux.js.org/api/store#subscribelistener" target="_blank">Redux API Reference: Store — subscribe(listener)</a>
+        </div>
+
+        <h3>subscribe возвращает unsubscribe</h3>
+        <p>
+          Вызов <code>subscribe</code> возвращает функцию для отписки. Вызов этой функции
+          удаляет listener из списка — он больше не будет вызываться при dispatch.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> unsubscribe = store.<span class="fn">subscribe</span>(() => {
+  <span class="fn">console.log</span>(<span class="str">'State изменился:'</span>, store.<span class="fn">getState</span>())
+})
+
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+<span class="cm">// → "State изменился: { value: 1 }"</span>
+
+<span class="fn">unsubscribe</span>()
+
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+<span class="cm">// → (тишина — listener отписан)</span>
+<span class="cm">// Но state ВСЁ РАВНО обновился! getState() вернёт { value: 2 }</span>
+        </div>
+
+        <h3>Unsubscribe ≠ остановка dispatch</h3>
+        <p>
+          Важно: отписка от subscribe <strong>не останавливает</strong> обновление state.
+          Dispatch по-прежнему вызывает reducer и обновляет state. Просто listener
+          больше не уведомляется.
+        </p>
+
+        <div class="tip">
+          Попробуйте в демо: нажмите «Отписаться», затем нажмите +1 несколько раз.
+          Счётчик на экране перестанет обновляться, но если нажать «Проверить getState()» —
+          вы увидите, что state продолжал меняться.
+        </div>
+
+        <h3>Повторная подписка</h3>
+        <p>
+          После отписки можно подписаться заново, вызвав <code>subscribe</code> с тем же
+          или новым callback. Каждый вызов <code>subscribe</code> создаёт новую подписку.
+        </p>
+
+        <h3>Low-level API</h3>
+        <p>
+          <code>subscribe</code> — низкоуровневый API. В реальных приложениях с React
+          используется <code>react-redux</code>, который вызывает <code>subscribe</code>
+          внутри себя (через <code>useSelector</code> и <code>Provider</code>).
+        </p>
+
+        <div class="warning">
+          Listener вызывается при <strong>каждом</strong> dispatch, даже если state не изменился
+          (reducer вернул тот же объект). Если нужна оптимизация — сравнивайте state
+          до и после внутри listener.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>subscribe(listener)</code> добавляет callback, вызываемый после каждого dispatch</li>
+          <li>Возвращает функцию <code>unsubscribe</code> для отписки</li>
+          <li>Отписка не останавливает обновление state — только убирает уведомление</li>
+          <li>Можно подписаться заново после отписки</li>
+          <li>React-Redux использует <code>subscribe</code> внутри себя</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

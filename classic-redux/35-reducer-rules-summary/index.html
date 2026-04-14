@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>35 — Reducer Rules Summary: интерактивный квиз</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">35 / 100</span>
+      Reducer Rules Summary — итоговый квиз
+    </div>
+    <nav class="site-header__nav">
+      <a href="../34-reducer-state-shape/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">35</span>
+      <a href="../36-create-store/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Quiz -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Квиз: правильный ли reducer?</div>
+      <div class="demo-section__body">
+        <div style="max-width: 650px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <span style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.85rem;">
+              Вопрос: <span id="question-num">1</span> / <span id="question-total">7</span>
+            </span>
+            <span style="font-family: var(--font-mono); font-size: 0.85rem;">
+              Счёт: <span id="score" style="color: var(--success); font-weight: 700;">0</span>
+            </span>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label" id="quiz-label">Reducer #1</div>
+            <pre id="quiz-code" style="color: var(--accent-cyan); font-size: 0.82rem; line-height: 1.5;"></pre>
+          </div>
+
+          <div id="quiz-question" style="color: var(--text-bright); font-size: 1rem; font-weight: 600; margin-bottom: 12px; text-align: center;"></div>
+
+          <div id="quiz-buttons" style="display: flex; gap: 12px; justify-content: center; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-yes" style="min-width: 120px; font-size: 1rem;">✓ Да</button>
+            <button class="btn" id="btn-no" style="min-width: 120px; font-size: 1rem; border-color: var(--accent-red); color: var(--accent-red);">✕ Нет</button>
+          </div>
+
+          <div id="quiz-result" style="display: none; padding: 12px; border-radius: 8px; margin-bottom: 16px;"></div>
+
+          <div style="text-align: center;">
+            <button class="btn" id="btn-next" style="display: none;">Следующий вопрос →</button>
+            <button class="btn btn--accent" id="btn-restart" style="display: none;">Пройти заново</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Все правила reducer'ов</div>
+      <div class="theory__body">
+        <h3>Полный список правил reducer'а</h3>
+        <p>
+          Reducer — это <strong>чистая функция</strong>, которая принимает текущий state
+          и action, и возвращает новый state. Вот все правила, которые необходимо соблюдать:
+        </p>
+
+        <div class="quote">
+          «Reducers must always follow some specific rules:
+          They should only calculate the new state value based on the state and action arguments.
+          They are not allowed to modify the existing state.
+          They must not do any asynchronous logic, calculate random values, or cause other "side effects".»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#rules-of-reducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>1. Чистая функция (Pure Function)</h3>
+        <p>
+          Reducer должен быть <strong>чистой функцией</strong>: результат зависит
+          <em>только</em> от аргументов (state и action). Никаких внешних зависимостей.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ✅ Чистая функция</span>
+<span class="kw">function</span> <span class="fn">reducer</span>(state: <span class="type">number</span>, action: <span class="type">Action</span>): <span class="type">number</span> {
+  <span class="kw">return</span> state + action.<span class="prop">payload</span>
+}
+
+<span class="cm">// ❌ Зависимость от внешней переменной</span>
+<span class="kw">let</span> multiplier = <span class="num">2</span>
+<span class="kw">function</span> <span class="fn">reducer</span>(state: <span class="type">number</span>, action: <span class="type">Action</span>): <span class="type">number</span> {
+  <span class="kw">return</span> state + action.<span class="prop">payload</span> * multiplier
+}
+        </div>
+
+        <h3>2. Нет побочных эффектов (No Side Effects)</h3>
+        <p>
+          Reducer не должен: логировать в консоль, делать HTTP-запросы,
+          записывать в localStorage, изменять DOM, генерировать случайные числа.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ Побочные эффекты</span>
+<span class="kw">function</span> <span class="fn">reducer</span>(state, action) {
+  console.<span class="fn">log</span>(action)              <span class="cm">// side effect!</span>
+  localStorage.<span class="fn">setItem</span>(<span class="str">'state'</span>, ...) <span class="cm">// side effect!</span>
+  <span class="fn">fetch</span>(<span class="str">'/api'</span>)                     <span class="cm">// side effect!</span>
+  <span class="kw">return</span> { ...state, <span class="prop">value</span>: <span class="fn">Math.random</span>() } <span class="cm">// непредсказуемо!</span>
+}
+        </div>
+
+        <h3>3. Иммутабельные обновления</h3>
+        <p>
+          Reducer <strong>никогда</strong> не изменяет существующий state напрямую.
+          Всегда создаётся новый объект/массив через spread или методы,
+          возвращающие новый массив.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ Мутация!</span>
+state.<span class="prop">count</span> = state.<span class="prop">count</span> + <span class="num">1</span>
+state.<span class="prop">items</span>.<span class="fn">push</span>(newItem)
+
+<span class="cm">// ✅ Иммутабельное обновление</span>
+<span class="kw">return</span> { ...state, <span class="prop">count</span>: state.<span class="prop">count</span> + <span class="num">1</span> }
+<span class="kw">return</span> { ...state, <span class="prop">items</span>: [...state.<span class="prop">items</span>, newItem] }
+        </div>
+
+        <h3>4. Возврат state для неизвестных actions</h3>
+        <p>
+          Если reducer получает action, который он не обрабатывает, он
+          <strong>должен вернуть текущий state</strong> без изменений.
+          Это делается через <code>default</code> в switch.
+        </p>
+
+        <div class="code-block">
+<span class="kw">switch</span> (action.<span class="prop">type</span>) {
+  <span class="kw">case</span> <span class="str">'known/action'</span>:
+    <span class="kw">return</span> { ...state, <span class="prop">updated</span>: <span class="num">true</span> }
+  <span class="kw">default</span>:
+    <span class="kw">return</span> state  <span class="cm">// ← обязательно!</span>
+}
+        </div>
+
+        <h3>5. Нет асинхронной логики</h3>
+        <p>
+          Reducer — синхронная функция. Никаких <code>async/await</code>,
+          <code>setTimeout</code>, <code>Promise</code>, <code>fetch</code>.
+          Асинхронная логика выносится в middleware (thunk, saga и т.д.).
+        </p>
+
+        <h3>6. Нет случайных значений</h3>
+        <p>
+          <code>Math.random()</code>, <code>Date.now()</code>, <code>crypto.randomUUID()</code>
+          — всё это делает reducer непредсказуемым. Такие значения должны
+          генерироваться <strong>до dispatch</strong> и передаваться в action.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ В reducer</span>
+<span class="kw">return</span> { ...state, <span class="prop">id</span>: <span class="fn">Date.now</span>(), <span class="prop">random</span>: <span class="fn">Math.random</span>() }
+
+<span class="cm">// ✅ В action creator</span>
+<span class="kw">const</span> action = {
+  <span class="prop">type</span>: <span class="str">'item/added'</span>,
+  <span class="prop">payload</span>: { <span class="prop">id</span>: <span class="fn">Date.now</span>(), <span class="prop">random</span>: <span class="fn">Math.random</span>() }
+}
+store.<span class="fn">dispatch</span>(action)
+        </div>
+
+        <div class="tip">
+          Пройдите квиз в демо выше — каждый вопрос показывает reducer и спрашивает,
+          правильный ли он. Это поможет закрепить все правила на практике.
+        </div>
+
+        <div class="warning">
+          Нарушение правил reducer'ов приводит к непредсказуемому поведению:
+          DevTools перестают работать, time-travel debugging ломается,
+          React-компоненты не перерисовываются. Правила — не рекомендации,
+          а <strong>обязательные требования</strong>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Reducer — <strong>чистая функция</strong>: (state, action) → newState</li>
+          <li><strong>Нет побочных эффектов</strong>: нет fetch, console.log, localStorage</li>
+          <li><strong>Иммутабельные обновления</strong>: только spread, map, filter — никогда push, splice</li>
+          <li><strong>default</strong> всегда возвращает state</li>
+          <li><strong>Нет async</strong>: reducer — синхронный</li>
+          <li><strong>Нет random/Date.now</strong>: непредсказуемые значения — в action creator</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

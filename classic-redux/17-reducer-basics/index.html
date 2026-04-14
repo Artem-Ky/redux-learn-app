@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>17 — Что такое Reducer?</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">17 / 100</span>
+      Reducer — (state, action) => newState
+    </div>
+    <nav class="site-header__nav">
+      <a href="../16-action-creators-arrow/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">17</span>
+      <a href="../18-reducer-initial-state/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Counter reducer with switch/case -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Reducer в действии</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Счётчик</h3>
+            <div class="counter">
+              <button class="btn" id="btn-dec">−</button>
+              <div class="counter__value" id="counter-value">0</div>
+              <button class="btn" id="btn-inc">+</button>
+            </div>
+            <div class="btn-group" style="margin-top: 12px;">
+              <button class="btn" id="btn-add5">+5</button>
+              <button class="btn" id="btn-mul2">×2</button>
+              <button class="btn" id="btn-reset">Reset</button>
+              <button class="btn" id="btn-unknown">???</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 1rem;"></pre>
+            </div>
+            <div class="state-display" style="margin-top: 12px;">
+              <div class="state-display__label">Последний Action</div>
+              <pre id="action-display" style="color: var(--accent-orange); font-size: 0.85rem;">—</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что такое Reducer?</div>
+      <div class="theory__body">
+        <h3>Определение</h3>
+        <p>
+          <strong>Reducer</strong> — это функция, которая принимает текущий <code>state</code>
+          и объект <code>action</code>, решает, как обновить состояние (если нужно),
+          и возвращает <strong>новое состояние</strong>:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Сигнатура reducer'а</span>
+(<span class="prop">state</span>, <span class="prop">action</span>) => <span class="prop">newState</span>
+        </div>
+
+        <div class="quote">
+          «A reducer is a function that receives the current state and an action object,
+          decides how to update the state if necessary, and returns the new state:
+          (state, action) => newState. You can think of a reducer as an event listener
+          which handles events based on the received action (event) type.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#reducers" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Аналогия с Array.reduce()</h3>
+        <p>
+          Reducer в Redux назван по аналогии с <code>Array.reduce()</code>.
+          Метод <code>reduce()</code> «сворачивает» массив в одно значение,
+          обрабатывая элементы один за другим. Redux reducer «сворачивает»
+          последовательность экшенов в итоговый state:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Array.reduce — массив → одно значение</span>
+<span class="kw">const</span> sum = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>].<span class="fn">reduce</span>(
+  (<span class="prop">accumulator</span>, <span class="prop">item</span>) => accumulator + item,
+  <span class="num">0</span>  <span class="cm">// начальное значение</span>
+)
+<span class="cm">// 0 + 1 = 1, 1 + 2 = 3, 3 + 3 = 6</span>
+
+<span class="cm">// Redux reducer — экшены → итоговый state</span>
+<span class="kw">const</span> actions = [
+  { <span class="prop">type</span>: <span class="str">'counter/incremented'</span> },
+  { <span class="prop">type</span>: <span class="str">'counter/incremented'</span> },
+  { <span class="prop">type</span>: <span class="str">'counter/addAmount'</span>, <span class="prop">payload</span>: <span class="num">5</span> }
+]
+<span class="kw">const</span> finalState = actions.<span class="fn">reduce</span>(<span class="fn">counterReducer</span>, { <span class="prop">value</span>: <span class="num">0</span> })
+<span class="cm">// { value: 0 } → { value: 1 } → { value: 2 } → { value: 7 }</span>
+        </div>
+
+        <h3>Типичная структура reducer'а</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">counterReducer</span>(state = { <span class="prop">value</span>: <span class="num">0</span> }, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'counter/incremented'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> + <span class="num">1</span> }
+    <span class="kw">case</span> <span class="str">'counter/decremented'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> - <span class="num">1</span> }
+    <span class="kw">case</span> <span class="str">'counter/addAmount'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> + action.<span class="prop">payload</span> }
+    <span class="kw">case</span> <span class="str">'counter/reset'</span>:
+      <span class="kw">return</span> { <span class="prop">value</span>: <span class="num">0</span> }
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state  <span class="cm">// неизвестные экшены — без изменений</span>
+  }
+}
+        </div>
+
+        <h3>Правила Reducer'а</h3>
+        <p>Reducer должен соблюдать три строгих правила:</p>
+
+        <div class="quote">
+          «Reducers must always follow some specific rules:
+          They should only calculate the new state value based on the state and action arguments.
+          They are not allowed to modify the existing state.
+          They must not do any asynchronous logic, calculate random values,
+          or cause other "side effects".»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#rules-of-reducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <ul>
+          <li><strong>Чистота:</strong> результат зависит только от <code>state</code> и <code>action</code></li>
+          <li><strong>Иммутабельность:</strong> нельзя изменять <code>state</code> напрямую, только создавать копию</li>
+          <li><strong>Без побочных эффектов:</strong> никаких API-вызовов, Math.random(), Date.now() и т.д.</li>
+        </ul>
+
+        <div class="warning">
+          Reducer — это <strong>чистая функция</strong>. При одинаковых <code>state</code>
+          и <code>action</code> он всегда возвращает одинаковый результат.
+          Никогда не мутируйте state, не вызывайте API, не генерируйте случайные значения внутри reducer'а.
+        </div>
+
+        <div class="tip">
+          Обратите внимание на <code>default</code> ветку в <code>switch</code> —
+          при неизвестном экшене reducer <strong>обязан вернуть текущий state</strong> без изменений.
+          Попробуйте кнопку «???» и посмотрите, что произойдёт.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Reducer: <code>(state, action) => newState</code></li>
+          <li>Назван по аналогии с <code>Array.reduce()</code></li>
+          <li>Использует <code>switch/case</code> по <code>action.type</code></li>
+          <li><strong>Чистая функция</strong> — нет побочных эффектов</li>
+          <li><strong>Иммутабельность</strong> — spread-оператор для копий</li>
+          <li><code>default</code> ветка возвращает <code>state</code> без изменений</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

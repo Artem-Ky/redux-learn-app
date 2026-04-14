@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>26 — Todo: переключение статуса</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">26 / 100</span>
+      Todo: Переключение статуса — toggle completed
+    </div>
+    <nav class="site-header__nav">
+      <a href="../25-reducer-todo-add/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">26</span>
+      <a href="../27-reducer-todo-delete/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Todo toggle -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Переключение выполнения задачи</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <p style="color: var(--text-muted); margin-bottom: 12px; font-size: 0.85rem;">
+            Нажмите на чекбокс, чтобы переключить статус задачи. Выполненные задачи отображаются зачёркнутыми.
+          </p>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Список задач</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Текущий State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Обновление одного элемента массива через map()</div>
+      <div class="theory__body">
+        <h3>Задача: изменить один элемент, не трогая остальные</h3>
+        <p>
+          Переключение статуса задачи — классический пример обновления одного элемента
+          в массиве. Нам нужно найти задачу по <code>id</code> и изменить только её поле
+          <code>completed</code>, оставив все остальные элементы без изменений.
+        </p>
+
+        <div class="quote">
+          «If we want to update one specific item in an array, we have to make copies
+          of all the items that we're not changing, and only change the one item
+          we need to update.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#immutable-updates" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Паттерн: map() с условием</h3>
+        <p>
+          Метод <code>map()</code> создаёт <strong>новый массив</strong>, проходя по каждому
+          элементу. Для элемента с нужным <code>id</code> мы возвращаем новый объект с
+          изменённым полем. Для всех остальных — возвращаем элемент как есть:
+        </p>
+
+        <div class="code-block">
+<span class="kw">case</span> <span class="str">'todos/todoToggled'</span>: {
+  <span class="kw">return</span> state.<span class="fn">map</span>(todo =>
+    todo.<span class="prop">id</span> === action.<span class="prop">payload</span>
+      ? { ...todo, <span class="prop">completed</span>: !todo.<span class="prop">completed</span> }
+      : todo  <span class="cm">// ← остальные элементы без изменений</span>
+  )
+}
+        </div>
+
+        <h3>Почему именно map(), а не цикл с индексом?</h3>
+        <p>
+          <code>map()</code> всегда возвращает новый массив — это гарантирует иммутабельность.
+          Паттерн <code>todo.id === action.payload ? новыйОбъект : todo</code> чётко показывает,
+          какой элемент обновляется. Это читаемо и безопасно.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ✔ Правильно: map создаёт новый массив</span>
+<span class="kw">return</span> state.<span class="fn">map</span>(todo =>
+  todo.<span class="prop">id</span> === id ? { ...todo, <span class="prop">completed</span>: !todo.<span class="prop">completed</span> } : todo
+)
+
+<span class="cm">// ✖ Неправильно: мутация через индекс</span>
+state[index].<span class="prop">completed</span> = !state[index].<span class="prop">completed</span>  <span class="cm">// ← мутация!</span>
+<span class="kw">return</span> state  <span class="cm">// ← та же ссылка, Redux не заметит изменений</span>
+        </div>
+
+        <h3>Новый объект только для изменённого элемента</h3>
+        <p>
+          Обратите внимание: мы создаём новый объект (<code>{ ...todo, completed: !todo.completed }</code>)
+          только для того элемента, который действительно изменился. Остальные элементы
+          возвращаются по старой ссылке — это важно для оптимизации (React пропустит
+          ре-рендер неизменённых элементов).
+        </p>
+
+        <div class="tip">
+          В DevTools-панели посмотрите на diff после каждого toggle — изменяется только
+          один элемент массива. Поле <code>completed</code> переключается между
+          <code>true</code> и <code>false</code>.
+        </div>
+
+        <h3>Action для toggle</h3>
+        <p>
+          Для переключения нам нужен только <code>id</code> задачи — текущее значение
+          <code>completed</code> мы берём из state внутри reducer:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Action — в payload передаём только id</span>
+{ <span class="prop">type</span>: <span class="str">'todos/todoToggled'</span>, <span class="prop">payload</span>: <span class="num">2</span> }
+
+<span class="cm">// Reducer знает текущее значение completed</span>
+<span class="cm">// и инвертирует его: true → false, false → true</span>
+        </div>
+
+        <div class="warning">
+          Не передавайте <code>completed: true</code> в payload! Reducer сам знает текущее значение
+          и инвертирует его через <code>!todo.completed</code>. Это предотвращает рассинхронизацию
+          между UI и state.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Используйте <code>map()</code> для обновления одного элемента массива</li>
+          <li>Паттерн: <code>item.id === action.payload ? { ...item, field: newValue } : item</code></li>
+          <li>Новый объект создаётся только для изменённого элемента</li>
+          <li>В payload передаём только <code>id</code>, reducer берёт текущее значение из state</li>
+          <li>Никогда не обращайтесь к элементу по индексу для мутации</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

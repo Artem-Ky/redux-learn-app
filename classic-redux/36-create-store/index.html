@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>36 — Создание Store с createStore</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">36 / 100</span>
+      Создание Store — createStore
+    </div>
+    <nav class="site-header__nav">
+      <a href="../35-reducer-rules-summary/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">36</span>
+      <a href="../37-store-getstate/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: createStore -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Создание Store и первый dispatch</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Начальный State (store.getState())</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+
+          <button class="btn btn--accent" id="btn-increment" style="margin-bottom: 12px;">
+            dispatch({ type: 'counter/incremented' })
+          </button>
+
+          <div class="state-display">
+            <div class="state-display__label">State после dispatch</div>
+            <pre id="state-after" style="color: var(--success); font-size: 0.85rem;">Нажмите кнопку выше ↑</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — createStore: создание Redux Store</div>
+      <div class="theory__body">
+        <h3>Что такое Store?</h3>
+        <p>
+          <strong>Store</strong> — это объект, который объединяет всё в Redux: state, reducer
+          и API для взаимодействия. Каждое Redux-приложение имеет ровно один store.
+        </p>
+
+        <div class="quote">
+          «The Redux store brings together the state, actions, and reducers that make up your app.
+          The store has several responsibilities: holds the current application state inside,
+          allows access to the current state via store.getState(), allows state to be updated
+          via store.dispatch(action), and registers listener callbacks via store.subscribe(listener).»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#redux-store" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>createStore(reducer)</h3>
+        <p>
+          Функция <code>createStore</code> принимает reducer и возвращает store.
+          При создании store автоматически диспатчит специальный action <code>@@INIT</code>,
+          чтобы reducer вернул начальное состояние.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">legacy_createStore</span> <span class="kw">as</span> createStore } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="kw">function</span> <span class="fn">counterReducer</span>(state: <span class="type">number</span> = <span class="num">0</span>, action: <span class="type">Action</span>): <span class="type">number</span> {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'counter/incremented'</span>:
+      <span class="kw">return</span> state + <span class="num">1</span>
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state
+  }
+}
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(counterReducer)
+<span class="cm">// ↑ Redux автоматически диспатчит @@INIT</span>
+<span class="cm">// reducer получает (undefined, { type: '@@redux/INIT...' })</span>
+<span class="cm">// → срабатывает default параметр state = 0</span>
+<span class="cm">// → начальный state = 0</span>
+        </div>
+
+        <h3>@@INIT — скрытый первый action</h3>
+        <p>
+          Когда <code>createStore</code> вызывается, Redux немедленно диспатчит action с type
+          <code>@@redux/INIT...</code>. Этот action не совпадает ни с одним <code>case</code>
+          вашего reducer, поэтому срабатывает <code>default</code>, и reducer возвращает
+          начальное значение (default параметр функции).
+        </p>
+
+        <div class="tip">
+          Откройте DevTools-панель выше — вы увидите <code>@@INIT</code> как самый первый
+          action в истории. Это подтверждает, что store уже работает до любого ручного dispatch.
+        </div>
+
+        <h3>Ответственности Store</h3>
+        <ul>
+          <li><strong>Хранит</strong> текущий state приложения</li>
+          <li><strong>getState()</strong> — позволяет читать текущий state</li>
+          <li><strong>dispatch(action)</strong> — позволяет обновлять state</li>
+          <li><strong>subscribe(listener)</strong> — регистрирует callback на изменения</li>
+        </ul>
+
+        <div class="code-block">
+<span class="kw">const</span> store = <span class="fn">createStore</span>(counterReducer)
+
+<span class="cm">// 1. Прочитать state</span>
+<span class="fn">console.log</span>(store.<span class="fn">getState</span>()) <span class="cm">// 0</span>
+
+<span class="cm">// 2. Обновить state</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+
+<span class="cm">// 3. Прочитать обновлённый state</span>
+<span class="fn">console.log</span>(store.<span class="fn">getState</span>()) <span class="cm">// 1</span>
+        </div>
+
+        <div class="warning">
+          <code>createStore</code> в новых версиях Redux помечен как deprecated в пользу
+          Redux Toolkit <code>configureStore</code>. Мы используем
+          <code>legacy_createStore</code> для изучения основ без лишних абстракций.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>createStore(reducer)</code> создаёт store и автоматически вызывает <code>@@INIT</code></li>
+          <li>Reducer при <code>@@INIT</code> получает <code>undefined</code> как state → возвращает default</li>
+          <li>Store — единственный источник правды (single source of truth)</li>
+          <li>Store предоставляет 3 метода: <code>getState</code>, <code>dispatch</code>, <code>subscribe</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

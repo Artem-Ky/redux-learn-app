@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>41 — preloadedState: второй аргумент createStore</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">41 / 100</span>
+      preloadedState — второй аргумент createStore
+    </div>
+    <nav class="site-header__nav">
+      <a href="../40-store-subscribe-multiple/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">41</span>
+      <a href="../42-store-replace-reducer/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: preloadedState -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — preloadedState</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Текущее значение из store</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn" id="btn-increment">+ Increment</button>
+            <button class="btn" id="btn-decrement">− Decrement</button>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-save">💾 Сохранить в localStorage</button>
+            <button class="btn btn--accent" id="btn-load">📂 Загрузить из localStorage</button>
+            <button class="btn" id="btn-clear-storage">🗑 Очистить localStorage</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">localStorage['redux-state']</div>
+            <pre id="ls-display" style="color: var(--accent-orange); font-size: 0.85rem;">—</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — preloadedState (второй аргумент createStore)</div>
+      <div class="theory__body">
+        <h3>Что такое preloadedState?</h3>
+        <p>
+          <code>createStore</code> принимает необязательный второй аргумент —
+          <strong>preloadedState</strong>. Это начальное значение, с которого стартует store,
+          <em>минуя</em> значение по умолчанию из reducer.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">legacy_createStore</span> <span class="kw">as</span> createStore } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(reducer, { <span class="prop">value</span>: <span class="num">42</span> })
+<span class="cm">// store.getState() → { value: 42 }</span>
+        </div>
+
+        <div class="quote">
+          «The preloadedState argument is the initial state passed to the Redux store
+          when it is created. It is an optional argument that allows you to bootstrap
+          the store with state obtained from another source.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#loading-initial-state" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Отличие от default parameter в reducer</h3>
+        <p>
+          Reducer может задавать значение по умолчанию через параметр
+          <code>state = initialState</code>. Но если передан <code>preloadedState</code>,
+          он <strong>перекрывает</strong> этот default — reducer получит preloadedState
+          при первом вызове (@@INIT).
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Reducer с default parameter</span>
+<span class="kw">function</span> <span class="fn">reducer</span>(state = { <span class="prop">value</span>: <span class="num">0</span> }, action) {
+  <span class="cm">// state = { value: 0 } используется только если</span>
+  <span class="cm">// preloadedState НЕ передан</span>
+  ...
+}
+
+<span class="cm">// Без preloadedState:</span>
+<span class="fn">createStore</span>(reducer)          <span class="cm">// state = { value: 0 }</span>
+
+<span class="cm">// С preloadedState:</span>
+<span class="fn">createStore</span>(reducer, { <span class="prop">value</span>: <span class="num">42</span> }) <span class="cm">// state = { value: 42 }</span>
+        </div>
+
+        <h3>Основные use cases</h3>
+        <ul>
+          <li><strong>SSR hydration</strong> — сервер рендерит HTML с данными и передаёт state через <code>window.__PRELOADED_STATE__</code></li>
+          <li><strong>localStorage persistence</strong> — сохраняем state при уходе со страницы, восстанавливаем при возврате</li>
+          <li><strong>Тестирование</strong> — создаём store с нужным state для теста</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Пример: восстановление из localStorage</span>
+<span class="kw">const</span> saved = localStorage.<span class="fn">getItem</span>(<span class="str">'redux-state'</span>)
+<span class="kw">const</span> preloaded = saved ? <span class="fn">JSON.parse</span>(saved) : <span class="kw">undefined</span>
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(reducer, preloaded)
+        </div>
+
+        <div class="tip">
+          Нажмите «Сохранить в localStorage» в демо, затем «Загрузить из localStorage» —
+          store будет пересоздан с сохранённым значением через preloadedState.
+        </div>
+
+        <div class="warning">
+          Если вы используете <code>combineReducers</code>, preloadedState должен иметь
+          <strong>ту же форму</strong>, что и структура reducer'ов. Каждый ключ preloadedState
+          должен соответствовать ключу в combineReducers.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>preloadedState</code> — второй аргумент <code>createStore</code></li>
+          <li>Перекрывает default parameter reducer'а при инициализации</li>
+          <li>Используется для SSR, localStorage persistence, тестов</li>
+          <li>Если не передан — reducer использует свой default</li>
+          <li>Должен совпадать по форме с ожидаемым state</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

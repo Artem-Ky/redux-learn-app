@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>40 — Множество подписчиков (multiple subscribers)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">40 / 100</span>
+      Multiple Subscribers — несколько подписчиков
+    </div>
+    <nav class="site-header__nav">
+      <a href="../39-store-subscribe/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">40</span>
+      <a href="../41-store-preloaded-state/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: multiple subscribers -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Три независимых подписчика</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-increment">+1</button>
+            <button class="btn" id="btn-decrement">−1</button>
+            <button class="btn" id="btn-add-five">+5</button>
+            <button class="btn" id="btn-reset">Сброс</button>
+          </div>
+
+          <div class="two-col" style="margin-bottom: 16px;">
+            <!-- Subscriber 1: Counter Display -->
+            <div class="state-display">
+              <div class="state-display__label">Подписчик #1 — Counter Display</div>
+              <div id="subscriber-counter" style="font-size: 2rem; font-weight: 700; color: var(--accent-cyan); text-align: center; padding: 16px;">
+                0
+              </div>
+            </div>
+
+            <!-- Subscriber 2: Action Log -->
+            <div class="state-display">
+              <div class="state-display__label">Подписчик #2 — Action Log</div>
+              <div id="subscriber-log" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-primary); max-height: 150px; overflow-y: auto; padding: 8px;">
+                <span style="color: var(--text-muted); font-style: italic;">Ожидание действий...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subscriber 3: History -->
+          <div class="state-display">
+            <div class="state-display__label">Подписчик #3 — History (массив прошлых state)</div>
+            <pre id="subscriber-history" style="color: var(--accent-orange); font-size: 0.8rem; max-height: 150px; overflow-y: auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Множество подписчиков</div>
+      <div class="theory__body">
+        <h3>Несколько subscribe на один store</h3>
+        <p>
+          Redux поддерживает <strong>множество подписчиков</strong>. Каждый вызов
+          <code>store.subscribe(listener)</code> добавляет новый callback в список.
+          При каждом dispatch <strong>все</strong> зарегистрированные listener'ы
+          вызываются последовательно.
+        </p>
+
+        <div class="quote">
+          «The subscriptions are snapshotted just before every dispatch() call.
+          If you subscribe or unsubscribe while the listeners are being invoked,
+          this will not have any effect on the dispatch() that is currently in progress.»
+          <br>— <a href="https://redux.js.org/api/store#subscribelistener" target="_blank">Redux API Reference: Store — subscribe(listener)</a>
+        </div>
+
+        <h3>Порядок вызова — порядок регистрации</h3>
+        <p>
+          Listener'ы вызываются в том порядке, в котором они были зарегистрированы.
+          Первый <code>subscribe</code> — первый callback:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Регистрация трёх подписчиков</span>
+store.<span class="fn">subscribe</span>(() => <span class="fn">console.log</span>(<span class="str">'#1 Counter Display'</span>))
+store.<span class="fn">subscribe</span>(() => <span class="fn">console.log</span>(<span class="str">'#2 Action Log'</span>))
+store.<span class="fn">subscribe</span>(() => <span class="fn">console.log</span>(<span class="str">'#3 History'</span>))
+
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+<span class="cm">// → #1 Counter Display</span>
+<span class="cm">// → #2 Action Log</span>
+<span class="cm">// → #3 History</span>
+        </div>
+
+        <h3>Каждый подписчик — независимый</h3>
+        <p>
+          Подписчики ничего не знают друг о друге. Каждый решает сам, что делать
+          с новым state: обновить DOM, записать в лог, сохранить историю и т.д.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Подписчик 1: обновляет отображение счётчика</span>
+store.<span class="fn">subscribe</span>(() => {
+  counterEl.<span class="prop">textContent</span> = String(store.<span class="fn">getState</span>().<span class="prop">value</span>)
+})
+
+<span class="cm">// Подписчик 2: ведёт лог действий</span>
+store.<span class="fn">subscribe</span>(() => {
+  logEl.<span class="prop">textContent</span> += <span class="str">'\n'</span> + lastAction.<span class="prop">type</span>
+})
+
+<span class="cm">// Подписчик 3: сохраняет историю state</span>
+store.<span class="fn">subscribe</span>(() => {
+  history.<span class="fn">push</span>(store.<span class="fn">getState</span>())
+})
+        </div>
+
+        <h3>Сценарии использования</h3>
+        <ul>
+          <li><strong>UI-обновление</strong> — перерисовка компонентов при изменении state</li>
+          <li><strong>Логирование</strong> — запись каждого изменения для отладки</li>
+          <li><strong>Персистенция</strong> — сохранение state в localStorage</li>
+          <li><strong>Аналитика</strong> — отправка событий при определённых изменениях</li>
+          <li><strong>Undo/Redo</strong> — сохранение истории state для отмены действий</li>
+        </ul>
+
+        <div class="tip">
+          В демо выше три подписчика работают одновременно: один показывает число,
+          второй ведёт лог action types, третий сохраняет историю state.
+          Все три вызываются при каждом dispatch.
+        </div>
+
+        <h3>Snapshot-семантика</h3>
+        <p>
+          Список подписчиков «замораживается» (snapshot) перед каждым dispatch.
+          Если внутри listener добавить или удалить подписчика — это повлияет
+          только на <strong>следующий</strong> dispatch, а не на текущий.
+        </p>
+
+        <div class="warning">
+          Не полагайтесь на конкретный порядок вызова listener'ов в бизнес-логике.
+          Порядок — это деталь реализации. Каждый listener должен быть
+          <strong>независимым</strong> и не зависеть от результата другого.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Можно регистрировать <strong>множество</strong> подписчиков через <code>subscribe</code></li>
+          <li>Все вызываются после каждого dispatch в порядке регистрации</li>
+          <li>Каждый подписчик <strong>независим</strong> и решает, что делать с новым state</li>
+          <li>Snapshot-семантика: изменение списка подписчиков во время dispatch не влияет на текущий вызов</li>
+          <li>Каждый <code>subscribe</code> возвращает свою функцию <code>unsubscribe</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

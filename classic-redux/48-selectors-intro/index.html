@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>48 — Selectors: введение</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">48 / 100</span>
+      Selectors — что такое селектор?
+    </div>
+    <nav class="site-header__nav">
+      <a href="../47-store-api-summary/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">48</span>
+      <a href="../49-selectors-derived-data/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Selectors intro -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Селекторы для чтения state</div>
+      <div class="demo-section__body">
+        <div style="max-width: 550px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <input type="text" id="todo-input" placeholder="Новая задача..." style="flex: 1;">
+            <button class="btn btn--accent" id="btn-add">Добавить</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">
+              Todos (selectTodos) — <span id="todo-count" style="color: var(--accent-cyan);">0</span> шт.
+            </div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+            <div id="empty-msg" style="color: var(--text-muted); padding: 12px; text-align: center; font-style: italic;">
+              Нет задач
+            </div>
+          </div>
+
+          <div class="two-col">
+            <div class="state-display">
+              <div class="state-display__label">selectTodos(state)</div>
+              <pre id="selector-todos" style="color: var(--accent-cyan); font-size: 0.8rem; max-height: 150px; overflow-y: auto;"></pre>
+            </div>
+
+            <div class="state-display">
+              <div class="state-display__label">selectTodoCount(state)</div>
+              <pre id="selector-count" style="color: var(--accent-green); font-size: 0.8rem; min-height: 40px;"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что такое Selector?</div>
+      <div class="theory__body">
+        <h3>Определение</h3>
+        <p>
+          <strong>Selector</strong> — это функция, которая принимает state и возвращает
+          нужную часть данных. Это простая чистая функция:
+          <code>state => state.someField</code>.
+        </p>
+
+        <div class="quote">
+          «A "selector function" is any function that accepts the Redux store state
+          (or part of the state) as an argument, and returns data that is based on
+          that state. Selectors don't have to be written using a special library,
+          and it doesn't matter whether you write them as arrow functions or as
+          the function keyword.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#selectors" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Простейший селектор</h3>
+        <p>
+          Селектор — это просто функция. Никакой магии:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectTodos</span> = (state: <span class="type">AppState</span>): <span class="type">Todo</span>[] => state.<span class="prop">todos</span>
+
+<span class="cm">// Использование:</span>
+<span class="kw">const</span> todos = <span class="fn">selectTodos</span>(store.<span class="fn">getState</span>())
+        </div>
+
+        <h3>Селектор с вычислением</h3>
+        <p>
+          Селектор может не просто извлекать данные, но и вычислять производные:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectTodoCount</span> = (state: <span class="type">AppState</span>): <span class="type">number</span> =>
+  state.<span class="prop">todos</span>.<span class="prop">length</span>
+        </div>
+
+        <h3>Зачем нужны селекторы?</h3>
+        <ul>
+          <li>
+            <strong>Инкапсуляция</strong> — компоненты не знают структуру state.
+            Если структура изменится, нужно обновить только селектор.
+          </li>
+          <li>
+            <strong>Переиспользование</strong> — один селектор можно использовать
+            в разных местах приложения.
+          </li>
+          <li>
+            <strong>Единый источник доступа</strong> — вся логика чтения данных
+            в одном месте.
+          </li>
+          <li>
+            <strong>Тестируемость</strong> — чистые функции легко тестировать.
+          </li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Без селектора — жёсткая привязка к структуре state:</span>
+<span class="kw">const</span> todos = store.<span class="fn">getState</span>().<span class="prop">todos</span>
+
+<span class="cm">// С селектором — абстракция:</span>
+<span class="kw">const</span> todos = <span class="fn">selectTodos</span>(store.<span class="fn">getState</span>())
+
+<span class="cm">// Если state.todos переименуется в state.items,</span>
+<span class="cm">// меняем только selectTodos — остальной код не затронут</span>
+        </div>
+
+        <div class="tip">
+          Соглашение по именованию: селекторы начинаются с <code>select</code>,
+          например <code>selectTodos</code>, <code>selectTodoCount</code>,
+          <code>selectUserName</code>. Это помогает легко находить их в коде.
+        </div>
+
+        <h3>Селекторы и combineReducers</h3>
+        <p>
+          При использовании <code>combineReducers</code> state имеет вложенную структуру.
+          Селекторы «знают» эту структуру и предоставляют удобный доступ:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// State после combineReducers:</span>
+<span class="cm">// { todos: [...], filters: { ... } }</span>
+
+<span class="kw">const</span> <span class="fn">selectTodos</span> = (state: <span class="type">AppState</span>) => state.<span class="prop">todos</span>
+<span class="kw">const</span> <span class="fn">selectFilters</span> = (state: <span class="type">AppState</span>) => state.<span class="prop">filters</span>
+<span class="kw">const</span> <span class="fn">selectStatusFilter</span> = (state: <span class="type">AppState</span>) => state.<span class="prop">filters</span>.<span class="prop">status</span>
+        </div>
+
+        <div class="warning">
+          Селектор всегда получает <strong>весь state</strong> (корневой объект) как аргумент.
+          Не передавайте в селектор уже извлечённую часть state — это нарушает паттерн
+          и делает селектор бесполезным.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Selector — функция <code>(state) => данные</code></li>
+          <li>Инкапсулирует знание о структуре state</li>
+          <li>Может извлекать данные или вычислять производные</li>
+          <li>Именование: <code>selectSomething</code></li>
+          <li>Чистая функция — легко тестировать и переиспользовать</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

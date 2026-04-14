@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>50 — Selectors с параметрами</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">50 / 100</span>
+      Selectors с параметрами — поиск и фильтрация
+    </div>
+    <nav class="site-header__nav">
+      <a href="../49-selectors-derived-data/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">50</span>
+      <a href="../51-selectors-composition/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Parameterized selectors -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Поиск todo по ID и фильтрация по статусу</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Все задачи (5 шт.)</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+          </div>
+
+          <div class="two-col" style="margin-bottom: 16px;">
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">selectTodoById(state, id)</h3>
+              <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <label style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; align-self: center;">ID:</label>
+                <input type="number" id="id-input" value="1" min="1" max="5" style="width: 60px;">
+                <button class="btn btn--accent" id="btn-find">Найти</button>
+              </div>
+              <div class="state-display">
+                <div class="state-display__label">Результат</div>
+                <pre id="find-result" style="color: var(--accent-cyan); font-size: 0.8rem; min-height: 50px;"></pre>
+              </div>
+            </div>
+
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">selectTodosByStatus(state, done)</h3>
+              <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                <label style="color: var(--text-muted); font-size: 0.85rem;">completed:</label>
+                <button class="btn" id="btn-toggle-status" style="min-width: 80px;">true</button>
+              </div>
+              <div class="state-display">
+                <div class="state-display__label">Результат — <span id="status-count" style="color: var(--accent-green);">0</span> шт.</div>
+                <pre id="status-result" style="color: var(--accent-green); font-size: 0.8rem; min-height: 50px; max-height: 150px; overflow-y: auto;"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Селекторы с параметрами</div>
+      <div class="theory__body">
+        <h3>Зачем параметры?</h3>
+        <p>
+          Иногда нужно извлечь данные, зависящие от <strong>внешнего параметра</strong>:
+          конкретный ID, статус фильтра, строка поиска. Для этого селектор принимает
+          дополнительные аргументы помимо state.
+        </p>
+
+        <h3>Паттерн: (state, param) => result</h3>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectTodoById</span> = (state: <span class="type">AppState</span>, id: <span class="type">number</span>): <span class="type">Todo</span> | <span class="type">undefined</span> =>
+  state.<span class="prop">todos</span>.<span class="fn">find</span>(todo => todo.<span class="prop">id</span> === id)
+
+<span class="cm">// Использование:</span>
+<span class="kw">const</span> todo = <span class="fn">selectTodoById</span>(store.<span class="fn">getState</span>(), <span class="num">3</span>)
+        </div>
+
+        <h3>find для одного элемента</h3>
+        <p>
+          <code>Array.find()</code> возвращает первый элемент, удовлетворяющий условию,
+          или <code>undefined</code> если ничего не найдено:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectTodoById</span> = (state: <span class="type">AppState</span>, id: <span class="type">number</span>): <span class="type">Todo</span> | <span class="type">undefined</span> =>
+  state.<span class="prop">todos</span>.<span class="fn">find</span>(todo => todo.<span class="prop">id</span> === id)
+
+<span class="cm">// find вернёт undefined, если ID не найден</span>
+<span class="kw">const</span> result = <span class="fn">selectTodoById</span>(state, <span class="num">999</span>) <span class="cm">// undefined</span>
+        </div>
+
+        <h3>filter для множества элементов</h3>
+        <p>
+          <code>Array.filter()</code> возвращает новый массив со всеми элементами,
+          прошедшими проверку:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectTodosByStatus</span> = (state: <span class="type">AppState</span>, completed: <span class="type">boolean</span>): <span class="type">Todo</span>[] =>
+  state.<span class="prop">todos</span>.<span class="fn">filter</span>(todo => todo.<span class="prop">completed</span> === completed)
+
+<span class="cm">// Все выполненные:</span>
+<span class="fn">selectTodosByStatus</span>(state, <span class="num">true</span>)
+
+<span class="cm">// Все активные:</span>
+<span class="fn">selectTodosByStatus</span>(state, <span class="num">false</span>)
+        </div>
+
+        <h3>Когда параметризировать селектор?</h3>
+        <ul>
+          <li><strong>Поиск по ID</strong> — <code>selectUserById(state, userId)</code></li>
+          <li><strong>Фильтрация по значению</strong> — <code>selectOrdersByStatus(state, 'pending')</code></li>
+          <li><strong>Поиск по тексту</strong> — <code>selectTodosBySearch(state, query)</code></li>
+          <li><strong>Пагинация</strong> — <code>selectPageItems(state, page, perPage)</code></li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Ещё примеры параметризированных селекторов:</span>
+
+<span class="kw">const</span> <span class="fn">selectUserById</span> = (state: <span class="type">AppState</span>, userId: <span class="type">number</span>) =>
+  state.<span class="prop">users</span>.<span class="fn">find</span>(u => u.<span class="prop">id</span> === userId)
+
+<span class="kw">const</span> <span class="fn">selectProductsByCategory</span> = (state: <span class="type">AppState</span>, category: <span class="type">string</span>) =>
+  state.<span class="prop">products</span>.<span class="fn">filter</span>(p => p.<span class="prop">category</span> === category)
+
+<span class="kw">const</span> <span class="fn">selectTodosBySearch</span> = (state: <span class="type">AppState</span>, query: <span class="type">string</span>) =>
+  state.<span class="prop">todos</span>.<span class="fn">filter</span>(t =>
+    t.<span class="prop">text</span>.<span class="fn">toLowerCase</span>().<span class="fn">includes</span>(query.<span class="fn">toLowerCase</span>())
+  )
+        </div>
+
+        <div class="tip">
+          Параметризированный селектор — это по-прежнему обычная функция. Первый
+          аргумент всегда <code>state</code>, дополнительные — параметры для фильтрации
+          или поиска. Это соглашение Redux.
+        </div>
+
+        <div class="warning">
+          Помните, что <code>find</code> может вернуть <code>undefined</code>. Всегда
+          обрабатывайте случай «не найдено» в коде, который вызывает такой селектор.
+          В TypeScript используйте тип <code>Todo | undefined</code>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Параметризированный селектор: <code>(state, param) => result</code></li>
+          <li><code>find</code> — для поиска одного элемента (возвращает <code>T | undefined</code>)</li>
+          <li><code>filter</code> — для выборки нескольких элементов (возвращает <code>T[]</code>)</li>
+          <li>Первый аргумент — всегда state, остальные — параметры</li>
+          <li>Используйте для поиска по ID, фильтрации по статусу, поиска по тексту</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

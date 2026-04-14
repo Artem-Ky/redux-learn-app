@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>45 — Store Enhancers: введение</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">45 / 100</span>
+      Store Enhancers — введение
+    </div>
+    <nav class="site-header__nav">
+      <a href="../44-store-no-direct-mutation/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">45</span>
+      <a href="../46-store-enhancer-compose/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Store Enhancer -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — logEnhancer логирует каждый dispatch</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div style="color: var(--success); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; margin-bottom: 12px;">
+            ⚡ Store создан с logEnhancer (третий аргумент createStore)
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn" id="btn-increment">+ Increment</button>
+            <button class="btn" id="btn-decrement">− Decrement</button>
+            <button class="btn" id="btn-reset">Reset</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Исходный код logEnhancer</div>
+            <pre id="enhancer-source" style="color: var(--text-primary); font-size: 0.8rem; line-height: 1.5;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Store Enhancers</div>
+      <div class="theory__body">
+        <h3>Что такое Store Enhancer?</h3>
+        <p>
+          <strong>Store Enhancer</strong> — это функция высшего порядка, которая оборачивает
+          <code>createStore</code> и может модифицировать поведение store. Это третий
+          (необязательный) аргумент <code>createStore</code>.
+        </p>
+
+        <div class="quote">
+          «Store enhancers are a formal mechanism for adding capabilities to Redux itself.
+          Most people will never need to write one. An enhancer wraps the store's dispatch,
+          getState, and subscribe functions, and can override them.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#configuring-the-store" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Сигнатура enhancer</h3>
+        <div class="code-block">
+<span class="cm">// Enhancer — это функция, принимающая createStore</span>
+<span class="cm">// и возвращающая улучшенный createStore</span>
+<span class="kw">type</span> <span class="type">StoreEnhancer</span> = (
+  createStore: <span class="type">CreateStore</span>
+) => (
+  reducer: <span class="type">Reducer</span>,
+  preloadedState?: <span class="type">State</span>
+) => <span class="type">Store</span>
+        </div>
+
+        <h3>Третий аргумент createStore</h3>
+        <p>
+          Enhancer передаётся как третий аргумент. Redux определяет тип аргумента:
+          если второй аргумент — функция, он считается enhancer'ом (без preloadedState).
+        </p>
+
+        <div class="code-block">
+<span class="cm">// С preloadedState и enhancer:</span>
+<span class="fn">createStore</span>(reducer, preloadedState, enhancer)
+
+<span class="cm">// Только с enhancer (без preloadedState):</span>
+<span class="fn">createStore</span>(reducer, enhancer)
+        </div>
+
+        <h3>Пример: logEnhancer</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">logEnhancer</span>(createStore) {
+  <span class="kw">return</span> (reducer, preloadedState) => {
+    <span class="kw">const</span> store = <span class="fn">createStore</span>(reducer, preloadedState)
+
+    <span class="kw">const</span> originalDispatch = store.<span class="prop">dispatch</span>
+    store.<span class="prop">dispatch</span> = (action) => {
+      console.<span class="fn">log</span>(<span class="str">'[enhancer] action:'</span>, action)
+      console.<span class="fn">log</span>(<span class="str">'[enhancer] state до:'</span>, store.<span class="fn">getState</span>())
+      <span class="kw">const</span> result = <span class="fn">originalDispatch</span>(action)
+      console.<span class="fn">log</span>(<span class="str">'[enhancer] state после:'</span>, store.<span class="fn">getState</span>())
+      <span class="kw">return</span> result
+    }
+
+    <span class="kw">return</span> store
+  }
+}
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(reducer, logEnhancer)
+        </div>
+
+        <h3>Что может enhancer</h3>
+        <ul>
+          <li><strong>Обернуть dispatch</strong> — добавить логирование, аналитику, дебаунс</li>
+          <li><strong>Обернуть getState</strong> — трансформировать возвращаемый state</li>
+          <li><strong>Обернуть subscribe</strong> — фильтровать уведомления</li>
+          <li><strong>Добавить методы</strong> — расширить API store</li>
+        </ul>
+
+        <div class="tip">
+          Каждый dispatch в демо выше проходит через logEnhancer. Посмотрите в консоль —
+          вы увидите action и state до/после каждого dispatch.
+        </div>
+
+        <h3>DevTools Extension — это enhancer!</h3>
+        <p>
+          Самый известный enhancer — <code>Redux DevTools Extension</code>. Он оборачивает
+          store, перехватывает все dispatch и записывает историю для time-travel.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> store = <span class="fn">createStore</span>(
+  reducer,
+  <span class="kw">window</span>.__REDUX_DEVTOOLS_EXTENSION__?.()
+)
+        </div>
+
+        <div class="warning">
+          Enhancers — мощный, но низкоуровневый инструмент. В большинстве случаев
+          <strong>middleware</strong> (который сам является enhancer'ом через
+          <code>applyMiddleware</code>) — более подходящий выбор для расширения dispatch.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Enhancer — третий аргумент <code>createStore</code></li>
+          <li>Оборачивает создание store, может переопределить dispatch/getState/subscribe</li>
+          <li>Сигнатура: <code>(createStore) => (reducer, preloadedState) => store</code></li>
+          <li>Redux DevTools — самый известный enhancer</li>
+          <li>Для большинства задач лучше использовать middleware</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>11 — Action Constants</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">11 / 100</span>
+      Action Constants — Выносим типы в константы
+    </div>
+    <nav class="site-header__nav">
+      <a href="../10-flux-standard-action/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">11</span>
+      <a href="../12-action-creators-intro/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Constants comparison -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Строковые литералы vs Константы</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <!-- Before: string literals -->
+          <div>
+            <h3 style="color: var(--error); margin-bottom: 12px;">❌ До — строковые литералы</h3>
+            <div class="code-block" style="font-size: 0.78rem; margin-bottom: 12px;">
+<span class="cm">// Опечатка проходит незаметно!</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/<span style="color:var(--error);text-decoration:underline;">incremeted</span>'</span> }) <span class="cm">// ← опечатка!</span>
+            </div>
+            <div class="counter" style="margin-bottom: 12px;">
+              <button class="btn" id="btn-dec-before">−</button>
+              <div class="counter__value" id="counter-before">0</div>
+              <button class="btn" id="btn-inc-before">+</button>
+            </div>
+            <div class="btn-group">
+              <button class="btn" id="btn-reset-before">Reset</button>
+              <button class="btn btn--danger" id="btn-typo">Dispatch с опечаткой</button>
+            </div>
+            <div class="state-display" style="margin-top: 12px;">
+              <div class="state-display__label">Результат опечатки</div>
+              <pre id="typo-result" style="color: var(--text-muted); font-size: 0.82rem;">Нажмите «Dispatch с опечаткой»</pre>
+            </div>
+          </div>
+
+          <!-- After: constants -->
+          <div>
+            <h3 style="color: var(--success); margin-bottom: 12px;">✔ После — константы</h3>
+            <div class="code-block" style="font-size: 0.78rem; margin-bottom: 12px;">
+<span class="kw">const</span> <span class="prop">INCREMENTED</span> = <span class="str">'counter/incremented'</span>
+<span class="kw">const</span> <span class="prop">DECREMENTED</span> = <span class="str">'counter/decremented'</span>
+<span class="kw">const</span> <span class="prop">RESET</span> = <span class="str">'counter/reset'</span>
+
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="prop">INCREMENTED</span> }) <span class="cm">// ← автокомплит!</span>
+            </div>
+            <div class="counter" style="margin-bottom: 12px;">
+              <button class="btn" id="btn-dec-after">−</button>
+              <div class="counter__value" id="counter-after">0</div>
+              <button class="btn" id="btn-inc-after">+</button>
+            </div>
+            <div class="btn-group">
+              <button class="btn" id="btn-reset-after">Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="state-display" style="margin-top: 16px;">
+          <div class="state-display__label">Текущий State (оба счётчика используют один store)</div>
+          <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.9rem;"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Зачем выносить типы в константы</div>
+      <div class="theory__body">
+        <h3>Проблема: строковые литералы</h3>
+        <p>
+          Когда action type — это строковый литерал, который повторяется в нескольких местах
+          (dispatch, reducer, middleware), легко допустить <strong>опечатку</strong>. JavaScript
+          не выдаст ошибку — reducer просто не обработает экшен, и баг будет тихим.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// В reducer</span>
+<span class="kw">case</span> <span class="str">'counter/incremented'</span>: ...
+
+<span class="cm">// В dispatch — опечатка!</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremeted'</span> })  <span class="cm">// «e» пропущена</span>
+<span class="cm">// Reducer не найдёт совпадения → вернёт state без изменений</span>
+<span class="cm">// Ни ошибки, ни предупреждения — тихий баг!</span>
+        </div>
+
+        <h3>Решение: выносим в константы</h3>
+        <div class="code-block">
+<span class="cm">// actionTypes.ts</span>
+<span class="kw">export const</span> <span class="prop">INCREMENTED</span> = <span class="str">'counter/incremented'</span>
+<span class="kw">export const</span> <span class="prop">DECREMENTED</span> = <span class="str">'counter/decremented'</span>
+<span class="kw">export const</span> <span class="prop">RESET</span>       = <span class="str">'counter/reset'</span>
+
+<span class="cm">// reducer.ts</span>
+<span class="kw">import</span> { <span class="prop">INCREMENTED</span>, <span class="prop">DECREMENTED</span>, <span class="prop">RESET</span> } <span class="kw">from</span> <span class="str">'./actionTypes'</span>
+
+<span class="kw">case</span> <span class="prop">INCREMENTED</span>: ...
+<span class="kw">case</span> <span class="prop">DECREMENTED</span>: ...
+<span class="kw">case</span> <span class="prop">RESET</span>: ...
+
+<span class="cm">// dispatch</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="prop">INCREMENTED</span> })
+        </div>
+
+        <h3>Преимущества констант</h3>
+        <ul>
+          <li><strong>Защита от опечаток</strong> — если написать <code>INCREMETED</code>, IDE и компилятор выдадут ошибку</li>
+          <li><strong>Автодополнение</strong> — IDE предлагает имена констант при вводе</li>
+          <li><strong>Единый источник истины</strong> — строка определена в одном месте</li>
+          <li><strong>Рефакторинг</strong> — переименование меняет значение везде</li>
+          <li><strong>Поиск</strong> — легко найти все места использования конкретного типа</li>
+        </ul>
+
+        <h3>Типичная структура файлов</h3>
+        <div class="code-block">
+src/
+├── store/
+│   ├── actionTypes.ts    <span class="cm">// константы типов</span>
+│   ├── actions.ts        <span class="cm">// action creators (следующий урок)</span>
+│   ├── reducer.ts        <span class="cm">// reducer</span>
+│   └── store.ts          <span class="cm">// createStore</span>
+        </div>
+
+        <div class="tip">
+          В Redux Toolkit константы не нужны — <code>createSlice</code> автоматически
+          генерирует типы и action creators. Но понимание констант важно для работы
+          с legacy-кодом и для понимания, <em>почему</em> RTK упрощает жизнь.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Строковые литералы подвержены тихим ошибкам из-за опечаток</li>
+          <li>Выносите action types в именованные константы</li>
+          <li>Используйте одну и ту же константу в reducer и dispatch</li>
+          <li>В Redux Toolkit этот паттерн встроен в <code>createSlice</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

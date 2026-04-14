@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>44 — Почему нельзя мутировать state напрямую</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">44 / 100</span>
+      Почему нельзя мутировать state напрямую
+    </div>
+    <nav class="site-header__nav">
+      <a href="../43-store-internals/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">44</span>
+      <a href="../45-store-enhancers-intro/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Direct mutation problem -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Мутация vs Dispatch</div>
+      <div class="demo-section__body">
+        <div style="max-width: 550px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">UI отображает (из subscribe)</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-dispatch">✅ Нормальный dispatch (+1)</button>
+            <button class="btn" id="btn-mutate" style="border-color: var(--error); color: var(--error);">
+              ❌ Прямая мутация (= 999)
+            </button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState() (реальное значение в памяти)</div>
+            <pre id="real-state" style="color: var(--accent-orange); font-size: 1rem; text-align: center;"></pre>
+          </div>
+
+          <div id="mutation-warning" style="display: none; padding: 12px; background: rgba(244, 71, 71, 0.1); border: 1px solid var(--error); border-radius: 6px; margin-bottom: 16px;">
+            <div style="color: var(--error); font-weight: 600; margin-bottom: 4px;">⚠️ Мутация произошла!</div>
+            <div style="color: var(--text-muted); font-size: 0.85rem;">
+              Значение в памяти изменилось, но UI не обновился — subscribe НЕ вызван.
+            </div>
+          </div>
+
+          <button class="btn" id="btn-check">🔍 Проверить реальный state</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Почему нельзя мутировать state</div>
+      <div class="theory__body">
+        <h3>Store не защищает state от мутаций</h3>
+        <p>
+          <code>store.getState()</code> возвращает <strong>прямую ссылку</strong> на объект state.
+          Redux не создаёт копию, не замораживает объект (Object.freeze), не использует Proxy.
+          Технически, вы можете изменить state напрямую — и это <strong>молча сломает</strong>
+          всё.
+        </p>
+
+        <div class="quote">
+          «Redux does not actually prevent you from mutating your state. There is nothing
+          in the store code that stops you from doing store.getState().someField = someValue.
+          However, doing so will break time-travel debugging, and components will not
+          re-render as expected.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#dispatching-actions" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Что происходит при прямой мутации</h3>
+        <div class="code-block">
+<span class="cm">// ❌ ПЛОХО: прямая мутация</span>
+store.<span class="fn">getState</span>().<span class="prop">value</span> = <span class="num">999</span>
+
+<span class="cm">// Что произошло:</span>
+<span class="cm">// ✓ Значение в памяти изменилось</span>
+<span class="cm">// ✗ Subscribers НЕ вызваны → UI НЕ обновился</span>
+<span class="cm">// ✗ DevTools НЕ увидели изменение</span>
+<span class="cm">// ✗ Time-travel сломан</span>
+        </div>
+
+        <div class="code-block">
+<span class="cm">// ✅ ПРАВИЛЬНО: через dispatch</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/set'</span>, <span class="prop">payload</span>: <span class="num">999</span> })
+
+<span class="cm">// Что произошло:</span>
+<span class="cm">// ✓ Reducer создал новый объект state</span>
+<span class="cm">// ✓ Subscribers вызваны → UI обновился</span>
+<span class="cm">// ✓ DevTools записали action</span>
+<span class="cm">// ✓ Time-travel работает</span>
+        </div>
+
+        <h3>Почему getState() возвращает ссылку?</h3>
+        <p>
+          Производительность. Глубокое копирование объекта при каждом вызове getState()
+          было бы слишком дорого. Redux полагается на <strong>конвенцию</strong>: вы
+          <em>обещаете</em> не мутировать state напрямую.
+        </p>
+
+        <h3>Что ломается при мутации</h3>
+        <ul>
+          <li><strong>React-Redux</strong> — <code>connect</code> и <code>useSelector</code> сравнивают ссылки (===). Если state мутирован, ссылка та же → React не перерендерит</li>
+          <li><strong>DevTools</strong> — не видят изменений, т.к. action не был dispatched</li>
+          <li><strong>Time-travel</strong> — невозможно «откатить» мутацию, предыдущий state потерян</li>
+          <li><strong>Middleware</strong> — не вызывается, т.к. dispatch не произошёл</li>
+        </ul>
+
+        <div class="tip">
+          Нажмите «Прямая мутация» в демо, затем «Проверить реальный state». Вы увидите,
+          что значение в памяти изменилось, но UI остался старым — subscribe не был вызван.
+        </div>
+
+        <div class="warning">
+          Redux <strong>не защищает</strong> от мутаций. Это ваша ответственность.
+          В продакшене используйте <code>redux-immutable-state-invariant</code> middleware
+          для отлова мутаций в development-режиме.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>getState()</code> возвращает <strong>прямую ссылку</strong>, не копию</li>
+          <li>Мутация state молча ломает UI, DevTools, time-travel</li>
+          <li>Только <code>dispatch</code> запускает reducer и уведомляет подписчиков</li>
+          <li>Redux полагается на конвенцию иммутабельности, а не на защиту</li>
+          <li>Используйте линтеры и middleware для отлова мутаций</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

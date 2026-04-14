@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>12 — Action Creators (введение)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">12 / 100</span>
+      Action Creators — Фабрики экшенов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../11-action-constants/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">12</span>
+      <a href="../13-action-creators-with-payload/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Two approaches -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Два подхода: вручную vs Action Creator</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <!-- Approach 1: Raw dispatch -->
+          <div>
+            <h3 style="color: var(--accent-orange); margin-bottom: 12px;">① Dispatch вручную</h3>
+            <div class="code-block" style="font-size: 0.78rem; margin-bottom: 12px;">
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/decremented'</span> })
+            </div>
+            <div class="counter" style="margin-bottom: 12px;">
+              <button class="btn" id="btn-dec-raw">−</button>
+              <div class="counter__value" id="counter-raw">0</div>
+              <button class="btn" id="btn-inc-raw">+</button>
+            </div>
+            <button class="btn" id="btn-reset-raw">Reset</button>
+          </div>
+
+          <!-- Approach 2: Action creator -->
+          <div>
+            <h3 style="color: var(--accent-cyan); margin-bottom: 12px;">② Dispatch через Action Creator</h3>
+            <div class="code-block" style="font-size: 0.78rem; margin-bottom: 12px;">
+<span class="kw">function</span> <span class="fn">increment</span>() {
+  <span class="kw">return</span> { <span class="prop">type</span>: <span class="str">'counter/incremented'</span> }
+}
+store.<span class="fn">dispatch</span>(<span class="fn">increment</span>())
+            </div>
+            <div class="counter" style="margin-bottom: 12px;">
+              <button class="btn" id="btn-dec-creator">−</button>
+              <div class="counter__value" id="counter-creator">0</div>
+              <button class="btn" id="btn-inc-creator">+</button>
+            </div>
+            <button class="btn" id="btn-reset-creator">Reset</button>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+          <div class="state-display" style="margin-bottom: 12px;">
+            <div class="state-display__label">Текущий State (общий store)</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.9rem;"></pre>
+          </div>
+          <div class="state-display">
+            <div class="state-display__label">Последний Action</div>
+            <pre id="action-display" style="color: var(--accent-orange); font-size: 0.85rem;">—</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что такое Action Creator?</div>
+      <div class="theory__body">
+        <h3>Определение</h3>
+        <p>
+          <strong>Action Creator</strong> — это функция, которая создаёт и возвращает action-объект.
+          Вместо того чтобы каждый раз вручную писать объект <code>{ type: '...' }</code>,
+          вы вызываете функцию.
+        </p>
+
+        <div class="quote">
+          «An action creator is a function that creates and returns an action object.
+          We typically use these so we don't have to write the action object by hand every time.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-7-standard-patterns#action-creators" target="_blank">Redux Fundamentals, Part 7</a>
+        </div>
+
+        <h3>Простой action creator</h3>
+        <div class="code-block">
+<span class="cm">// Action creator — просто функция, возвращающая action</span>
+<span class="kw">function</span> <span class="fn">increment</span>(): <span class="type">CounterAction</span> {
+  <span class="kw">return</span> { <span class="prop">type</span>: <span class="str">'counter/incremented'</span> }
+}
+
+<span class="kw">function</span> <span class="fn">decrement</span>(): <span class="type">CounterAction</span> {
+  <span class="kw">return</span> { <span class="prop">type</span>: <span class="str">'counter/decremented'</span> }
+}
+
+<span class="kw">function</span> <span class="fn">reset</span>(): <span class="type">CounterAction</span> {
+  <span class="kw">return</span> { <span class="prop">type</span>: <span class="str">'counter/reset'</span> }
+}
+
+<span class="cm">// Использование</span>
+store.<span class="fn">dispatch</span>(<span class="fn">increment</span>())  <span class="cm">// вместо { type: 'counter/incremented' }</span>
+store.<span class="fn">dispatch</span>(<span class="fn">decrement</span>())  <span class="cm">// вместо { type: 'counter/decremented' }</span>
+        </div>
+
+        <h3>Зачем использовать Action Creators?</h3>
+        <ul>
+          <li><strong>DRY</strong> — структура action описана в одном месте, не дублируется</li>
+          <li><strong>Инкапсуляция</strong> — dispatch-код не знает деталей реализации action</li>
+          <li><strong>Защита от ошибок</strong> — тип экшена задаётся только в action creator</li>
+          <li><strong>Удобство рефакторинга</strong> — при изменении структуры action, правите только одну функцию</li>
+          <li><strong>Тестируемость</strong> — action creator легко тестировать как чистую функцию</li>
+        </ul>
+
+        <h3>Без action creator vs с ним</h3>
+        <div class="code-block">
+<span class="cm">// ❌ Без action creator — дублирование</span>
+<span class="cm">// файл button.ts</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+<span class="cm">// файл header.ts</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+<span class="cm">// файл sidebar.ts</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+
+<span class="cm">// ✔ С action creator — единый источник</span>
+<span class="cm">// файл button.ts</span>
+store.<span class="fn">dispatch</span>(<span class="fn">increment</span>())
+<span class="cm">// файл header.ts</span>
+store.<span class="fn">dispatch</span>(<span class="fn">increment</span>())
+<span class="cm">// файл sidebar.ts</span>
+store.<span class="fn">dispatch</span>(<span class="fn">increment</span>())
+        </div>
+
+        <div class="tip">
+          Обратите внимание: оба подхода в демо выше дают <strong>абсолютно одинаковый результат</strong>.
+          Action creator — это просто удобная обёртка, которая не меняет поведение Redux.
+          В DevTools экшены от обоих подходов выглядят идентично.
+        </div>
+
+        <h3>Action Creator + константы</h3>
+        <p>
+          Часто action creators комбинируют с константами из предыдущего урока:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">INCREMENTED</span> = <span class="str">'counter/incremented'</span>
+
+<span class="kw">function</span> <span class="fn">increment</span>() {
+  <span class="kw">return</span> { <span class="prop">type</span>: <span class="prop">INCREMENTED</span> }
+}
+        </div>
+
+        <div class="warning">
+          В классическом Redux action creators нужно писать вручную. В Redux Toolkit
+          <code>createSlice</code> генерирует их автоматически — это одно из главных
+          преимуществ RTK.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Action Creator — функция, возвращающая action-объект</li>
+          <li>Результат идентичен ручному созданию объекта</li>
+          <li>Преимущества: DRY, инкапсуляция, защита от ошибок</li>
+          <li>В следующем уроке — action creators с payload</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

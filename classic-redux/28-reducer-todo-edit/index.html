@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>28 — Todo: редактирование текста</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">28 / 100</span>
+      Todo: Редактирование текста — обновление полей элемента
+    </div>
+    <nav class="site-header__nav">
+      <a href="../27-reducer-todo-delete/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">28</span>
+      <a href="../29-reducer-multiple-actions/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Todo edit -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Редактирование текста задачи</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <p style="color: var(--text-muted); margin-bottom: 12px; font-size: 0.85rem;">
+            Дважды кликните на текст задачи для редактирования. Нажмите Enter или кликните вне поля для сохранения.
+          </p>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Список задач</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Текущий State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Обновление конкретных полей элемента массива</div>
+      <div class="theory__body">
+        <h3>Редактирование текста — обновление одного поля</h3>
+        <p>
+          В предыдущих уроках мы переключали <code>completed</code> (boolean). Теперь мы
+          обновляем <code>text</code> (string). Принцип тот же: <code>map()</code> с условием
+          по <code>id</code>, но вместо инверсии boolean мы подставляем новую строку.
+        </p>
+
+        <div class="quote">
+          «We need to make a copy of every level of nesting that needs to be updated.
+          For updating a specific item in an array, we use array.map() to create
+          a new version of the array.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#immutable-updates" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Action с составным payload</h3>
+        <p>
+          Для редактирования нам нужны два данных: <code>id</code> задачи и новый <code>text</code>.
+          Поэтому <code>payload</code> — это объект:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Action для редактирования</span>
+{
+  <span class="prop">type</span>: <span class="str">'todos/todoEdited'</span>,
+  <span class="prop">payload</span>: {
+    <span class="prop">id</span>: <span class="num">2</span>,
+    <span class="prop">text</span>: <span class="str">'Новый текст задачи'</span>
+  }
+}
+        </div>
+
+        <h3>Reducer: деструктуризация payload</h3>
+        <p>
+          В reducer мы извлекаем <code>id</code> и <code>text</code> из <code>action.payload</code>
+          через деструктуризацию и используем <code>map()</code> для обновления:
+        </p>
+
+        <div class="code-block">
+<span class="kw">case</span> <span class="str">'todos/todoEdited'</span>: {
+  <span class="kw">const</span> { <span class="prop">id</span>, <span class="prop">text</span> } = action.<span class="prop">payload</span>
+  <span class="kw">return</span> state.<span class="fn">map</span>(todo =>
+    todo.<span class="prop">id</span> === id
+      ? { ...todo, <span class="prop">text</span> }  <span class="cm">// ← обновляем только text</span>
+      : todo
+  )
+}
+        </div>
+
+        <h3>Локальное состояние vs Redux state</h3>
+        <p>
+          Обратите внимание: состояние «сейчас редактируется» (<code>editingId</code>)
+          хранится <strong>не в Redux</strong>, а в локальной переменной. Это правильный подход —
+          временное UI-состояние (открыт ли модал, какой input активен) не нужно
+          хранить в Redux store.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Локальное UI-состояние — НЕ в Redux</span>
+<span class="kw">let</span> editingId: <span class="type">number</span> | <span class="type">null</span> = <span class="num">null</span>
+
+<span class="cm">// Redux state — только данные задач</span>
+<span class="cm">// [{ id, text, completed }, ...]</span>
+        </div>
+
+        <div class="tip">
+          Общее правило: если состояние нужно <em>только одному компоненту</em> и не влияет
+          на другие части приложения — храните его локально. Данные, которые нужны
+          нескольким компонентам или должны пережить навигацию — в Redux.
+        </div>
+
+        <h3>Spread для обновления одного поля</h3>
+        <p>
+          Запись <code>{ ...todo, text }</code> создаёт новый объект со всеми полями
+          из <code>todo</code>, но с обновлённым <code>text</code>. Остальные поля
+          (<code>id</code>, <code>completed</code>) копируются из оригинала:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Исходный объект</span>
+{ <span class="prop">id</span>: <span class="num">2</span>, <span class="prop">text</span>: <span class="str">'Старый текст'</span>, <span class="prop">completed</span>: <span class="num">false</span> }
+
+<span class="cm">// { ...todo, text: 'Новый текст' }</span>
+{ <span class="prop">id</span>: <span class="num">2</span>, <span class="prop">text</span>: <span class="str">'Новый текст'</span>, <span class="prop">completed</span>: <span class="num">false</span> }
+<span class="cm">// ↑ id и completed — из оригинала, text — новый</span>
+        </div>
+
+        <div class="warning">
+          Если пользователь вводит пустую строку, не сохраняйте изменения.
+          В нашем примере мы проверяем <code>text.trim()</code> перед dispatch.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>payload</code> может быть объектом с несколькими полями: <code>{ id, text }</code></li>
+          <li>Деструктуризация <code>const { id, text } = action.payload</code> делает код читаемым</li>
+          <li><code>map()</code> + spread обновляет только нужный элемент и нужное поле</li>
+          <li>Временное UI-состояние (editingId) хранится локально, не в Redux</li>
+          <li>Валидируйте данные перед dispatch (пустая строка, пробелы и т.д.)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

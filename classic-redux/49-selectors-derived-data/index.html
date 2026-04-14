@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>49 — Selectors: производные данные</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">49 / 100</span>
+      Selectors — производные (derived) данные
+    </div>
+    <nav class="site-header__nav">
+      <a href="../48-selectors-intro/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">49</span>
+      <a href="../50-selectors-parameterized/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Derived data selectors -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Три панели: All / Completed / Active</div>
+      <div class="demo-section__body">
+        <div style="max-width: 700px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div class="state-display">
+              <div class="state-display__label">
+                selectTodos — <span id="all-count" style="color: var(--accent-cyan);">0</span>
+              </div>
+              <ul id="panel-all" style="list-style: none; padding: 4px 0; font-size: 0.8rem;"></ul>
+            </div>
+
+            <div class="state-display">
+              <div class="state-display__label">
+                selectCompleted — <span id="completed-count" style="color: var(--accent-green);">0</span>
+              </div>
+              <ul id="panel-completed" style="list-style: none; padding: 4px 0; font-size: 0.8rem;"></ul>
+            </div>
+
+            <div class="state-display">
+              <div class="state-display__label">
+                selectActive — <span id="active-count" style="color: var(--accent-orange);">0</span>
+              </div>
+              <ul id="panel-active" style="list-style: none; padding: 4px 0; font-size: 0.8rem;"></ul>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Нажмите на задачу, чтобы переключить статус</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Селекторы для производных данных</div>
+      <div class="theory__body">
+        <h3>Derived data — что это?</h3>
+        <p>
+          Производные данные (derived data) — это данные, которые <strong>вычисляются</strong>
+          на основе state, а не хранятся напрямую. Вместо того чтобы хранить в state
+          отдельно «активные todos», мы вычисляем их через селектор.
+        </p>
+
+        <div class="quote">
+          «Selector functions can be used to calculate derived data, allowing Redux
+          to store the minimal possible state. Selectors are efficient. A selector
+          is not recomputed unless one of its arguments changes.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#selectors" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Фильтрация через селекторы</h3>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectTodos</span> = (state: <span class="type">AppState</span>): <span class="type">Todo</span>[] =>
+  state.<span class="prop">todos</span>
+
+<span class="kw">const</span> <span class="fn">selectCompletedTodos</span> = (state: <span class="type">AppState</span>): <span class="type">Todo</span>[] =>
+  state.<span class="prop">todos</span>.<span class="fn">filter</span>(todo => todo.<span class="prop">completed</span>)
+
+<span class="kw">const</span> <span class="fn">selectActiveTodos</span> = (state: <span class="type">AppState</span>): <span class="type">Todo</span>[] =>
+  state.<span class="prop">todos</span>.<span class="fn">filter</span>(todo => !todo.<span class="prop">completed</span>)
+        </div>
+
+        <h3>Подсчёт через селекторы</h3>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectTodoCount</span> = (state: <span class="type">AppState</span>): <span class="type">number</span> =>
+  state.<span class="prop">todos</span>.<span class="prop">length</span>
+
+<span class="kw">const</span> <span class="fn">selectCompletedCount</span> = (state: <span class="type">AppState</span>): <span class="type">number</span> =>
+  state.<span class="prop">todos</span>.<span class="fn">filter</span>(t => t.<span class="prop">completed</span>).<span class="prop">length</span>
+
+<span class="kw">const</span> <span class="fn">selectActiveCount</span> = (state: <span class="type">AppState</span>): <span class="type">number</span> =>
+  state.<span class="prop">todos</span>.<span class="fn">filter</span>(t => !t.<span class="prop">completed</span>).<span class="prop">length</span>
+        </div>
+
+        <h3>Почему не хранить derived data в state?</h3>
+        <p>
+          Один из принципов Redux — хранить <strong>минимальный state</strong>.
+          Если данные можно вычислить из уже имеющегося state, их не нужно хранить отдельно:
+        </p>
+        <ul>
+          <li><strong>Нет дублирования</strong> — один источник правды</li>
+          <li><strong>Нет рассинхронизации</strong> — вычисленные данные всегда актуальны</li>
+          <li><strong>Проще reducer</strong> — не нужно обновлять производные поля</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// ❌ Плохо: дублирование в state</span>
+{
+  <span class="prop">todos</span>: [...],
+  <span class="prop">completedTodos</span>: [...],  <span class="cm">// дубль!</span>
+  <span class="prop">activeTodos</span>: [...],     <span class="cm">// дубль!</span>
+  <span class="prop">todoCount</span>: <span class="num">5</span>           <span class="cm">// дубль!</span>
+}
+
+<span class="cm">// ✅ Хорошо: минимальный state + селекторы</span>
+{
+  <span class="prop">todos</span>: [...]  <span class="cm">// остальное — через selectCompletedTodos и т.д.</span>
+}
+        </div>
+
+        <div class="tip">
+          Логика вычислений находится в селекторах, а не в компонентах.
+          Компонент просто вызывает <code>selectCompletedTodos(state)</code> и
+          получает готовый результат, не зная деталей фильтрации.
+        </div>
+
+        <h3>Примеры типичных derived-селекторов</h3>
+        <ul>
+          <li><code>selectCompletedTodos</code> — фильтрация по статусу</li>
+          <li><code>selectTodoCount</code> — подсчёт элементов</li>
+          <li><code>selectTotalPrice</code> — сумма цен в корзине</li>
+          <li><code>selectUnreadMessages</code> — непрочитанные сообщения</li>
+          <li><code>selectSortedItems</code> — отсортированный список</li>
+        </ul>
+
+        <div class="warning">
+          Помните: каждый вызов <code>filter</code> или <code>map</code> в селекторе
+          создаёт <strong>новый массив</strong>. Это может быть проблемой для
+          производительности в больших приложениях. В следующих уроках мы рассмотрим
+          мемоизацию селекторов с помощью <code>reselect</code>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Derived data — данные, вычисленные из state, а не хранимые</li>
+          <li>Селекторы используют <code>filter</code>, <code>map</code>, <code>reduce</code> для вычислений</li>
+          <li>Храните минимальный state — вычисляйте остальное через селекторы</li>
+          <li>Логика фильтрации/подсчёта — в селекторах, не в компонентах</li>
+          <li>Каждый вызов создаёт новую ссылку (мемоизация — тема будущих уроков)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

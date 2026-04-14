@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>10 — Flux Standard Action (FSA)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">10 / 100</span>
+      Flux Standard Action (FSA)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../09-action-payload/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">10</span>
+      <a href="../11-action-constants/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: FSA Builder -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — FSA Builder</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Собери FSA-объект</h3>
+
+            <div style="margin-bottom: 12px;">
+              <label style="color: var(--text-muted); font-size: 0.75rem;">type <span style="color: var(--error);">*обязательное</span></label>
+              <input type="text" id="fsa-type" value="todos/todoAdded" style="margin-top: 2px;">
+            </div>
+
+            <div style="margin-bottom: 12px;">
+              <label style="color: var(--text-muted); font-size: 0.75rem;">payload (необязательное)</label>
+              <input type="text" id="fsa-payload" value="Купить молоко" placeholder="строка или JSON" style="margin-top: 2px;">
+            </div>
+
+            <div style="margin-bottom: 12px;">
+              <label style="color: var(--text-muted); font-size: 0.75rem;">meta (необязательное)</label>
+              <input type="text" id="fsa-meta" value="" placeholder='{"source": "userInput"}' style="margin-top: 2px;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label style="color: var(--text-muted); font-size: 0.75rem;">error (boolean, необязательное)</label>
+              <div style="display: flex; gap: 12px; margin-top: 4px; align-items: center;">
+                <label style="color: var(--text-primary); font-size: 0.85rem; cursor: pointer;">
+                  <input type="radio" name="fsa-error" value="none" checked> не задано
+                </label>
+                <label style="color: var(--success); font-size: 0.85rem; cursor: pointer;">
+                  <input type="radio" name="fsa-error" value="false"> false
+                </label>
+                <label style="color: var(--error); font-size: 0.85rem; cursor: pointer;">
+                  <input type="radio" name="fsa-error" value="true"> true
+                </label>
+              </div>
+            </div>
+
+            <div class="btn-group">
+              <button class="btn btn--success" id="btn-success">✔ Создать Success</button>
+              <button class="btn btn--danger" id="btn-error">✖ Создать Error</button>
+              <button class="btn btn--accent" id="btn-validate">Валидировать</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Сгенерированный FSA-объект</div>
+              <pre id="fsa-preview" style="color: var(--accent-cyan); font-size: 0.85rem;">{}</pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">Результат валидации</div>
+              <pre id="fsa-validation" style="color: var(--text-muted); font-size: 0.85rem;">Нажмите «Валидировать»</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Flux Standard Action (FSA)</div>
+      <div class="theory__body">
+        <h3>Что такое FSA?</h3>
+        <p>
+          <strong>Flux Standard Action</strong> — это соглашение о структуре action-объектов,
+          предложенное сообществом для единообразия. FSA определяет, какие поля может содержать
+          экшен и как они должны использоваться.
+        </p>
+
+        <div class="quote">
+          «A Flux Standard Action MUST be a plain JavaScript object, MUST have a type property.
+          An action MAY have a payload, error, or meta property. An action MUST NOT include
+          properties other than type, payload, error, and meta.»
+          <br>— <a href="https://github.com/redux-utilities/flux-standard-action" target="_blank">Flux Standard Action Spec</a>
+        </div>
+
+        <h3>Структура FSA</h3>
+        <div class="code-block">
+{
+  <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span>,   <span class="cm">// ОБЯЗАТЕЛЬНОЕ — строка</span>
+  <span class="prop">payload</span>: <span class="str">'Купить молоко'</span>,  <span class="cm">// необязательное — любые данные</span>
+  <span class="prop">meta</span>: { <span class="prop">source</span>: <span class="str">'ui'</span> },    <span class="cm">// необязательное — метаданные</span>
+  <span class="prop">error</span>: <span class="num">false</span>              <span class="cm">// необязательное — boolean</span>
+}
+        </div>
+
+        <h3>Четыре поля FSA</h3>
+        <ul>
+          <li><code>type</code> (обязательное) — строка, идентификатор действия</li>
+          <li><code>payload</code> — данные, связанные с действием. Если <code>error: true</code>, payload ДОЛЖЕН быть объектом Error</li>
+          <li><code>error</code> — если <code>true</code>, экшен представляет ошибку</li>
+          <li><code>meta</code> — дополнительная информация, не являющаяся частью payload (источник, timestamp и т.д.)</li>
+        </ul>
+
+        <h3>Success vs Error action</h3>
+        <div class="code-block">
+<span class="cm">// Success action</span>
+{
+  <span class="prop">type</span>: <span class="str">'users/fetchCompleted'</span>,
+  <span class="prop">payload</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">name</span>: <span class="str">'Анна'</span> }
+}
+
+<span class="cm">// Error action</span>
+{
+  <span class="prop">type</span>: <span class="str">'users/fetchCompleted'</span>,
+  <span class="prop">payload</span>: <span class="kw">new</span> <span class="fn">Error</span>(<span class="str">'Сервер недоступен'</span>),
+  <span class="prop">error</span>: <span class="num">true</span>
+}
+        </div>
+
+        <h3>Почему сообщество предпочитает отдельные типы?</h3>
+        <p>
+          Хотя FSA предлагает использовать поле <code>error: true</code> для обозначения ошибок,
+          на практике многие разработчики предпочитают <strong>отдельные action types</strong>:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Вместо одного типа с error: true/false</span>
+<span class="str">'users/fetchCompleted'</span> + <span class="prop">error</span>: <span class="num">true</span>
+
+<span class="cm">// Предпочитают отдельные типы</span>
+<span class="str">'users/fetchSucceeded'</span>
+<span class="str">'users/fetchFailed'</span>
+        </div>
+
+        <p>
+          Это делает reducer проще — каждый case обрабатывает одну ситуацию, не нужно
+          проверять <code>action.error</code>.
+        </p>
+
+        <div class="warning">
+          FSA — это <em>соглашение</em>, а не требование Redux. Однако Redux Toolkit
+          генерирует FSA-совместимые экшены по умолчанию, поэтому знание FSA полезно.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>FSA — стандартизация структуры action-объектов</li>
+          <li>Допустимые поля: <code>type</code>, <code>payload</code>, <code>error</code>, <code>meta</code></li>
+          <li>Других полей быть не должно (по спецификации)</li>
+          <li>На практике чаще используют отдельные action types вместо поля error</li>
+          <li>Redux Toolkit создаёт FSA-совместимые экшены</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

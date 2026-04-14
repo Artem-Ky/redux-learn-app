@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>27 — Todo: удаление элемента</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">27 / 100</span>
+      Todo: Удаление элемента — filter() вместо splice()
+    </div>
+    <nav class="site-header__nav">
+      <a href="../26-reducer-todo-toggle/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">27</span>
+      <a href="../28-reducer-todo-edit/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Todo delete -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Удаление задач из списка</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <p style="color: var(--text-muted); margin-bottom: 12px; font-size: 0.85rem;">
+            Нажмите кнопку ✕ справа от задачи, чтобы удалить её. Следите за state в DevTools — массив уменьшается.
+          </p>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Список задач (<span id="todo-count">3</span>)</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+            <div id="empty-msg" style="color: var(--text-muted); padding: 12px; text-align: center; font-style: italic; display: none;">
+              Все задачи удалены
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Текущий State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Удаление элементов из массива (filter)</div>
+      <div class="theory__body">
+        <h3>filter() — иммутабельное удаление</h3>
+        <p>
+          Для удаления элемента из массива в Redux мы используем метод <code>filter()</code>.
+          Он создаёт <strong>новый массив</strong>, содержащий только те элементы, которые
+          прошли проверку (predicate). Элемент с нужным <code>id</code> просто не попадает
+          в новый массив.
+        </p>
+
+        <div class="quote">
+          «We can use array methods like filter() to create a new array without the item
+          we want to remove, or use map() to create a copy of an array where we replace
+          items that match a condition.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#immutable-updates" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Паттерн: filter по id</h3>
+        <p>
+          Reducer получает <code>id</code> задачи для удаления в <code>action.payload</code>
+          и возвращает новый массив без этого элемента:
+        </p>
+
+        <div class="code-block">
+<span class="kw">case</span> <span class="str">'todos/todoDeleted'</span>: {
+  <span class="kw">return</span> state.<span class="fn">filter</span>(todo => todo.<span class="prop">id</span> !== action.<span class="prop">payload</span>)
+}
+        </div>
+
+        <p>
+          Это читается как: «верни все задачи, чей id <strong>не равен</strong> переданному».
+          Результат — новый массив, на один элемент короче.
+        </p>
+
+        <h3>Почему не splice()?</h3>
+        <p>
+          Метод <code>splice()</code> <strong>мутирует</strong> исходный массив. В Redux
+          это запрещено — мы должны всегда возвращать новый массив:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ✔ Правильно: filter создаёт новый массив</span>
+<span class="kw">return</span> state.<span class="fn">filter</span>(todo => todo.<span class="prop">id</span> !== action.<span class="prop">payload</span>)
+
+<span class="cm">// ✖ Неправильно: splice мутирует массив</span>
+<span class="kw">const</span> index = state.<span class="fn">findIndex</span>(t => t.<span class="prop">id</span> === action.<span class="prop">payload</span>)
+state.<span class="fn">splice</span>(index, <span class="num">1</span>)  <span class="cm">// ← мутация!</span>
+<span class="kw">return</span> state            <span class="cm">// ← та же ссылка</span>
+        </div>
+
+        <h3>Что происходит внутри</h3>
+        <p>
+          Допустим, у нас есть 3 задачи с id 1, 2, 3. Мы хотим удалить задачу с id 2:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// До: state = [{ id: 1 }, { id: 2 }, { id: 3 }]</span>
+
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/todoDeleted'</span>, <span class="prop">payload</span>: <span class="num">2</span> })
+
+<span class="cm">// filter проверяет каждый элемент:</span>
+<span class="cm">// id: 1 !== 2 → true  → включить</span>
+<span class="cm">// id: 2 !== 2 → false → исключить</span>
+<span class="cm">// id: 3 !== 2 → true  → включить</span>
+
+<span class="cm">// После: state = [{ id: 1 }, { id: 3 }]</span>
+        </div>
+
+        <div class="tip">
+          Откройте DevTools и удалите задачу — вы увидите, как в diff элемент исчезает
+          из массива. Длина массива (<code>state.length</code>) уменьшается на 1.
+        </div>
+
+        <div class="warning">
+          Если в массиве несколько элементов с одинаковым <code>id</code>, <code>filter()</code>
+          удалит <strong>все</strong> совпадения. Убедитесь, что id уникальны!
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>filter()</code> создаёт новый массив — это иммутабельная операция</li>
+          <li>Паттерн: <code>state.filter(item => item.id !== action.payload)</code></li>
+          <li>Никогда не используйте <code>splice()</code> в reducer</li>
+          <li>В payload передаём только <code>id</code> удаляемого элемента</li>
+          <li>filter не мутирует исходный массив — это ключевое требование Redux</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>09 — Action Payload</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">09 / 100</span>
+      Action Payload — Данные в экшене
+    </div>
+    <nav class="site-header__nav">
+      <a href="../08-action-types-naming/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">09</span>
+      <a href="../10-flux-standard-action/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Todo list with payload -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Todo-лист с payload</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Добавить задачу</h3>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+              <input type="text" id="todo-input" placeholder="Текст задачи..." style="flex: 1;">
+              <button class="btn btn--accent" id="btn-add">Добавить</button>
+            </div>
+
+            <h3 style="color: var(--text-bright); margin-bottom: 8px;">Список задач</h3>
+            <div id="todo-list" style="min-height: 60px;">
+              <div style="color: var(--text-muted); font-style: italic;">Пока пусто — добавьте задачу выше</div>
+            </div>
+
+            <div class="btn-group" style="margin-top: 16px;">
+              <button class="btn btn--danger" id="btn-clear">Очистить все</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">Последний отправленный Action (с payload)</div>
+              <pre id="action-display" style="color: var(--accent-orange); font-size: 0.85rem;">—</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Поле payload в Action</div>
+      <div class="theory__body">
+        <h3>Зачем нужен payload?</h3>
+        <p>
+          Поле <code>type</code> говорит <em>что произошло</em>, а <strong>payload</strong>
+          передаёт <em>дополнительные данные</em>, необходимые для обновления state. Без
+          payload reducer не знал бы, какой именно текст добавить, какое число прибавить и т.д.
+        </p>
+
+        <div class="quote">
+          «An action object can have other fields with additional information about what happened.
+          By convention, we put that information in a field called payload.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#actions" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Примеры payload</h3>
+        <div class="code-block">
+<span class="cm">// Payload — строка</span>
+{ <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span>, <span class="prop">payload</span>: <span class="str">'Купить молоко'</span> }
+
+<span class="cm">// Payload — число</span>
+{ <span class="prop">type</span>: <span class="str">'counter/addAmount'</span>, <span class="prop">payload</span>: <span class="num">5</span> }
+
+<span class="cm">// Payload — объект</span>
+{ <span class="prop">type</span>: <span class="str">'users/userUpdated'</span>, <span class="prop">payload</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">name</span>: <span class="str">'Анна'</span> } }
+        </div>
+
+        <h3>Как payload попадает в reducer</h3>
+        <p>
+          Reducer читает <code>action.payload</code> и использует эти данные для вычисления
+          нового state:
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">todosReducer</span>(state = [], action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'todos/todoAdded'</span>:
+      <span class="kw">return</span> [...state, action.<span class="prop">payload</span>]
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state
+  }
+}
+
+store.<span class="fn">dispatch</span>({
+  <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span>,
+  <span class="prop">payload</span>: <span class="str">'Купить молоко'</span>
+})
+<span class="cm">// state: ['Купить молоко']</span>
+        </div>
+
+        <h3>Payload — это соглашение, а не требование</h3>
+        <p>
+          Технически можно назвать поле как угодно (<code>data</code>, <code>text</code>,
+          <code>value</code>), но <strong>payload</strong> — общепринятое соглашение,
+          которое делает код предсказуемым. Это часть стандарта
+          <em>Flux Standard Action</em> (FSA), который мы разберём в следующем уроке.
+        </p>
+
+        <div class="tip">
+          Не все экшены нуждаются в payload. Например, <code>counter/incremented</code> достаточно
+          самоописателен — reducer знает, что нужно прибавить 1. Payload нужен, когда данные
+          динамические и приходят извне (ввод пользователя, ответ API и т.д.).
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>type</code> — <em>что произошло</em>, <code>payload</code> — <em>данные события</em></li>
+          <li><strong>payload</strong> — общепринятое имя для дополнительных данных</li>
+          <li>Payload может быть строкой, числом, объектом, массивом — чем угодно</li>
+          <li>Reducer использует <code>action.payload</code> для вычисления нового state</li>
+          <li>Не каждый экшен нуждается в payload</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

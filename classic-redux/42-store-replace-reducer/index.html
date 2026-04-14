@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>42 — store.replaceReducer(): горячая замена reducer</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">42 / 100</span>
+      store.replaceReducer() — горячая замена reducer
+    </div>
+    <nav class="site-header__nav">
+      <a href="../41-store-preloaded-state/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">42</span>
+      <a href="../43-store-internals/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: replaceReducer -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — replaceReducer()</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div id="reducer-label" style="color: var(--accent-orange); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; margin-bottom: 12px;">
+            Активный reducer: counterReducer (шаг +1)
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn" id="btn-increment">+ Increment</button>
+            <button class="btn" id="btn-decrement">− Decrement</button>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn--accent" id="btn-switch-double">Переключить на doubleReducer (шаг ×2)</button>
+            <button class="btn" id="btn-switch-normal">Вернуть counterReducer (шаг +1)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — store.replaceReducer()</div>
+      <div class="theory__body">
+        <h3>Что делает replaceReducer?</h3>
+        <p>
+          Метод <code>store.replaceReducer(nextReducer)</code> заменяет текущий reducer store
+          на новый. Это <strong>продвинутый API</strong>, который используется в специфических
+          сценариях.
+        </p>
+
+        <div class="quote">
+          «replaceReducer is an advanced API. You might need this if your app implements
+          code splitting, and you want to load some of the reducers dynamically. You might
+          also need this if you implement a hot reloading mechanism for Redux.»
+          <br>— <a href="https://redux.js.org/api/store#replacereducernextreducer" target="_blank">Redux API Reference: Store</a>
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+store.<span class="fn">replaceReducer</span>(nextReducer: <span class="type">Reducer</span>): <span class="kw">void</span>
+        </div>
+
+        <h3>Основные use cases</h3>
+        <ul>
+          <li><strong>Code splitting</strong> — подгрузка reducer'ов по мере необходимости</li>
+          <li><strong>Hot Module Replacement</strong> — замена reducer без перезагрузки</li>
+          <li><strong>Динамические фичи</strong> — добавление/удаление slice reducer'ов</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Code splitting: динамическая загрузка reducer</span>
+<span class="kw">import</span>(<span class="str">'./features/newFeature/reducer'</span>).<span class="fn">then</span>(module => {
+  <span class="kw">const</span> newRootReducer = <span class="fn">combineReducers</span>({
+    ...existingReducers,
+    <span class="prop">newFeature</span>: module.<span class="prop">default</span>
+  })
+  store.<span class="fn">replaceReducer</span>(newRootReducer)
+})
+        </div>
+
+        <h3>replaceReducer диспатчит @@INIT</h3>
+        <p>
+          После замены reducer Redux автоматически диспатчит внутренний action
+          <code>@@INIT</code>. Это заставляет новый reducer инициализировать state —
+          новые ключи получат default values из нового reducer.
+        </p>
+
+        <div class="code-block">
+store.<span class="fn">replaceReducer</span>(newReducer)
+<span class="cm">// Redux автоматически: store.dispatch({ type: '@@INIT' })</span>
+<span class="cm">// Новый reducer обрабатывает существующий state</span>
+        </div>
+
+        <div class="tip">
+          Попробуйте переключить reducer в демо выше. Заметьте, что state (счётчик) сохраняется
+          при замене — меняется только логика обработки действий. Кнопка Increment теперь
+          увеличивает на 2 вместо 1.
+        </div>
+
+        <div class="warning">
+          <code>replaceReducer</code> не сбрасывает state. Существующее состояние передаётся
+          новому reducer как есть. Если новый reducer ожидает другую форму state, это может
+          привести к ошибкам.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>replaceReducer</code> — продвинутый API для замены reducer на лету</li>
+          <li>Используется для code splitting, HMR, динамических фич</li>
+          <li>После замены автоматически диспатчит <code>@@INIT</code></li>
+          <li>State <strong>не сбрасывается</strong> при замене reducer</li>
+          <li>Новый reducer должен уметь работать с существующим state</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

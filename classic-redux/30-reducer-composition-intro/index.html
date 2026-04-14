@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>30 — Reducer Composition: разделение reducer'ов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">30 / 100</span>
+      Reducer Composition — разделение на слайсы
+    </div>
+    <nav class="site-header__nav">
+      <a href="../29-reducer-multiple-actions/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">30</span>
+      <a href="../31-combine-reducers/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Reducer composition -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — От одного reducer к composition</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
+            <span id="mode-label" style="color: var(--accent-orange); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600;">
+              Режим: Один большой reducer
+            </span>
+            <button class="btn btn--accent" id="btn-refactor" style="margin-left: auto;">
+              Рефакторить → Split Reducers
+            </button>
+          </div>
+
+          <div class="two-col">
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">Todos</h3>
+              <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="text" id="todo-input" placeholder="Новая задача..." style="flex: 1;">
+                <button class="btn" id="btn-add-todo">+</button>
+              </div>
+              <div class="state-display">
+                <ul id="todo-list" style="list-style: none; padding: 4px 0;"></ul>
+                <div id="todo-empty" style="color: var(--text-muted); padding: 8px; text-align: center; font-style: italic;">
+                  Нет задач
+                </div>
+              </div>
+              <div id="shown-count" style="color: var(--text-muted); font-size: 0.72rem; margin-top: 4px;"></div>
+            </div>
+
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">Filters</h3>
+              <div style="margin-bottom: 8px;">
+                <label style="color: var(--text-muted); font-size: 0.75rem;">Статус:</label>
+                <div class="btn-group" style="margin-top: 4px;">
+                  <button class="btn filter-btn" data-status="all">Все</button>
+                  <button class="btn filter-btn" data-status="active">Активные</button>
+                  <button class="btn filter-btn" data-status="completed">Выполненные</button>
+                </div>
+              </div>
+              <div>
+                <label style="color: var(--text-muted); font-size: 0.75rem;">Цвета:</label>
+                <div class="btn-group" style="margin-top: 4px;">
+                  <button class="btn color-btn" data-color="red" style="color: #f44747;">● red</button>
+                  <button class="btn color-btn" data-color="blue" style="color: #569cd6;">● blue</button>
+                  <button class="btn color-btn" data-color="green" style="color: #4caf50;">● green</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-top: 16px;">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem; max-height: 200px; overflow-y: auto;"></pre>
+          </div>
+
+          <div id="code-comparison" style="margin-top: 16px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Reducer Composition (разделение reducer'ов)</div>
+      <div class="theory__body">
+        <h3>Проблема: один reducer на всё</h3>
+        <p>
+          В предыдущем уроке мы написали один reducer, обрабатывающий все действия.
+          Но представьте приложение, где state содержит <code>todos</code>, <code>filters</code>,
+          <code>user</code>, <code>notifications</code>... Один reducer будет огромным и
+          трудно поддерживаемым.
+        </p>
+
+        <div class="quote">
+          «It's not really the number of actions that matters, but how complex the state
+          shape is. Each reducer effectively handles a slice of the state, and each reducer
+          needs to know how to handle actions that apply to that particular slice.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#splitting-reducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Принцип: каждый reducer управляет своим «слайсом»</h3>
+        <p>
+          <strong>Reducer composition</strong> — это принцип разделения: вместо одного
+          гигантского reducer мы создаём несколько маленьких, каждый из которых управляет
+          своей частью (slice) state.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// БЫЛО: один большой reducer</span>
+<span class="kw">function</span> <span class="fn">rootReducer</span>(state = initialState, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="cm">// 10 case для todos...</span>
+    <span class="cm">// 5 case для filters...</span>
+    <span class="cm">// 8 case для user...</span>
+    <span class="kw">default</span>: <span class="kw">return</span> state
+  }
+}
+        </div>
+
+        <div class="code-block">
+<span class="cm">// СТАЛО: разделение на слайсы</span>
+<span class="kw">function</span> <span class="fn">todosReducer</span>(state: <span class="type">Todo</span>[] = [], action): <span class="type">Todo</span>[] {
+  <span class="cm">// Обрабатывает только todos</span>
+}
+
+<span class="kw">function</span> <span class="fn">filtersReducer</span>(state: <span class="type">FiltersState</span> = initialFilters, action): <span class="type">FiltersState</span> {
+  <span class="cm">// Обрабатывает только filters</span>
+}
+        </div>
+
+        <h3>Ручная композиция</h3>
+        <p>
+          До использования <code>combineReducers</code> можно объединить reducer'ы вручную.
+          Корневой reducer делегирует обработку каждому слайс-reducer'у:
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">rootReducer</span>(state: <span class="type">AppState</span> = initialState, action: <span class="type">Action</span>): <span class="type">AppState</span> {
+  <span class="kw">return</span> {
+    <span class="prop">todos</span>: <span class="fn">todosReducer</span>(state.<span class="prop">todos</span>, action),
+    <span class="prop">filters</span>: <span class="fn">filtersReducer</span>(state.<span class="prop">filters</span>, action)
+  }
+}
+        </div>
+
+        <h3>combineReducers — автоматическая композиция</h3>
+        <p>
+          Redux предоставляет утилиту <code>combineReducers</code>, которая делает то же самое
+          автоматически. Она принимает объект, где ключ — имя слайса, а значение — reducer:
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">combineReducers</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="kw">const</span> rootReducer = <span class="fn">combineReducers</span>({
+  <span class="prop">todos</span>: todosReducer,
+  <span class="prop">filters</span>: filtersReducer
+})
+
+<span class="cm">// Результат: state = { todos: [...], filters: { ... } }</span>
+        </div>
+
+        <div class="tip">
+          Нажмите кнопку «Рефакторить» в демо выше, чтобы увидеть переход от одного
+          большого reducer к двум разделённым. Оба подхода дают одинаковый state —
+          разница только в организации кода.
+        </div>
+
+        <h3>Структура state после разделения</h3>
+        <p>
+          Каждый слайс-reducer получает <strong>только свою часть</strong> state и
+          возвращает обновлённую версию этой части:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Полный state</span>
+{
+  <span class="prop">todos</span>: [                        <span class="cm">// ← todosReducer</span>
+    { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">text</span>: <span class="str">'...'</span>, <span class="prop">completed</span>: <span class="num">false</span> }
+  ],
+  <span class="prop">filters</span>: {                      <span class="cm">// ← filtersReducer</span>
+    <span class="prop">status</span>: <span class="str">'all'</span>,
+    <span class="prop">colors</span>: []
+  }
+}
+        </div>
+
+        <div class="warning">
+          Каждый слайс-reducer <strong>не знает</strong> о существовании других слайсов.
+          <code>todosReducer</code> получает только <code>state.todos</code> (массив), а не
+          весь state объект. Это обеспечивает изоляцию и модульность.
+        </div>
+
+        <h3>Подготовка к combineReducers</h3>
+        <p>
+          В следующем уроке (31) мы подробно разберём <code>combineReducers</code> — утилиту,
+          которая автоматизирует то, что мы сделали вручную. Она генерирует корневой reducer,
+          вызывающий каждый слайс-reducer с его частью state.
+        </p>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><strong>Reducer composition</strong> — разделение одного reducer на несколько по слайсам</li>
+          <li>Каждый слайс-reducer управляет <strong>только своей частью</strong> state</li>
+          <li>Корневой reducer делегирует обработку слайс-reducer'ам</li>
+          <li><code>combineReducers</code> автоматизирует ручную композицию</li>
+          <li>State имеет структуру <code>{ sliceName: sliceState, ... }</code></li>
+          <li>Оба подхода (один reducer и split) дают <strong>идентичный</strong> результат</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

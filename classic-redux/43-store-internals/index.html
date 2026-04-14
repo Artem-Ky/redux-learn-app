@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>43 — Как устроен Store внутри: мини-реализация</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">43 / 100</span>
+      Как Store работает внутри — мини-реализация
+    </div>
+    <nav class="site-header__nav">
+      <a href="../42-store-replace-reducer/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">43</span>
+      <a href="../44-store-no-direct-mutation/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Store internals -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Наш собственный createStore!</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div style="color: var(--success); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; margin-bottom: 12px;">
+            ⚡ Работает на miniCreateStore — Redux НЕ импортирован
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px;">
+            <button class="btn" id="btn-increment">+ Increment</button>
+            <button class="btn" id="btn-decrement">− Decrement</button>
+            <button class="btn" id="btn-reset">Reset</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Исходный код miniCreateStore</div>
+            <pre id="source-display" style="color: var(--text-primary); font-size: 0.8rem; line-height: 1.5;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Как устроен Redux Store внутри</div>
+      <div class="theory__body">
+        <h3>Store — это удивительно просто</h3>
+        <p>
+          Redux Store можно реализовать примерно в <strong>25 строках кода</strong>. Внутри
+          — всего лишь замыкание с переменной state, массивом слушателей и тремя методами.
+        </p>
+
+        <div class="quote">
+          «The Redux store itself is actually quite small — the store code is less than
+          200 lines, and you could rewrite it yourself if you wanted to. It's really just
+          a few functions in a closure.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#inside-a-redux-store" target="_blank">Redux Fundamentals, Part 4: Store</a>
+        </div>
+
+        <h3>Полная реализация miniCreateStore</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">miniCreateStore</span>(reducer, preloadedState?) {
+  <span class="kw">let</span> state = preloadedState
+  <span class="kw">let</span> listeners: <span class="type">Function</span>[] = []
+
+  <span class="cm">// Инициализация: вызываем reducer с undefined</span>
+  <span class="cm">// чтобы каждый reducer вернул свой default state</span>
+  <span class="kw">if</span> (state === <span class="kw">undefined</span>) {
+    state = <span class="fn">reducer</span>(<span class="kw">undefined</span>, { <span class="prop">type</span>: <span class="str">'@@INIT'</span> })
+  }
+
+  <span class="kw">function</span> <span class="fn">getState</span>() {
+    <span class="kw">return</span> state
+  }
+
+  <span class="kw">function</span> <span class="fn">dispatch</span>(action) {
+    state = <span class="fn">reducer</span>(state, action)
+    listeners.<span class="fn">forEach</span>(listener => <span class="fn">listener</span>())
+  }
+
+  <span class="kw">function</span> <span class="fn">subscribe</span>(listener) {
+    listeners.<span class="fn">push</span>(listener)
+    <span class="kw">return</span> () => {
+      listeners = listeners.<span class="fn">filter</span>(l => l !== listener)
+    }
+  }
+
+  <span class="kw">return</span> { getState, dispatch, subscribe }
+}
+        </div>
+
+        <h3>Разбор по частям</h3>
+
+        <p><strong>1. Замыкание (closure)</strong></p>
+        <p>
+          <code>state</code> и <code>listeners</code> — приватные переменные внутри замыкания.
+          Доступ к ним возможен только через возвращаемые методы.
+        </p>
+
+        <p><strong>2. getState()</strong></p>
+        <p>
+          Просто возвращает текущее значение <code>state</code>. Никакой копии — та же ссылка.
+        </p>
+
+        <p><strong>3. dispatch(action)</strong></p>
+        <p>
+          Вызывает reducer с текущим state и action, сохраняет результат, затем уведомляет
+          всех подписчиков. Это <strong>единственный способ</strong> изменить state.
+        </p>
+
+        <p><strong>4. subscribe(listener)</strong></p>
+        <p>
+          Добавляет слушателя в массив. Возвращает функцию для отписки (unsubscribe).
+        </p>
+
+        <p><strong>5. @@INIT</strong></p>
+        <p>
+          При создании store вызывается <code>reducer(undefined, { type: '@@INIT' })</code>.
+          Поскольку state === undefined, каждый reducer вернёт свой default state.
+        </p>
+
+        <div class="tip">
+          Демо выше работает полностью на нашей реализации — без импорта Redux.
+          Счётчик, dispatch, subscribe — всё работает на miniCreateStore.
+        </div>
+
+        <h3>Сравнение с настоящим Redux</h3>
+        <p>
+          Реальный <code>createStore</code> добавляет:
+        </p>
+        <ul>
+          <li>Проверку типов аргументов (reducer — функция, action.type — строка)</li>
+          <li>Защиту от dispatch внутри reducer</li>
+          <li>Метод <code>replaceReducer</code></li>
+          <li>Поддержку enhancers (третий аргумент)</li>
+          <li>Observable интерфейс (Symbol.observable)</li>
+        </ul>
+
+        <div class="warning">
+          Наша мини-реализация — учебная. В продакшене используйте настоящий Redux,
+          который включает важные проверки и оптимизации.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Store — это замыкание с <code>state</code> и <code>listeners</code></li>
+          <li><code>getState()</code> возвращает ссылку на текущий state</li>
+          <li><code>dispatch(action)</code> вызывает reducer + уведомляет подписчиков</li>
+          <li><code>subscribe(listener)</code> возвращает функцию отписки</li>
+          <li><code>@@INIT</code> при создании инициализирует default state</li>
+          <li>Вся логика — ~25 строк</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

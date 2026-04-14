@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>46 — Compose: объединение enhancer'ов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">46 / 100</span>
+      Compose — объединение нескольких enhancer'ов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../45-store-enhancers-intro/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">46</span>
+      <a href="../47-store-api-summary/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Compose enhancers -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Два enhancer'а через compose()</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Счётчик</div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 12px;">
+              <span id="counter-value" style="font-family: var(--font-mono); font-size: 2rem; color: var(--accent-cyan); min-width: 60px; text-align: center;">0</span>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn" id="btn-decrement">−1</button>
+                <button class="btn btn--accent" id="btn-increment">+1</button>
+                <button class="btn" id="btn-add5">+5</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">getState() — результат с timestamp от enhancer'а</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="btn" id="btn-reset">Сбросить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — compose() для объединения enhancer'ов</div>
+      <div class="theory__body">
+        <h3>Зачем compose?</h3>
+        <p>
+          Часто приложению нужно несколько enhancer'ов одновременно: один добавляет
+          логирование, другой — метрики, третий — DevTools. Функция <code>compose</code>
+          из Redux позволяет объединить их в один.
+        </p>
+
+        <div class="quote">
+          «Since enhancers are the most powerful extension mechanism for a Redux store, you
+          will almost certainly need to use at least one enhancer when setting up a store.
+          Redux includes a <code>compose</code> function that can be used to merge multiple
+          enhancers into a single enhancer.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#creating-a-store-with-enhancers" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Что делает compose?</h3>
+        <p>
+          <code>compose(f, g, h)</code> возвращает <code>(...args) => f(g(h(...args)))</code>.
+          То есть функции применяются <strong>справа налево</strong>. Это стандартная
+          математическая композиция функций.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">compose</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="kw">const</span> composedEnhancer = <span class="fn">compose</span>(
+  logEnhancer,        <span class="cm">// применяется вторым (оборачивает результат)</span>
+  timestampEnhancer   <span class="cm">// применяется первым (ближе к store)</span>
+)
+        </div>
+
+        <h3>Пример: logEnhancer</h3>
+        <p>
+          Этот enhancer оборачивает <code>dispatch</code>, чтобы логировать каждое
+          отправленное действие и новый state:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> logEnhancer = (createStore) => (reducer, preloadedState, enhancer) => {
+  <span class="kw">const</span> store = <span class="fn">createStore</span>(reducer, preloadedState, enhancer)
+  <span class="kw">const</span> originalDispatch = store.<span class="prop">dispatch</span>
+
+  store.<span class="prop">dispatch</span> = (action) => {
+    console.<span class="fn">log</span>(<span class="str">'📋 dispatch:'</span>, action)
+    <span class="kw">const</span> result = <span class="fn">originalDispatch</span>(action)
+    console.<span class="fn">log</span>(<span class="str">'📋 new state:'</span>, store.<span class="fn">getState</span>())
+    <span class="kw">return</span> result
+  }
+
+  <span class="kw">return</span> store
+}
+        </div>
+
+        <h3>Пример: timestampEnhancer</h3>
+        <p>
+          Этот enhancer оборачивает <code>getState</code>, добавляя <code>lastUpdated</code>
+          к результату:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> timestampEnhancer = (createStore) => (reducer, preloadedState, enhancer) => {
+  <span class="kw">const</span> store = <span class="fn">createStore</span>(reducer, preloadedState, enhancer)
+  <span class="kw">const</span> originalGetState = store.<span class="prop">getState</span>
+
+  store.<span class="prop">getState</span> = () => ({
+    ...<span class="fn">originalGetState</span>(),
+    <span class="prop">lastUpdated</span>: <span class="kw">new</span> <span class="fn">Date</span>().<span class="fn">toLocaleTimeString</span>()
+  })
+
+  <span class="kw">return</span> store
+}
+        </div>
+
+        <h3>Объединение через compose</h3>
+
+        <div class="code-block">
+<span class="kw">const</span> composedEnhancer = <span class="fn">compose</span>(logEnhancer, timestampEnhancer)
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(reducer, <span class="kw">undefined</span>, composedEnhancer)
+        </div>
+
+        <div class="tip">
+          Порядок в <code>compose</code> важен! Enhancer'ы применяются <strong>справа
+          налево</strong>: сначала <code>timestampEnhancer</code> оборачивает store,
+          затем <code>logEnhancer</code> оборачивает результат. Это значит, что
+          <code>logEnhancer</code> «видит» store, уже модифицированный
+          <code>timestampEnhancer</code>.
+        </div>
+
+        <h3>createStore с третьим аргументом</h3>
+        <p>
+          Enhancer передаётся <strong>третьим аргументом</strong> в <code>createStore</code>.
+          Второй аргумент — начальное состояние (preloadedState). Если начальное
+          состояние не нужно, передайте <code>undefined</code>:
+        </p>
+
+        <div class="code-block">
+<span class="fn">createStore</span>(reducer, <span class="kw">undefined</span>, composedEnhancer)
+<span class="cm">// reducer — первый аргумент</span>
+<span class="cm">// undefined — preloadedState (нет)</span>
+<span class="cm">// composedEnhancer — enhancer (третий)</span>
+        </div>
+
+        <div class="warning">
+          Не путайте порядок аргументов! Если передать enhancer вторым аргументом,
+          Redux попытается использовать его как начальное состояние, что приведёт
+          к ошибке.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>compose</code> объединяет несколько enhancer'ов в один</li>
+          <li>Порядок выполнения — <strong>справа налево</strong></li>
+          <li>Каждый enhancer оборачивает store, добавляя своё поведение</li>
+          <li>Enhancer передаётся третьим аргументом в <code>createStore</code></li>
+          <li><code>compose</code> полезен и вне Redux — это общая утилита композиции функций</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

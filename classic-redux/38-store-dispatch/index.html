@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>38 — store.dispatch(action)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">38 / 100</span>
+      store.dispatch(action) — обновление state
+    </div>
+    <nav class="site-header__nav">
+      <a href="../37-store-getstate/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">38</span>
+      <a href="../39-store-subscribe/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: dispatch -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — dispatch различных action types</div>
+      <div class="demo-section__body">
+        <div style="max-width: 550px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-increment">dispatch increment</button>
+            <button class="btn" id="btn-decrement">dispatch decrement</button>
+            <button class="btn" id="btn-reset">dispatch reset</button>
+          </div>
+
+          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
+            <input type="number" id="amount-input" value="5" style="width: 60px;">
+            <button class="btn btn--accent" id="btn-add-amount">dispatch addAmount</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Текущий State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Возвращаемое значение dispatch()</div>
+            <pre id="return-display" style="color: var(--accent-orange); font-size: 0.85rem;">Нажмите любую кнопку ↑</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — store.dispatch(action)</div>
+      <div class="theory__body">
+        <h3>Единственный способ обновить state</h3>
+        <p>
+          <code>store.dispatch(action)</code> — это <strong>единственный</strong> способ
+          изменить state в Redux. Вызов dispatch передаёт action в reducer, который
+          вычисляет новый state.
+        </p>
+
+        <div class="quote">
+          «Dispatches an action. This is the only way to trigger a state change.
+          The store's reducing function will be called with the current getState() result
+          and the given action synchronously.»
+          <br>— <a href="https://redux.js.org/api/store#dispatchaction" target="_blank">Redux API Reference: Store — dispatch(action)</a>
+        </div>
+
+        <h3>dispatch вызывает reducer синхронно</h3>
+        <p>
+          Когда вы вызываете <code>dispatch(action)</code>, Redux <strong>синхронно</strong>
+          вызывает reducer с текущим state и переданным action. Это значит, что после
+          <code>dispatch</code> вызов <code>getState()</code> уже вернёт обновлённый state.
+        </p>
+
+        <div class="code-block">
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+<span class="cm">// ↑ reducer уже отработал</span>
+<span class="fn">console.log</span>(store.<span class="fn">getState</span>()) <span class="cm">// уже новый state</span>
+        </div>
+
+        <h3>dispatch возвращает action</h3>
+        <p>
+          Возвращаемое значение <code>dispatch()</code> — это тот же action объект,
+          который вы передали. Это полезно для цепочки вызовов и middleware.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> returnedAction = store.<span class="fn">dispatch</span>({
+  <span class="prop">type</span>: <span class="str">'counter/addAmount'</span>,
+  <span class="prop">payload</span>: <span class="num">5</span>
+})
+
+<span class="fn">console.log</span>(returnedAction)
+<span class="cm">// { type: 'counter/addAmount', payload: 5 }</span>
+        </div>
+
+        <h3>Различные action types</h3>
+        <p>
+          В реальном приложении store получает множество разных action types.
+          Reducer обрабатывает каждый тип через <code>switch/case</code>:
+        </p>
+
+        <div class="code-block">
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/decremented'</span> })
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/reset'</span> })
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/addAmount'</span>, <span class="prop">payload</span>: <span class="num">10</span> })
+        </div>
+
+        <div class="warning">
+          <strong>Нельзя dispatch из reducer!</strong> Reducer — чистая функция. Вызов
+          <code>store.dispatch()</code> внутри reducer приведёт к ошибке или непредсказуемому
+          поведению. Dispatch вызывается только из обработчиков событий, middleware или
+          внешнего кода.
+        </div>
+
+        <div class="tip">
+          Нажмите кнопки в демо и обратите внимание: после каждого dispatch в консоль
+          выводится и action, и новый state. Также посмотрите на «Возвращаемое значение» —
+          dispatch всегда возвращает тот же action, который получил.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>dispatch(action)</code> — единственный способ обновить state</li>
+          <li>Reducer вызывается <strong>синхронно</strong> внутри dispatch</li>
+          <li><code>dispatch</code> возвращает переданный action объект</li>
+          <li>Нельзя вызывать dispatch внутри reducer</li>
+          <li>После dispatch <code>getState()</code> уже возвращает новый state</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

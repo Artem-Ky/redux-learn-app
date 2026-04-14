@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>15 — Генерация ID в Action Creator</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">15 / 100</span>
+      Генерация уникальных ID в Action Creator
+    </div>
+    <nav class="site-header__nav">
+      <a href="../14-action-creators-complex/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">15</span>
+      <a href="../16-action-creators-arrow/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Notes list with unique IDs -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Заметки с уникальными ID</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Добавить заметку</h3>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="note-input" placeholder="Текст заметки..." style="flex: 1;">
+              <button class="btn btn--accent" id="btn-add">Добавить</button>
+            </div>
+
+            <div style="margin-top: 16px;">
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">Список заметок</h3>
+              <div id="notes-list" style="color: var(--text-secondary); font-size: 0.85rem;">
+                Пока пусто
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.82rem;"></pre>
+            </div>
+            <div class="state-display" style="margin-top: 12px;">
+              <div class="state-display__label">Созданный Action</div>
+              <pre id="action-display" style="color: var(--accent-orange); font-size: 0.82rem;">—</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Генерация ID в Action Creator</div>
+      <div class="theory__body">
+        <h3>Почему ID генерируется в Action Creator, а не в Reducer?</h3>
+        <p>
+          Reducer должен быть <strong>чистой функцией</strong> — он не может иметь
+          побочных эффектов и должен возвращать предсказуемый результат при одинаковых входных данных.
+          Генерация уникального ID — это <strong>побочный эффект</strong>, потому что каждый вызов
+          даёт новое значение:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ НЕЛЬЗЯ — генерация ID в reducer нарушает чистоту</span>
+<span class="kw">function</span> <span class="fn">notesReducer</span>(state, action) {
+  <span class="kw">case</span> <span class="str">'notes/noteAdded'</span>:
+    <span class="kw">return</span> [...state, {
+      <span class="prop">id</span>: Math.<span class="fn">random</span>(),  <span class="cm">// ← побочный эффект!</span>
+      <span class="prop">text</span>: action.<span class="prop">payload</span>
+    }]
+}
+
+<span class="cm">// ✅ ПРАВИЛЬНО — генерация ID в action creator</span>
+<span class="kw">let</span> nextId = <span class="num">1</span>
+<span class="kw">function</span> <span class="fn">noteAdded</span>(<span class="prop">text</span>: <span class="type">string</span>) {
+  <span class="kw">return</span> {
+    <span class="prop">type</span>: <span class="str">'notes/noteAdded'</span>,
+    <span class="prop">payload</span>: { <span class="prop">id</span>: nextId++, <span class="prop">text</span> }
+  }
+}
+        </div>
+
+        <div class="quote">
+          «Reducers must always follow some specific rules: They should only calculate
+          the new state value based on the state and action arguments.
+          They must not do any asynchronous logic, calculate random values,
+          or cause other "side effects".»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#rules-of-reducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Паттерн nextId++</h3>
+        <p>
+          Самый простой способ — использовать замыкание с инкрементируемым счётчиком.
+          Каждый вызов action creator'а увеличивает счётчик:
+        </p>
+
+        <div class="code-block">
+<span class="kw">let</span> nextNoteId = <span class="num">1</span>
+
+<span class="kw">function</span> <span class="fn">noteAdded</span>(<span class="prop">text</span>: <span class="type">string</span>) {
+  <span class="kw">return</span> {
+    <span class="prop">type</span>: <span class="str">'notes/noteAdded'</span>,
+    <span class="prop">payload</span>: {
+      <span class="prop">id</span>: nextNoteId++,  <span class="cm">// 1, 2, 3, 4...</span>
+      <span class="prop">text</span>
+    }
+  }
+}
+        </div>
+
+        <h3>Альтернативы: nanoid / uuid</h3>
+        <p>
+          В реальных проектах часто используют библиотеки для генерации уникальных идентификаторов:
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">nanoid</span> } <span class="kw">from</span> <span class="str">'nanoid'</span>
+
+<span class="kw">function</span> <span class="fn">noteAdded</span>(<span class="prop">text</span>: <span class="type">string</span>) {
+  <span class="kw">return</span> {
+    <span class="prop">type</span>: <span class="str">'notes/noteAdded'</span>,
+    <span class="prop">payload</span>: {
+      <span class="prop">id</span>: <span class="fn">nanoid</span>(),  <span class="cm">// 'V1StGXR8_Z5jdHi6B-myT'</span>
+      <span class="prop">text</span>
+    }
+  }
+}
+        </div>
+
+        <div class="warning">
+          Никогда не генерируйте случайные значения (ID, даты, Math.random()) внутри reducer'а.
+          Это нарушает его чистоту и делает поведение непредсказуемым.
+          Все «нечистые» операции выполняются <strong>до dispatch</strong> — в action creator'е.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Reducer — <strong>чистая функция</strong>, никаких побочных эффектов</li>
+          <li>Генерация ID — побочный эффект → делаем в <strong>action creator</strong></li>
+          <li>Простой подход: <code>let nextId = 1; nextId++</code></li>
+          <li>Продвинутый подход: <code>nanoid()</code> или <code>uuid()</code></li>
+          <li>ID приходит в reducer <strong>готовым</strong> через <code>action.payload.id</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

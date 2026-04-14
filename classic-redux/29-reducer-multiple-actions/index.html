@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>29 — Reducer: множество action types</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">29 / 100</span>
+      Reducer с множеством Action Types — полнофункциональный Todo
+    </div>
+    <nav class="site-header__nav">
+      <a href="../28-reducer-todo-edit/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">29</span>
+      <a href="../30-reducer-composition-intro/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Full todo app -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Полнофункциональный Todo (6 операций)</div>
+      <div class="demo-section__body">
+        <div style="max-width: 550px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <input type="text" id="todo-input" placeholder="Новая задача..." style="flex: 1;">
+            <button class="btn btn--accent" id="btn-add">Добавить</button>
+          </div>
+
+          <div class="btn-group" style="margin-bottom: 16px;">
+            <button class="btn" id="btn-complete-all">✔ Выполнить все</button>
+            <button class="btn" id="btn-clear-completed">✕ Очистить выполненные</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">
+              Задачи: <span id="todo-count">0</span> всего,
+              <span id="active-count">0</span> активных,
+              <span id="completed-count">0</span> выполненных
+            </div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+            <div id="empty-msg" style="color: var(--text-muted); padding: 12px; text-align: center; font-style: italic; display: none;">
+              Список пуст
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Текущий State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem; max-height: 200px; overflow-y: auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Один reducer, множество действий</div>
+      <div class="theory__body">
+        <h3>Реальные reducer'ы обрабатывают много action types</h3>
+        <p>
+          В предыдущих уроках мы рассматривали каждую операцию отдельно: добавление,
+          переключение, удаление, редактирование. В реальном приложении <strong>один reducer</strong>
+          обрабатывает все эти действия через <code>switch/case</code>.
+        </p>
+
+        <div class="quote">
+          «A reducer may handle many different action types. It should look at the
+          action.type field to decide what to do for each action type, and return
+          a new state based on the action.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#creating-the-root-reducer" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Полный reducer со всеми операциями</h3>
+        <p>
+          Вот как выглядит reducer, обрабатывающий 6 различных action types для todo-списка:
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">todosReducer</span>(state: <span class="type">TodoState</span> = initialState, action: <span class="type">TodoAction</span>): <span class="type">TodoState</span> {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+
+    <span class="kw">case</span> <span class="str">'todos/todoAdded'</span>: {
+      <span class="kw">const</span> newTodo: <span class="type">Todo</span> = {
+        <span class="prop">id</span>: nextId++,
+        <span class="prop">text</span>: action.<span class="prop">payload</span>,
+        <span class="prop">completed</span>: <span class="num">false</span>
+      }
+      <span class="kw">return</span> [...state, newTodo]
+    }
+
+    <span class="kw">case</span> <span class="str">'todos/todoToggled'</span>:
+      <span class="kw">return</span> state.<span class="fn">map</span>(todo =>
+        todo.<span class="prop">id</span> === action.<span class="prop">payload</span>
+          ? { ...todo, <span class="prop">completed</span>: !todo.<span class="prop">completed</span> }
+          : todo
+      )
+
+    <span class="kw">case</span> <span class="str">'todos/todoDeleted'</span>:
+      <span class="kw">return</span> state.<span class="fn">filter</span>(todo =>
+        todo.<span class="prop">id</span> !== action.<span class="prop">payload</span>
+      )
+
+    <span class="kw">case</span> <span class="str">'todos/todoEdited'</span>: {
+      <span class="kw">const</span> { <span class="prop">id</span>, <span class="prop">text</span> } = action.<span class="prop">payload</span>
+      <span class="kw">return</span> state.<span class="fn">map</span>(todo =>
+        todo.<span class="prop">id</span> === id ? { ...todo, <span class="prop">text</span> } : todo
+      )
+    }
+
+    <span class="kw">case</span> <span class="str">'todos/allCompleted'</span>:
+      <span class="kw">return</span> state.<span class="fn">map</span>(todo =>
+        ({ ...todo, <span class="prop">completed</span>: <span class="num">true</span> })
+      )
+
+    <span class="kw">case</span> <span class="str">'todos/completedCleared'</span>:
+      <span class="kw">return</span> state.<span class="fn">filter</span>(todo =>
+        !todo.<span class="prop">completed</span>
+      )
+
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state
+  }
+}
+        </div>
+
+        <h3>Организация большого reducer</h3>
+        <p>
+          Когда reducer обрабатывает 5–10+ action types, он может стать большим.
+          Вот несколько советов по организации:
+        </p>
+        <ul>
+          <li><strong>Группируйте case</strong> по логике: CRUD-операции вместе, bulk-операции вместе</li>
+          <li><strong>Используйте фигурные скобки</strong> <code>{ }</code> в case, если нужны локальные переменные</li>
+          <li><strong>Выносите сложную логику</strong> в отдельные функции</li>
+          <li><strong>Каждый case возвращает</strong> — не забывайте <code>return</code></li>
+          <li><strong>default всегда возвращает state</strong> без изменений</li>
+        </ul>
+
+        <h3>Когда пора разделять reducer</h3>
+        <p>
+          Если reducer становится слишком большим или обрабатывает данные из разных
+          «доменов» (например, todos + filters + user), это сигнал для <strong>разделения</strong>
+          на несколько reducer'ов. Об этом подробно — в следующем уроке.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Признаки того, что reducer пора разделить:</span>
+<span class="cm">// 1. Обрабатывает state разной «формы» (todos + filters)</span>
+<span class="cm">// 2. Больше ~15 case</span>
+<span class="cm">// 3. Разные части state не связаны друг с другом</span>
+<span class="cm">// 4. Файл больше 100-150 строк</span>
+        </div>
+
+        <div class="tip">
+          В этом примере все 6 операций обрабатываются одним reducer — это нормально,
+          потому что все они работают с одним типом данных (<code>Todo[]</code>).
+          Проблемы начинаются, когда один reducer пытается управлять несколькими
+          независимыми частями state.
+        </div>
+
+        <h3>Bulk-операции</h3>
+        <p>
+          <code>todos/allCompleted</code> и <code>todos/completedCleared</code> — примеры
+          «массовых» операций. Они работают не с одним элементом, а со всеми:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Выполнить все: map с фиксированным значением</span>
+state.<span class="fn">map</span>(todo => ({ ...todo, <span class="prop">completed</span>: <span class="num">true</span> }))
+
+<span class="cm">// Очистить выполненные: filter по условию</span>
+state.<span class="fn">filter</span>(todo => !todo.<span class="prop">completed</span>)
+        </div>
+
+        <div class="warning">
+          <strong>Не забывайте про <code>default</code> case!</strong> Если reducer получает
+          неизвестный action type, он должен вернуть state без изменений. Без <code>default</code>
+          reducer вернёт <code>undefined</code>, что сломает приложение.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Один reducer может обрабатывать множество action types через <code>switch/case</code></li>
+          <li>Каждый case — самостоятельная иммутабельная операция</li>
+          <li>Паттерны: spread для добавления, map для обновления, filter для удаления</li>
+          <li>Bulk-операции (allCompleted, completedCleared) работают со всеми элементами</li>
+          <li>Если reducer слишком большой — пора разделять (следующий урок)</li>
+          <li><code>default</code> всегда возвращает <code>state</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

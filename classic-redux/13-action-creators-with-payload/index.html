@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>13 — Action Creator с параметрами</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">13 / 100</span>
+      Action Creator с параметрами (payload)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../12-action-creators-intro/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">13</span>
+      <a href="../14-action-creators-complex/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Todo list with action creator -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Todo-список через Action Creator</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Добавить задачу</h3>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="todo-input" placeholder="Текст задачи..." style="flex: 1;">
+              <button class="btn btn--accent" id="btn-add">Добавить</button>
+            </div>
+
+            <div style="margin-top: 16px;">
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">Список задач</h3>
+              <div id="todo-list" style="color: var(--text-secondary); font-size: 0.85rem;">
+                Пока пусто
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.82rem;"></pre>
+            </div>
+            <div class="state-display" style="margin-top: 12px;">
+              <div class="state-display__label">Созданный Action</div>
+              <pre id="action-display" style="color: var(--accent-orange); font-size: 0.82rem;">—</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Action Creator с параметрами</div>
+      <div class="theory__body">
+        <h3>Передача аргументов в Action Creator</h3>
+        <p>
+          В предыдущем уроке мы создали простые action creator'ы без параметров.
+          Но в реальных приложениях экшены почти всегда содержат <strong>payload</strong> —
+          данные, описывающие, что именно произошло. Чтобы формировать payload,
+          action creator принимает аргументы:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Action creator с параметром</span>
+<span class="kw">function</span> <span class="fn">todoAdded</span>(<span class="prop">text</span>: <span class="type">string</span>) {
+  <span class="kw">return</span> {
+    <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span>,
+    <span class="prop">payload</span>: text
+  }
+}
+
+<span class="cm">// Использование:</span>
+store.<span class="fn">dispatch</span>(<span class="fn">todoAdded</span>(<span class="str">'Купить молоко'</span>))
+<span class="cm">// → { type: 'todos/todoAdded', payload: 'Купить молоко' }</span>
+        </div>
+
+        <div class="quote">
+          «An action creator is a function that creates and returns an action object.
+          We typically use these so we don't have to write the action object by hand every time.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#action-creators" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Зачем передавать параметры?</h3>
+        <p>
+          Без параметров action creator всегда возвращает один и тот же объект.
+          С параметрами — он <strong>формирует payload</strong> на основе входных данных:
+        </p>
+        <ul>
+          <li>Текст новой задачи → <code>payload: 'Купить молоко'</code></li>
+          <li>Сумма для перевода → <code>payload: 500</code></li>
+          <li>ID для удаления → <code>payload: 42</code></li>
+        </ul>
+
+        <h3>Инкапсуляция формата экшена</h3>
+        <p>
+          Action creator <strong>инкапсулирует</strong> детали формирования экшена.
+          Вызывающий код не знает и не должен знать, как именно устроен объект экшена.
+          Если формат изменится (например, payload станет объектом), менять нужно
+          только action creator:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Раньше:</span>
+<span class="kw">function</span> <span class="fn">todoAdded</span>(<span class="prop">text</span>: <span class="type">string</span>) {
+  <span class="kw">return</span> { <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span>, <span class="prop">payload</span>: text }
+}
+
+<span class="cm">// Позже — формат изменился, но вызывающий код НЕ меняется:</span>
+<span class="kw">function</span> <span class="fn">todoAdded</span>(<span class="prop">text</span>: <span class="type">string</span>) {
+  <span class="kw">return</span> { <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span>, <span class="prop">payload</span>: { <span class="prop">text</span>, <span class="prop">createdAt</span>: Date.<span class="fn">now</span>() } }
+}
+
+<span class="cm">// В обоих случаях вызов одинаковый:</span>
+store.<span class="fn">dispatch</span>(<span class="fn">todoAdded</span>(<span class="str">'Купить молоко'</span>))
+        </div>
+
+        <div class="tip">
+          Action creator — это <strong>единственное место</strong>, где формируется
+          объект экшена. Это упрощает рефакторинг: при изменении структуры payload
+          нужно обновить только функцию-creator, а не каждый <code>dispatch()</code>.
+        </div>
+
+        <h3>Reducer для обработки</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">todosReducer</span>(state = [], action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'todos/todoAdded'</span>:
+      <span class="kw">return</span> [...state, {
+        <span class="prop">id</span>: state.<span class="prop">length</span> + <span class="num">1</span>,
+        <span class="prop">text</span>: action.<span class="prop">payload</span>,
+        <span class="prop">completed</span>: <span class="kw">false</span>
+      }]
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state
+  }
+}
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Action creator <strong>принимает аргументы</strong> и формирует из них payload</li>
+          <li>Вызывающий код работает с <strong>простым интерфейсом</strong>: <code>todoAdded('текст')</code></li>
+          <li>Формат экшена <strong>инкапсулирован</strong> внутри creator'а</li>
+          <li>Reducer получает готовый объект экшена и обрабатывает <code>action.payload</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

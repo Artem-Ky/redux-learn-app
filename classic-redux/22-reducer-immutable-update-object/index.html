@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>22 — Иммутабельное обновление объекта</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">22 / 100</span>
+      Иммутабельное обновление объекта в reducer
+    </div>
+    <nav class="site-header__nav">
+      <a href="../21-reducer-default-case/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">22</span>
+      <a href="../23-reducer-immutable-update-array/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Профиль пользователя (объект)</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Обновить поля</h3>
+            <div class="btn-group" style="flex-direction: column;">
+              <button class="btn" id="btn-name">Изменить имя → «Алексей»</button>
+              <button class="btn" id="btn-age">Увеличить возраст +1</button>
+              <button class="btn" id="btn-email">Изменить email → «alex@dev.io»</button>
+              <button class="btn" id="btn-city">Изменить город → «Новосибирск»</button>
+              <button class="btn" id="btn-reset">Сбросить профиль</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">Ссылка изменилась?</div>
+              <pre id="ref-display" style="font-size: 0.85rem;">—</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Spread-оператор для обновления объекта</div>
+      <div class="theory__body">
+        <h3>Почему нельзя мутировать state?</h3>
+        <p>
+          Redux определяет, изменился ли state, через сравнение ссылок (<code>===</code>).
+          Если вы мутируете объект напрямую — ссылка остаётся прежней,
+          и Redux <strong>не увидит изменение</strong>. UI не обновится.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ ПЛОХО — мутация</span>
+<span class="kw">case</span> <span class="str">'profile/nameChanged'</span>:
+  state.<span class="prop">name</span> = action.<span class="prop">payload</span>  <span class="cm">// мутация!</span>
+  <span class="kw">return</span> state                    <span class="cm">// та же ссылка — Redux не заметит</span>
+        </div>
+
+        <h3>Правильный паттерн: spread + перезапись</h3>
+        <div class="code-block">
+<span class="cm">// ✔ ПРАВИЛЬНО — новый объект</span>
+<span class="kw">case</span> <span class="str">'profile/nameChanged'</span>:
+  <span class="kw">return</span> {
+    ...state,                           <span class="cm">// копируем все поля</span>
+    <span class="prop">name</span>: action.<span class="prop">payload</span>              <span class="cm">// перезаписываем нужное</span>
+  }
+        </div>
+
+        <p>
+          Оператор <code>...state</code> создаёт <em>поверхностную копию</em> (shallow copy) объекта.
+          Затем мы перезаписываем только нужное поле. Результат — <strong>новый объект</strong>
+          с новой ссылкой, и Redux обнаружит изменение.
+        </p>
+
+        <div class="quote">
+          «Reducers are not allowed to modify the existing state. Instead, they must make
+          immutable updates, by copying the existing state and making changes to the copied values.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#rules-of-reducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Как Redux обнаруживает изменения</h3>
+        <div class="code-block">
+<span class="kw">const</span> oldState = store.<span class="fn">getState</span>()
+store.<span class="fn">dispatch</span>(action)
+<span class="kw">const</span> newState = store.<span class="fn">getState</span>()
+
+<span class="cm">// Redux проверяет:</span>
+oldState === newState   <span class="cm">// false → state изменился, обновить UI</span>
+                        <span class="cm">// true  → state не изменился, ничего не делать</span>
+        </div>
+
+        <div class="tip">
+          <strong>Запомните:</strong> <code>{ ...state, field: newValue }</code> — базовый паттерн
+          иммутабельного обновления объекта в Redux. Он создаёт новый объект, копируя все поля
+          и перезаписывая только те, что нужно изменить.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Reducer должен возвращать <strong>новый объект</strong>, а не мутировать старый</li>
+          <li>Паттерн: <code>{ ...state, changedField: newValue }</code></li>
+          <li>Redux проверяет изменения через <code>===</code> (сравнение ссылок)</li>
+          <li>Мутация state → Redux не увидит изменение → UI не обновится</li>
+          <li>Spread создаёт <em>поверхностную</em> копию (вложенные объекты — те же ссылки)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

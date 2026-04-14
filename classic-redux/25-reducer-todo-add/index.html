@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>25 — Todo: добавление элемента</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">25 / 100</span>
+      Todo: Добавление элемента — полный цикл action → reducer → state
+    </div>
+    <nav class="site-header__nav">
+      <a href="../24-reducer-immutable-nested/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">25</span>
+      <a href="../26-reducer-todo-toggle/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Todo add -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Добавление задач в Todo-список</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <input type="text" id="todo-input" placeholder="Введите текст задачи..." style="flex: 1;">
+            <button class="btn btn--accent" id="btn-add">Добавить</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Список задач</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+            <div id="empty-msg" style="color: var(--text-muted); padding: 12px; text-align: center; font-style: italic;">
+              Список пуст — добавьте первую задачу
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Текущий State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Добавление элементов в массив (reducer)</div>
+      <div class="theory__body">
+        <h3>Полный цикл: Action → Reducer → Новый State</h3>
+        <p>
+          В этом уроке мы проходим полный цикл Redux на примере добавления задачи в todo-список.
+          Пользователь вводит текст, нажимает «Добавить», и происходит следующее:
+        </p>
+        <ol>
+          <li>Создаётся action объект <code>{ type: 'todos/todoAdded', payload: text }</code></li>
+          <li>Action отправляется в store через <code>store.dispatch(action)</code></li>
+          <li>Store вызывает reducer с текущим state и action</li>
+          <li>Reducer создаёт <strong>новый</strong> массив с добавленным элементом</li>
+          <li>Store сохраняет новый state и уведомляет подписчиков</li>
+        </ol>
+
+        <div class="quote">
+          «Reducers must always follow some specific rules: They should only calculate the new
+          state value based on the state and action arguments. They must make immutable updates,
+          by copying the existing state and making changes to the copied values.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#rules-of-reducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Структура состояния Todo</h3>
+        <p>
+          Каждая задача — это объект с тремя полями: уникальный <code>id</code>,
+          текст задачи <code>text</code> и статус выполнения <code>completed</code>.
+          State — это массив таких объектов:
+        </p>
+
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">Todo</span> {
+  <span class="prop">id</span>: <span class="type">number</span>
+  <span class="prop">text</span>: <span class="type">string</span>
+  <span class="prop">completed</span>: <span class="type">boolean</span>
+}
+
+<span class="cm">// State — массив задач</span>
+<span class="kw">type</span> <span class="type">TodoState</span> = <span class="type">Todo</span>[]
+
+<span class="cm">// Начальное состояние — пустой массив</span>
+<span class="kw">const</span> initialState: <span class="type">TodoState</span> = []
+        </div>
+
+        <h3>Reducer: добавление через spread</h3>
+        <p>
+          Для иммутабельного добавления элемента в массив мы используем spread-оператор.
+          Вместо <code>state.push(newTodo)</code> (мутация!) мы создаём новый массив,
+          содержащий все старые элементы плюс новый:
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">todosReducer</span>(state: <span class="type">TodoState</span> = initialState, action: <span class="type">TodoAction</span>): <span class="type">TodoState</span> {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'todos/todoAdded'</span>: {
+      <span class="kw">const</span> newTodo: <span class="type">Todo</span> = {
+        <span class="prop">id</span>: nextId++,
+        <span class="prop">text</span>: action.<span class="prop">payload</span>,
+        <span class="prop">completed</span>: <span class="num">false</span>
+      }
+      <span class="kw">return</span> [...state, newTodo]  <span class="cm">// ← новый массив!</span>
+    }
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state
+  }
+}
+        </div>
+
+        <h3>Генерация уникальных ID</h3>
+        <p>
+          В этом примере мы используем простой инкрементный счётчик <code>nextId</code>
+          для генерации уникальных идентификаторов. В реальном приложении можно использовать
+          <code>uuid</code>, <code>nanoid</code> или ID из базы данных.
+        </p>
+
+        <div class="code-block">
+<span class="kw">let</span> nextId = <span class="num">1</span>
+
+<span class="cm">// Каждый вызов создаёт todo с уникальным id</span>
+<span class="cm">// id: 1, id: 2, id: 3, ...</span>
+        </div>
+
+        <div class="warning">
+          <strong>Никогда не используйте <code>push()</code> в reducer!</strong>
+          Метод <code>push()</code> мутирует существующий массив. Redux требует иммутабельных
+          обновлений — всегда возвращайте новый массив через <code>[...state, newItem]</code>.
+        </div>
+
+        <h3>Почему <code>[...state, newTodo]</code>, а не <code>state.push(newTodo)</code>?</h3>
+        <p>
+          Spread создаёт <strong>новую ссылку</strong> на массив. Redux сравнивает ссылки
+          (reference equality), чтобы определить, изменился ли state. Если вернуть тот же
+          массив (мутированный через push), Redux не заметит изменений и UI не обновится.
+        </p>
+
+        <div class="tip">
+          Обратите внимание на DevTools-панель: каждый dispatch <code>todos/todoAdded</code>
+          показывает, как массив растёт. Diff показывает только добавленный элемент —
+          остальные элементы массива не изменились.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Action <code>todos/todoAdded</code> несёт текст задачи в <code>payload</code></li>
+          <li>Reducer создаёт новый объект todo с <code>id</code>, <code>text</code>, <code>completed: false</code></li>
+          <li>Для добавления используем spread: <code>[...state, newTodo]</code></li>
+          <li>Никогда не мутируем state напрямую (никакого <code>push</code>!)</li>
+          <li>ID генерируются инкрементно через внешний счётчик</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

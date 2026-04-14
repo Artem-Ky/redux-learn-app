@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>31 — combineReducers: объединение reducer'ов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">31 / 100</span>
+      combineReducers — автоматическое объединение слайсов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../30-reducer-composition-intro/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">31</span>
+      <a href="../32-combine-reducers-deep/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: combineReducers -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — combineReducers: два слайса</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div class="two-col">
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">Todos (todosReducer)</h3>
+              <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <input type="text" id="todo-input" placeholder="Новая задача..." style="flex: 1;">
+                <button class="btn btn--accent" id="btn-add-todo">Добавить</button>
+              </div>
+              <div class="state-display">
+                <ul id="todo-list" style="list-style: none; padding: 4px 0;"></ul>
+                <div id="todo-empty" style="color: var(--text-muted); padding: 8px; text-align: center; font-style: italic;">
+                  Нет задач
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">Filters (filtersReducer)</h3>
+              <div style="margin-bottom: 8px;">
+                <label style="color: var(--text-muted); font-size: 0.75rem;">Статус:</label>
+                <div class="btn-group" style="margin-top: 4px;">
+                  <button class="btn filter-btn" data-status="all">Все</button>
+                  <button class="btn filter-btn" data-status="active">Активные</button>
+                  <button class="btn filter-btn" data-status="completed">Готовые</button>
+                </div>
+              </div>
+              <div class="state-display" style="margin-top: 12px;">
+                <div class="state-display__label">filters slice</div>
+                <pre id="filters-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-top: 16px;">
+            <div class="state-display__label">Полный State (combineReducers)</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem; max-height: 250px; overflow-y: auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — combineReducers API</div>
+      <div class="theory__body">
+        <h3>Что такое combineReducers?</h3>
+        <p>
+          <code>combineReducers</code> — утилита из Redux, которая принимает объект с
+          слайс-reducer'ами и возвращает один <strong>корневой reducer</strong> (root reducer).
+          Ключи этого объекта определяют <strong>форму state</strong>.
+        </p>
+
+        <div class="quote">
+          «combineReducers takes an object full of slice reducer functions, and creates
+          a function that outputs a corresponding state object with the same keys.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#combinereducers" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>API combineReducers</h3>
+        <p>
+          Функция принимает единственный аргумент — объект, где ключ — имя слайса,
+          а значение — reducer для этого слайса:
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">combineReducers</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="kw">const</span> rootReducer = <span class="fn">combineReducers</span>({
+  <span class="prop">todos</span>: todosReducer,
+  <span class="prop">filters</span>: filtersReducer
+})
+
+<span class="cm">// rootReducer — это обычная функция:</span>
+<span class="cm">// (state, action) => newState</span>
+        </div>
+
+        <h3>Ключи формируют форму state</h3>
+        <p>
+          Ключи объекта, переданного в <code>combineReducers</code>, становятся ключами
+          корневого state. Это значит, что <strong>форма state определяется ключами</strong>,
+          а не reducer'ами:
+        </p>
+
+        <div class="code-block">
+<span class="fn">combineReducers</span>({
+  <span class="prop">todos</span>: todosReducer,
+  <span class="prop">filters</span>: filtersReducer
+})
+
+<span class="cm">// Результат: state = {</span>
+<span class="cm">//   todos: [...],    ← результат todosReducer</span>
+<span class="cm">//   filters: {...}   ← результат filtersReducer</span>
+<span class="cm">// }</span>
+        </div>
+
+        <h3>Root Reducer — концепция</h3>
+        <p>
+          Результат <code>combineReducers</code> — это <strong>root reducer</strong>
+          (корневой reducer). Он передаётся в <code>createStore</code>. При каждом dispatch
+          корневой reducer вызывает каждый слайс-reducer с его частью state и текущим action.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Внутри combineReducers делает примерно это:</span>
+<span class="kw">function</span> <span class="fn">rootReducer</span>(state, action) {
+  <span class="kw">return</span> {
+    <span class="prop">todos</span>: <span class="fn">todosReducer</span>(state.<span class="prop">todos</span>, action),
+    <span class="prop">filters</span>: <span class="fn">filtersReducer</span>(state.<span class="prop">filters</span>, action)
+  }
+}
+        </div>
+
+        <h3>Каждый слайс получает только свою часть state</h3>
+        <p>
+          Это ключевой момент: <code>todosReducer</code> получает <strong>только</strong>
+          <code>state.todos</code> (массив), а не весь объект state.
+          <code>filtersReducer</code> получает только <code>state.filters</code>.
+          Слайс-reducer'ы изолированы друг от друга.
+        </p>
+
+        <div class="tip">
+          Попробуйте добавить задачу и переключить фильтр в демо выше.
+          Обратите внимание, как полный state содержит оба слайса, но
+          каждый reducer управляет только своей частью.
+        </div>
+
+        <div class="warning">
+          Если слайс-reducer не обрабатывает полученный action, он <strong>обязан</strong>
+          вернуть текущий state без изменений (через <code>default</code> в switch).
+          Иначе этот слайс станет <code>undefined</code>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>combineReducers</code> создаёт root reducer из набора слайс-reducer'ов</li>
+          <li>Ключи объекта определяют <strong>форму</strong> итогового state</li>
+          <li>Каждый слайс-reducer получает <strong>только свою часть</strong> state</li>
+          <li>Root reducer вызывает все слайс-reducer'ы при каждом dispatch</li>
+          <li>Слайс-reducer должен возвращать state по умолчанию для неизвестных actions</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

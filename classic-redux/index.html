@@ -53,6 +53,233 @@
         <div class="index-card__title">Action Object</div>
         <div class="index-card__desc">Структура экшена, поле type, первый Redux store</div>
       </a>
+      <a href="./08-action-types-naming/" class="index-card">
+        <div class="index-card__num">08</div>
+        <div class="index-card__title">Именование типов экшенов</div>
+        <div class="index-card__desc">Соглашение domain/eventName, best practices</div>
+      </a>
+      <a href="./09-action-payload/" class="index-card">
+        <div class="index-card__num">09</div>
+        <div class="index-card__title">Поле payload</div>
+        <div class="index-card__desc">Передача данных через экшены, todo-лист</div>
+      </a>
+      <a href="./10-flux-standard-action/" class="index-card">
+        <div class="index-card__num">10</div>
+        <div class="index-card__title">Flux Standard Action</div>
+        <div class="index-card__desc">FSA-соглашение: type, payload, meta, error</div>
+      </a>
+      <a href="./11-action-constants/" class="index-card">
+        <div class="index-card__num">11</div>
+        <div class="index-card__title">Константы экшенов</div>
+        <div class="index-card__desc">Вынесение типов в const, защита от опечаток</div>
+      </a>
+      <a href="./12-action-creators-intro/" class="index-card">
+        <div class="index-card__num">12</div>
+        <div class="index-card__title">Action Creators (введение)</div>
+        <div class="index-card__desc">Функции, создающие экшены. DRY, инкапсуляция</div>
+      </a>
+      <a href="./13-action-creators-with-payload/" class="index-card">
+        <div class="index-card__num">13</div>
+        <div class="index-card__title">Action Creators с payload</div>
+        <div class="index-card__desc">Передача аргументов в action creator</div>
+      </a>
+      <a href="./14-action-creators-complex/" class="index-card">
+        <div class="index-card__num">14</div>
+        <div class="index-card__title">Сложные Action Creators</div>
+        <div class="index-card__desc">Несколько параметров, подготовка payload</div>
+      </a>
+      <a href="./15-action-creators-with-id/" class="index-card">
+        <div class="index-card__num">15</div>
+        <div class="index-card__title">Генерация ID в Action Creator</div>
+        <div class="index-card__desc">Уникальные ID, чистота reducer</div>
+      </a>
+      <a href="./16-action-creators-arrow/" class="index-card">
+        <div class="index-card__num">16</div>
+        <div class="index-card__title">Arrow Action Creators</div>
+        <div class="index-card__desc">Краткая запись через стрелочные функции</div>
+      </a>
+    </div>
+
+    <div class="section-title">C. Reducers — Редьюсеры</div>
+    <div class="index-grid">
+      <a href="./17-reducer-basics/" class="index-card">
+        <div class="index-card__num">17</div>
+        <div class="index-card__title">Основы Reducer</div>
+        <div class="index-card__desc">Сигнатура (state, action) => newState</div>
+      </a>
+      <a href="./18-reducer-initial-state/" class="index-card">
+        <div class="index-card__num">18</div>
+        <div class="index-card__title">Начальное состояние</div>
+        <div class="index-card__desc">initialState, default parameter, @@INIT</div>
+      </a>
+      <a href="./19-reducer-why-called-reducer/" class="index-card">
+        <div class="index-card__num">19</div>
+        <div class="index-card__title">Почему «reducer»?</div>
+        <div class="index-card__desc">Связь с Array.reduce(), аналогия</div>
+      </a>
+      <a href="./20-reducer-switch-vs-if/" class="index-card">
+        <div class="index-card__num">20</div>
+        <div class="index-card__title">switch vs if/else</div>
+        <div class="index-card__desc">Стили ветвления в reducer</div>
+      </a>
+      <a href="./21-reducer-default-case/" class="index-card">
+        <div class="index-card__num">21</div>
+        <div class="index-card__title">Default case</div>
+        <div class="index-card__desc">Возврат state для неизвестных экшенов</div>
+      </a>
+      <a href="./22-reducer-immutable-update-object/" class="index-card">
+        <div class="index-card__num">22</div>
+        <div class="index-card__title">Иммутабельность объектов в reducer</div>
+        <div class="index-card__desc">Spread-оператор, профиль пользователя</div>
+      </a>
+      <a href="./23-reducer-immutable-update-array/" class="index-card">
+        <div class="index-card__num">23</div>
+        <div class="index-card__title">Иммутабельность массивов в reducer</div>
+        <div class="index-card__desc">Добавление, удаление, обновление</div>
+      </a>
+      <a href="./24-reducer-immutable-nested/" class="index-card">
+        <div class="index-card__num">24</div>
+        <div class="index-card__title">Вложенные обновления в reducer</div>
+        <div class="index-card__desc">Каскадное копирование, мотивация для Immer</div>
+      </a>
+      <a href="./25-reducer-todo-add/" class="index-card">
+        <div class="index-card__num">25</div>
+        <div class="index-card__title">Todo: добавление</div>
+        <div class="index-card__desc">Полный цикл action → reducer → state</div>
+      </a>
+      <a href="./26-reducer-todo-toggle/" class="index-card">
+        <div class="index-card__num">26</div>
+        <div class="index-card__title">Todo: переключение</div>
+        <div class="index-card__desc">Обновление элемента через map</div>
+      </a>
+      <a href="./27-reducer-todo-delete/" class="index-card">
+        <div class="index-card__num">27</div>
+        <div class="index-card__title">Todo: удаление</div>
+        <div class="index-card__desc">Удаление через filter</div>
+      </a>
+      <a href="./28-reducer-todo-edit/" class="index-card">
+        <div class="index-card__num">28</div>
+        <div class="index-card__title">Todo: редактирование</div>
+        <div class="index-card__desc">Обновление текста элемента</div>
+      </a>
+      <a href="./29-reducer-multiple-actions/" class="index-card">
+        <div class="index-card__num">29</div>
+        <div class="index-card__title">Множество экшенов в reducer</div>
+        <div class="index-card__desc">Полноценный todo-reducer с 6+ case</div>
+      </a>
+      <a href="./30-reducer-composition-intro/" class="index-card">
+        <div class="index-card__num">30</div>
+        <div class="index-card__title">Композиция reducer'ов</div>
+        <div class="index-card__desc">Разделение на slice reducer'ы</div>
+      </a>
+      <a href="./31-combine-reducers/" class="index-card">
+        <div class="index-card__num">31</div>
+        <div class="index-card__title">combineReducers</div>
+        <div class="index-card__desc">API combineReducers, root reducer</div>
+      </a>
+      <a href="./32-combine-reducers-deep/" class="index-card">
+        <div class="index-card__num">32</div>
+        <div class="index-card__title">combineReducers (глубже)</div>
+        <div class="index-card__desc">Три slice: users, posts, comments</div>
+      </a>
+      <a href="./33-reducer-higher-order/" class="index-card">
+        <div class="index-card__num">33</div>
+        <div class="index-card__title">Higher-Order Reducers</div>
+        <div class="index-card__desc">Фабрики reducer'ов, переиспользование</div>
+      </a>
+      <a href="./34-reducer-state-shape/" class="index-card">
+        <div class="index-card__num">34</div>
+        <div class="index-card__title">Проектирование State Shape</div>
+        <div class="index-card__desc">Плоская vs вложенная структура</div>
+      </a>
+      <a href="./35-reducer-rules-summary/" class="index-card">
+        <div class="index-card__num">35</div>
+        <div class="index-card__title">Правила reducer'ов (quiz)</div>
+        <div class="index-card__desc">Интерактивный тест: правильный ли reducer?</div>
+      </a>
+    </div>
+
+    <div class="section-title">D. Store — Хранилище</div>
+    <div class="index-grid">
+      <a href="./36-create-store/" class="index-card">
+        <div class="index-card__num">36</div>
+        <div class="index-card__title">Создание Store</div>
+        <div class="index-card__desc">createStore, @@INIT, начальное состояние</div>
+      </a>
+      <a href="./37-store-getstate/" class="index-card">
+        <div class="index-card__num">37</div>
+        <div class="index-card__title">store.getState()</div>
+        <div class="index-card__desc">Чтение текущего состояния</div>
+      </a>
+      <a href="./38-store-dispatch/" class="index-card">
+        <div class="index-card__num">38</div>
+        <div class="index-card__title">store.dispatch()</div>
+        <div class="index-card__desc">Единственный способ изменить state</div>
+      </a>
+      <a href="./39-store-subscribe/" class="index-card">
+        <div class="index-card__num">39</div>
+        <div class="index-card__title">store.subscribe()</div>
+        <div class="index-card__desc">Подписка и отписка от изменений</div>
+      </a>
+      <a href="./40-store-subscribe-multiple/" class="index-card">
+        <div class="index-card__num">40</div>
+        <div class="index-card__title">Множество подписчиков</div>
+        <div class="index-card__desc">Три независимых subscriber'а</div>
+      </a>
+      <a href="./41-store-preloaded-state/" class="index-card">
+        <div class="index-card__num">41</div>
+        <div class="index-card__title">preloadedState</div>
+        <div class="index-card__desc">Предзагруженное состояние, localStorage</div>
+      </a>
+      <a href="./42-store-replace-reducer/" class="index-card">
+        <div class="index-card__num">42</div>
+        <div class="index-card__title">replaceReducer()</div>
+        <div class="index-card__desc">Горячая замена reducer'а</div>
+      </a>
+      <a href="./43-store-internals/" class="index-card">
+        <div class="index-card__num">43</div>
+        <div class="index-card__title">Store изнутри</div>
+        <div class="index-card__desc">Мини-реализация createStore (~25 строк)</div>
+      </a>
+      <a href="./44-store-no-direct-mutation/" class="index-card">
+        <div class="index-card__num">44</div>
+        <div class="index-card__title">Нельзя мутировать state</div>
+        <div class="index-card__desc">Почему прямая мутация ломает всё</div>
+      </a>
+      <a href="./45-store-enhancers-intro/" class="index-card">
+        <div class="index-card__num">45</div>
+        <div class="index-card__title">Store Enhancers</div>
+        <div class="index-card__desc">Обёртки вокруг store</div>
+      </a>
+      <a href="./46-store-enhancer-compose/" class="index-card">
+        <div class="index-card__num">46</div>
+        <div class="index-card__title">compose()</div>
+        <div class="index-card__desc">Композиция нескольких enhancer'ов</div>
+      </a>
+      <a href="./47-store-api-summary/" class="index-card">
+        <div class="index-card__num">47</div>
+        <div class="index-card__title">Store API (сводка)</div>
+        <div class="index-card__desc">Все методы store в одном месте</div>
+      </a>
+    </div>
+
+    <div class="section-title">E. Selectors — Селекторы</div>
+    <div class="index-grid">
+      <a href="./48-selectors-intro/" class="index-card">
+        <div class="index-card__num">48</div>
+        <div class="index-card__title">Что такое Selector?</div>
+        <div class="index-card__desc">Функции для извлечения данных из state</div>
+      </a>
+      <a href="./49-selectors-derived-data/" class="index-card">
+        <div class="index-card__num">49</div>
+        <div class="index-card__title">Производные данные</div>
+        <div class="index-card__desc">Вычисление данных из state</div>
+      </a>
+      <a href="./50-selectors-parameterized/" class="index-card">
+        <div class="index-card__num">50</div>
+        <div class="index-card__title">Selector с параметрами</div>
+        <div class="index-card__desc">selectTodoById(state, id)</div>
+      </a>
     </div>
   </div>
 </body>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>16 — Стрелочные Action Creator</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">16 / 100</span>
+      Стрелочные функции для Action Creator
+    </div>
+    <nav class="site-header__nav">
+      <a href="../15-action-creators-with-id/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">16</span>
+      <a href="../17-reducer-basics/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Counter with both syntaxes -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Сравнение синтаксисов</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Счётчик</h3>
+            <div class="counter">
+              <button class="btn" id="btn-dec">−</button>
+              <div class="counter__value" id="counter-value">0</div>
+              <button class="btn" id="btn-inc">+</button>
+            </div>
+            <div class="btn-group" style="margin-top: 12px;">
+              <button class="btn" id="btn-add5">+5</button>
+              <button class="btn" id="btn-reset">Reset</button>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">Переключатель синтаксиса</h3>
+              <div class="btn-group">
+                <button class="btn btn--accent" id="btn-show-regular">function</button>
+                <button class="btn" id="btn-show-arrow">arrow =&gt;</button>
+              </div>
+              <pre id="code-display" style="color: var(--accent-yellow); font-size: 0.78rem; margin-top: 12px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 6px; white-space: pre-wrap;"></pre>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.82rem;"></pre>
+            </div>
+            <div class="state-display" style="margin-top: 12px;">
+              <div class="state-display__label">Последний Action</div>
+              <pre id="action-display" style="color: var(--accent-orange); font-size: 0.82rem;">—</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Стрелочные Action Creator</div>
+      <div class="theory__body">
+        <h3>Обычная функция vs Стрелочная</h3>
+        <p>
+          Action creator — это функция, возвращающая объект. Её можно записать двумя способами.
+          <strong>Результат одинаковый</strong> — разница только в синтаксисе:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ═══ Обычная функция (function declaration) ═══</span>
+<span class="kw">function</span> <span class="fn">increment</span>() {
+  <span class="kw">return</span> { <span class="prop">type</span>: <span class="str">'counter/incremented'</span> }
+}
+
+<span class="kw">function</span> <span class="fn">addAmount</span>(<span class="prop">amount</span>: <span class="type">number</span>) {
+  <span class="kw">return</span> { <span class="prop">type</span>: <span class="str">'counter/addAmount'</span>, <span class="prop">payload</span>: amount }
+}
+        </div>
+
+        <div class="code-block">
+<span class="cm">// ═══ Стрелочная функция (arrow function) ═══</span>
+<span class="kw">const</span> <span class="fn">increment</span> = () => ({
+  <span class="prop">type</span>: <span class="str">'counter/incremented'</span>
+})
+
+<span class="kw">const</span> <span class="fn">addAmount</span> = (<span class="prop">amount</span>: <span class="type">number</span>) => ({
+  <span class="prop">type</span>: <span class="str">'counter/addAmount'</span>,
+  <span class="prop">payload</span>: amount
+})
+        </div>
+
+        <h3>Неявный return и скобки</h3>
+        <p>
+          Ключевая особенность стрелочных функций — <strong>implicit return</strong>
+          (неявный возврат). Но есть важный нюанс: объектные литералы <code>{}</code>
+          нужно оборачивать в <strong>круглые скобки</strong> <code>()</code>,
+          иначе JavaScript воспримет фигурные скобки как тело функции:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ ОШИБКА — JS думает, что {} — тело функции</span>
+<span class="kw">const</span> <span class="fn">increment</span> = () => { <span class="prop">type</span>: <span class="str">'counter/incremented'</span> }
+<span class="cm">// Вернёт undefined!</span>
+
+<span class="cm">// ✅ ПРАВИЛЬНО — скобки говорят, что это объект</span>
+<span class="kw">const</span> <span class="fn">increment</span> = () => ({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+        </div>
+
+        <div class="warning">
+          Не забывайте <strong>круглые скобки</strong> вокруг объектного литерала
+          при использовании implicit return в стрелочной функции:
+          <code>() => ({ ... })</code>, а не <code>() => { ... }</code>
+        </div>
+
+        <h3>Когда что использовать?</h3>
+        <ul>
+          <li><strong>Стрелочная</strong> — для простых action creator'ов (1 строка, прямой return объекта)</li>
+          <li><strong>Обычная</strong> — когда внутри есть логика (генерация ID, проверки, подготовка данных)</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Стрелочная — коротко и ясно для простых случаев</span>
+<span class="kw">const</span> <span class="fn">increment</span> = () => ({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+<span class="kw">const</span> <span class="fn">decrement</span> = () => ({ <span class="prop">type</span>: <span class="str">'counter/decremented'</span> })
+
+<span class="cm">// Обычная — когда нужна логика</span>
+<span class="kw">let</span> nextId = <span class="num">1</span>
+<span class="kw">function</span> <span class="fn">todoAdded</span>(<span class="prop">text</span>: <span class="type">string</span>) {
+  <span class="kw">const</span> id = nextId++
+  <span class="kw">return</span> {
+    <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span>,
+    <span class="prop">payload</span>: { <span class="prop">id</span>, <span class="prop">text</span> }
+  }
+}
+        </div>
+
+        <div class="tip">
+          В сообществе Redux стрелочные функции — самый популярный стиль для простых
+          action creator'ов. Они компактные и хорошо читаются. Оба варианта
+          <strong>функционально идентичны</strong> — выбор за вами.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Стрелочная функция с implicit return: <code>const fn = () => ({ ... })</code></li>
+          <li><strong>Обязательно</strong> оборачивайте объект в <code>()</code></li>
+          <li>Оба синтаксиса создают <strong>идентичные</strong> объекты экшенов</li>
+          <li>Стрелочные — для простых, обычные — для сложных creator'ов</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

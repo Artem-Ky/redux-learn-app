@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>19 — Почему «reducer»?</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">19 / 100</span>
+      Почему «reducer»? Связь с Array.reduce()
+    </div>
+    <nav class="site-header__nav">
+      <a href="../18-reducer-initial-state/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">19</span>
+      <a href="../20-reducer-switch-vs-if/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Array.reduce() vs Redux Store</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div style="border-right: 1px solid var(--border); padding-right: 16px;">
+            <h3 style="color: var(--accent-cyan); margin-bottom: 12px;">
+              Array.reduce() <span class="tag tag--info">reduce</span>
+            </h3>
+            <p style="color: var(--text-secondary); font-size: 0.82rem; margin-bottom: 12px;">
+              Массив экшенов пропускается через <code>actions.reduce(reducer, initialState)</code>
+            </p>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Результат reduce()</div>
+              <pre id="reduce-result" style="color: var(--accent-cyan); font-size: 1rem;">—</pre>
+            </div>
+            <button class="btn btn--accent" id="btn-run-reduce">Запустить reduce()</button>
+          </div>
+
+          <div style="padding-left: 16px;">
+            <h3 style="color: var(--accent-purple); margin-bottom: 12px;">
+              Redux Store <span class="tag tag--info">dispatch</span>
+            </h3>
+            <p style="color: var(--text-secondary); font-size: 0.82rem; margin-bottom: 12px;">
+              Те же экшены отправляются по одному через <code>store.dispatch()</code>
+            </p>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Результат store.getState()</div>
+              <pre id="store-result" style="color: var(--accent-purple); font-size: 1rem;">—</pre>
+            </div>
+            <button class="btn btn--accent" id="btn-run-dispatch">Dispatch все экшены</button>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center;">
+          <div class="state-display">
+            <div class="state-display__label">Совпадение результатов</div>
+            <pre id="match-result" style="color: var(--text-muted); font-size: 1rem;">Нажмите обе кнопки</pre>
+          </div>
+          <button class="btn" id="btn-reset" style="margin-top: 12px;">Сбросить</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Почему reducer называется «reducer»?</div>
+      <div class="theory__body">
+        <h3>Array.reduce() — основа концепции</h3>
+        <p>
+          Метод <code>Array.prototype.reduce()</code> принимает массив значений и «сворачивает» (reduces)
+          его в одно значение. Он делает это, вызывая <strong>callback-функцию</strong> для каждого элемента
+          и передавая результат предыдущего вызова как <em>аккумулятор</em>:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> numbers = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>]
+
+<span class="kw">const</span> sum = numbers.<span class="fn">reduce</span>((accumulator, currentValue) => {
+  <span class="kw">return</span> accumulator + currentValue
+}, <span class="num">0</span>)   <span class="cm">// 0 — начальное значение аккумулятора</span>
+
+<span class="cm">// Шаги:</span>
+<span class="cm">// (0, 1) → 1</span>
+<span class="cm">// (1, 2) → 3</span>
+<span class="cm">// (3, 3) → 6</span>
+<span class="cm">// (6, 4) → 10</span>
+<span class="cm">// (10, 5) → 15</span>
+        </div>
+
+        <h3>Redux reducer — это та же идея!</h3>
+        <p>
+          Redux reducer — это функция с сигнатурой <code>(state, action) => newState</code>.
+          Это <em>точно такая же</em> сигнатура, как у callback для <code>Array.reduce()</code>!
+        </p>
+        <p>
+          Если у вас есть массив экшенов, вы можете получить итоговый state,
+          пропустив их через <code>reduce()</code>:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> actions = [
+  { <span class="prop">type</span>: <span class="str">'counter/incremented'</span> },
+  { <span class="prop">type</span>: <span class="str">'counter/incremented'</span> },
+  { <span class="prop">type</span>: <span class="str">'counter/addAmount'</span>, <span class="prop">payload</span>: <span class="num">5</span> },
+]
+
+<span class="kw">const</span> initialState = { <span class="prop">value</span>: <span class="num">0</span> }
+
+<span class="kw">const</span> finalState = actions.<span class="fn">reduce</span>(counterReducer, initialState)
+<span class="cm">// { value: 7 }</span>
+        </div>
+
+        <div class="quote">
+          «Redux reducers reduce a set of actions (over time) into a single state.
+          The difference is that with Array.reduce() it happens all at once,
+          and with Redux, it happens over the lifetime of your running app.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#reducers" target="_blank">Redux Fundamentals, Part 3: Reducers</a>
+        </div>
+
+        <h3>Сравнение: Array.reduce() vs Redux</h3>
+        <div class="code-block">
+<span class="cm">// Array.reduce()</span>
+<span class="cm">// callback:     (accumulator, item)  → newAccumulator</span>
+<span class="cm">// initialValue: начальное значение аккумулятора</span>
+
+<span class="cm">// Redux reducer</span>
+<span class="cm">// reducer:      (state, action)      → newState</span>
+<span class="cm">// initialState: начальное состояние</span>
+
+<span class="cm">// Одна и та же сигнатура!</span>
+        </div>
+
+        <div class="tip">
+          <strong>Ключевая идея:</strong> reducer «сводит» (reduces) поток экшенов во времени
+          к единственному текущему состоянию. Каждый новый экшен — это как следующий элемент
+          массива, а текущий state — аккумулятор.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Reducer назван по аналогии с <code>Array.prototype.reduce()</code></li>
+          <li>Сигнатура одинаковая: <code>(accumulator, item) → newAccumulator</code></li>
+          <li>В Redux: <code>(state, action) → newState</code></li>
+          <li>Разница: <code>reduce()</code> обрабатывает всё сразу, Redux — по мере поступления экшенов</li>
+          <li>Можно воспроизвести всю историю Redux, пропустив массив экшенов через <code>reduce()</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>34 — Designing State Shape: вложенный vs плоский</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">34 / 100</span>
+      Designing State Shape — проектирование структуры state
+    </div>
+    <nav class="site-header__nav">
+      <a href="../33-reducer-higher-order/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">34</span>
+      <a href="../35-reducer-rules-summary/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: State shape comparison -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Вложенный vs Плоский (нормализованный) state</div>
+      <div class="demo-section__body">
+        <div style="max-width: 700px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px; align-items: center;">
+            <button class="btn btn--accent" id="btn-nested" style="flex: 1;">Вложенный (Nested)</button>
+            <button class="btn" id="btn-flat" style="flex: 1;">Плоский (Normalized)</button>
+          </div>
+
+          <div id="view-label" style="text-align: center; margin-bottom: 12px; font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-orange); font-weight: 600;">
+            Режим: Вложенная структура
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label" id="structure-label">Вложенный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem; max-height: 400px; overflow-y: auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Проектирование формы state</div>
+      <div class="theory__body">
+        <h3>Почему форма state важна?</h3>
+        <p>
+          Структура state определяет, насколько просто будет писать reducer'ы,
+          обновлять данные и читать их в компонентах. Неправильная форма приводит
+          к сложным обновлениям и дублированию данных.
+        </p>
+
+        <div class="quote">
+          «In a larger application, state shape is a key concern. Much of the
+          pain of managing state is due to organizing it in a way that makes
+          the rest of the code complex.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/normalizing-state-shape" target="_blank">Redux Docs: Normalizing State Shape</a>
+        </div>
+
+        <h3>Вложенная (Nested) структура</h3>
+        <p>
+          Первый инстинкт — хранить данные так, как они выглядят в API или UI:
+          посты содержат автора и комментарии внутри себя.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ Вложенная структура (проблемная)</span>
+{
+  <span class="prop">posts</span>: [
+    {
+      <span class="prop">id</span>: <span class="num">1</span>,
+      <span class="prop">title</span>: <span class="str">'Мой пост'</span>,
+      <span class="prop">author</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">name</span>: <span class="str">'Алексей'</span> },
+      <span class="prop">comments</span>: [
+        { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">text</span>: <span class="str">'Отлично!'</span> }
+      ]
+    }
+  ]
+}
+        </div>
+
+        <h3>Плоская (Normalized) структура</h3>
+        <p>
+          Лучший подход для Redux — <strong>нормализация</strong>: каждый тип данных
+          хранится отдельно, а связи — через ID.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ✅ Плоская (нормализованная) структура</span>
+{
+  <span class="prop">posts</span>: [
+    { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">title</span>: <span class="str">'Мой пост'</span>, <span class="prop">authorId</span>: <span class="num">1</span> }
+  ],
+  <span class="prop">users</span>: [
+    { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">name</span>: <span class="str">'Алексей'</span> }
+  ],
+  <span class="prop">comments</span>: [
+    { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">text</span>: <span class="str">'Отлично!'</span>, <span class="prop">postId</span>: <span class="num">1</span> }
+  ]
+}
+        </div>
+
+        <h3>Почему плоская структура лучше для Redux?</h3>
+        <ul>
+          <li><strong>Нет дублирования</strong>: один пользователь — одна запись, даже если он автор 100 постов</li>
+          <li><strong>Простые обновления</strong>: чтобы изменить имя автора, обновляем одну запись в <code>users</code></li>
+          <li><strong>Простые reducer'ы</strong>: каждый reducer работает с плоским массивом</li>
+          <li><strong>Предсказуемость</strong>: нет глубокой вложенности = нет сложных spread-операций</li>
+        </ul>
+
+        <div class="quote">
+          «The recommended approach to managing relational or nested data in a Redux store
+          is to treat a portion of your store as if it were a database, and keep that data
+          in a normalized form.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/normalizing-state-shape#designing-a-normalized-state" target="_blank">Redux Docs: Normalizing State Shape</a>
+        </div>
+
+        <h3>Три категории state</h3>
+        <p>
+          State в Redux-приложении обычно делится на три категории:
+        </p>
+        <ul>
+          <li><strong>Domain data</strong> — данные приложения (пользователи, посты, товары)</li>
+          <li><strong>App state</strong> — состояние логики (загрузка, ошибки, пагинация)</li>
+          <li><strong>UI state</strong> — состояние интерфейса (открытые модальные окна, активные вкладки)</li>
+        </ul>
+
+        <div class="code-block">
+{
+  <span class="cm">// Domain data (нормализованные)</span>
+  <span class="prop">users</span>: [...],
+  <span class="prop">posts</span>: [...],
+
+  <span class="cm">// App state</span>
+  <span class="prop">loading</span>: { <span class="prop">posts</span>: <span class="num">false</span>, <span class="prop">users</span>: <span class="num">true</span> },
+  <span class="prop">errors</span>: { <span class="prop">posts</span>: <span class="num">null</span> },
+
+  <span class="cm">// UI state</span>
+  <span class="prop">ui</span>: { <span class="prop">modalOpen</span>: <span class="num">false</span>, <span class="prop">activeTab</span>: <span class="str">'posts'</span> }
+}
+        </div>
+
+        <div class="tip">
+          Переключайте режимы в демо выше, чтобы увидеть разницу между вложенной
+          и плоской структурами. Обратите внимание на console: там показаны
+          плюсы и минусы каждого подхода.
+        </div>
+
+        <div class="warning">
+          Вложенная структура создаёт проблему <strong>дублирования</strong>: если
+          один пользователь автор 10 постов, его данные копируются 10 раз.
+          Обновление имени потребует изменить все 10 копий — это ошибкоопасно.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><strong>Плоская (нормализованная)</strong> структура — рекомендация Redux</li>
+          <li>Каждый тип данных — отдельный слайс, связи через ID</li>
+          <li>Нет дублирования, простые обновления, простые reducer'ы</li>
+          <li>State делится на domain data, app state и UI state</li>
+          <li>Нормализация = база данных в виде JS-объекта</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

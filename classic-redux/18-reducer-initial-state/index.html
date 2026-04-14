@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>18 — Начальное состояние Reducer</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">18 / 100</span>
+      Initial State и default-параметр
+    </div>
+    <nav class="site-header__nav">
+      <a href="../17-reducer-basics/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">18</span>
+      <a href="../19-reducer-why-called-reducer/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Two stores side by side -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Начальное состояние</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--accent-cyan); margin-bottom: 12px;">Store A — с default-параметром</h3>
+            <pre id="state-a" style="color: var(--accent-cyan); font-size: 0.85rem; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px;">—</pre>
+            <div class="btn-group" style="margin-top: 10px;">
+              <button class="btn" id="btn-inc-a">+1</button>
+              <button class="btn" id="btn-dec-a">−1</button>
+            </div>
+          </div>
+
+          <div>
+            <h3 style="color: var(--accent-orange); margin-bottom: 12px;">Store B — без default (undefined!)</h3>
+            <pre id="state-b" style="color: var(--accent-orange); font-size: 0.85rem; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px;">—</pre>
+            <div class="btn-group" style="margin-top: 10px;">
+              <button class="btn" id="btn-inc-b">+1</button>
+              <button class="btn" id="btn-dec-b">−1</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center;">
+          <button class="btn btn--accent" id="btn-init">Отправить @@INIT вручную</button>
+          <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 6px;">
+            Этот экшен Redux отправляет автоматически при createStore()
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Начальное состояние и default-параметр</div>
+      <div class="theory__body">
+        <h3>ES6 default-параметр в Reducer</h3>
+        <p>
+          Reducer использует <strong>ES6 default parameter</strong> для определения
+          начального состояния. Когда <code>state</code> равен <code>undefined</code>,
+          вместо него подставляется значение по умолчанию:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> initialState = { <span class="prop">value</span>: <span class="num">0</span> }
+
+<span class="cm">// state = initialState — default-параметр ES6</span>
+<span class="kw">function</span> <span class="fn">counterReducer</span>(<span class="prop">state</span> = initialState, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'counter/incremented'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> + <span class="num">1</span> }
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state
+  }
+}
+        </div>
+
+        <h3>Экшен @@INIT</h3>
+        <p>
+          При вызове <code>createStore(reducer)</code> Redux автоматически отправляет
+          специальный «инициализирующий» экшен с типом <code>@@INIT</code>
+          (или <code>@@redux/INIT...</code>). Это заставляет reducer вызваться
+          с <code>state = undefined</code>:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Что происходит внутри createStore:</span>
+<span class="kw">const</span> store = <span class="fn">createStore</span>(counterReducer)
+
+<span class="cm">// 1. Redux вызывает: counterReducer(undefined, { type: '@@INIT' })</span>
+<span class="cm">// 2. state === undefined → срабатывает default: state = { value: 0 }</span>
+<span class="cm">// 3. action.type === '@@INIT' → попадает в default case → return state</span>
+<span class="cm">// 4. Store сохраняет { value: 0 } как начальное состояние</span>
+        </div>
+
+        <div class="quote">
+          «The first time that the reducer is called, state will be undefined.
+          That's our chance to return an initial value for the state.
+          Reducers normally use ES6 default argument syntax to provide initial state:
+          (state = initialState, action).»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-3-state-actions-reducers#creating-the-root-reducer" target="_blank">Redux Fundamentals, Part 3</a>
+        </div>
+
+        <h3>Что если забыть default-параметр?</h3>
+        <p>
+          Если reducer не имеет default-параметра, при вызове с <code>undefined</code>
+          он вернёт <code>undefined</code> — и это ошибка! State не должен быть undefined:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ Без default-параметра</span>
+<span class="kw">function</span> <span class="fn">badReducer</span>(<span class="prop">state</span>, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'increment'</span>:
+      <span class="kw">return</span> { <span class="prop">value</span>: state.<span class="prop">value</span> + <span class="num">1</span> }  <span class="cm">// TypeError: Cannot read 'value' of undefined</span>
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state  <span class="cm">// return undefined</span>
+  }
+}
+        </div>
+
+        <h3>preloadedState vs default-параметр</h3>
+        <p>
+          <code>createStore</code> принимает необязательный второй аргумент —
+          <code>preloadedState</code>. Если он указан, Redux использует его
+          вместо default-параметра reducer'а:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// С preloadedState — default-параметр НЕ используется</span>
+<span class="kw">const</span> store = <span class="fn">createStore</span>(
+  counterReducer,
+  { <span class="prop">value</span>: <span class="num">42</span> }  <span class="cm">// ← preloadedState</span>
+)
+<span class="cm">// store.getState() → { value: 42 }</span>
+
+<span class="cm">// Без preloadedState — используется default из reducer</span>
+<span class="kw">const</span> store = <span class="fn">createStore</span>(counterReducer)
+<span class="cm">// store.getState() → { value: 0 }  (из initialState)</span>
+        </div>
+
+        <div class="tip">
+          <code>preloadedState</code> часто используется для <strong>гидрации</strong> —
+          восстановления состояния из localStorage или серверного рендеринга (SSR).
+          В обычных случаях достаточно default-параметра в reducer'е.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Начальное состояние задаётся через <strong>ES6 default-параметр</strong>: <code>state = initialState</code></li>
+          <li><code>createStore()</code> отправляет <code>@@INIT</code> для инициализации</li>
+          <li>Reducer вызывается с <code>state = undefined</code> → срабатывает default</li>
+          <li><code>preloadedState</code> (2-й аргумент createStore) <strong>переопределяет</strong> default</li>
+          <li>Без default-параметра state будет <code>undefined</code> — ошибка!</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

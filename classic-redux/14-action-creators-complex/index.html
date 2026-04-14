@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>14 — Action Creator со сложным payload</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">14 / 100</span>
+      Action Creator — сложный payload
+    </div>
+    <nav class="site-header__nav">
+      <a href="../13-action-creators-with-payload/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">14</span>
+      <a href="../15-action-creators-with-id/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Color filter app -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Фильтр по цветам</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Управление цветами</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="display: inline-block; width: 20px; height: 20px; background: #f44747; border-radius: 4px;"></span>
+                <span style="color: var(--text-secondary); width: 70px;">Red</span>
+                <button class="btn" data-color="red" data-change="added" style="font-size: 0.75rem;">+ Добавить</button>
+                <button class="btn" data-color="red" data-change="removed" style="font-size: 0.75rem;">− Убрать</button>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="display: inline-block; width: 20px; height: 20px; background: #569cd6; border-radius: 4px;"></span>
+                <span style="color: var(--text-secondary); width: 70px;">Blue</span>
+                <button class="btn" data-color="blue" data-change="added" style="font-size: 0.75rem;">+ Добавить</button>
+                <button class="btn" data-color="blue" data-change="removed" style="font-size: 0.75rem;">− Убрать</button>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="display: inline-block; width: 20px; height: 20px; background: #4caf50; border-radius: 4px;"></span>
+                <span style="color: var(--text-secondary); width: 70px;">Green</span>
+                <button class="btn" data-color="green" data-change="added" style="font-size: 0.75rem;">+ Добавить</button>
+                <button class="btn" data-color="green" data-change="removed" style="font-size: 0.75rem;">− Убрать</button>
+              </div>
+            </div>
+
+            <div style="margin-top: 16px;">
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">Активные фильтры</h3>
+              <div id="active-filters" style="color: var(--text-secondary); font-size: 0.85rem;">Нет активных фильтров</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.82rem;"></pre>
+            </div>
+            <div class="state-display" style="margin-top: 12px;">
+              <div class="state-display__label">Последний Action</div>
+              <pre id="action-display" style="color: var(--accent-orange); font-size: 0.82rem;">—</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Сложный payload в Action Creator</div>
+      <div class="theory__body">
+        <h3>Несколько параметров → объект в payload</h3>
+        <p>
+          Когда action creator принимает <strong>несколько аргументов</strong>,
+          он комбинирует их в структурированный объект payload.
+          Это позволяет передать всю необходимую информацию в одном экшене:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Action creator с несколькими параметрами</span>
+<span class="kw">function</span> <span class="fn">colorFilterChanged</span>(<span class="prop">color</span>: <span class="type">string</span>, <span class="prop">changeType</span>: <span class="type">string</span>) {
+  <span class="kw">return</span> {
+    <span class="prop">type</span>: <span class="str">'filters/colorFilterChanged'</span>,
+    <span class="prop">payload</span>: {
+      <span class="prop">color</span>,
+      <span class="prop">changeType</span>
+    }
+  }
+}
+
+<span class="cm">// Результат:</span>
+<span class="fn">colorFilterChanged</span>(<span class="str">'red'</span>, <span class="str">'added'</span>)
+<span class="cm">// → { type: 'filters/colorFilterChanged', payload: { color: 'red', changeType: 'added' } }</span>
+        </div>
+
+        <div class="quote">
+          «The type field should be a string that gives this action a descriptive name...
+          An action object can have other fields with additional information about what happened.
+          By convention, we put that information in a field called payload.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#actions" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Подготовка данных в Action Creator</h3>
+        <p>
+          Action creator может не просто передавать аргументы «как есть», а
+          <strong>подготавливать и трансформировать</strong> данные перед созданием экшена.
+          Это централизует логику формирования payload:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Action creator может трансформировать входные данные</span>
+<span class="kw">function</span> <span class="fn">colorFilterChanged</span>(<span class="prop">color</span>: <span class="type">string</span>, <span class="prop">changeType</span>: <span class="type">string</span>) {
+  <span class="kw">return</span> {
+    <span class="prop">type</span>: <span class="str">'filters/colorFilterChanged'</span>,
+    <span class="prop">payload</span>: {
+      <span class="prop">color</span>: color.<span class="fn">toLowerCase</span>(),
+      <span class="prop">changeType</span>
+    }
+  }
+}
+        </div>
+
+        <h3>Инкапсуляция деталей формата</h3>
+        <p>
+          Компонент, вызывающий <code>colorFilterChanged('red', 'added')</code>,
+          не знает, как устроен объект экшена. Он знает только <strong>интерфейс</strong>
+          (два аргумента). Если завтра payload изменится — менять нужно только creator.
+        </p>
+
+        <div class="tip">
+          Каждый action creator — это <strong>контракт</strong> между UI и store.
+          UI говорит «что хочет» через параметры, а creator формирует правильный экшен.
+        </div>
+
+        <h3>Reducer для обработки сложного payload</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">filtersReducer</span>(state, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'filters/colorFilterChanged'</span>: {
+      <span class="kw">const</span> { <span class="prop">color</span>, <span class="prop">changeType</span> } = action.<span class="prop">payload</span>
+      <span class="kw">if</span> (changeType === <span class="str">'added'</span>) {
+        <span class="kw">return</span> { ...state, <span class="prop">selectedColors</span>: [...state.<span class="prop">selectedColors</span>, color] }
+      } <span class="kw">else</span> {
+        <span class="kw">return</span> { ...state, <span class="prop">selectedColors</span>: state.<span class="prop">selectedColors</span>.<span class="fn">filter</span>(c => c !== color) }
+      }
+    }
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state
+  }
+}
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Action creator может принимать <strong>несколько аргументов</strong></li>
+          <li>Аргументы комбинируются в <strong>объект payload</strong></li>
+          <li>Creator <strong>инкапсулирует</strong> формат экшена от вызывающего кода</li>
+          <li>Reducer деструктурирует payload: <code>const { color, changeType } = action.payload</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

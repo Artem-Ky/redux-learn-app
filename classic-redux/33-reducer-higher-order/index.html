@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>33 — Higher-Order Reducers: фабрики reducer'ов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">33 / 100</span>
+      Higher-Order Reducers — фабрики reducer'ов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../32-combine-reducers-deep/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">33</span>
+      <a href="../34-reducer-state-shape/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Higher-order reducers -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Два независимых счётчика через фабрику</div>
+      <div class="demo-section__body">
+        <div style="max-width: 550px;">
+          <div class="two-col">
+            <div>
+              <h3 style="color: var(--accent-cyan); margin-bottom: 12px;">Счётчик A</h3>
+              <div style="text-align: center; margin-bottom: 12px;">
+                <span id="counter-a-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent-cyan); font-family: var(--font-mono);">0</span>
+              </div>
+              <div class="btn-group" style="justify-content: center;">
+                <button class="btn" id="btn-a-dec">−</button>
+                <button class="btn btn--accent" id="btn-a-inc">+</button>
+              </div>
+              <div style="text-align: center; margin-top: 8px; color: var(--text-muted); font-size: 0.75rem; font-family: var(--font-mono);">
+                counterA/incremented
+              </div>
+            </div>
+
+            <div>
+              <h3 style="color: var(--accent-orange); margin-bottom: 12px;">Счётчик B</h3>
+              <div style="text-align: center; margin-bottom: 12px;">
+                <span id="counter-b-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent-orange); font-family: var(--font-mono);">0</span>
+              </div>
+              <div class="btn-group" style="justify-content: center;">
+                <button class="btn" id="btn-b-dec">−</button>
+                <button class="btn btn--accent" id="btn-b-inc">+</button>
+              </div>
+              <div style="text-align: center; margin-top: 8px; color: var(--text-muted); font-size: 0.75rem; font-family: var(--font-mono);">
+                counterB/incremented
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-top: 16px;">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Higher-Order Reducers (фабрики)</div>
+      <div class="theory__body">
+        <h3>Проблема: дублирование логики reducer'ов</h3>
+        <p>
+          Представьте, что в приложении нужно несколько счётчиков с одинаковой логикой.
+          Копировать код reducer'а — плохая практика. Вместо этого используется
+          <strong>higher-order reducer</strong> — функция, которая <em>создаёт</em> reducer.
+        </p>
+
+        <div class="quote">
+          «A higher-order reducer is a function that takes a reducer as an argument,
+          and/or returns a new reducer function as a result.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/reusing-reducer-logic" target="_blank">Redux Docs: Reusing Reducer Logic</a>
+        </div>
+
+        <h3>Reducer Factory (фабрика)</h3>
+        <p>
+          <strong>createCounterReducer</strong> — фабричная функция, которая принимает имя
+          счётчика и возвращает reducer, реагирующий только на actions с этим именем:
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">createCounterReducer</span>(counterName: <span class="type">string</span>) {
+  <span class="kw">return function</span>(state: <span class="type">number</span> = <span class="num">0</span>, action: <span class="type">Action</span>): <span class="type">number</span> {
+    <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+      <span class="kw">case</span> <span class="str">`${counterName}/incremented`</span>:
+        <span class="kw">return</span> state + <span class="num">1</span>
+      <span class="kw">case</span> <span class="str">`${counterName}/decremented`</span>:
+        <span class="kw">return</span> state - <span class="num">1</span>
+      <span class="kw">default</span>:
+        <span class="kw">return</span> state
+    }
+  }
+}
+        </div>
+
+        <h3>Динамическое создание reducer'ов</h3>
+        <p>
+          Теперь мы можем создать сколько угодно независимых reducer'ов из одной фабрики:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> counterAReducer = <span class="fn">createCounterReducer</span>(<span class="str">'counterA'</span>)
+<span class="kw">const</span> counterBReducer = <span class="fn">createCounterReducer</span>(<span class="str">'counterB'</span>)
+
+<span class="kw">const</span> rootReducer = <span class="fn">combineReducers</span>({
+  <span class="prop">counterA</span>: counterAReducer,
+  <span class="prop">counterB</span>: counterBReducer
+})
+
+<span class="cm">// state = { counterA: 0, counterB: 0 }</span>
+        </div>
+
+        <h3>Actions привязаны к имени</h3>
+        <p>
+          Каждый reducer реагирует только на «свои» actions благодаря префиксу имени.
+          <code>counterA/incremented</code> изменяет только счётчик A,
+          <code>counterB/incremented</code> — только B.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Увеличить счётчик A:</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counterA/incremented'</span> })
+<span class="cm">// counterAReducer: обрабатывает ✓</span>
+<span class="cm">// counterBReducer: игнорирует (default) ✗</span>
+        </div>
+
+        <h3>Применения паттерна</h3>
+        <ul>
+          <li>Несколько экземпляров одинаковой логики (счётчики, формы, списки)</li>
+          <li>Добавление «обёрток» вокруг reducer'ов (undo/redo, логирование)</li>
+          <li>Условная обработка actions по метаданным</li>
+          <li>Создание reducer'ов из конфигурации (data-driven reducers)</li>
+        </ul>
+
+        <div class="tip">
+          Нажимайте +/− для каждого счётчика в демо. Обратите внимание в DevTools:
+          actions имеют разные префиксы (<code>counterA/</code> vs <code>counterB/</code>),
+          а каждый reducer реагирует только на «свои».
+        </div>
+
+        <div class="warning">
+          Higher-order reducer — мощный паттерн, но не злоупотребляйте: если логика
+          reducer'ов существенно различается, лучше написать их отдельно. Фабрики хороши
+          для <strong>идентичной</strong> логики с разными именами.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><strong>Higher-order reducer</strong> — функция, создающая reducer'ы</li>
+          <li>Позволяет переиспользовать логику без дублирования</li>
+          <li>Каждый созданный reducer реагирует на actions с уникальным префиксом</li>
+          <li>Комбинируется с <code>combineReducers</code> для создания нескольких слайсов</li>
+          <li>Применяется для однотипных компонентов: счётчики, формы, списки</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
