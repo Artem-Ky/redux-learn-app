@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>05 — Иммутабельность (вложенные объекты)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">05 / 100</span>
+      Иммутабельность (вложенные объекты)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../04-immutability-arrays/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">05</span>
+      <a href="../06-pure-functions/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Обновление вложенных объектов</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Исходный объект</div>
+              <pre id="obj-display" style="color: var(--accent-cyan); font-size: 0.82rem;"></pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">Проверка ссылок после обновления</div>
+              <pre id="refs-display" style="color: var(--accent-yellow); font-size: 0.82rem;">—</pre>
+            </div>
+          </div>
+          <div>
+            <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 0.85rem;">
+              Задача: обновить <code>company.address.city</code> на «Новосибирск»
+            </p>
+            <div class="btn-group" style="flex-direction: column;">
+              <button class="btn btn--danger" id="btn-mutate">
+                Мутация: obj.company.address.city = '...'
+                <span class="tag tag--bad">плохо</span>
+              </button>
+              <button class="btn btn--success" id="btn-immutable">
+                Иммутабельно: каскад spread
+                <span class="tag tag--good">правильно</span>
+              </button>
+              <button class="btn" id="btn-reset">Сбросить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Иммутабельное обновление вложенных структур</div>
+      <div class="theory__body">
+        <h3>Проблема вложенных объектов</h3>
+        <p>
+          Чем глубже вложенность, тем больше кода нужно для иммутабельного обновления.
+          Для каждого уровня вложенности нужно создать копию:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> state = {
+  <span class="prop">user</span>: {
+    <span class="prop">name</span>: <span class="str">'Иван'</span>,
+    <span class="prop">company</span>: {
+      <span class="prop">name</span>: <span class="str">'Рога и Копыта'</span>,
+      <span class="prop">address</span>: {
+        <span class="prop">city</span>: <span class="str">'Москва'</span>,        <span class="cm">// ← хотим изменить ЭТО</span>
+        <span class="prop">zip</span>: <span class="str">'101000'</span>
+      }
+    }
+  }
+}
+
+<span class="cm">// Для обновления city нужно копировать КАЖДЫЙ уровень:</span>
+<span class="kw">const</span> newState = {
+  ...state,                             <span class="cm">// копия корня</span>
+  <span class="prop">user</span>: {
+    ...state.<span class="prop">user</span>,                      <span class="cm">// копия user</span>
+    <span class="prop">company</span>: {
+      ...state.<span class="prop">user</span>.<span class="prop">company</span>,            <span class="cm">// копия company</span>
+      <span class="prop">address</span>: {
+        ...state.<span class="prop">user</span>.<span class="prop">company</span>.<span class="prop">address</span>,  <span class="cm">// копия address</span>
+        <span class="prop">city</span>: <span class="str">'Новосибирск'</span>              <span class="cm">// ← новое значение</span>
+      }
+    }
+  }
+}
+        </div>
+
+        <div class="warning">
+          Это одна из главных болевых точек классического Redux.
+          Именно эту проблему решает библиотека <strong>Immer</strong>,
+          которую мы изучим позже. Immer позволяет писать «мутирующий» код,
+          а за кулисами создаёт иммутабельные обновления.
+        </div>
+
+        <h3>Что происходит со ссылками?</h3>
+        <p>При правильном иммутабельном обновлении:</p>
+        <ul>
+          <li><code>state === newState</code> → <strong>false</strong> (новый корневой объект)</li>
+          <li><code>state.user === newState.user</code> → <strong>false</strong> (скопирован)</li>
+          <li><code>state.user.company === newState.user.company</code> → <strong>false</strong></li>
+          <li><code>state.user.company.address === newState.user.company.address</code> → <strong>false</strong></li>
+          <li>Но! <code>state.user.name === newState.user.name</code> → <strong>true</strong> (строки-примитивы не копируются)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

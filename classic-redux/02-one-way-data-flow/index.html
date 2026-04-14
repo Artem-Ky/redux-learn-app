@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>02 — Однонаправленный поток данных</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">02 / 100</span>
+      Однонаправленный поток данных
+    </div>
+    <nav class="site-header__nav">
+      <a href="../01-what-is-redux/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">02</span>
+      <a href="../03-immutability-basics/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Counter without Redux -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Счётчик без Redux (чистый JS)</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <div class="flow-diagram" style="flex-direction: column; gap: 8px; align-items: stretch;">
+              <div class="flow-step" id="step-state">
+                <div class="flow-step__label">State (состояние)</div>
+                <div class="flow-step__value" id="state-value">{ count: 0 }</div>
+              </div>
+              <div class="flow-arrow" style="text-align: center;">↓</div>
+              <div class="flow-step" id="step-view">
+                <div class="flow-step__label">View (отображение)</div>
+                <div class="flow-step__value">
+                  <span id="counter-display" style="font-size: 2rem;">0</span>
+                </div>
+              </div>
+              <div class="flow-arrow" style="text-align: center;">↓</div>
+              <div class="flow-step" id="step-action">
+                <div class="flow-step__label">Action (действие пользователя)</div>
+                <div class="flow-step__value">
+                  <div class="btn-group" style="justify-content: center;">
+                    <button class="btn" id="btn-dec">− 1</button>
+                    <button class="btn btn--accent" id="btn-inc">+ 1</button>
+                    <button class="btn" id="btn-reset">Reset</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="console-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — One-Way Data Flow</div>
+      <div class="theory__body">
+        <h3>Что такое однонаправленный поток данных?</h3>
+        <p>
+          Прежде чем углубляться в Redux, важно понять базовый паттерн управления состоянием.
+          Любое приложение можно разбить на три части:
+        </p>
+        <ul>
+          <li><strong>State</strong> — источник истины, описывает состояние приложения в конкретный момент</li>
+          <li><strong>View</strong> — визуальное представление, основанное на текущем state</li>
+          <li><strong>Actions</strong> — события, происходящие на основе действий пользователя, которые запускают обновления state</li>
+        </ul>
+
+        <div class="quote">
+          «State describes the condition of the app at a specific point in time.
+          The UI is rendered based on that state. When something happens (such as
+          a user clicking a button), the state is updated based on what occurred.
+          The UI re-renders based on the new state.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Проблема масштабирования</h3>
+        <p>
+          В примере выше всё просто: одно состояние, один view, прямые действия.
+          Но когда <strong>несколько компонентов</strong> нуждаются в одних данных,
+          особенно если они расположены в разных частях приложения — простота ломается.
+        </p>
+        <p>
+          Решение — <strong>вынести общее состояние</strong> из компонентов в централизованное место.
+          Это и есть основная идея Redux: единое место для хранения глобального state,
+          с определёнными правилами обновления.
+        </p>
+
+        <h3>Код примера</h3>
+        <div class="code-block">
+<span class="cm">// State — простой объект</span>
+<span class="kw">let</span> state = { <span class="prop">count</span>: <span class="num">0</span> }
+
+<span class="cm">// View — функция отрисовки</span>
+<span class="kw">function</span> <span class="fn">render</span>() {
+  document.getElementById(<span class="str">'display'</span>).textContent = state.<span class="prop">count</span>
+}
+
+<span class="cm">// Action — обновление state и перерисовка</span>
+<span class="kw">function</span> <span class="fn">increment</span>() {
+  state = { ...state, <span class="prop">count</span>: state.<span class="prop">count</span> + <span class="num">1</span> }  <span class="cm">// иммутабельно!</span>
+  <span class="fn">render</span>()
+}
+        </div>
+
+        <div class="tip">
+          Обратите внимание: даже без Redux мы используем <strong>иммутабельное обновление</strong>
+          (<code>{ ...state, count: state.count + 1 }</code> вместо <code>state.count++</code>).
+          Это важнейший паттерн, который мы подробно разберём в следующих уроках.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

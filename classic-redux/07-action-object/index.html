@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>07 — Action Object (первый Redux)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">07 / 100</span>
+      Action Object — Первый Redux Store
+    </div>
+    <nav class="site-header__nav">
+      <a href="../06-pure-functions/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">07</span>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Create and dispatch actions -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Создание и dispatch экшенов</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Счётчик</h3>
+            <div class="counter">
+              <button class="btn" id="btn-dec">−</button>
+              <div class="counter__value" id="counter-value">0</div>
+              <button class="btn" id="btn-inc">+</button>
+            </div>
+            <div class="btn-group" style="margin-top: 16px;">
+              <button class="btn" id="btn-reset">Reset</button>
+              <button class="btn" id="btn-add5">+5</button>
+              <button class="btn" id="btn-unknown">Неизвестный экшен</button>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <h3 style="color: var(--text-bright); margin-bottom: 8px;">Кастомный экшен</h3>
+              <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <div style="flex: 1;">
+                  <label style="color: var(--text-muted); font-size: 0.75rem;">type</label>
+                  <input type="text" id="custom-type" value="counter/incremented" style="margin-top: 2px;">
+                </div>
+                <div style="flex: 1;">
+                  <label style="color: var(--text-muted); font-size: 0.75rem;">payload (число)</label>
+                  <input type="number" id="custom-payload" value="" placeholder="необязательно" style="margin-top: 2px;">
+                </div>
+                <button class="btn btn--accent" id="btn-custom">Dispatch</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="state-display">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 1rem;"></pre>
+            </div>
+            <div class="state-display" style="margin-top: 12px;">
+              <div class="state-display__label">Последний отправленный Action</div>
+              <pre id="action-display" style="color: var(--accent-orange); font-size: 0.85rem;">—</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что такое Action?</div>
+      <div class="theory__body">
+        <h3>Action — обычный JavaScript-объект</h3>
+        <p>
+          <strong>Action</strong> (экшен) — это простой JavaScript-объект, который имеет поле <code>type</code>.
+          Можно думать об экшене как о <em>событии</em>, описывающем «что произошло» в приложении.
+        </p>
+
+        <div class="quote">
+          «An action is a plain JavaScript object that has a type field. You can think
+          of an action as an event that describes something that happened in the application.
+          The type field should be a string that gives this action a descriptive name,
+          like "todos/todoAdded".»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#actions" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Обязательное поле: type</h3>
+        <p>
+          Поле <code>type</code> — строка, дающая экшену уникальное описательное имя.
+          Принятое соглашение — формат <code>"домен/событие"</code>:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Формат: "домен/чтоПроизошло"</span>
+{ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> }
+{ <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span> }
+{ <span class="prop">type</span>: <span class="str">'filters/statusChanged'</span> }
+        </div>
+
+        <h3>Дополнительные данные: payload</h3>
+        <p>
+          Экшен может содержать дополнительную информацию о том, что произошло.
+          По соглашению, эти данные помещаются в поле <code>payload</code>:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> addTodoAction = {
+  <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span>,
+  <span class="prop">payload</span>: <span class="str">'Купить молоко'</span>
+}
+
+<span class="kw">const</span> addByAmount = {
+  <span class="prop">type</span>: <span class="str">'counter/addAmount'</span>,
+  <span class="prop">payload</span>: <span class="num">5</span>
+}
+        </div>
+
+        <h3>Как это работает в этом примере</h3>
+        <div class="code-block">
+<span class="kw">import</span> { createStore } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="cm">// Reducer — обрабатывает экшены и возвращает новый state</span>
+<span class="kw">function</span> <span class="fn">counterReducer</span>(state = { <span class="prop">value</span>: <span class="num">0</span> }, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'counter/incremented'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> + <span class="num">1</span> }
+    <span class="kw">case</span> <span class="str">'counter/decremented'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> - <span class="num">1</span> }
+    <span class="kw">case</span> <span class="str">'counter/addAmount'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> + action.<span class="prop">payload</span> }
+    <span class="kw">case</span> <span class="str">'counter/reset'</span>:
+      <span class="kw">return</span> { <span class="prop">value</span>: <span class="num">0</span> }
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state  <span class="cm">// ВАЖНО: неизвестные экшены — возвращаем state без изменений</span>
+  }
+}
+
+<span class="cm">// Создаём store</span>
+<span class="kw">const</span> store = <span class="fn">createStore</span>(counterReducer)
+
+<span class="cm">// Dispatch — единственный способ изменить state</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/addAmount'</span>, <span class="prop">payload</span>: <span class="num">5</span> })
+        </div>
+
+        <div class="tip">
+          Обратите внимание на <strong>DevTools-панель</strong> выше — она показывает каждый
+          отправленный экшен, текущий state и разницу (diff) между предыдущим и новым состоянием.
+          Это аналог расширения Redux DevTools для Chrome, встроенный прямо в страницу.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Action — <strong>обычный объект</strong> (plain JS object)</li>
+          <li>Обязательное поле: <code>type</code> (строка)</li>
+          <li>Дополнительные данные — в поле <code>payload</code></li>
+          <li>Действия отправляются через <code>store.dispatch(action)</code></li>
+          <li>Store вызывает reducer и сохраняет новый state</li>
+          <li>Dispatch — <strong>единственный</strong> способ изменить state в Redux</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

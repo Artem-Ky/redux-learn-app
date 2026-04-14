@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>06 — Чистые функции</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">06 / 100</span>
+      Чистые функции и побочные эффекты
+    </div>
+    <nav class="site-header__nav">
+      <a href="../05-immutability-nested/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">06</span>
+      <a href="../07-action-object/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Чистая vs нечистая функция</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div style="border-right: 1px solid var(--border); padding-right: 16px;">
+            <h3 style="color: var(--success); margin-bottom: 12px;">
+              Чистая функция <span class="tag tag--good">pure</span>
+            </h3>
+            <div class="code-block" style="font-size: 0.78rem;">
+<span class="kw">function</span> <span class="fn">add</span>(a: <span class="type">number</span>, b: <span class="type">number</span>): <span class="type">number</span> {
+  <span class="kw">return</span> a + b
+}
+            </div>
+            <div class="btn-group" style="margin-top: 8px;">
+              <button class="btn btn--success" id="btn-pure-1">add(2, 3)</button>
+              <button class="btn btn--success" id="btn-pure-2">add(10, 20)</button>
+              <button class="btn btn--success" id="btn-pure-3">add(2, 3) ещё раз</button>
+            </div>
+          </div>
+          <div style="padding-left: 16px;">
+            <h3 style="color: var(--error); margin-bottom: 12px;">
+              Нечистая функция <span class="tag tag--bad">impure</span>
+            </h3>
+            <div class="code-block" style="font-size: 0.78rem;">
+<span class="kw">let</span> callCount = <span class="num">0</span>
+<span class="kw">function</span> <span class="fn">addImpure</span>(a: <span class="type">number</span>, b: <span class="type">number</span>): <span class="type">string</span> {
+  callCount++
+  <span class="kw">return</span> <span class="str">`${a + b} (call #${callCount} at ${Date.now()})`</span>
+}
+            </div>
+            <div class="btn-group" style="margin-top: 8px;">
+              <button class="btn btn--danger" id="btn-impure-1">addImpure(2, 3)</button>
+              <button class="btn btn--danger" id="btn-impure-2">addImpure(10, 20)</button>
+              <button class="btn btn--danger" id="btn-impure-3">addImpure(2, 3) ещё раз</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Pure Functions и Side Effects</div>
+      <div class="theory__body">
+        <h3>Что такое чистая функция?</h3>
+        <p>Чистая функция — функция, которая:</p>
+        <ol>
+          <li>Результат зависит <strong>только от аргументов</strong> (одинаковые входы → одинаковый выход)</li>
+          <li><strong>Не вызывает побочных эффектов</strong> (не меняет внешние переменные, не делает HTTP-запросы и т.д.)</li>
+        </ol>
+
+        <div class="quote">
+          «Reducers must always follow some specific rules:
+          They should only calculate the new state value based on the state and action arguments.
+          They are not allowed to modify the existing state.
+          They must not do any asynchronous logic, calculate random values, or cause other "side effects".»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#reducers" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Побочные эффекты (Side Effects)</h3>
+        <p>Побочный эффект — любое изменение состояния или поведения, видимое <em>за пределами</em> возвращаемого значения:</p>
+        <ul>
+          <li>Логирование в консоль</li>
+          <li>Сохранение файла</li>
+          <li>Установка таймера</li>
+          <li>HTTP-запросы</li>
+          <li>Изменение внешних переменных / мутация аргументов</li>
+          <li>Генерация случайных чисел (<code>Math.random()</code>)</li>
+          <li>Получение текущего времени (<code>Date.now()</code>)</li>
+        </ul>
+
+        <h3>Почему reducer должен быть чистым?</h3>
+        <div class="tip">
+          <strong>Предсказуемость:</strong> одни и те же входные данные (state + action) всегда дают один и тот же результат.<br>
+          <strong>Тестируемость:</strong> не нужно мокать внешние зависимости.<br>
+          <strong>Time-travel:</strong> DevTools могут «перематывать» и «проигрывать» экшены, получая тот же state.<br>
+          <strong>Hot-reloading:</strong> можно заменить reducer на лету и пересчитать state.
+        </div>
+
+        <h3>Где тогда делать побочные эффекты?</h3>
+        <p>
+          Побочные эффекты живут в <strong>middleware</strong> (промежуточном ПО).
+          Мы подробно разберём это позже — в разделе про Thunk и middleware.
+          Reducer — это <em>чистая математика</em> обновления state.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

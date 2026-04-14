@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03 — Иммутабельность (основы)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">03 / 100</span>
+      Иммутабельность (основы)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../02-one-way-data-flow/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">03</span>
+      <a href="../04-immutability-arrays/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Мутация vs Иммутабельное обновление</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Исходный объект (original)</div>
+              <pre id="original-display" style="color: var(--accent-cyan); font-size: 0.9rem;">{ a: 1, b: 2, c: 3 }</pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">Результат операции</div>
+              <pre id="result-display" style="color: var(--accent-orange); font-size: 0.9rem;">—</pre>
+            </div>
+          </div>
+          <div>
+            <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 0.85rem;">
+              Попробуйте оба подхода и посмотрите в консоли разницу:
+            </p>
+            <div class="btn-group" style="flex-direction: column;">
+              <button class="btn btn--danger" id="btn-mutate">
+                Мутировать: original.b = 999
+                <span class="tag tag--bad">мутация</span>
+              </button>
+              <button class="btn btn--success" id="btn-immutable">
+                Иммутабельно: { ...original, b: 999 }
+                <span class="tag tag--good">копия</span>
+              </button>
+              <button class="btn" id="btn-reset">Сбросить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Иммутабельность</div>
+      <div class="theory__body">
+        <h3>Что такое иммутабельность?</h3>
+        <p>
+          <strong>«Mutable»</strong> означает «изменяемый». Если что-то <strong>«immutable»</strong>,
+          оно не может быть изменено. В JavaScript объекты и массивы по умолчанию
+          <em>мутабельны</em> — вы можете менять их содержимое:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> obj = { <span class="prop">a</span>: <span class="num">1</span>, <span class="prop">b</span>: <span class="num">2</span> }
+obj.<span class="prop">b</span> = <span class="num">3</span>  <span class="cm">// Мутация! Тот же объект в памяти, но содержимое изменилось</span>
+
+<span class="kw">const</span> arr = [<span class="str">'a'</span>, <span class="str">'b'</span>]
+arr.<span class="fn">push</span>(<span class="str">'c'</span>)  <span class="cm">// Мутация! Изменили оригинальный массив</span>
+        </div>
+
+        <div class="quote">
+          «In order to update values immutably, your code must make copies of existing
+          objects/arrays, and then modify the copies. We can do this by hand using
+          JavaScript's array / object spread operators.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#immutability" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <h3>Иммутабельное обновление</h3>
+        <p>
+          Чтобы обновить данные иммутабельно, нужно <strong>создать копию</strong>
+          существующего объекта/массива и модифицировать копию:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> obj = { <span class="prop">a</span>: <span class="num">1</span>, <span class="prop">b</span>: <span class="num">2</span> }
+
+<span class="cm">// Spread-оператор создаёт НОВЫЙ объект</span>
+<span class="kw">const</span> copy = { ...obj, <span class="prop">b</span>: <span class="num">3</span> }
+
+obj === copy   <span class="cm">// false — это РАЗНЫЕ объекты в памяти</span>
+obj.<span class="prop">b</span>          <span class="cm">// 2 — оригинал НЕ изменился!</span>
+copy.<span class="prop">b</span>         <span class="cm">// 3 — только копия содержит новое значение</span>
+        </div>
+
+        <h3>Почему Redux требует иммутабельности?</h3>
+        <ul>
+          <li><strong>Предсказуемость</strong> — если state не мутируется, легко отследить каждое изменение</li>
+          <li><strong>Time-travel debugging</strong> — DevTools может сохранять снимки state и «путешествовать во времени»</li>
+          <li><strong>React-Redux оптимизации</strong> — React-Redux использует <code>===</code> для сравнения;
+            если ссылка та же — компонент НЕ перерисовывается</li>
+          <li><strong>Тестируемость</strong> — чистые функции без мутаций легко тестировать</li>
+        </ul>
+
+        <div class="warning">
+          Redux store НЕ защищает от мутаций сам по себе. Это ответственность разработчика —
+          всегда возвращать новые объекты из reducer'ов. Позже мы увидим, как библиотека
+          <strong>Immer</strong> решает эту проблему.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

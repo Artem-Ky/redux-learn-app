@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01 — Что такое Redux?</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">01 / 100</span>
+      Что такое Redux?
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <span class="current">01</span>
+      <a href="../02-one-way-data-flow/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Поток данных Redux</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Нажмите «Пройти цикл», чтобы увидеть как данные проходят через Redux пошагово:
+        </p>
+        <div class="flow-diagram" id="flow">
+          <div class="flow-step" id="step-action">
+            <div class="flow-step__label">1. Action</div>
+            <div class="flow-step__value">{ type: '...' }</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="step-dispatch">
+            <div class="flow-step__label">2. Dispatch</div>
+            <div class="flow-step__value">store.dispatch()</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="step-reducer">
+            <div class="flow-step__label">3. Reducer</div>
+            <div class="flow-step__value">(state, action) =&gt; newState</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="step-store">
+            <div class="flow-step__label">4. Store</div>
+            <div class="flow-step__value">Новый state</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="step-ui">
+            <div class="flow-step__label">5. UI</div>
+            <div class="flow-step__value">Обновление</div>
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 16px;">
+          <button class="btn btn--accent" id="btn-cycle">Пройти цикл</button>
+          <button class="btn" id="btn-reset">Сбросить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что такое Redux?</div>
+      <div class="theory__body">
+        <h3>Определение</h3>
+        <p>
+          <strong>Redux</strong> — это библиотека для управления и обновления глобального состояния приложения.
+          UI генерирует события, называемые <strong>«actions»</strong> (экшены), которые описывают «что произошло»,
+          а отдельная логика обновления — <strong>«reducers»</strong> (редьюсеры) — обновляет состояние в ответ.
+        </p>
+
+        <div class="quote">
+          «Redux is a pattern and library for managing and updating application state,
+          using events called "actions". It serves as a centralized store for state that
+          needs to be used across your entire application, with rules ensuring that the
+          state can only be updated in a predictable fashion.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-1-overview" target="_blank">Redux Fundamentals, Part 1</a>
+        </div>
+
+        <h3>Три принципа Redux</h3>
+        <ol>
+          <li>
+            <strong>Single Source of Truth</strong> (Единый источник истины) —
+            глобальное состояние хранится в объекте внутри единственного <em>store</em>.
+            Любая часть данных существует только в одном месте.
+          </li>
+          <li>
+            <strong>State is Read-Only</strong> (Состояние только для чтения) —
+            единственный способ изменить состояние — отправить <em>action</em>,
+            объект, описывающий что произошло. UI не может случайно перезаписать данные.
+          </li>
+          <li>
+            <strong>Changes via Pure Reducer Functions</strong> (Изменения через чистые функции) —
+            чтобы указать, как дерево состояний обновляется в ответ на экшены,
+            вы пишете чистые <em>reducer</em>-функции.
+          </li>
+        </ol>
+
+        <h3>Когда использовать Redux?</h3>
+        <div class="tip">
+          Redux полезен, когда:<br>
+          — У вас много данных, которые нужны в разных частях приложения<br>
+          — Состояние часто обновляется<br>
+          — Логика обновления может быть сложной<br>
+          — Кодовая база средняя или большая, над ней работает много людей
+        </div>
+
+        <h3>Поток данных Redux</h3>
+        <p>Диаграмма выше показывает, как данные проходят через Redux-приложение:</p>
+        <ol>
+          <li>Пользователь взаимодействует с UI (клик, ввод и т.д.)</li>
+          <li>UI создаёт <strong>action</strong> — простой объект <code>{ type: 'событие' }</code></li>
+          <li><strong>dispatch</strong> — action отправляется в store</li>
+          <li>Store вызывает <strong>reducer</strong> — чистую функцию <code>(state, action) => newState</code></li>
+          <li>Reducer возвращает новое состояние, store сохраняет его</li>
+          <li>Store оповещает <strong>UI</strong>, UI обновляется</li>
+        </ol>
+
+        <h3>Код диаграммы (упрощённо)</h3>
+        <div class="code-block">
+<span class="cm">// 1. Action — объект, описывающий событие</span>
+<span class="kw">const</span> action = { <span class="prop">type</span>: <span class="str">'counter/incremented'</span> }
+
+<span class="cm">// 2. Reducer — чистая функция</span>
+<span class="kw">function</span> <span class="fn">counterReducer</span>(state = { <span class="prop">value</span>: <span class="num">0</span> }, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'counter/incremented'</span>:
+      <span class="kw">return</span> { ...state, <span class="prop">value</span>: state.<span class="prop">value</span> + <span class="num">1</span> }
+    <span class="kw">default</span>:
+      <span class="kw">return</span> state
+  }
+}
+
+<span class="cm">// 3. Store — хранит состояние</span>
+<span class="kw">const</span> store = Redux.<span class="fn">createStore</span>(counterReducer)
+
+<span class="cm">// 4. Dispatch — отправка action</span>
+store.<span class="fn">dispatch</span>(action)
+
+<span class="cm">// 5. Новое состояние</span>
+console.<span class="fn">log</span>(store.<span class="fn">getState</span>()) <span class="cm">// { value: 1 }</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

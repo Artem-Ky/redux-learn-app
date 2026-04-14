@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04 — Иммутабельность (массивы)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">04 / 100</span>
+      Иммутабельность (массивы)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../03-immutability-basics/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">04</span>
+      <a href="../05-immutability-nested/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Мутабельные vs иммутабельные операции с массивами</div>
+      <div class="demo-section__body">
+        <div class="state-display" style="margin-bottom: 16px;">
+          <div class="state-display__label">Текущий массив</div>
+          <pre id="array-display" style="color: var(--accent-cyan); font-size: 0.95rem;"></pre>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <p style="color: var(--error); font-weight: 600; margin-bottom: 8px;">Мутация (плохо для Redux)</p>
+            <div class="btn-group" style="flex-direction: column;">
+              <button class="btn btn--danger" data-op="push">push('новый') — мутирует!</button>
+              <button class="btn btn--danger" data-op="splice">splice(1,1) — мутирует!</button>
+              <button class="btn btn--danger" data-op="direct">arr[0] = 'X' — мутирует!</button>
+              <button class="btn btn--danger" data-op="sort">sort() — мутирует!</button>
+            </div>
+          </div>
+          <div>
+            <p style="color: var(--success); font-weight: 600; margin-bottom: 8px;">Иммутабельно (правильно)</p>
+            <div class="btn-group" style="flex-direction: column;">
+              <button class="btn btn--success" data-op="spread-add">[...arr, 'новый'] — копия</button>
+              <button class="btn btn--success" data-op="filter">filter(i !== 1) — копия</button>
+              <button class="btn btn--success" data-op="map">map(обновить[0]) — копия</button>
+              <button class="btn btn--success" data-op="slice-sort">[...arr].sort() — копия</button>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: 12px;">
+          <button class="btn" id="btn-reset">Сбросить массив</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Иммутабельные операции с массивами</div>
+      <div class="theory__body">
+        <h3>Мутирующие методы (нельзя в Redux)</h3>
+        <div class="code-block">
+<span class="cm">// Все эти методы ИЗМЕНЯЮТ оригинальный массив:</span>
+arr.<span class="fn">push</span>(item)       <span class="cm">// добавляет в конец</span>
+arr.<span class="fn">pop</span>()            <span class="cm">// удаляет последний</span>
+arr.<span class="fn">splice</span>(i, <span class="num">1</span>)    <span class="cm">// удаляет по индексу</span>
+arr.<span class="fn">sort</span>()           <span class="cm">// сортирует на месте</span>
+arr.<span class="fn">reverse</span>()        <span class="cm">// разворачивает на месте</span>
+arr[i] = newValue   <span class="cm">// прямое присвоение</span>
+        </div>
+
+        <h3>Иммутабельные альтернативы (правильно для Redux)</h3>
+        <div class="code-block">
+<span class="cm">// Добавление</span>
+<span class="kw">const</span> added = [...arr, newItem]            <span class="cm">// spread + новый элемент</span>
+<span class="kw">const</span> added2 = arr.<span class="fn">concat</span>(newItem)        <span class="cm">// concat возвращает новый массив</span>
+
+<span class="cm">// Удаление</span>
+<span class="kw">const</span> removed = arr.<span class="fn">filter</span>((_, i) => i !== index)
+
+<span class="cm">// Обновление элемента</span>
+<span class="kw">const</span> updated = arr.<span class="fn">map</span>((item, i) =>
+  i === index ? newValue : item
+)
+
+<span class="cm">// Сортировка (сначала копия!)</span>
+<span class="kw">const</span> sorted = [...arr].<span class="fn">sort</span>()
+
+<span class="cm">// Вставка в середину</span>
+<span class="kw">const</span> inserted = [
+  ...arr.<span class="fn">slice</span>(<span class="num">0</span>, index),
+  newItem,
+  ...arr.<span class="fn">slice</span>(index)
+]
+        </div>
+
+        <div class="quote">
+          «We can do this by hand using JavaScript's array / object spread operators,
+          as well as array methods that return new copies of the array instead of
+          mutating the original array.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow#immutability" target="_blank">Redux Fundamentals, Part 2</a>
+        </div>
+
+        <div class="warning">
+          <strong>Частая ошибка:</strong> <code>array.sort()</code> мутирует оригинал!
+          Всегда делайте копию перед сортировкой: <code>[...array].sort()</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
