@@ -10,30 +10,41 @@ interface Todo {
 }
 
 interface RootState {
-  todos: Todo[]
+  entities: Record<number, Todo>
+  ids: number[]
 }
 
-const initialTodos: Todo[] = [
-  { id: 0, text: 'Изучить Actions', completed: true },
-  { id: 1, text: 'Изучить Reducers', completed: false },
-  { id: 2, text: 'Изучить Store', completed: false },
-  { id: 3, text: 'Изучить Selectors', completed: true },
-  { id: 4, text: 'Изучить Middleware', completed: false },
-]
+const todoIds = [0, 1, 2, 3, 4]
 
-function todosReducer(state: Todo[] = initialTodos, action: any): Todo[] {
+const initialState: RootState = {
+  entities: {
+    0: { id: 0, text: 'Изучить Actions', completed: true },
+    1: { id: 1, text: 'Изучить Reducers', completed: false },
+    2: { id: 2, text: 'Изучить Store', completed: false },
+    3: { id: 3, text: 'Изучить Selectors', completed: true },
+    4: { id: 4, text: 'Изучить Middleware', completed: false },
+  },
+  ids: [0, 1, 2, 3, 4]
+}
+
+function rootReducer(state: RootState = initialState, action: any): RootState {
   switch (action.type) {
-    case 'todos/toggled':
-      return state.map(t => t.id === action.payload ? { ...t, completed: !t.completed } : t)
+    case 'todos/toggled': {
+      const id = action.payload
+      const todo = state.entities[id]
+      return {
+        ...state,
+        entities: {
+          ...state.entities,
+          [id]: { ...todo, completed: !todo.completed }
+        }
+      }
+    }
     case 'noop':
       return state
     default:
       return state
   }
-}
-
-function rootReducer(state: RootState | undefined, action: any): RootState {
-  return { todos: todosReducer(state?.todos, action) }
 }
 
 const store = createStore(rootReducer)
@@ -44,39 +55,40 @@ devtools.connectStore(store)
 const con = new ConsolePanel(document.getElementById('console-container')!, 'Счётчик пересчётов селекторов')
 
 // ─── Shared selector (один на всех) ───
-
-const selectTodos = (state: RootState) => state.todos
+// Один экземпляр createSelector. cache size = 1.
+// Каждый вызов с другим id сбрасывает кэш предыдущего вызова.
 
 let sharedRecomputeCount = 0
 
 const selectTodoByIdShared = createSelector(
-  selectTodos,
+  (state: RootState) => state.entities,
   (_: RootState, id: number) => id,
-  (todos, id) => {
+  (entities, id) => {
     sharedRecomputeCount++
-    return todos.find(t => t.id === id)
+    return entities[id]
   }
 )
 
-// ─── Factory selector (свой на каждую строку) ───
+// ─── Factory selector (свой экземпляр на каждую строку) ───
+// todoId запекается через замыкание → селектор зависит ТОЛЬКО от entities[todoId].
+// Изменение другого entity НЕ инвалидирует этот кэш.
 
 const factoryRecomputeCounts: Record<number, number> = {}
 
 const makeSelectTodoById = (todoId: number) => {
   factoryRecomputeCounts[todoId] = 0
   return createSelector(
-    selectTodos,
-    (_: RootState, id: number) => id,
-    (todos, id) => {
+    (state: RootState) => state.entities[todoId],
+    (entity) => {
       factoryRecomputeCounts[todoId]++
-      return todos.find(t => t.id === id)
+      return entity
     }
   )
 }
 
 const factorySelectors = new Map<number, ReturnType<typeof makeSelectTodoById>>()
-for (const todo of initialTodos) {
-  factorySelectors.set(todo.id, makeSelectTodoById(todo.id))
+for (const id of todoIds) {
+  factorySelectors.set(id, makeSelectTodoById(id))
 }
 
 // ─── Rendering ───
@@ -86,15 +98,15 @@ function renderSharedList(): void {
   const container = document.getElementById('shared-list')!
   const prevCount = sharedRecomputeCount
 
-  const rows = initialTodos.map(todo => {
+  const rows = todoIds.map(id => {
     const countBefore = sharedRecomputeCount
-    const selected = selectTodoByIdShared(state, todo.id)
+    const selected = selectTodoByIdShared(state, id)
     const recomputed = sharedRecomputeCount > countBefore
     const status = selected?.completed ? '✅' : '⬜'
 
     return `
       <div class="todo-row">
-        <span class="todo-row__id">#${todo.id}</span>
+        <span class="todo-row__id">#${id}</span>
         <span class="todo-row__text">${status} ${selected?.text ?? '?'}</span>
         <span class="todo-row__selector-info">shared instance</span>
         <span class="todo-row__recompute ${recomputed ? 'hit' : 'zero'}">
@@ -117,18 +129,18 @@ function renderFactoryList(): void {
     prevTotals[Number(id)] = count
   }
 
-  const rows = initialTodos.map(todo => {
-    const selector = factorySelectors.get(todo.id)!
-    const countBefore = factoryRecomputeCounts[todo.id]
-    const selected = selector(state, todo.id)
-    const recomputed = factoryRecomputeCounts[todo.id] > countBefore
+  const rows = todoIds.map(id => {
+    const selector = factorySelectors.get(id)!
+    const countBefore = factoryRecomputeCounts[id]
+    const selected = selector(state)
+    const recomputed = factoryRecomputeCounts[id] > countBefore
     const status = selected?.completed ? '✅' : '⬜'
 
     return `
       <div class="todo-row">
-        <span class="todo-row__id">#${todo.id}</span>
+        <span class="todo-row__id">#${id}</span>
         <span class="todo-row__text">${status} ${selected?.text ?? '?'}</span>
-        <span class="todo-row__selector-info">own instance #${todo.id}</span>
+        <span class="todo-row__selector-info">own instance #${id}</span>
         <span class="todo-row__recompute ${recomputed ? 'hit' : 'zero'}">
           ${recomputed ? '⚡ recompute' : '— cached'}
         </span>
@@ -150,8 +162,6 @@ function render(): void {
 }
 
 store.subscribe(render)
-
-// initial render — primes caches
 render()
 
 // ─── Log initial ───
@@ -207,7 +217,7 @@ document.getElementById('btn-unrelated')!.addEventListener('click', () => {
   con.log(`Shared: +${sharedDelta} пересчётов`)
   con.log(`Factory: +${factoryDelta} пересчётов`)
   if (sharedDelta === 0 && factoryDelta === 0) {
-    con.success('Оба подхода: кэш валиден, пересчётов нет (state.todos не изменился)')
+    con.success('Оба подхода: кэш валиден, пересчётов нет (state не изменился)')
   }
   con.log('')
 })

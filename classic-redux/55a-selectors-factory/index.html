@@ -150,14 +150,14 @@
         <div class="code-block">
 <span class="cm">// Один экземпляр селектора на ВСЁ приложение</span>
 <span class="kw">const</span> <span class="fn">selectTodoById</span> = <span class="fn">createSelector</span>(
-  (<span class="prop">state</span>: RootState) => state.<span class="prop">todos</span>,
+  (<span class="prop">state</span>: RootState) => state.<span class="prop">entities</span>,
   (_: RootState, <span class="prop">id</span>: <span class="type">number</span>) => id,
-  (<span class="prop">todos</span>, <span class="prop">id</span>) => todos.<span class="fn">find</span>(t => t.<span class="prop">id</span> === id)  <span class="cm">// пересчитывается КАЖДЫЙ раз!</span>
+  (<span class="prop">entities</span>, <span class="prop">id</span>) => entities[id]  <span class="cm">// пересчитывается КАЖДЫЙ раз!</span>
 )
 
-<span class="cm">// Строка 0 вызывает selectTodoById(state, 0)  → cache MISS, вычисляем</span>
-<span class="cm">// Строка 1 вызывает selectTodoById(state, 1)  → id изменился → cache MISS!</span>
-<span class="cm">// Строка 2 вызывает selectTodoById(state, 2)  → id изменился → cache MISS!</span>
+<span class="cm">// Строка 0: selectTodoById(state, 0)  → cache MISS, вычисляем</span>
+<span class="cm">// Строка 1: selectTodoById(state, 1)  → id изменился → cache MISS!</span>
+<span class="cm">// Строка 2: selectTodoById(state, 2)  → id изменился → cache MISS!</span>
 <span class="cm">// ... мемоизация бесполезна — всегда пересчёт!</span>
         </div>
 
@@ -175,22 +175,23 @@
         </p>
 
         <div class="code-block">
-<span class="cm">// ФАБРИКА: каждый вызов возвращает НОВЫЙ экземпляр createSelector</span>
-<span class="kw">const</span> <span class="fn">makeSelectTodoById</span> = () =>
+<span class="cm">// ФАБРИКА: id запекается через замыкание</span>
+<span class="cm">// Каждый экземпляр зависит ТОЛЬКО от entities[todoId]</span>
+<span class="kw">const</span> <span class="fn">makeSelectTodoById</span> = (<span class="prop">todoId</span>: <span class="type">number</span>) =>
   <span class="fn">createSelector</span>(
-    (<span class="prop">state</span>: RootState) => state.<span class="prop">todos</span>,
-    (_: RootState, <span class="prop">id</span>: <span class="type">number</span>) => id,
-    (<span class="prop">todos</span>, <span class="prop">id</span>) => todos.<span class="fn">find</span>(t => t.<span class="prop">id</span> === id)
+    (<span class="prop">state</span>: RootState) => state.<span class="prop">entities</span>[todoId],
+    (<span class="prop">entity</span>) => entity
   )
 
 <span class="cm">// Каждая строка создаёт СВОЙ экземпляр:</span>
-<span class="kw">const</span> selectTodo0 = <span class="fn">makeSelectTodoById</span>()  <span class="cm">// свой кэш для id=0</span>
-<span class="kw">const</span> selectTodo1 = <span class="fn">makeSelectTodoById</span>()  <span class="cm">// свой кэш для id=1</span>
-<span class="kw">const</span> selectTodo2 = <span class="fn">makeSelectTodoById</span>()  <span class="cm">// свой кэш для id=2</span>
+<span class="kw">const</span> selectTodo0 = <span class="fn">makeSelectTodoById</span>(<span class="num">0</span>)  <span class="cm">// зависит от entities[0]</span>
+<span class="kw">const</span> selectTodo1 = <span class="fn">makeSelectTodoById</span>(<span class="num">1</span>)  <span class="cm">// зависит от entities[1]</span>
+<span class="kw">const</span> selectTodo2 = <span class="fn">makeSelectTodoById</span>(<span class="num">2</span>)  <span class="cm">// зависит от entities[2]</span>
 
-<span class="cm">// Теперь при изменении todo #2:</span>
-<span class="cm">// selectTodo0(state, 0) → cache HIT (todos массив тот же? нет, новый... но id=0 не менялся)</span>
-<span class="cm">// selectTodo2(state, 2) → cache MISS (id=2 изменился)</span>
+<span class="cm">// При Toggle #2:</span>
+<span class="cm">// selectTodo0(state) → entities[0] не изменился → cache HIT ✓</span>
+<span class="cm">// selectTodo1(state) → entities[1] не изменился → cache HIT ✓</span>
+<span class="cm">// selectTodo2(state) → entities[2] ИЗМЕНИЛСЯ  → cache MISS, пересчёт</span>
         </div>
 
         <h3>Как это работает в React-Redux</h3>
@@ -202,15 +203,21 @@
 <span class="cm">// В React компоненте строки списка:</span>
 <span class="kw">const</span> <span class="fn">TodoRow</span> = ({ <span class="prop">id</span> }: { id: <span class="type">number</span> }) => {
   <span class="cm">// useMemo создаёт ОДИН раз при монтировании</span>
-  <span class="kw">const</span> selectTodo = <span class="fn">useMemo</span>(<span class="fn">makeSelectTodoById</span>, [])
+  <span class="kw">const</span> selectTodo = <span class="fn">useMemo</span>(() => <span class="fn">makeSelectTodoById</span>(id), [id])
 
-  <span class="cm">// Этот селектор — уникальный для ЭТОЙ строки</span>
-  <span class="kw">const</span> todo = <span class="fn">useSelector</span>(state => <span class="fn">selectTodo</span>(state, id))
+  <span class="cm">// Этот селектор зависит ТОЛЬКО от entities[id]</span>
+  <span class="kw">const</span> todo = <span class="fn">useSelector</span>(<span class="fn">selectTodo</span>)
 
   <span class="kw">return</span> &lt;div&gt;{todo.<span class="prop">text</span>}&lt;/div&gt;
 }
         </div>
 
+        <div class="tip">
+          <strong>Ключевой момент:</strong> фабрика работает вместе с <strong>нормализованным state</strong>.
+          Когда state хранит <code>entities: { [id]: entity }</code>, каждый фабричный селектор
+          зависит только от <code>entities[todoId]</code>. Изменение другого entity не инвалидирует кэш.
+          С массивом <code>todos[]</code> это не работает — любой <code>.map()</code> создаёт новый массив для всех.
+        </div>
         <div class="tip">
           <strong>Паттерн именования:</strong> фабрику обычно называют с префиксом <code>make</code>:
           <code>makeSelectTodoById</code>, <code>makeSelectUserPosts</code> и т.д.
@@ -243,24 +250,23 @@
 <span class="kw">import</span> { <span class="fn">createSelector</span> } <span class="kw">from</span> <span class="str">'reselect'</span>
 
 <span class="kw">interface</span> <span class="type">Todo</span> { <span class="prop">id</span>: <span class="type">number</span>; <span class="prop">text</span>: <span class="type">string</span>; <span class="prop">completed</span>: <span class="type">boolean</span> }
-<span class="kw">interface</span> <span class="type">RootState</span> { <span class="prop">todos</span>: <span class="type">Todo</span>[] }
-
-<span class="cm">// Обычный селектор (не мемоизированный) — всем подходит</span>
-<span class="kw">const</span> <span class="fn">selectTodos</span> = (<span class="prop">state</span>: <span class="type">RootState</span>) => state.<span class="prop">todos</span>
+<span class="kw">interface</span> <span class="type">RootState</span> {
+  <span class="prop">entities</span>: <span class="type">Record</span>&lt;<span class="type">number</span>, <span class="type">Todo</span>&gt;
+  <span class="prop">ids</span>: <span class="type">number</span>[]
+}
 
 <span class="cm">// ❌ ОДИН на всех — кэш бьётся при смене id</span>
 <span class="kw">const</span> <span class="fn">selectTodoById</span> = <span class="fn">createSelector</span>(
-  <span class="fn">selectTodos</span>,
+  (<span class="prop">state</span>: <span class="type">RootState</span>) => state.<span class="prop">entities</span>,
   (_: <span class="type">RootState</span>, <span class="prop">id</span>: <span class="type">number</span>) => id,
-  (<span class="prop">todos</span>, <span class="prop">id</span>) => todos.<span class="fn">find</span>(t => t.<span class="prop">id</span> === id)
+  (<span class="prop">entities</span>, <span class="prop">id</span>) => entities[id]
 )
 
-<span class="cm">// ✅ ФАБРИКА — каждый вызов = новый кэш</span>
-<span class="kw">const</span> <span class="fn">makeSelectTodoById</span> = () =>
+<span class="cm">// ✅ ФАБРИКА — id через замыкание, зависимость только от entities[todoId]</span>
+<span class="kw">const</span> <span class="fn">makeSelectTodoById</span> = (<span class="prop">todoId</span>: <span class="type">number</span>) =>
   <span class="fn">createSelector</span>(
-    <span class="fn">selectTodos</span>,
-    (_: <span class="type">RootState</span>, <span class="prop">id</span>: <span class="type">number</span>) => id,
-    (<span class="prop">todos</span>, <span class="prop">id</span>) => todos.<span class="fn">find</span>(t => t.<span class="prop">id</span> === id)
+    (<span class="prop">state</span>: <span class="type">RootState</span>) => state.<span class="prop">entities</span>[todoId],
+    (<span class="prop">entity</span>) => entity
   )
         </div>
       </div>
