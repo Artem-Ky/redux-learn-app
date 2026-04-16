@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>70 — redux-thunk — официальный thunk middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">70 / 100</span>
+      redux-thunk — официальный thunk middleware
+    </div>
+    <nav class="site-header__nav">
+      <a href="../69-thunk-concept/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">70</span>
+      <a href="../71-thunk-action-creator/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Official redux-thunk -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Загрузка данных с redux-thunk</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Thunk-функция имитирует API-запрос: dispatches <code>'loading'</code>,
+            ждёт 1.5 секунды, dispatches <code>'loaded'</code> с данными.
+          </p>
+
+          <button class="btn btn--accent" id="btn-load" style="margin-bottom: 16px;">
+            🔄 Load Data
+          </button>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Статус</div>
+            <pre id="status-display" style="color: var(--text-secondary); font-size: 0.9rem;">idle</pre>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Данные</div>
+            <div id="data-display" style="min-height: 60px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Нажмите "Load Data" ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — redux-thunk: официальный middleware</div>
+      <div class="theory__body">
+        <h3>Установка</h3>
+
+        <div class="code-block">
+<span class="fn">npm install</span> redux-thunk
+        </div>
+
+        <h3>Подключение</h3>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="prop">thunk</span> } <span class="kw">from</span> <span class="str">'redux-thunk'</span>
+<span class="kw">import</span> { <span class="prop">legacy_createStore</span> <span class="kw">as</span> <span class="prop">createStore</span>, <span class="prop">applyMiddleware</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(reducer, <span class="fn">applyMiddleware</span>(<span class="prop">thunk</span>))
+        </div>
+
+        <div class="quote">
+          «The Redux Thunk middleware allows you to write action creators that return
+          a function instead of an action. The thunk can be used to delay the dispatch
+          of an action, or to dispatch only if a certain condition is met.»
+          <br>— <a href="https://github.com/reduxjs/redux-thunk" target="_blank">redux-thunk — GitHub</a>
+        </div>
+
+        <h3>Сигнатура thunk-функции</h3>
+        <p>
+          Thunk-функция получает два аргумента: <code>dispatch</code> и <code>getState</code>.
+          Внутри можно выполнять любую асинхронную логику.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Thunk action creator</span>
+<span class="kw">const</span> <span class="fn">fetchData</span> = () => {
+  <span class="cm">// Возвращаем thunk-функцию</span>
+  <span class="kw">return</span> <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>, <span class="prop">getState</span>: <span class="type">any</span>) => {
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'data/loading'</span> })
+
+    <span class="kw">const</span> response = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/data'</span>)
+    <span class="kw">const</span> data = <span class="kw">await</span> response.<span class="fn">json</span>()
+
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'data/loaded'</span>, <span class="prop">payload</span>: data })
+  }
+}
+
+<span class="cm">// dispatch thunk</span>
+store.<span class="fn">dispatch</span>(<span class="fn">fetchData</span>())
+        </div>
+
+        <h3>async/await в thunks</h3>
+        <p>
+          Thunk-функция может быть <code>async</code>. Это позволяет использовать
+          <code>await</code> для API-вызовов, таймеров и других асинхронных операций.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">loadUsers</span> = () => <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>) => {
+  <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'users/loading'</span> })
+
+  <span class="kw">try</span> {
+    <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/users'</span>)
+    <span class="kw">const</span> users = <span class="kw">await</span> res.<span class="fn">json</span>()
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'users/loaded'</span>, <span class="prop">payload</span>: users })
+  } <span class="kw">catch</span> (err) {
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'users/error'</span>, <span class="prop">payload</span>: err.<span class="prop">message</span> })
+  }
+}
+        </div>
+
+        <h3>Сравнение с нашей реализацией</h3>
+        <p>
+          Официальный <code>redux-thunk</code> делает практически то же самое, что наш
+          5-строчный middleware из урока 69. Дополнительно он поддерживает
+          <code>extraArgument</code> — третий аргумент, который можно передать thunk'ам.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Наша реализация (урок 69):</span>
+<span class="kw">const</span> <span class="fn">thunkMiddleware</span> = (<span class="prop">storeAPI</span>) => (<span class="prop">next</span>) => (<span class="prop">action</span>) => {
+  <span class="kw">if</span> (<span class="kw">typeof</span> action === <span class="str">'function'</span>) {
+    <span class="kw">return</span> <span class="fn">action</span>(storeAPI.<span class="prop">dispatch</span>, storeAPI.<span class="prop">getState</span>)
+  }
+  <span class="kw">return</span> <span class="fn">next</span>(action)
+}
+
+<span class="cm">// Официальный redux-thunk (упрощённо):</span>
+<span class="kw">const</span> <span class="fn">thunk</span> = (<span class="prop">storeAPI</span>) => (<span class="prop">next</span>) => (<span class="prop">action</span>) => {
+  <span class="kw">if</span> (<span class="kw">typeof</span> action === <span class="str">'function'</span>) {
+    <span class="kw">return</span> <span class="fn">action</span>(storeAPI.<span class="prop">dispatch</span>, storeAPI.<span class="prop">getState</span>, extraArgument)
+  }
+  <span class="kw">return</span> <span class="fn">next</span>(action)
+}
+        </div>
+
+        <div class="tip">
+          В Redux Toolkit <code>redux-thunk</code> уже включён по умолчанию — его не нужно
+          устанавливать отдельно. <code>configureStore()</code> автоматически подключает
+          thunk middleware.
+        </div>
+
+        <div class="warning">
+          Thunk-функция не попадает в reducer — middleware перехватывает её до этого.
+          Reducer по-прежнему получает только обычные action-объекты с полем <code>type</code>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>npm install redux-thunk</code> + <code>import { thunk } from 'redux-thunk'</code></li>
+          <li>Подключение: <code>applyMiddleware(thunk)</code></li>
+          <li>Thunk-функция: <code>(dispatch, getState) => { ... }</code></li>
+          <li>Поддерживает <code>async/await</code></li>
+          <li>Почти идентичен нашей 5-строчной реализации + <code>extraArgument</code></li>
+          <li>В Redux Toolkit включён по умолчанию</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

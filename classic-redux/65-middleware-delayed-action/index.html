@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>65 — Delayed Action middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .pulse-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-orange);
+      margin-right: 8px;
+      animation: pulse 1s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+    .delay-indicator {
+      display: none;
+      align-items: center;
+      padding: 8px 12px;
+      background: rgba(255, 152, 0, 0.1);
+      border: 1px solid var(--accent-orange);
+      border-radius: 6px;
+      color: var(--accent-orange);
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+    }
+    .delay-indicator.active {
+      display: flex;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">65 / 100</span>
+      Middleware с async — отложенные действия
+    </div>
+    <nav class="site-header__nav">
+      <a href="../64-middleware-action-transform/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">65</span>
+      <a href="../66-middleware-pipeline-order/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Delayed action middleware -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Middleware откладывает действие на 1 секунду</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div id="delay-indicator" class="delay-indicator">
+            <span class="pulse-dot"></span>
+            Ожидание... действие будет выполнено через 1 секунду
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn" id="btn-instant">Instant +1</button>
+            <button class="btn btn--accent" id="btn-delayed">Delayed +1</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Статус</div>
+            <pre id="status-display" style="color: var(--accent-green); font-size: 0.85rem;">Готово</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Middleware с асинхронным поведением</div>
+      <div class="theory__body">
+        <h3>Middleware может содержать async-логику</h3>
+        <p>
+          Reducer'ы должны быть чистыми функциями без побочных эффектов.
+          Но middleware — это место, где <strong>побочные эффекты разрешены</strong>:
+          setTimeout, fetch, WebSocket, localStorage и т.д.
+        </p>
+
+        <div class="quote">
+          «Middleware have access to dispatch and getState, so they can dispatch
+          new actions and read the current state. This makes them the ideal place
+          for putting side effects like network requests, logging, and other
+          asynchronous behavior.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-6-async-logic" target="_blank">Redux Fundamentals, Part 6</a>
+        </div>
+
+        <h3>Паттерн: перехват и отложенный dispatch</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">delayMiddleware</span> =
+  (storeAPI: <span class="type">any</span>) => (next: <span class="type">any</span>) => (action: <span class="type">any</span>): <span class="type">any</span> => {
+    <span class="kw">if</span> (action.<span class="prop">type</span> === <span class="str">'counter/delayedIncrement'</span>) {
+      <span class="fn">setTimeout</span>(() => {
+        storeAPI.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+      }, <span class="num">1000</span>)
+      <span class="kw">return</span> <span class="cm">// не вызываем next() для этого action</span>
+    }
+    <span class="kw">return</span> <span class="fn">next</span>(action)
+  }
+        </div>
+
+        <h3>dispatch vs next</h3>
+        <p>
+          Ключевое отличие: <code>storeAPI.dispatch()</code> отправляет action
+          <strong>с самого начала</strong> pipeline (через все middleware).
+          <code>next()</code> передаёт action <strong>следующему</strong> middleware.
+          Для отложенных действий используем <code>storeAPI.dispatch()</code>.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// storeAPI.dispatch() — через ВСЕ middleware</span>
+storeAPI.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+
+<span class="cm">// next() — только к следующему middleware в цепочке</span>
+<span class="fn">next</span>(action)
+        </div>
+
+        <h3>Прелюдия к thunk</h3>
+        <p>
+          Этот паттерн — предвестник <strong>redux-thunk</strong>. Thunk middleware
+          позволяет dispatch'ить функции вместо объектов. Функция получает
+          <code>dispatch</code> и <code>getState</code> для асинхронной логики.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Thunk — это функция вместо action-объекта</span>
+<span class="kw">const</span> <span class="fn">delayedIncrement</span> = (dispatch: <span class="type">any</span>, getState: <span class="type">any</span>): <span class="type">void</span> => {
+  <span class="fn">setTimeout</span>(() => {
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+  }, <span class="num">1000</span>)
+}
+
+<span class="cm">// Thunk middleware позволяет dispatch'ить функции:</span>
+store.<span class="fn">dispatch</span>(delayedIncrement)
+        </div>
+
+        <h3>Побочные эффекты — в middleware, не в reducer</h3>
+        <ul>
+          <li><strong>Reducer</strong> — чистая функция, только вычисление нового state</li>
+          <li><strong>Middleware</strong> — сайд-эффекты: таймеры, API-вызовы, логирование</li>
+          <li><strong>setTimeout</strong> — отложенное действие</li>
+          <li><strong>fetch</strong> — сетевой запрос</li>
+          <li><strong>localStorage</strong> — персистентность</li>
+        </ul>
+
+        <div class="tip">
+          Нажмите «Delayed +1» — пульсирующая точка покажет ожидание. Через 1 секунду
+          middleware сам dispatch'ит <code>counter/incremented</code>, и счётчик обновится.
+          Посмотрите временные метки в консоли.
+        </div>
+
+        <div class="warning">
+          Middleware с async-логикой усложняет дебаг: действие происходит «само по себе»
+          через время. Всегда логируйте, когда и почему middleware инициирует dispatch.
+          В продакшене используйте redux-thunk или redux-saga вместо ручных setTimeout.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Middleware может содержать async-логику (setTimeout, promises)</li>
+          <li>Побочные эффекты принадлежат middleware, не reducer</li>
+          <li><code>storeAPI.dispatch()</code> отправляет через весь pipeline</li>
+          <li>Этот паттерн — основа redux-thunk</li>
+          <li>Используйте <code>storeAPI.dispatch()</code>, не <code>next()</code>, для отложенных действий</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

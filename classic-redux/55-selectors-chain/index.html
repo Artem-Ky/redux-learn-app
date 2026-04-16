@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>55 — Цепочки мемоизированных селекторов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">55 / 100</span>
+      Цепочки мемоизированных селекторов — двойная мемоизация
+    </div>
+    <nav class="site-header__nav">
+      <a href="../54-selectors-multiple-inputs/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">55</span>
+      <a href="../56-middleware-concept/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Цепочка: selectFilteredTodos → selectFilteredTodoIds</div>
+      <div class="demo-section__body">
+        <div style="max-width: 620px;">
+          <div class="two-col" style="margin-bottom: 16px;">
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px; font-size: 0.85rem;">Фильтр по статусу</h3>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn--accent" id="btn-all">Все</button>
+                <button class="btn" id="btn-active">Активные</button>
+                <button class="btn" id="btn-completed">Завершённые</button>
+              </div>
+            </div>
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px; font-size: 0.85rem;">Действия</h3>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button class="btn" id="btn-noop">Dispatch без изменений</button>
+                <button class="btn" id="btn-toggle">Toggle #1</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 12px;">
+            <div class="state-display__label">
+              Фильтр: <span id="cur-filter" style="color: var(--accent-cyan);">all</span>
+            </div>
+          </div>
+
+          <div class="two-col" style="margin-bottom: 12px;">
+            <div class="state-display">
+              <div class="state-display__label">selectFilteredTodos — пересчётов: <span id="recompute-filtered" style="color: var(--accent-green);">0</span></div>
+              <pre id="filtered-result" style="color: var(--accent-cyan); font-size: 0.75rem; max-height: 120px; overflow-y: auto;"></pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">selectFilteredTodoIds — пересчётов: <span id="recompute-ids" style="color: var(--accent-green);">0</span></div>
+              <pre id="ids-result" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Цепочки мемоизированных селекторов</div>
+      <div class="theory__body">
+        <h3>Мемоизированный селектор как input</h3>
+        <p>
+          Результат <code>createSelector</code> — это обычная функция-селектор. Её можно
+          передать как <strong>input selector</strong> в другой <code>createSelector</code>,
+          создавая цепочку мемоизации:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Уровень 1: мемоизированная фильтрация</span>
+<span class="kw">const</span> <span class="fn">selectFilteredTodos</span> = <span class="fn">createSelector</span>(
+  <span class="fn">selectTodos</span>,
+  <span class="fn">selectFilter</span>,
+  (todos, filter) => { <span class="cm">/* фильтрация */</span> }
+)
+
+<span class="cm">// Уровень 2: мемоизированное извлечение ID</span>
+<span class="kw">const</span> <span class="fn">selectFilteredTodoIds</span> = <span class="fn">createSelector</span>(
+  <span class="fn">selectFilteredTodos</span>,           <span class="cm">// input — мемоизированный!</span>
+  (todos) => todos.<span class="fn">map</span>(t => t.<span class="prop">id</span>)
+)
+        </div>
+
+        <h3>Как работает цепочка</h3>
+        <p>
+          При вызове <code>selectFilteredTodoIds(state)</code> происходит:
+        </p>
+
+        <div class="code-block">
+<span class="fn">selectFilteredTodoIds</span>(state)
+  → <span class="fn">selectFilteredTodos</span>(state)  <span class="cm">// input (мемоизированный)</span>
+    → <span class="fn">selectTodos</span>(state)         <span class="cm">// input 1 мемоизированного</span>
+    → <span class="fn">selectFilter</span>(state)        <span class="cm">// input 2 мемоизированного</span>
+    → <span class="cm">если inputs те же → кэш</span>    <span class="cm">// уровень 1 не пересчитывается</span>
+  → <span class="cm">если input тот же → кэш</span>      <span class="cm">// уровень 2 тоже не пересчитывается</span>
+        </div>
+
+        <h3>Выгода двойной мемоизации</h3>
+        <ul>
+          <li><strong>Dispatch без изменений</strong> — ни один output selector не вызывается</li>
+          <li><strong>Изменился фильтр</strong> — пересчитывается уровень 1, затем уровень 2 (только если результат уровня 1 новый)</li>
+          <li><strong>Изменился todo</strong> — оба пересчитываются (новый массив todos → новый отфильтрованный → новые ID)</li>
+        </ul>
+
+        <div class="quote">
+          <strong>Redux Fundamentals, Part 7: Standard Redux Patterns:</strong>
+          «Memoized selectors are a valuable tool for improving performance. Reselect's
+          <code>createSelector</code> can be used to create memoized selectors that only
+          recalculate results when their inputs change.»
+          <br>
+          <a href="https://redux.js.org/tutorials/fundamentals/part-7-standard-patterns#memoizing-selectors-with-createselector" target="_blank">redux.js.org — Memoizing Selectors</a>
+        </div>
+
+        <h3>Когда мемоизация «ломается»</h3>
+        <p>
+          <code>createSelector</code> кэширует только <strong>последний</strong> результат.
+          Если селектор вызывается с <em>чередующимися</em> inputs, кэш постоянно
+          «промахивается»:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Плохо: чередование → кэш бесполезен</span>
+<span class="fn">selectFilteredTodos</span>(stateA) <span class="cm">// кэш: stateA</span>
+<span class="fn">selectFilteredTodos</span>(stateB) <span class="cm">// промах, кэш: stateB</span>
+<span class="fn">selectFilteredTodos</span>(stateA) <span class="cm">// промах, кэш: stateA</span>
+
+<span class="cm">// Решение: отдельные экземпляры для разных компонентов</span>
+<span class="kw">const</span> <span class="fn">makeSelectFiltered</span> = () => <span class="fn">createSelector</span>(...)
+        </div>
+
+        <div class="tip">
+          Цепочки мемоизированных селекторов — мощный инструмент. Каждый уровень
+          кэширует свой результат, и пересчёт происходит только для тех уровней,
+          где inputs действительно изменились.
+        </div>
+
+        <div class="warning">
+          Не создавайте слишком длинные цепочки (3+ уровней) без необходимости.
+          Каждый уровень добавляет сложность при дебаге. Оптимально: 1-2 уровня мемоизации.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Мемоизированный селектор можно использовать как input для другого createSelector</li>
+          <li>Цепочка кэширует на каждом уровне — максимальная эффективность</li>
+          <li>При dispatch без изменений — ни один output selector не вызывается</li>
+          <li>Кэш размером 1: чередование разных inputs ломает мемоизацию</li>
+          <li>Фабрика <code>() => createSelector(...)</code> решает проблему нескольких подписчиков</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

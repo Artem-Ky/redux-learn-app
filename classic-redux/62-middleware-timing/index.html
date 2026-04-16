@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>62 — Timing middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">62 / 100</span>
+      Timing middleware — мониторинг производительности
+    </div>
+    <nav class="site-header__nav">
+      <a href="../61-middleware-crash-reporter/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">62</span>
+      <a href="../63-middleware-action-filter/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Timing middleware -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Замеряем время выполнения dispatch</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn" id="btn-fast">Fast +1</button>
+            <button class="btn btn--accent" id="btn-slow">Slow +1 (тяжёлый reducer)</button>
+            <button class="btn" id="btn-decrement">− 1</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Последний замер</div>
+            <pre id="timing-display" style="color: var(--accent-green); font-size: 0.9rem;">Нажмите кнопку для замера</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Timing middleware</div>
+      <div class="theory__body">
+        <h3>Зачем замерять время dispatch?</h3>
+        <p>
+          Middleware может замерять, сколько времени занимает обработка каждого action.
+          Это помогает <strong>выявить медленные reducer'ы</strong> и оптимизировать
+          производительность приложения.
+        </p>
+
+        <div class="quote">
+          «Middleware provides a third-party extension point between dispatching an action,
+          and the moment it reaches the reducer.»
+          <br>— <a href="https://redux.js.org/understanding/history-and-design/middleware" target="_blank">Redux Docs — Middleware</a>
+        </div>
+
+        <h3>Паттерн: performance.now() до и после</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">timingMiddleware</span> =
+  (storeAPI: <span class="type">any</span>) => (next: <span class="type">any</span>) => (action: <span class="type">any</span>): <span class="type">any</span> => {
+    <span class="kw">const</span> start = performance.<span class="fn">now</span>()
+    <span class="kw">const</span> result = <span class="fn">next</span>(action)
+    <span class="kw">const</span> end = performance.<span class="fn">now</span>()
+    <span class="kw">const</span> duration = (end - start).<span class="fn">toFixed</span>(<span class="num">2</span>)
+
+    console.<span class="fn">log</span>(<span class="str">`${action.type} took ${duration}ms`</span>)
+    <span class="kw">return</span> result
+  }
+        </div>
+
+        <h3>Как это работает?</h3>
+        <ul>
+          <li><code>performance.now()</code> — точный таймер (микросекунды, не миллисекунды как <code>Date.now()</code>)</li>
+          <li>Замер <strong>до</strong> <code>next(action)</code> — фиксирует начало</li>
+          <li>Замер <strong>после</strong> — фиксирует конец</li>
+          <li>Разница = время выполнения всех middleware ниже + reducer</li>
+        </ul>
+
+        <h3>Профилирование dispatch'ей</h3>
+        <p>
+          В демо выше «Fast +1» выполняется почти мгновенно (< 0.1ms), а «Slow +1»
+          искусственно замедлен тяжёлым циклом. Timing middleware показывает разницу.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Пример: предупреждение о медленных action'ах</span>
+<span class="kw">const</span> <span class="fn">timingMiddleware</span> =
+  (storeAPI: <span class="type">any</span>) => (next: <span class="type">any</span>) => (action: <span class="type">any</span>): <span class="type">any</span> => {
+    <span class="kw">const</span> start = performance.<span class="fn">now</span>()
+    <span class="kw">const</span> result = <span class="fn">next</span>(action)
+    <span class="kw">const</span> ms = performance.<span class="fn">now</span>() - start
+
+    <span class="kw">if</span> (ms > <span class="num">1</span>) {
+      console.<span class="fn">warn</span>(<span class="str">`⚠ Slow dispatch: ${action.type} (${ms.toFixed(2)}ms)`</span>)
+    }
+    <span class="kw">return</span> result
+  }
+        </div>
+
+        <h3>Мониторинг в продакшене</h3>
+        <p>
+          В реальных приложениях timing данные отправляются в системы мониторинга
+          (DataDog, New Relic) для отслеживания деградации производительности
+          во времени.
+        </p>
+
+        <div class="tip">
+          <code>performance.now()</code> возвращает время в миллисекундах с точностью до
+          микросекунд. Это намного точнее, чем <code>Date.now()</code>, который считает
+          только целые миллисекунды.
+        </div>
+
+        <div class="warning">
+          Не оставляйте timing middleware в продакшен-сборке без необходимости — он добавляет
+          небольшой overhead к каждому dispatch. Используйте условное подключение:
+          <code>process.env.NODE_ENV !== 'production'</code>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Замер: <code>performance.now()</code> до и после <code>next(action)</code></li>
+          <li>Показывает время выполнения reducer + нижестоящих middleware</li>
+          <li>Помогает найти медленные reducer'ы</li>
+          <li>Можно настроить порог для предупреждений</li>
+          <li>В продакшене — отправка данных в систему мониторинга</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

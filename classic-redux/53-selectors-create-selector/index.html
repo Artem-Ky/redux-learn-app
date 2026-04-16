@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>53 — createSelector из Reselect</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">53 / 100</span>
+      createSelector из Reselect — мемоизация селекторов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../52-selectors-reselect-intro/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">53</span>
+      <a href="../54-selectors-multiple-inputs/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — createSelector: мемоизированный selectTodoIds</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Todo-список</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-no-change">Dispatch без изменений</button>
+            <button class="btn" id="btn-toggle">Toggle todo #1</button>
+          </div>
+
+          <div class="two-col">
+            <div class="state-display">
+              <div class="state-display__label">
+                selectTodoIds (мемоизированный)
+              </div>
+              <pre id="ids-result" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+            </div>
+            <div>
+              <div class="state-display" style="margin-bottom: 8px;">
+                <div class="state-display__label">prevResult === newResult</div>
+                <pre id="equality-result" style="font-size: 1rem; text-align: center; padding: 16px;"></pre>
+              </div>
+              <div class="state-display">
+                <div class="state-display__label">Output selector вызвался раз: <span id="recompute-count" style="color: var(--accent-green);">0</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — createSelector из Reselect</div>
+      <div class="theory__body">
+        <h3>Что такое Reselect?</h3>
+        <p>
+          <strong>Reselect</strong> — библиотека для создания мемоизированных селекторов.
+          Она кэширует последний результат и пересчитывает его только когда
+          входные данные действительно изменились.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Установка:</span>
+npm install reselect
+        </div>
+
+        <h3>API createSelector</h3>
+        <p>
+          <code>createSelector</code> принимает <strong>input selectors</strong>
+          и <strong>output selector</strong>:
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createSelector</span> } <span class="kw">from</span> <span class="str">'reselect'</span>
+
+<span class="kw">const</span> <span class="fn">selectTodos</span> = (state: <span class="type">RootState</span>) => state.<span class="prop">todos</span>
+
+<span class="cm">// input selector → selectTodos</span>
+<span class="cm">// output selector → todos => todos.map(t => t.id)</span>
+<span class="kw">const</span> <span class="fn">selectTodoIds</span> = <span class="fn">createSelector</span>(
+  <span class="fn">selectTodos</span>,                       <span class="cm">// input selector</span>
+  (todos) => todos.<span class="fn">map</span>(t => t.<span class="prop">id</span>)    <span class="cm">// output selector</span>
+)
+        </div>
+
+        <div class="quote">
+          <strong>Redux Fundamentals, Part 7: Standard Redux Patterns:</strong>
+          «Reselect provides a function called <code>createSelector</code> that generates
+          memoized selector functions. <code>createSelector</code> accepts one or more
+          "input selector" functions as arguments, plus an "output selector", and returns
+          the new selector function.»
+          <br>
+          <a href="https://redux.js.org/tutorials/fundamentals/part-7-standard-patterns#memoizing-selectors-with-createselector" target="_blank">redux.js.org — Memoizing Selectors with createSelector</a>
+        </div>
+
+        <h3>Как работает кэширование</h3>
+        <p>
+          При каждом вызове <code>createSelector</code> сравнивает результаты
+          input selectors с предыдущими. Если они совпадают по <code>===</code>,
+          output selector <strong>не вызывается</strong> — возвращается кэш:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Первый вызов:</span>
+<span class="fn">selectTodoIds</span>(state)
+  → <span class="fn">selectTodos</span>(state) → todos[]  <span class="cm">// input</span>
+  → (todos) => todos.<span class="fn">map</span>(...)       <span class="cm">// output вызывается ✔</span>
+  → [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]                     <span class="cm">// кэшируется</span>
+
+<span class="cm">// Повторный вызов (todos не изменились):</span>
+<span class="fn">selectTodoIds</span>(state)
+  → <span class="fn">selectTodos</span>(state) → todos[]  <span class="cm">// те же ===</span>
+  → <span class="cm">output НЕ вызывается</span>           <span class="cm">// возврат кэша ✔</span>
+  → [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]                     <span class="cm">// та же ссылка!</span>
+        </div>
+
+        <h3>Сравнение: без мемоизации vs с мемоизацией</h3>
+
+        <div class="code-block">
+<span class="cm">// БЕЗ мемоизации (урок 52):</span>
+<span class="kw">const</span> <span class="fn">selectTodoIds</span> = (state) =>
+  state.<span class="prop">todos</span>.<span class="fn">map</span>(t => t.<span class="prop">id</span>)
+<span class="cm">// Каждый вызов → новый массив → новая ссылка</span>
+
+<span class="cm">// С мемоизацией (createSelector):</span>
+<span class="kw">const</span> <span class="fn">selectTodoIds</span> = <span class="fn">createSelector</span>(
+  <span class="fn">selectTodos</span>,
+  (todos) => todos.<span class="fn">map</span>(t => t.<span class="prop">id</span>)
+)
+<span class="cm">// Если todos те же → кэшированный массив → та же ссылка</span>
+        </div>
+
+        <div class="tip">
+          <code>createSelector</code> кэширует только <strong>последний</strong> результат
+          (кэш размером 1). Если input selectors чередуют разные значения, кэш будет
+          «промахиваться» каждый раз. Для большинства случаев этого достаточно.
+        </div>
+
+        <div class="warning">
+          Не вызывайте <code>createSelector</code> внутри компонента или функции рендера!
+          Каждый вызов создаёт <strong>новый</strong> мемоизированный селектор со своим кэшем.
+          Определяйте селекторы на уровне модуля (вне компонентов).
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>createSelector(inputSelectors, outputSelector)</code></li>
+          <li>Кэширует последний результат (кэш размером 1)</li>
+          <li>Пересчитывает output только при изменении inputs</li>
+          <li>Решает проблему ссылочного равенства из урока 52</li>
+          <li>Определяйте селекторы на уровне модуля, не в компонентах</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

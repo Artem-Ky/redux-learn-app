@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>51 — Композиция селекторов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">51 / 100</span>
+      Композиция селекторов — строим из маленьких большие
+    </div>
+    <nav class="site-header__nav">
+      <a href="../50-selectors-parameterized/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">51</span>
+      <a href="../52-selectors-reselect-intro/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Todo-список с фильтрацией через композицию селекторов</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn" id="btn-all">Все</button>
+            <button class="btn btn--accent" id="btn-active">Активные</button>
+            <button class="btn" id="btn-completed">Завершённые</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Фильтр: <span id="current-filter" style="color: var(--accent-cyan);">all</span></div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Отфильтрованные задачи — <span id="count" style="color: var(--accent-green);">0</span> шт.</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Композиция селекторов</div>
+      <div class="theory__body">
+        <h3>Что такое композиция селекторов?</h3>
+        <p>
+          Композиция — это паттерн, при котором один селектор <strong>вызывает другие селекторы</strong>
+          для получения промежуточных данных, а затем комбинирует результат. Каждый селектор
+          отвечает за одну задачу — <em>Single Responsibility Principle</em>.
+        </p>
+
+        <div class="quote">
+          <strong>Redux Fundamentals, Part 7: Standard Redux Patterns:</strong>
+          «Selectors are primarily used to encapsulate logic for looking up specific values
+          from state, logic for actually deriving values, and improving performance by
+          avoiding unnecessary recalculations.»
+          <br>
+          <a href="https://redux.js.org/tutorials/fundamentals/part-7-standard-patterns#selectors" target="_blank">redux.js.org — Standard Patterns: Selectors</a>
+        </div>
+
+        <h3>Паттерн: маленькие селекторы → составной</h3>
+        <p>
+          Вместо одного большого селектора, который знает всю структуру state,
+          мы пишем базовые селекторы для каждого среза и комбинируем их:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Базовые (input) селекторы — по одному на каждый срез</span>
+<span class="kw">const</span> <span class="fn">selectTodos</span> = (state: <span class="type">RootState</span>) => state.<span class="prop">todos</span>
+<span class="kw">const</span> <span class="fn">selectFilter</span> = (state: <span class="type">RootState</span>) => state.<span class="prop">filter</span>
+
+<span class="cm">// Составной (composed) селектор — использует оба базовых</span>
+<span class="kw">const</span> <span class="fn">selectFilteredTodos</span> = (state: <span class="type">RootState</span>): <span class="type">Todo</span>[] => {
+  <span class="kw">const</span> todos = <span class="fn">selectTodos</span>(state)
+  <span class="kw">const</span> filter = <span class="fn">selectFilter</span>(state)
+
+  <span class="kw">switch</span> (filter) {
+    <span class="kw">case</span> <span class="str">'active'</span>: <span class="kw">return</span> todos.<span class="fn">filter</span>(t => !t.<span class="prop">completed</span>)
+    <span class="kw">case</span> <span class="str">'completed'</span>: <span class="kw">return</span> todos.<span class="fn">filter</span>(t => t.<span class="prop">completed</span>)
+    <span class="kw">default</span>: <span class="kw">return</span> todos
+  }
+}
+        </div>
+
+        <h3>Зачем разбивать на маленькие?</h3>
+        <ul>
+          <li><strong>Переиспользование</strong> — <code>selectTodos</code> можно использовать и в других составных селекторах</li>
+          <li><strong>Тестирование</strong> — каждый селектор тестируется отдельно</li>
+          <li><strong>Рефакторинг</strong> — при изменении формы state меняется только базовый селектор</li>
+          <li><strong>Читаемость</strong> — составной селектор описывает «что», а не «как»</li>
+        </ul>
+
+        <h3>Цепочка вызовов</h3>
+        <p>
+          При вызове <code>selectFilteredTodos(state)</code> происходит:
+        </p>
+
+        <div class="code-block">
+<span class="fn">selectFilteredTodos</span>(state)
+  → <span class="fn">selectTodos</span>(state)      <span class="cm">// получаем todos[]</span>
+  → <span class="fn">selectFilter</span>(state)     <span class="cm">// получаем 'all' | 'active' | 'completed'</span>
+  → <span class="cm">фильтрация</span>             <span class="cm">// возвращаем результат</span>
+        </div>
+
+        <div class="tip">
+          Держите базовые селекторы максимально простыми — одна строка, прямой доступ
+          к полю state. Вся логика преобразования — в составных селекторах.
+        </div>
+
+        <div class="warning">
+          Пока мы используем обычные функции. При каждом вызове <code>selectFilteredTodos</code>
+          создаётся новый массив через <code>.filter()</code>, даже если данные не изменились.
+          Это станет проблемой — решение рассмотрим в следующих уроках (Reselect).
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Композиция = селектор вызывает другие селекторы</li>
+          <li>Базовые селекторы — простой доступ к полям state</li>
+          <li>Составные селекторы — логика фильтрации, сортировки, трансформации</li>
+          <li>Single Responsibility: один селектор — одна задача</li>
+          <li>Переиспользование и лёгкое тестирование</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

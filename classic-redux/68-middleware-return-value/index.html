@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>68 — Возвращаемое значение middleware и dispatch</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">68 / 100</span>
+      Возвращаемое значение middleware и dispatch
+    </div>
+    <nav class="site-header__nav">
+      <a href="../67-middleware-dispatch-vs-next/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">68</span>
+      <a href="../69-thunk-concept/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Return values -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Что возвращает dispatch()?</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Middleware может вернуть <strong>любое значение</strong> вместо результата
+            <code>next(action)</code>. Это значение станет результатом <code>store.dispatch()</code>.
+          </p>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-normal">
+              dispatch (обычный)
+            </button>
+            <button class="btn" id="btn-hello" style="border-color: var(--accent-orange); color: var(--accent-orange);">
+              dispatch (alwaysReturnHello)
+            </button>
+            <button class="btn" id="btn-promise" style="border-color: var(--accent-green); color: var(--accent-green);">
+              dispatch (returnPromise)
+            </button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Результат dispatch()</div>
+            <pre id="result-display" style="color: var(--accent-cyan); font-size: 0.85rem; min-height: 40px;">Нажмите кнопку ↑</pre>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">typeof результата</div>
+            <pre id="type-display" style="color: var(--accent-yellow); font-size: 0.85rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Возвращаемое значение middleware</div>
+      <div class="theory__body">
+        <h3>Что возвращает dispatch() по умолчанию?</h3>
+        <p>
+          Без middleware <code>store.dispatch(action)</code> возвращает сам <strong>action объект</strong>.
+          Но middleware может изменить это поведение, вернув что угодно.
+        </p>
+
+        <div class="quote">
+          «Middleware can also modify the return value of dispatch. The simplest example
+          is a middleware that always returns a specific value... dispatch will return
+          whatever the outermost middleware returns.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#middleware" target="_blank">Redux Fundamentals, Part 4: Store — Middleware</a>
+        </div>
+
+        <h3>Цепочка возвращаемых значений</h3>
+        <p>
+          Возвращаемое значение <code>dispatch()</code> — это то, что вернёт
+          <strong>первый (внешний)</strong> middleware в цепочке. Каждый middleware
+          может передать значение от <code>next(action)</code> или заменить его.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Middleware, который всегда возвращает строку</span>
+<span class="kw">const</span> <span class="fn">alwaysReturnHello</span> = (<span class="prop">storeAPI</span>: <span class="type">any</span>) => (<span class="prop">next</span>: <span class="type">any</span>) => (<span class="prop">action</span>: <span class="type">any</span>) => {
+  <span class="fn">next</span>(action) <span class="cm">// action всё равно проходит</span>
+  <span class="kw">return</span> <span class="str">'Hello!'</span> <span class="cm">// но возвращаем свою строку</span>
+}
+
+<span class="kw">const</span> result = store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'test'</span> })
+<span class="fn">console.log</span>(result) <span class="cm">// 'Hello!'</span>
+        </div>
+
+        <h3>Middleware, возвращающий Promise</h3>
+        <p>
+          Особенно полезно для асинхронных middleware: они могут вернуть <code>Promise</code>,
+          и вызывающий код сможет «дождаться» завершения асинхронной операции.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">asyncMiddleware</span> = (<span class="prop">storeAPI</span>: <span class="type">any</span>) => (<span class="prop">next</span>: <span class="type">any</span>) => (<span class="prop">action</span>: <span class="type">any</span>) => {
+  <span class="kw">if</span> (action.<span class="prop">type</span> === <span class="str">'async/run'</span>) {
+    <span class="kw">return</span> <span class="kw">new</span> <span class="type">Promise</span>(<span class="fn">resolve</span> => {
+      <span class="fn">setTimeout</span>(() => {
+        <span class="fn">next</span>(action)
+        <span class="fn">resolve</span>(<span class="str">'done!'</span>)
+      }, <span class="num">1000</span>)
+    })
+  }
+  <span class="kw">return</span> <span class="fn">next</span>(action)
+}
+
+<span class="cm">// Можно использовать await:</span>
+<span class="kw">const</span> result = <span class="kw">await</span> store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'async/run'</span> })
+<span class="fn">console.log</span>(result) <span class="cm">// 'done!'</span>
+        </div>
+
+        <h3>Thunks и возвращаемые значения</h3>
+        <p>
+          Именно этот механизм позволяет thunk middleware возвращать <code>Promise</code>
+          из <code>dispatch(thunkFunction)</code>. Компоненты могут дождаться завершения
+          асинхронной логики.
+        </p>
+
+        <div class="tip">
+          Возвращаемое значение dispatch — мощный механизм. Thunk middleware использует
+          его для возврата промисов, что позволяет компонентам ждать завершения
+          асинхронных операций через <code>await dispatch(thunk)</code>.
+        </div>
+
+        <div class="warning">
+          Не полагайтесь на возвращаемое значение dispatch в обычном коде — это
+          деталь реализации middleware. В стандартном Redux (без middleware) dispatch
+          возвращает action, но это поведение может измениться при добавлении middleware.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>По умолчанию <code>dispatch()</code> возвращает action объект</li>
+          <li>Middleware может вернуть <strong>любое значение</strong></li>
+          <li><code>dispatch()</code> возвращает то, что вернёт первый middleware</li>
+          <li>Thunks используют это для возврата Promise</li>
+          <li>Каждый middleware может «заменить» возвращаемое значение</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

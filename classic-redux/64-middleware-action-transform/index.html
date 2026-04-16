@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>64 — Action Transform middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">64 / 100</span>
+      Middleware как трансформер — модификация action'ов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../63-middleware-action-filter/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">64</span>
+      <a href="../65-middleware-delayed-action/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Action transform middleware -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Middleware добавляет timestamp и meta к каждому action</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn" id="btn-increment">+1</button>
+            <button class="btn" id="btn-decrement">−1</button>
+            <button class="btn btn--accent" id="btn-reset">Reset</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Последний enriched action</div>
+            <pre id="enriched-display" style="color: var(--accent-green); font-size: 0.8rem; min-height: 60px;">Нажмите кнопку</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Middleware как трансформер action'ов</div>
+      <div class="theory__body">
+        <h3>Middleware может изменить action</h3>
+        <p>
+          Middleware имеет полный контроль над action'ом перед передачей в <code>next()</code>.
+          Можно <strong>добавить поля</strong>, изменить payload, нормализовать формат —
+          передать в <code>next()</code> модифицированный объект.
+        </p>
+
+        <div class="quote">
+          «A middleware can do anything it wants when it sees a dispatched action.
+          It can modify the action, delay it, ignore it, or pass it along.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#writing-custom-middleware" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Паттерн: обогащение action'а</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">enrichMiddleware</span> =
+  (storeAPI: <span class="type">any</span>) => (next: <span class="type">any</span>) => (action: <span class="type">any</span>): <span class="type">any</span> => {
+    <span class="kw">const</span> enrichedAction = {
+      ...action,
+      <span class="prop">timestamp</span>: <span class="fn">Date.now</span>(),
+      <span class="prop">meta</span>: { <span class="prop">source</span>: <span class="str">'user'</span> }
+    }
+    <span class="kw">return</span> <span class="fn">next</span>(enrichedAction)
+  }
+        </div>
+
+        <h3>Что можно добавить?</h3>
+        <ul>
+          <li><strong>timestamp</strong> — время отправки действия</li>
+          <li><strong>meta.source</strong> — кто инициировал (user, system, api)</li>
+          <li><strong>meta.correlationId</strong> — связь с цепочкой действий</li>
+          <li><strong>meta.userId</strong> — ID текущего пользователя</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Исходный action от компонента:</span>
+{ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> }
+
+<span class="cm">// После middleware:</span>
+{
+  <span class="prop">type</span>: <span class="str">'counter/incremented'</span>,
+  <span class="prop">timestamp</span>: <span class="num">1713100000000</span>,
+  <span class="prop">meta</span>: { <span class="prop">source</span>: <span class="str">'user'</span> }
+}
+        </div>
+
+        <h3>Нормализация формата action'ов</h3>
+        <p>
+          Middleware может приводить action'ы к единому формату. Например, если разные
+          части приложения используют разные соглашения:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">normalizeMiddleware</span> =
+  (storeAPI: <span class="type">any</span>) => (next: <span class="type">any</span>) => (action: <span class="type">any</span>): <span class="type">any</span> => {
+    <span class="kw">const</span> normalized = {
+      ...action,
+      <span class="prop">type</span>: action.<span class="prop">type</span>.<span class="fn">toLowerCase</span>(),
+      <span class="prop">meta</span>: action.<span class="prop">meta</span> || {}
+    }
+    <span class="kw">return</span> <span class="fn">next</span>(normalized)
+  }
+        </div>
+
+        <div class="tip">
+          В демо каждый dispatch обогащается полями <code>timestamp</code> и
+          <code>meta: { source: 'user' }</code>. Посмотрите в консоль — оригинальный
+          action сравнивается с enriched версией.
+        </div>
+
+        <div class="warning">
+          Изменяя action, вы создаёте <strong>новый объект</strong> через spread
+          (<code>{ ...action, ... }</code>). Никогда не мутируйте оригинальный action
+          напрямую — это может вызвать побочные эффекты в других middleware.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Middleware может модифицировать action перед <code>next()</code></li>
+          <li>Используйте spread: <code>next({ ...action, newField })</code></li>
+          <li>Добавление timestamp, meta, correlationId — частые паттерны</li>
+          <li>Не мутируйте оригинальный action — создавайте копию</li>
+          <li>Reducer получит уже обогащённый action</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

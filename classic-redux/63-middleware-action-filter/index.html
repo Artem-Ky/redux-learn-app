@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>63 — Action Filter middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">63 / 100</span>
+      Middleware как фильтр действий — блокировка action'ов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../62-middleware-timing/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">63</span>
+      <a href="../64-middleware-action-transform/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Action filter middleware -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Middleware блокирует counter/reset</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn" id="btn-increment">+1</button>
+            <button class="btn" id="btn-decrement">−1</button>
+            <button class="btn btn--danger" id="btn-reset">Reset (заблокирован!)</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Заблокированные action'ы</div>
+            <pre id="blocked-list" style="color: var(--accent-red); font-size: 0.85rem;">counter/reset</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Middleware как фильтр действий</div>
+      <div class="theory__body">
+        <h3>Middleware может не вызывать next()</h3>
+        <p>
+          Ключевая способность middleware — <strong>остановить action</strong>, просто
+          не вызвав <code>next(action)</code>. Action не дойдёт ни до следующего middleware,
+          ни до reducer'а.
+        </p>
+
+        <div class="quote">
+          «A middleware can do anything it wants when it sees a dispatched action.
+          It can do something when an action is dispatched, and then pass the action
+          along to the rest of the middleware pipeline, or it can stop the action
+          from being forwarded.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#writing-custom-middleware" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Паттерн: условный next()</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">actionFilter</span> =
+  (storeAPI: <span class="type">any</span>) => (next: <span class="type">any</span>) => (action: <span class="type">any</span>): <span class="type">any</span> => {
+    <span class="kw">if</span> (action.<span class="prop">type</span> === <span class="str">'counter/reset'</span>) {
+      console.<span class="fn">warn</span>(<span class="str">'BLOCKED:'</span>, action.<span class="prop">type</span>)
+      <span class="kw">return</span> <span class="cm">// не вызываем next() — action остановлен</span>
+    }
+    <span class="kw">return</span> <span class="fn">next</span>(action)
+  }
+        </div>
+
+        <h3>Почему это работает?</h3>
+        <ul>
+          <li>Middleware — «привратник» между dispatch и reducer</li>
+          <li>Если <code>next(action)</code> не вызван — action «исчезает»</li>
+          <li>Store не обновится, подписчики не получат уведомление</li>
+          <li>Для вызывающего кода всё выглядит нормально — dispatch вернул undefined</li>
+        </ul>
+
+        <h3>Blacklist vs Whitelist</h3>
+
+        <div class="code-block">
+<span class="cm">// Blacklist — блокировать конкретные action'ы</span>
+<span class="kw">const</span> BLOCKED: <span class="type">string</span>[] = [<span class="str">'counter/reset'</span>, <span class="str">'admin/deleteAll'</span>]
+
+<span class="kw">const</span> <span class="fn">blacklistFilter</span> =
+  (storeAPI: <span class="type">any</span>) => (next: <span class="type">any</span>) => (action: <span class="type">any</span>): <span class="type">any</span> => {
+    <span class="kw">if</span> (BLOCKED.<span class="fn">includes</span>(action.<span class="prop">type</span>)) <span class="kw">return</span>
+    <span class="kw">return</span> <span class="fn">next</span>(action)
+  }
+
+<span class="cm">// Whitelist — пропускать только разрешённые</span>
+<span class="kw">const</span> ALLOWED: <span class="type">string</span>[] = [<span class="str">'counter/incremented'</span>, <span class="str">'counter/decremented'</span>]
+
+<span class="kw">const</span> <span class="fn">whitelistFilter</span> =
+  (storeAPI: <span class="type">any</span>) => (next: <span class="type">any</span>) => (action: <span class="type">any</span>): <span class="type">any</span> => {
+    <span class="kw">if</span> (!ALLOWED.<span class="fn">includes</span>(action.<span class="prop">type</span>)) <span class="kw">return</span>
+    <span class="kw">return</span> <span class="fn">next</span>(action)
+  }
+        </div>
+
+        <h3>Практические сценарии</h3>
+        <ul>
+          <li><strong>Права доступа</strong> — блокировать admin-действия для обычных пользователей</li>
+          <li><strong>Валидация</strong> — не пропускать action с невалидным payload</li>
+          <li><strong>Дебаунс</strong> — блокировать повторные action'ы слишком быстро</li>
+          <li><strong>Feature flags</strong> — отключать функционал без изменения компонентов</li>
+        </ul>
+
+        <div class="tip">
+          В демо нажмите «Reset» — кнопка отправляет dispatch, но middleware перехватывает
+          action и не вызывает <code>next()</code>. Счётчик не сбрасывается. Посмотрите
+          в консоль — middleware логирует каждую попытку.
+        </div>
+
+        <div class="warning">
+          Фильтрация action'ов — мощный инструмент, но может запутать. Если action
+          dispatch'ится, но ничего не происходит — разработчик может долго искать баг.
+          Всегда логируйте заблокированные action'ы!
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Middleware может остановить action, не вызвав <code>next()</code></li>
+          <li>Blacklist — блокировать конкретные типы</li>
+          <li>Whitelist — пропускать только разрешённые типы</li>
+          <li>Используйте для прав доступа, валидации, feature flags</li>
+          <li>Всегда логируйте заблокированные action'ы для отладки</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

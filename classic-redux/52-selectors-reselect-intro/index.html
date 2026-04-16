@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>52 — Проблема ссылочного равенства</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">52 / 100</span>
+      Проблема ссылочного равенства и зачем нужна мемоизация
+    </div>
+    <nav class="site-header__nav">
+      <a href="../51-selectors-composition/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">52</span>
+      <a href="../53-selectors-create-selector/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Проблема: map() всегда создаёт новую ссылку</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Todo-список</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-no-change">Dispatch без изменений</button>
+            <button class="btn" id="btn-toggle">Toggle todo #1</button>
+          </div>
+
+          <div class="two-col">
+            <div class="state-display">
+              <div class="state-display__label">selectTodoIds — вызовов: <span id="call-count" style="color: var(--accent-green);">0</span></div>
+              <pre id="ids-result" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">prevResult === newResult</div>
+              <pre id="equality-result" style="font-size: 1rem; text-align: center; padding: 16px;"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Проблема ссылочного равенства (Reference Identity)</div>
+      <div class="theory__body">
+        <h3>В чём проблема?</h3>
+        <p>
+          Когда селектор использует <code>.map()</code>, <code>.filter()</code> или любой метод,
+          создающий <strong>новый массив</strong>, результат <em>всегда</em> будет новой ссылкой —
+          даже если исходные данные не изменились.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectTodoIds</span> = (state: <span class="type">RootState</span>) =>
+  state.<span class="prop">todos</span>.<span class="fn">map</span>(t => t.<span class="prop">id</span>)
+
+<span class="kw">const</span> result1 = <span class="fn">selectTodoIds</span>(store.<span class="fn">getState</span>())
+<span class="kw">const</span> result2 = <span class="fn">selectTodoIds</span>(store.<span class="fn">getState</span>())
+
+result1 === result2  <span class="cm">// false! Всегда новый массив</span>
+        </div>
+
+        <h3>Почему это важно?</h3>
+        <p>
+          В React-Redux хук <code>useSelector</code> по умолчанию сравнивает результат
+          селектора через <code>===</code> (строгое равенство). Если ссылка новая —
+          компонент <strong>перерендерится</strong>, даже если данные те же.
+        </p>
+
+        <div class="quote">
+          <strong>Redux Fundamentals, Part 7: Standard Redux Patterns:</strong>
+          «If we call <code>useSelector(selectTodoIds)</code> at the top of a component,
+          and the selector returns a new array reference every time an action is dispatched,
+          this component would re-render every time, even if the array of IDs didn't change!»
+          <br>
+          <a href="https://redux.js.org/tutorials/fundamentals/part-7-standard-patterns#memoized-selectors" target="_blank">redux.js.org — Memoized Selectors</a>
+        </div>
+
+        <h3>Методы, создающие новую ссылку</h3>
+        <ul>
+          <li><code>.map()</code> — всегда новый массив</li>
+          <li><code>.filter()</code> — всегда новый массив</li>
+          <li><code>.slice()</code> — всегда новый массив</li>
+          <li><code>.concat()</code> — всегда новый массив</li>
+          <li>Spread <code>[...arr]</code> — всегда новый массив</li>
+          <li><code>Object.assign()</code> / <code>{...obj}</code> — всегда новый объект</li>
+        </ul>
+
+        <h3>Что такое мемоизация?</h3>
+        <p>
+          Мемоизация — это техника кэширования результата функции. Если аргументы
+          не изменились, функция возвращает <strong>закэшированный результат</strong>
+          (ту же ссылку), вместо пересчёта.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Псевдокод мемоизации:</span>
+<span class="kw">let</span> lastInput, lastResult
+
+<span class="kw">function</span> <span class="fn">memoizedSelector</span>(state) {
+  <span class="kw">const</span> input = <span class="fn">selectTodos</span>(state)
+  <span class="kw">if</span> (input === lastInput) <span class="kw">return</span> lastResult  <span class="cm">// та же ссылка!</span>
+  lastInput = input
+  lastResult = input.<span class="fn">map</span>(t => t.<span class="prop">id</span>)
+  <span class="kw">return</span> lastResult
+}
+        </div>
+
+        <div class="tip">
+          Библиотека <strong>Reselect</strong> реализует именно этот паттерн: она кэширует
+          последний результат и пересчитывает только когда входные данные действительно изменились.
+          Мы рассмотрим <code>createSelector</code> в следующем уроке.
+        </div>
+
+        <div class="warning">
+          Если селектор возвращает примитив (число, строку, boolean), проблемы нет —
+          <code>===</code> сравнивает по значению. Проблема только с объектами и массивами,
+          где <code>===</code> сравнивает по ссылке.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>map/filter</code> всегда создают новый массив (новую ссылку)</li>
+          <li><code>===</code> для объектов/массивов сравнивает ссылки, не содержимое</li>
+          <li><code>useSelector</code> вызывает ре-рендер при новой ссылке</li>
+          <li>Мемоизация кэширует последний результат и возвращает его при тех же входных данных</li>
+          <li>Reselect — стандартное решение для мемоизированных селекторов в Redux</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

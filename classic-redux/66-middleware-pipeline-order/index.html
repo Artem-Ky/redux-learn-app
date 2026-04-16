@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>66 — Порядок выполнения middleware (onion model)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">66 / 100</span>
+      Pipeline — порядок выполнения middleware (onion model)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../65-middleware-delayed-action/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">66</span>
+      <a href="../67-middleware-dispatch-vs-next/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Onion model -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — «Луковая» модель middleware pipeline</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Три middleware (A, B, C) зарегистрированы по порядку. Каждый логирует «вход» и «выход».
+            Нажмите кнопку и наблюдайте порядок в консоли.
+          </p>
+
+          <button class="btn btn--accent" id="btn-dispatch" style="margin-bottom: 16px;">
+            dispatch({ type: 'test/run' })
+          </button>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Текущий State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+          </div>
+
+          <!-- Visual onion diagram -->
+          <div style="text-align: center; padding: 16px 0;">
+            <div style="display: inline-block; border: 2px solid var(--accent-purple); border-radius: 12px; padding: 16px 24px; position: relative;">
+              <div style="color: var(--accent-purple); font-size: 0.75rem; position: absolute; top: -10px; left: 12px; background: var(--bg-secondary); padding: 0 6px;">Middleware A</div>
+              <div style="display: inline-block; border: 2px solid var(--accent); border-radius: 10px; padding: 14px 20px; position: relative;">
+                <div style="color: var(--accent); font-size: 0.75rem; position: absolute; top: -10px; left: 12px; background: var(--bg-secondary); padding: 0 6px;">Middleware B</div>
+                <div style="display: inline-block; border: 2px solid var(--accent-green); border-radius: 8px; padding: 12px 16px; position: relative;">
+                  <div style="color: var(--accent-green); font-size: 0.75rem; position: absolute; top: -10px; left: 12px; background: var(--bg-secondary); padding: 0 6px;">Middleware C</div>
+                  <div style="border: 2px solid var(--accent-orange); border-radius: 6px; padding: 8px 14px; color: var(--accent-orange); font-size: 0.8rem; font-family: var(--font-mono);">
+                    Reducer
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 8px;">
+              dispatch → A enter → B enter → C enter → [reducer] → C exit → B exit → A exit
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — «Луковая» модель middleware pipeline</div>
+      <div class="theory__body">
+        <h3>Onion Model (луковая модель)</h3>
+        <p>
+          Middleware в Redux образуют <strong>конвейер</strong> (pipeline). Каждый middleware
+          «оборачивает» следующий, как слои луковицы. Порядок входа совпадает с порядком
+          регистрации, а порядок выхода — обратный.
+        </p>
+
+        <div class="quote">
+          «Redux middleware are written as a series of three nested functions...
+          When an action is dispatched, it actually goes through all of the middleware
+          in the pipeline first.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#middleware" target="_blank">Redux Fundamentals, Part 4: Store — Middleware</a>
+        </div>
+
+        <h3>Порядок выполнения</h3>
+        <p>
+          Если middleware зарегистрированы как <code>applyMiddleware(A, B, C)</code>:
+        </p>
+        <ul>
+          <li><strong>Вход (до next)</strong>: A → B → C (порядок регистрации)</li>
+          <li><strong>Reducer</strong>: выполняется в центре</li>
+          <li><strong>Выход (после next)</strong>: C → B → A (обратный порядок)</li>
+        </ul>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">middlewareA</span> = (<span class="prop">storeAPI</span>: <span class="type">any</span>) => (<span class="prop">next</span>: <span class="type">any</span>) => (<span class="prop">action</span>: <span class="type">any</span>) => {
+  <span class="fn">console.log</span>(<span class="str">'A enter'</span>)   <span class="cm">// ← до next()</span>
+  <span class="kw">const</span> result = <span class="fn">next</span>(action)
+  <span class="fn">console.log</span>(<span class="str">'A exit'</span>)    <span class="cm">// ← после next()</span>
+  <span class="kw">return</span> result
+}
+        </div>
+
+        <h3>Что происходит при вызове next(action)?</h3>
+        <p>
+          <code>next(action)</code> передаёт action <strong>следующему</strong> middleware
+          в цепочке. Если это последний middleware, action попадает в reducer.
+          Код <strong>до</strong> <code>next()</code> — «вход» в middleware,
+          код <strong>после</strong> — «выход».
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Визуализация call stack:</span>
+<span class="fn">dispatch</span>(action)
+  └─ <span class="fn">middlewareA</span>: <span class="str">"A enter"</span>
+       └─ <span class="fn">middlewareB</span>: <span class="str">"B enter"</span>
+            └─ <span class="fn">middlewareC</span>: <span class="str">"C enter"</span>
+                 └─ <span class="fn">reducer</span>(state, action) → newState
+            <span class="fn">middlewareC</span>: <span class="str">"C exit"</span>
+       <span class="fn">middlewareB</span>: <span class="str">"B exit"</span>
+  <span class="fn">middlewareA</span>: <span class="str">"A exit"</span>
+        </div>
+
+        <h3>Аналогия с функциями</h3>
+        <p>
+          По сути pipeline middleware — это вложенные вызовы функций. Код до <code>next()</code>
+          выполняется при «погружении» в стек вызовов, а код после <code>next()</code> — при
+          «всплытии» обратно.
+        </p>
+
+        <div class="tip">
+          Этот паттерн аналогичен middleware в Express.js или Koa. В Koa его так и называют —
+          «onion model». Каждый middleware видит action на входе и результат на выходе.
+        </div>
+
+        <div class="warning">
+          Если middleware <strong>не вызывает</strong> <code>next(action)</code>, action
+          не дойдёт до reducer и до следующих middleware. Это может быть намеренным
+          (фильтрация действий), но часто — это баг.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Middleware образуют pipeline — цепочку обработчиков</li>
+          <li>Порядок входа = порядок регистрации в <code>applyMiddleware</code></li>
+          <li>Порядок выхода = обратный (как стек вызовов)</li>
+          <li>Код до <code>next()</code> — «enter», после <code>next()</code> — «exit»</li>
+          <li>Каждый middleware оборачивает следующий (onion model)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

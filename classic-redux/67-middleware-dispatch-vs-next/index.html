@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>67 — next(action) vs storeAPI.dispatch(action)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">67 / 100</span>
+      next(action) vs storeAPI.dispatch(action)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../66-middleware-pipeline-order/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">67</span>
+      <a href="../68-middleware-return-value/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: next vs dispatch -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Разница между next() и dispatch()</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Middleware «logger» перехватывает действия. Две кнопки отправляют action разными путями:
+            через <code>next()</code> (следующий middleware) и через <code>storeAPI.dispatch()</code>
+            (перезапуск всего pipeline).
+          </p>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Счётчик</div>
+            <pre id="counter-display" style="color: var(--accent-cyan); font-size: 1.5rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-next">
+              Increment (next)
+            </button>
+            <button class="btn" id="btn-dispatch" style="border-color: var(--accent-orange); color: var(--accent-orange);">
+              Increment (dispatch)
+            </button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Pipeline path</div>
+            <pre id="path-display" style="color: var(--text-secondary); font-size: 0.8rem; min-height: 40px;">Нажмите кнопку ↑</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — next(action) vs storeAPI.dispatch(action)</div>
+      <div class="theory__body">
+        <h3>Два способа передать action</h3>
+        <p>
+          Внутри middleware доступны две функции для передачи action дальше:
+          <code>next(action)</code> и <code>storeAPI.dispatch(action)</code>.
+          Они делают <strong>принципиально разные вещи</strong>.
+        </p>
+
+        <div class="quote">
+          «If you call storeAPI.dispatch(action), it will be sent to the first middleware
+          in the chain again, restarting the pipeline. If you call next(action), it goes
+          to the next middleware in line.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#writing-custom-middleware" target="_blank">Redux Fundamentals, Part 4: Store — Writing Custom Middleware</a>
+        </div>
+
+        <h3>next(action) — следующий middleware</h3>
+        <p>
+          <code>next(action)</code> передаёт action <strong>следующему</strong> middleware
+          в цепочке (или reducer, если это последний middleware). Это стандартный путь —
+          action проходит по pipeline один раз.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">myMiddleware</span> = (<span class="prop">storeAPI</span>: <span class="type">any</span>) => (<span class="prop">next</span>: <span class="type">any</span>) => (<span class="prop">action</span>: <span class="type">any</span>) => {
+  <span class="fn">console.log</span>(<span class="str">'passing to next middleware...'</span>)
+  <span class="kw">return</span> <span class="fn">next</span>(action) <span class="cm">// → следующий middleware</span>
+}
+        </div>
+
+        <h3>storeAPI.dispatch(action) — перезапуск pipeline</h3>
+        <p>
+          <code>storeAPI.dispatch(action)</code> отправляет action <strong>с самого начала</strong>
+          pipeline. Все middleware выполнятся заново. Это полезно, когда middleware хочет
+          отправить <strong>новый</strong> action.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">myMiddleware</span> = (<span class="prop">storeAPI</span>: <span class="type">any</span>) => (<span class="prop">next</span>: <span class="type">any</span>) => (<span class="prop">action</span>: <span class="type">any</span>) => {
+  <span class="kw">if</span> (action.<span class="prop">type</span> === <span class="str">'special'</span>) {
+    <span class="cm">// Отправляем НОВЫЙ action с самого начала pipeline</span>
+    storeAPI.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'converted'</span> })
+    <span class="kw">return</span>
+  }
+  <span class="kw">return</span> <span class="fn">next</span>(action)
+}
+        </div>
+
+        <h3>Когда использовать dispatch?</h3>
+        <ul>
+          <li><strong>Отправка нового action</strong> — middleware решает, что нужно другое действие</li>
+          <li><strong>Повторная обработка</strong> — action нужно пропустить через все middleware заново</li>
+          <li><strong>Thunk-паттерн</strong> — thunk-функция вызывает dispatch для отправки action'ов</li>
+        </ul>
+
+        <h3>Когда использовать next?</h3>
+        <ul>
+          <li><strong>Пропуск дальше</strong> — стандартный случай, action идёт дальше по цепочке</li>
+          <li><strong>Логирование</strong> — middleware только наблюдает, не вмешиваясь</li>
+          <li><strong>Дополнение action</strong> — middleware модифицирует и передаёт дальше</li>
+        </ul>
+
+        <div class="warning">
+          <strong>Опасность бесконечного цикла!</strong> Если middleware вызывает
+          <code>storeAPI.dispatch(action)</code> с тем же самым action без условия выхода,
+          pipeline будет перезапускаться бесконечно. Всегда проверяйте условие перед dispatch.
+        </div>
+
+        <div class="tip">
+          Простое правило: используйте <code>next(action)</code> для «пропускания» action
+          дальше, а <code>storeAPI.dispatch(action)</code> — для «отправки нового» action
+          с начала pipeline.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>next(action)</code> — передаёт action следующему middleware в цепочке</li>
+          <li><code>storeAPI.dispatch(action)</code> — перезапускает pipeline с начала</li>
+          <li>dispatch используется для отправки <strong>новых</strong> action'ов</li>
+          <li>next — стандартный путь для «пропускания» action дальше</li>
+          <li>dispatch того же action без условия = бесконечный цикл</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

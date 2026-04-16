@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>60 — Logger middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">60 / 100</span>
+      Logger middleware — первый практический middleware
+    </div>
+    <nav class="site-header__nav">
+      <a href="../59-middleware-arrow-syntax/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">60</span>
+      <a href="../61-middleware-crash-reporter/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Счётчик с Logger middleware</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div style="color: var(--accent-green); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; margin-bottom: 12px;">
+            ⚡ Logger middleware записывает каждый dispatch
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.4rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-increment" style="font-size: 1.2rem; min-width: 50px;">+</button>
+            <button class="btn btn--accent" id="btn-decrement" style="font-size: 1.2rem; min-width: 50px;">−</button>
+            <button class="btn" id="btn-reset">Reset</button>
+            <button class="btn" id="btn-add5">+5</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Исходный код loggerMiddleware</div>
+            <pre style="color: var(--text-primary); font-size: 0.8rem; line-height: 1.5;">const loggerMiddleware = storeAPI => next => action => {
+  console.log('dispatching', action)
+  let result = next(action)
+  console.log('next state', storeAPI.getState())
+  return result
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Logger Middleware</div>
+      <div class="theory__body">
+        <h3>Зачем logger?</h3>
+        <p>
+          Logger middleware — это самый популярный пример кастомного middleware. Он записывает
+          в консоль <strong>какой action был отправлен</strong> и <strong>каким стал state
+          после обработки</strong>. Это незаменимый инструмент для отладки.
+        </p>
+
+        <h3>Паттерн logger middleware</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">loggerMiddleware</span> = storeAPI => next => action => {
+  console.<span class="fn">log</span>(<span class="str">'dispatching'</span>, action)
+  <span class="kw">let</span> result = <span class="fn">next</span>(action)
+  console.<span class="fn">log</span>(<span class="str">'next state'</span>, storeAPI.<span class="fn">getState</span>())
+  <span class="kw">return</span> result
+}
+        </div>
+
+        <div class="quote">
+          «Here's a small example of a middleware that logs every action dispatched to the
+          store, along with the state after the action was handled. This is a simplified
+          version of the real redux-logger middleware.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#writing-custom-middleware" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Как это работает</h3>
+        <ol>
+          <li><code>console.log('dispatching', action)</code> — логируем action ДО обработки</li>
+          <li><code>let result = next(action)</code> — передаём action дальше (в reducer)</li>
+          <li><code>console.log('next state', storeAPI.getState())</code> — логируем state ПОСЛЕ</li>
+          <li><code>return result</code> — возвращаем результат для следующего middleware в цепочке</li>
+        </ol>
+
+        <h3>Расширенный logger</h3>
+        <p>
+          Можно добавить больше информации: state до dispatch, время, группировку:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">detailedLogger</span> = storeAPI => next => action => {
+  console.<span class="fn">group</span>(action.<span class="prop">type</span>)
+  console.<span class="fn">log</span>(<span class="str">'prev state'</span>, storeAPI.<span class="fn">getState</span>())
+  console.<span class="fn">log</span>(<span class="str">'action'</span>, action)
+
+  <span class="kw">const</span> start = Date.<span class="fn">now</span>()
+  <span class="kw">let</span> result = <span class="fn">next</span>(action)
+  <span class="kw">const</span> ms = Date.<span class="fn">now</span>() - start
+
+  console.<span class="fn">log</span>(<span class="str">'next state'</span>, storeAPI.<span class="fn">getState</span>())
+  console.<span class="fn">log</span>(<span class="str">'duration'</span>, ms + <span class="str">'ms'</span>)
+  console.<span class="fn">groupEnd</span>()
+
+  <span class="kw">return</span> result
+}
+        </div>
+
+        <h3>Почему return result?</h3>
+        <p>
+          <code>next(action)</code> возвращает значение — обычно сам action. Middleware
+          должен вернуть это значение, чтобы не сломать цепочку. Вызывающий код
+          <code>store.dispatch(action)</code> может зависеть от возвращаемого значения.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Полная цепочка return:</span>
+<span class="kw">const</span> <span class="fn">logger</span> = storeAPI => next => action => {
+  console.<span class="fn">log</span>(<span class="str">'dispatching'</span>, action)
+  <span class="kw">let</span> result = <span class="fn">next</span>(action)   <span class="cm">// result = возврат от reducer/middleware</span>
+  console.<span class="fn">log</span>(<span class="str">'next state'</span>, storeAPI.<span class="fn">getState</span>())
+  <span class="kw">return</span> result                <span class="cm">// ← обязательно!</span>
+}
+        </div>
+
+        <div class="tip">
+          Этот паттерн — «before / next / after» — основа для большинства middleware.
+          Код до <code>next(action)</code> выполняется ДО reducer'а, код после —
+          ПОСЛЕ. Это позволяет видеть и «до» и «после» в одном middleware.
+        </div>
+
+        <div class="warning">
+          В продакшене обычно используют библиотеку <code>redux-logger</code>, которая
+          форматирует вывод с цветами, diff'ами, и свёрнутыми группами. Но написать
+          свой простой logger — отличный способ понять middleware.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Logger — самый частый пример кастомного middleware</li>
+          <li>Логирует action и resulting state для каждого dispatch</li>
+          <li>Паттерн: log → <code>next(action)</code> → log → <code>return result</code></li>
+          <li>Код до <code>next</code> — ДО reducer'а, после — ПОСЛЕ</li>
+          <li>Всегда возвращайте <code>result</code> из <code>next(action)</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

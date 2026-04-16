@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>57 — applyMiddleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">57 / 100</span>
+      applyMiddleware — подключение middleware к store
+    </div>
+    <nav class="site-header__nav">
+      <a href="../56-middleware-concept/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">57</span>
+      <a href="../58-middleware-anatomy/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Порядок выполнения трёх middleware</div>
+      <div class="demo-section__body">
+        <div style="max-width: 550px;">
+          <div style="color: var(--accent-green); font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; margin-bottom: 12px;">
+            ⚡ applyMiddleware(print1, print2, print3)
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-dispatch">Dispatch Action</button>
+            <button class="btn" id="btn-clear">Очистить лог</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Код подключения</div>
+            <pre style="color: var(--text-primary); font-size: 0.8rem; line-height: 1.5;">const store = createStore(
+  rootReducer,
+  applyMiddleware(print1, print2, print3)
+)</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — applyMiddleware</div>
+      <div class="theory__body">
+        <h3>Что такое applyMiddleware?</h3>
+        <p>
+          <code>applyMiddleware</code> — это <strong>store enhancer</strong>, встроенный в Redux.
+          Он принимает список middleware и возвращает enhancer, который оборачивает
+          <code>dispatch</code> store'а цепочкой middleware.
+        </p>
+
+        <div class="quote">
+          «The applyMiddleware enhancer is itself an example of a store enhancer that is included
+          with Redux. It lets us change how dispatch works, and enables us to write middleware
+          that can contain whatever logic we want.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#middleware" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Подключение к createStore</h3>
+        <p>
+          <code>applyMiddleware</code> передаётся как второй или третий аргумент
+          <code>createStore</code>. Если нет preloadedState — как второй:
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { legacy_createStore <span class="kw">as</span> createStore, applyMiddleware } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="cm">// Без preloadedState:</span>
+<span class="kw">const</span> store = <span class="fn">createStore</span>(
+  rootReducer,
+  <span class="fn">applyMiddleware</span>(middleware1, middleware2)
+)
+
+<span class="cm">// С preloadedState:</span>
+<span class="kw">const</span> store = <span class="fn">createStore</span>(
+  rootReducer,
+  preloadedState,
+  <span class="fn">applyMiddleware</span>(middleware1, middleware2)
+)
+        </div>
+
+        <h3>Порядок middleware имеет значение</h3>
+        <p>
+          Middleware выполняются в порядке передачи в <code>applyMiddleware</code>.
+          Первый получает action первым, последний — последним перед reducer'ом.
+          Это конвейер (pipeline):
+        </p>
+
+        <div class="code-block">
+<span class="fn">applyMiddleware</span>(print1, print2, print3)
+
+<span class="cm">// Порядок выполнения:</span>
+<span class="cm">// dispatch(action)</span>
+<span class="cm">//   → print1 получает action, логирует "1", вызывает next(action)</span>
+<span class="cm">//     → print2 получает action, логирует "2", вызывает next(action)</span>
+<span class="cm">//       → print3 получает action, логирует "3", вызывает next(action)</span>
+<span class="cm">//         → reducer(state, action)</span>
+        </div>
+
+        <h3>Простейший middleware</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">print1</span> = storeAPI => next => action => {
+  console.<span class="fn">log</span>(<span class="str">'1'</span>)
+  <span class="kw">return</span> <span class="fn">next</span>(action)
+}
+        </div>
+
+        <div class="tip">
+          <code>applyMiddleware</code> — это store enhancer, а не просто утилита. Он возвращает
+          функцию, которую <code>createStore</code> использует для оборачивания store.
+          Поэтому middleware получают доступ к <code>dispatch</code> и <code>getState</code>.
+        </div>
+
+        <h3>Pipeline — конвейерная обработка</h3>
+        <p>
+          Middleware образуют <strong>pipeline</strong> — цепочку обработчиков. Каждый
+          middleware решает: передать action дальше (<code>next(action)</code>),
+          модифицировать его, или вовсе остановить. Это похоже на конвейер на заводе —
+          каждая станция делает свою работу и передаёт деталь дальше.
+        </p>
+
+        <div class="warning">
+          Если вы поменяете порядок middleware в <code>applyMiddleware</code>, изменится
+          порядок обработки action. В демо выше попробуйте мысленно представить, что будет
+          если порядок будет <code>applyMiddleware(print3, print1, print2)</code>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>applyMiddleware</code> — встроенный store enhancer Redux</li>
+          <li>Принимает middleware как аргументы: <code>applyMiddleware(m1, m2, m3)</code></li>
+          <li>Передаётся в <code>createStore</code> как второй/третий аргумент</li>
+          <li>Порядок middleware = порядок обработки action'ов</li>
+          <li>Каждый middleware вызывает <code>next(action)</code> для передачи дальше</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>54 — createSelector с несколькими input selectors</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">54 / 100</span>
+      createSelector с несколькими input selectors
+    </div>
+    <nav class="site-header__nav">
+      <a href="../53-selectors-create-selector/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">54</span>
+      <a href="../55-selectors-chain/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Фильтрация по статусу и цвету через createSelector</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <div class="two-col" style="margin-bottom: 16px;">
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px; font-size: 0.85rem;">Фильтр по статусу</h3>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn--accent" id="btn-status-all">Все</button>
+                <button class="btn" id="btn-status-active">Активные</button>
+                <button class="btn" id="btn-status-completed">Завершённые</button>
+              </div>
+            </div>
+            <div>
+              <h3 style="color: var(--text-bright); margin-bottom: 8px; font-size: 0.85rem;">Фильтр по цвету</h3>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn--accent" id="btn-color-all">Все</button>
+                <button class="btn" id="btn-color-red" style="border-color: #f44747;">Красный</button>
+                <button class="btn" id="btn-color-blue" style="border-color: #569cd6;">Синий</button>
+                <button class="btn" id="btn-color-green" style="border-color: #4caf50;">Зелёный</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 12px;">
+            <div class="state-display__label">
+              Фильтры: статус = <span id="cur-status" style="color: var(--accent-cyan);">all</span>,
+              цвет = <span id="cur-color" style="color: var(--accent-cyan);">all</span>
+              | Пересчётов output: <span id="recompute-count" style="color: var(--accent-green);">0</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Отфильтрованные задачи — <span id="count" style="color: var(--accent-green);">0</span> шт.</div>
+            <ul id="todo-list" style="list-style: none; padding: 8px 0;"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — createSelector с несколькими input selectors</div>
+      <div class="theory__body">
+        <h3>Несколько input selectors</h3>
+        <p>
+          <code>createSelector</code> принимает <strong>любое количество</strong> input selectors.
+          Результат каждого передаётся как аргумент в output selector:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectFilteredTodos</span> = <span class="fn">createSelector</span>(
+  <span class="fn">selectTodos</span>,     <span class="cm">// input 1 → todos</span>
+  <span class="fn">selectFilters</span>,   <span class="cm">// input 2 → filters</span>
+  (todos, filters) => {   <span class="cm">// output получает оба результата</span>
+    <span class="kw">let</span> result = todos
+    <span class="kw">if</span> (filters.<span class="prop">status</span> !== <span class="str">'all'</span>) {
+      result = result.<span class="fn">filter</span>(...)
+    }
+    <span class="kw">if</span> (filters.<span class="prop">color</span> !== <span class="str">'all'</span>) {
+      result = result.<span class="fn">filter</span>(...)
+    }
+    <span class="kw">return</span> result
+  }
+)
+        </div>
+
+        <div class="quote">
+          <strong>Redux Fundamentals, Part 7: Standard Redux Patterns:</strong>
+          «<code>createSelector</code> can accept multiple input selectors, which can be
+          provided as separate arguments. The result function receives the extracted values
+          as corresponding arguments.»
+          <br>
+          <a href="https://redux.js.org/tutorials/fundamentals/part-7-standard-patterns#memoizing-selectors-with-createselector" target="_blank">redux.js.org — Memoizing Selectors with createSelector</a>
+        </div>
+
+        <h3>Когда пересчитывается output?</h3>
+        <p>
+          Output selector вызывается <strong>только</strong> если хотя бы один input
+          вернул новое значение (по <code>===</code>). Если все inputs те же —
+          возвращается кэш.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// input 1: selectTodos → те же todos (ссылка не изменилась)</span>
+<span class="cm">// input 2: selectFilters → те же filters (ссылка не изменилась)</span>
+<span class="cm">// → output НЕ вызывается, возврат кэша</span>
+
+<span class="cm">// input 1: selectTodos → те же todos</span>
+<span class="cm">// input 2: selectFilters → НОВЫЙ объект filters</span>
+<span class="cm">// → output вызывается (input 2 изменился)</span>
+        </div>
+
+        <h3>Пример: фильтрация по статусу + цвету</h3>
+
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">Filters</span> {
+  <span class="prop">status</span>: <span class="str">'all'</span> | <span class="str">'active'</span> | <span class="str">'completed'</span>
+  <span class="prop">color</span>: <span class="str">'all'</span> | <span class="str">'red'</span> | <span class="str">'blue'</span> | <span class="str">'green'</span>
+}
+
+<span class="kw">const</span> <span class="fn">selectTodos</span> = (state: <span class="type">RootState</span>) => state.<span class="prop">todos</span>
+<span class="kw">const</span> <span class="fn">selectFilters</span> = (state: <span class="type">RootState</span>) => state.<span class="prop">filters</span>
+
+<span class="kw">const</span> <span class="fn">selectFilteredTodos</span> = <span class="fn">createSelector</span>(
+  <span class="fn">selectTodos</span>,
+  <span class="fn">selectFilters</span>,
+  (todos, filters) => {
+    <span class="kw">let</span> result = todos
+    <span class="kw">if</span> (filters.<span class="prop">status</span> === <span class="str">'active'</span>)
+      result = result.<span class="fn">filter</span>(t => !t.<span class="prop">completed</span>)
+    <span class="kw">else if</span> (filters.<span class="prop">status</span> === <span class="str">'completed'</span>)
+      result = result.<span class="fn">filter</span>(t => t.<span class="prop">completed</span>)
+    <span class="kw">if</span> (filters.<span class="prop">color</span> !== <span class="str">'all'</span>)
+      result = result.<span class="fn">filter</span>(t => t.<span class="prop">color</span> === filters.<span class="prop">color</span>)
+    <span class="kw">return</span> result
+  }
+)
+        </div>
+
+        <div class="tip">
+          Порядок аргументов в output selector соответствует порядку input selectors.
+          Первый input → первый аргумент, второй → второй, и т.д.
+        </div>
+
+        <div class="warning">
+          Если один из input selectors сам возвращает новый объект/массив при каждом вызове
+          (например, через <code>.filter()</code>), мемоизация «сломается» — output будет
+          пересчитываться каждый раз. Решение — мемоизировать и input selectors тоже.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>createSelector(input1, input2, ..., outputFn)</code> — любое количество inputs</li>
+          <li>Output получает результаты всех inputs как аргументы</li>
+          <li>Пересчёт только при изменении хотя бы одного input</li>
+          <li>Порядок аргументов output соответствует порядку inputs</li>
+          <li>Каждый input тоже можно мемоизировать для надёжности</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

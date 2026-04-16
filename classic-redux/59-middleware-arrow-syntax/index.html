@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>59 — Arrow-синтаксис middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">59 / 100</span>
+      Arrow function синтаксис для middleware
+    </div>
+    <nav class="site-header__nav">
+      <a href="../58-middleware-anatomy/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">59</span>
+      <a href="../60-middleware-logger/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — function vs arrow: одинаковый результат</div>
+      <div class="demo-section__body">
+        <div style="max-width: 650px;">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn" id="btn-function" style="flex: 1; border-color: var(--accent-purple);">function стиль</button>
+            <button class="btn btn--accent" id="btn-arrow" style="flex: 1;">arrow стиль</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label" id="syntax-label">Текущий синтаксис: arrow</div>
+            <pre id="code-display" style="color: var(--text-primary); font-size: 0.8rem; line-height: 1.6;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-dispatch">Dispatch Action</button>
+            <button class="btn" id="btn-clear">Очистить лог</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Arrow function синтаксис</div>
+      <div class="theory__body">
+        <h3>Два способа записи</h3>
+        <p>
+          Middleware можно записать через <code>function</code> или через стрелочные функции.
+          Результат абсолютно одинаковый — это лишь вопрос синтаксиса.
+        </p>
+
+        <h3>function-стиль (подробный)</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">myMiddleware</span>(storeAPI) {
+  <span class="kw">return function</span> <span class="fn">wrapDispatch</span>(next) {
+    <span class="kw">return function</span> <span class="fn">handleAction</span>(action) {
+      <span class="cm">// логика</span>
+      <span class="kw">return</span> <span class="fn">next</span>(action)
+    }
+  }
+}
+        </div>
+
+        <h3>arrow-стиль (компактный)</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">myMiddleware</span> = storeAPI => next => action => {
+  <span class="cm">// логика</span>
+  <span class="kw">return</span> <span class="fn">next</span>(action)
+}
+        </div>
+
+        <div class="quote">
+          «We could also write the middleware using ES2015 arrow functions,
+          which allows us to write them in a more compact way. The arrow function
+          approach is more commonly seen in Redux codebases.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#writing-custom-middleware" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Неявный vs явный return</h3>
+        <p>
+          Если тело функции — одно выражение, стрелочная функция делает неявный return.
+          Если нужна логика (несколько строк), используйте фигурные скобки и явный return:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Минимальный middleware — неявный return:</span>
+<span class="kw">const</span> <span class="fn">passThrough</span> = storeAPI => next => action => <span class="fn">next</span>(action)
+
+<span class="cm">// С логикой — явный return:</span>
+<span class="kw">const</span> <span class="fn">logger</span> = storeAPI => next => action => {
+  console.<span class="fn">log</span>(<span class="str">'action:'</span>, action)
+  <span class="kw">const</span> result = <span class="fn">next</span>(action)
+  console.<span class="fn">log</span>(<span class="str">'new state:'</span>, storeAPI.<span class="fn">getState</span>())
+  <span class="kw">return</span> result
+}
+        </div>
+
+        <h3>Читаемость</h3>
+        <p>
+          Arrow-синтаксис компактнее, но может быть сложнее для начинающих. Три уровня
+          вложенных стрелок <code>a => b => c => { }</code> не очевидны. Рекомендуется
+          сначала освоить function-стиль, а потом перейти на стрелочный.
+        </p>
+
+        <div class="tip">
+          В экосистеме Redux arrow-синтаксис стал <strong>конвенцией</strong>. Большинство
+          примеров в документации, библиотеках (redux-thunk, redux-saga) и туториалах
+          используют именно его. Привыкайте читать <code>storeAPI => next => action => { }</code>.
+        </div>
+
+        <h3>Сравнение бок о бок</h3>
+        <div class="code-block">
+<span class="cm">// ╔═══════════════════════════════════════╗</span>
+<span class="cm">// ║  function стиль   →   arrow стиль     ║</span>
+<span class="cm">// ╠═══════════════════════════════════════╣</span>
+<span class="cm">// ║  function(storeAPI)  storeAPI =>       ║</span>
+<span class="cm">// ║  function(next)      next =>           ║</span>
+<span class="cm">// ║  function(action)    action =>         ║</span>
+<span class="cm">// ╚═══════════════════════════════════════╝</span>
+        </div>
+
+        <div class="warning">
+          Не забывайте <code>return next(action)</code>! Без return результат dispatch
+          будет <code>undefined</code>, что может сломать цепочку middleware. Стрелочная
+          функция без фигурных скобок делает return автоматически, но с фигурными — нет.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>function и arrow — два эквивалентных синтаксиса для middleware</li>
+          <li>Arrow-стиль: <code>storeAPI => next => action => { return next(action) }</code></li>
+          <li>Неявный return: <code>storeAPI => next => action => next(action)</code></li>
+          <li>Arrow-стиль — конвенция в Redux экосистеме</li>
+          <li>function-стиль лучше для изучения, arrow — для продакшена</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

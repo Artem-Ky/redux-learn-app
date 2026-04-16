@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>61 — Crash Reporter middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">61 / 100</span>
+      Crash Reporter — middleware для перехвата ошибок
+    </div>
+    <nav class="site-header__nav">
+      <a href="../60-middleware-logger/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">61</span>
+      <a href="../62-middleware-timing/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: Crash Reporter middleware -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Middleware ловит ошибки reducer'а</div>
+      <div class="demo-section__body">
+        <div style="max-width: 500px;">
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">store.getState()</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 1.2rem; text-align: center;"></pre>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+            <button class="btn" id="btn-increment">Normal +1</button>
+            <button class="btn btn--danger" id="btn-crash">Crash!</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Статус</div>
+            <pre id="status-display" style="color: var(--accent-green); font-size: 0.85rem;">Приложение работает нормально</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Crash Reporter middleware</div>
+      <div class="theory__body">
+        <h3>Зачем ловить ошибки в middleware?</h3>
+        <p>
+          Если reducer выбросит исключение, обычное приложение <strong>упадёт целиком</strong>.
+          Crash Reporter middleware оборачивает вызов <code>next(action)</code> в
+          <code>try/catch</code>, перехватывает ошибку и позволяет приложению продолжить работу.
+        </p>
+
+        <div class="quote">
+          «Middleware provides a third-party extension point between dispatching an action, and
+          the moment it reaches the reducer. People use Redux middleware for logging, crash
+          reporting, talking to an asynchronous API, routing, and more.»
+          <br>— <a href="https://redux.js.org/understanding/history-and-design/middleware" target="_blank">Redux Docs — Middleware</a>
+        </div>
+
+        <h3>Паттерн: try/catch вокруг next(action)</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">crashReporter</span> =
+  (storeAPI: <span class="type">any</span>) => (next: <span class="type">any</span>) => (action: <span class="type">any</span>): <span class="type">any</span> => {
+    <span class="kw">try</span> {
+      <span class="kw">return</span> <span class="fn">next</span>(action)
+    } <span class="kw">catch</span> (err) {
+      console.<span class="fn">error</span>(<span class="str">'Caught an exception!'</span>, err)
+      <span class="cm">// Отправить ошибку на сервер</span>
+      <span class="fn">reportError</span>(err, storeAPI.<span class="fn">getState</span>(), action)
+      <span class="kw">throw</span> err <span class="cm">// опционально — можно и не пробрасывать</span>
+    }
+  }
+        </div>
+
+        <h3>Что происходит при ошибке?</h3>
+        <ul>
+          <li><strong>try</strong> — нормальный поток: <code>next(action)</code> вызывает следующий middleware или reducer</li>
+          <li><strong>catch</strong> — если reducer выбросил, ошибка перехвачена</li>
+          <li>Можно залогировать, отправить на сервер, показать пользователю</li>
+          <li>Можно <code>throw err</code> — пробросить дальше, или «проглотить» — приложение продолжит</li>
+        </ul>
+
+        <h3>Отправка ошибки на сервер</h3>
+        <p>
+          В продакшене Crash Reporter отправляет отчёт на сервер мониторинга
+          (Sentry, Bugsnag и т.д.) с полным контекстом: состояние store, действие,
+          стек ошибки.
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">reportError</span>(error: <span class="type">Error</span>, state: <span class="type">any</span>, action: <span class="type">any</span>): <span class="type">void</span> {
+  <span class="fn">fetch</span>(<span class="str">'/api/error-report'</span>, {
+    method: <span class="str">'POST'</span>,
+    body: <span class="fn">JSON.stringify</span>({
+      error: error.<span class="prop">message</span>,
+      stack: error.<span class="prop">stack</span>,
+      state,
+      action,
+      timestamp: <span class="fn">Date.now</span>()
+    })
+  })
+}
+        </div>
+
+        <h3>Graceful degradation</h3>
+        <p>
+          Middleware решает: пробросить ошибку (<code>throw err</code>) или «проглотить».
+          Проглатывание позволяет приложению работать дальше — это
+          <strong>graceful degradation</strong>. Пользователь видит, что кнопка не сработала,
+          но приложение не упало.
+        </p>
+
+        <div class="tip">
+          В нашем демо middleware <strong>не пробрасывает</strong> ошибку: приложение продолжает
+          работу после нажатия «Crash!». Нажмите «Normal +1» — счётчик всё ещё работает.
+        </div>
+
+        <div class="warning">
+          Не злоупотребляйте «проглатыванием» ошибок в продакшене. Если reducer выбрасывает —
+          это баг, который нужно исправить. Crash Reporter — страховочная сетка, а не замена
+          правильной обработки ошибок.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Crash Reporter оборачивает <code>next(action)</code> в <code>try/catch</code></li>
+          <li>Перехваченная ошибка логируется и/или отправляется на сервер</li>
+          <li>Можно «проглотить» ошибку для graceful degradation</li>
+          <li>Контекст ошибки: state, action, stack trace</li>
+          <li>В продакшене используйте Sentry, Bugsnag или аналоги</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

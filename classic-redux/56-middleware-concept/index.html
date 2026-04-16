@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>56 — Что такое Middleware?</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">56 / 100</span>
+      Что такое Middleware?
+    </div>
+    <nav class="site-header__nav">
+      <a href="../55-selectors-chain/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">56</span>
+      <a href="../57-middleware-apply/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Путь Action через Middleware</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Нажмите «Dispatch Action», чтобы увидеть как action проходит через цепочку middleware к reducer'у:
+        </p>
+        <div class="flow-diagram" id="flow">
+          <div class="flow-step" id="step-action">
+            <div class="flow-step__label">Action</div>
+            <div class="flow-step__value">dispatch()</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="step-mw1" style="border-color: var(--accent-purple);">
+            <div class="flow-step__label">Middleware 1</div>
+            <div class="flow-step__value">Логирование</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="step-mw2" style="border-color: var(--accent-orange);">
+            <div class="flow-step__label">Middleware 2</div>
+            <div class="flow-step__value">Аналитика</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="step-mw3" style="border-color: var(--accent-cyan);">
+            <div class="flow-step__label">Middleware 3</div>
+            <div class="flow-step__value">Таймер</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step" id="step-reducer">
+            <div class="flow-step__label">Reducer</div>
+            <div class="flow-step__value">newState</div>
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 16px;">
+          <button class="btn btn--accent" id="btn-dispatch">Dispatch Action</button>
+          <button class="btn" id="btn-reset">Сбросить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что такое Middleware?</div>
+      <div class="theory__body">
+        <h3>Определение</h3>
+        <p>
+          <strong>Middleware</strong> — это точка расширения между отправкой action и моментом,
+          когда он достигает reducer'а. Middleware может перехватывать, логировать, модифицировать,
+          задерживать или даже блокировать action'ы.
+        </p>
+
+        <div class="quote">
+          «Redux middleware provides a third-party extension point between dispatching an action,
+          and the moment it reaches the reducer. People use Redux middleware for logging, crash
+          reporting, talking to an asynchronous API, routing, and more.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#middleware" target="_blank">Redux Fundamentals, Part 4</a>
+        </div>
+
+        <h3>Аналогия с Express middleware</h3>
+        <p>
+          Если вы знакомы с Express.js, концепция похожа: запрос проходит через цепочку
+          обработчиков, каждый может что-то сделать и передать дальше через <code>next()</code>.
+          В Redux action проходит через цепочку middleware, каждый вызывает <code>next(action)</code>
+          для передачи action следующему.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Express middleware:</span>
+app.<span class="fn">use</span>((req, res, next) => {
+  console.<span class="fn">log</span>(req.<span class="prop">method</span>, req.<span class="prop">url</span>)
+  <span class="fn">next</span>()  <span class="cm">// передать дальше</span>
+})
+
+<span class="cm">// Redux middleware (похожая идея):</span>
+<span class="kw">const</span> <span class="fn">logger</span> = storeAPI => next => action => {
+  console.<span class="fn">log</span>(<span class="str">'action:'</span>, action)
+  <span class="kw">return</span> <span class="fn">next</span>(action)  <span class="cm">// передать дальше</span>
+}
+        </div>
+
+        <h3>Что может middleware?</h3>
+        <ul>
+          <li><strong>Логирование</strong> — записывать каждый action и state до/после</li>
+          <li><strong>Crash reporting</strong> — отлавливать ошибки в dispatch</li>
+          <li><strong>Async операции</strong> — общаться с API, работать с промисами</li>
+          <li><strong>Модификация</strong> — изменять или заменять action'ы</li>
+          <li><strong>Блокировка</strong> — не вызывать <code>next(action)</code> вовсе</li>
+        </ul>
+
+        <h3>Место в потоке данных</h3>
+        <p>
+          Без middleware поток данных простой: <code>dispatch(action) → reducer → newState</code>.
+          С middleware между dispatch и reducer появляется конвейер:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Без middleware:</span>
+dispatch(action) → reducer(state, action) → newState
+
+<span class="cm">// С middleware:</span>
+dispatch(action)
+  → <span class="fn">middleware1</span>(action)
+    → <span class="fn">middleware2</span>(action)
+      → <span class="fn">middleware3</span>(action)
+        → reducer(state, action) → newState
+        </div>
+
+        <h3>Побочные эффекты (Side Effects)</h3>
+        <p>
+          Reducer'ы должны быть чистыми функциями — без побочных эффектов. Но реальным
+          приложениям нужно делать HTTP-запросы, писать в localStorage, логировать.
+          <strong>Middleware</strong> — именно то место, где живут побочные эффекты в Redux.
+        </p>
+
+        <div class="tip">
+          Middleware — это «расширяемый конвейер» между dispatch и reducer. Каждый middleware
+          в цепочке получает action, может что-то с ним сделать, и передаёт дальше через
+          <code>next(action)</code>. Последний в цепочке передаёт action в reducer.
+        </div>
+
+        <div class="warning">
+          Если middleware не вызывает <code>next(action)</code>, action никогда не дойдёт
+          до reducer'а и state не обновится. Это может быть полезно для фильтрации,
+          но чаще — это баг.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Middleware — точка расширения между dispatch и reducer</li>
+          <li>Может логировать, модифицировать, задерживать, блокировать action'ы</li>
+          <li>Побочные эффекты живут в middleware, не в reducer'ах</li>
+          <li>Аналогия с Express: цепочка обработчиков с <code>next()</code></li>
+          <li>Подключается через <code>applyMiddleware()</code> (следующий урок)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

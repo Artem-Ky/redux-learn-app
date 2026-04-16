@@ -280,6 +280,110 @@
         <div class="index-card__title">Selector с параметрами</div>
         <div class="index-card__desc">selectTodoById(state, id)</div>
       </a>
+      <a href="./51-selectors-composition/" class="index-card">
+        <div class="index-card__num">51</div>
+        <div class="index-card__title">Композиция селекторов</div>
+        <div class="index-card__desc">Строим селекторы друг на друге</div>
+      </a>
+      <a href="./52-selectors-reselect-intro/" class="index-card">
+        <div class="index-card__num">52</div>
+        <div class="index-card__title">Проблема ссылок</div>
+        <div class="index-card__desc">Почему map/filter ломают === сравнение</div>
+      </a>
+      <a href="./53-selectors-create-selector/" class="index-card">
+        <div class="index-card__num">53</div>
+        <div class="index-card__title">createSelector (Reselect)</div>
+        <div class="index-card__desc">Мемоизация селекторов</div>
+      </a>
+      <a href="./54-selectors-multiple-inputs/" class="index-card">
+        <div class="index-card__num">54</div>
+        <div class="index-card__title">Несколько input selectors</div>
+        <div class="index-card__desc">createSelector с фильтрацией</div>
+      </a>
+      <a href="./55-selectors-chain/" class="index-card">
+        <div class="index-card__num">55</div>
+        <div class="index-card__title">Цепочка мемоизации</div>
+        <div class="index-card__desc">Мемоизированные селекторы как input</div>
+      </a>
+    </div>
+
+    <div class="section-title">F. Middleware — Промежуточное ПО</div>
+    <div class="index-grid">
+      <a href="./56-middleware-concept/" class="index-card">
+        <div class="index-card__num">56</div>
+        <div class="index-card__title">Что такое Middleware?</div>
+        <div class="index-card__desc">Расширение dispatch, pipeline</div>
+      </a>
+      <a href="./57-middleware-apply/" class="index-card">
+        <div class="index-card__num">57</div>
+        <div class="index-card__title">applyMiddleware</div>
+        <div class="index-card__desc">Подключение middleware к store</div>
+      </a>
+      <a href="./58-middleware-anatomy/" class="index-card">
+        <div class="index-card__num">58</div>
+        <div class="index-card__title">Анатомия middleware</div>
+        <div class="index-card__desc">Три вложенные функции</div>
+      </a>
+      <a href="./59-middleware-arrow-syntax/" class="index-card">
+        <div class="index-card__num">59</div>
+        <div class="index-card__title">Arrow-синтаксис</div>
+        <div class="index-card__desc">storeAPI => next => action => ...</div>
+      </a>
+      <a href="./60-middleware-logger/" class="index-card">
+        <div class="index-card__num">60</div>
+        <div class="index-card__title">Logger middleware</div>
+        <div class="index-card__desc">Первый кастомный middleware</div>
+      </a>
+      <a href="./61-middleware-crash-reporter/" class="index-card">
+        <div class="index-card__num">61</div>
+        <div class="index-card__title">Crash Reporter</div>
+        <div class="index-card__desc">Перехват ошибок в reducer</div>
+      </a>
+      <a href="./62-middleware-timing/" class="index-card">
+        <div class="index-card__num">62</div>
+        <div class="index-card__title">Timing middleware</div>
+        <div class="index-card__desc">Замер времени dispatch</div>
+      </a>
+      <a href="./63-middleware-action-filter/" class="index-card">
+        <div class="index-card__num">63</div>
+        <div class="index-card__title">Фильтр экшенов</div>
+        <div class="index-card__desc">Блокировка определённых actions</div>
+      </a>
+      <a href="./64-middleware-action-transform/" class="index-card">
+        <div class="index-card__num">64</div>
+        <div class="index-card__title">Трансформер экшенов</div>
+        <div class="index-card__desc">Добавление timestamp и meta</div>
+      </a>
+      <a href="./65-middleware-delayed-action/" class="index-card">
+        <div class="index-card__num">65</div>
+        <div class="index-card__title">Отложенные действия</div>
+        <div class="index-card__desc">setTimeout в middleware</div>
+      </a>
+      <a href="./66-middleware-pipeline-order/" class="index-card">
+        <div class="index-card__num">66</div>
+        <div class="index-card__title">Pipeline — порядок</div>
+        <div class="index-card__desc">Луковичная модель (onion model)</div>
+      </a>
+      <a href="./67-middleware-dispatch-vs-next/" class="index-card">
+        <div class="index-card__num">67</div>
+        <div class="index-card__title">dispatch vs next</div>
+        <div class="index-card__desc">Разница между next() и dispatch()</div>
+      </a>
+      <a href="./68-middleware-return-value/" class="index-card">
+        <div class="index-card__num">68</div>
+        <div class="index-card__title">Возвращаемое значение</div>
+        <div class="index-card__desc">Что возвращает store.dispatch()</div>
+      </a>
+      <a href="./69-thunk-concept/" class="index-card">
+        <div class="index-card__num">69</div>
+        <div class="index-card__title">Thunk — концепция</div>
+        <div class="index-card__desc">Dispatch функции вместо объекта</div>
+      </a>
+      <a href="./70-thunk-middleware-official/" class="index-card">
+        <div class="index-card__num">70</div>
+        <div class="index-card__title">redux-thunk</div>
+        <div class="index-card__desc">Официальный thunk middleware</div>
+      </a>
     </div>
   </div>
 </body>
