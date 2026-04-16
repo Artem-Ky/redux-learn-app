@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>98 — Reselect: кастомные проверки равенства</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">98 / 100</span>
+      Reselect: кастомные проверки равенства
+    </div>
+    <nav class="site-header__nav">
+      <a href="../97-reselect-deep/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">98</span>
+      <a href="../99-redux-thunk-deep/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Default === vs Custom deep equality</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+          Два селектора получают одинаковые данные. <strong>Default</strong> использует <code>===</code>
+          для входных значений. <strong>Custom</strong> использует глубокое сравнение (JSON.stringify).
+          Смотрите, как отличается число перевычислений.
+        </p>
+
+        <div class="two-col" style="margin-bottom: 20px;">
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 20px; text-align: center;">
+            <div style="font-size: 0.75rem; color: var(--accent-yellow); text-transform: uppercase; margin-bottom: 8px;">Default (===)</div>
+            <div id="counter-default" style="font-family: var(--font-mono); font-size: 2.5rem; font-weight: 700; color: var(--accent-yellow);">0</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">перевычислений</div>
+          </div>
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--accent-green); border-radius: var(--radius-sm); padding: 20px; text-align: center;">
+            <div style="font-size: 0.75rem; color: var(--accent-green); text-transform: uppercase; margin-bottom: 8px;">Custom (deep equality)</div>
+            <div id="counter-custom" style="font-family: var(--font-mono); font-size: 2.5rem; font-weight: 700; color: var(--accent-green);">0</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">перевычислений</div>
+          </div>
+        </div>
+
+        <div class="btn-group" style="margin-bottom: 16px; flex-wrap: wrap;">
+          <button class="btn btn--accent" id="btn-same-data">Dispatch (те же данные, новая ссылка)</button>
+          <button class="btn btn--success" id="btn-new-data">Dispatch (новые данные)</button>
+          <button class="btn" id="btn-many" style="border-color: var(--accent-purple); color: var(--accent-purple);">10x Dispatch (те же данные)</button>
+          <button class="btn btn--danger" id="btn-reset">Сбросить</button>
+        </div>
+
+        <div class="state-display">
+          <div class="state-display__label">Текущее состояние</div>
+          <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.82rem;"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Кастомные проверки равенства в Reselect</div>
+      <div class="theory__body">
+        <h3>Как работает мемоизация createSelector</h3>
+        <p>
+          По умолчанию <code>createSelector</code> использует <strong>строгое равенство</strong>
+          (<code>===</code>) для проверки входных значений. Если входные селекторы вернули
+          те же ссылки — результирующая функция <strong>не перевычисляется</strong>.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createSelector</span> } <span class="kw">from</span> <span class="str">'reselect'</span>
+
+<span class="cm">// Входной селектор каждый раз создаёт НОВЫЙ массив:</span>
+<span class="kw">const</span> <span class="fn">selectItems</span> = (<span class="prop">state</span>: <span class="type">State</span>) =>
+  <span class="prop">state</span>.<span class="prop">items</span>.<span class="fn">filter</span>(<span class="prop">i</span> => <span class="prop">i</span>.<span class="prop">active</span>)  <span class="cm">// новая ссылка каждый раз!</span>
+
+<span class="cm">// Результирующий селектор пересчитывается КАЖДЫЙ вызов,</span>
+<span class="cm">// потому что filter() всегда возвращает новый массив (!== предыдущему)</span>
+<span class="kw">const</span> <span class="fn">selectTotal</span> = <span class="fn">createSelector</span>(
+  [<span class="fn">selectItems</span>],
+  (<span class="prop">items</span>) => <span class="prop">items</span>.<span class="fn">reduce</span>((<span class="prop">sum</span>, <span class="prop">i</span>) => <span class="prop">sum</span> + <span class="prop">i</span>.<span class="prop">price</span>, <span class="num">0</span>)
+)
+        </div>
+
+        <h3>Решение: memoizeOptions</h3>
+        <p>
+          <code>createSelector</code> принимает третий аргумент — объект настроек мемоизации.
+          Ключевое свойство: <code>memoizeOptions.equalityCheck</code> — функция сравнения
+          входных значений.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">deepEqual</span> = (<span class="prop">a</span>: <span class="type">unknown</span>, <span class="prop">b</span>: <span class="type">unknown</span>): <span class="type">boolean</span> =>
+  <span class="type">JSON</span>.<span class="fn">stringify</span>(<span class="prop">a</span>) === <span class="type">JSON</span>.<span class="fn">stringify</span>(<span class="prop">b</span>)
+
+<span class="kw">const</span> <span class="fn">selectTotal</span> = <span class="fn">createSelector</span>(
+  [<span class="fn">selectItems</span>],
+  (<span class="prop">items</span>) => <span class="prop">items</span>.<span class="fn">reduce</span>((<span class="prop">sum</span>, <span class="prop">i</span>) => <span class="prop">sum</span> + <span class="prop">i</span>.<span class="prop">price</span>, <span class="num">0</span>),
+  {
+    <span class="prop">memoizeOptions</span>: {
+      <span class="prop">equalityCheck</span>: <span class="fn">deepEqual</span>
+    }
+  }
+)
+        </div>
+
+        <h3>resultEqualityCheck</h3>
+        <p>
+          Отдельная настройка <code>resultEqualityCheck</code> сравнивает
+          <strong>результат</strong> вычисления. Если результат «глубоко» равен предыдущему,
+          селектор вернёт <strong>старую ссылку</strong>:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectFiltered</span> = <span class="fn">createSelector</span>(
+  [<span class="fn">selectItems</span>, <span class="fn">selectFilter</span>],
+  (<span class="prop">items</span>, <span class="prop">filter</span>) => <span class="prop">items</span>.<span class="fn">filter</span>(<span class="prop">i</span> => <span class="prop">i</span>.<span class="prop">status</span> === <span class="prop">filter</span>),
+  {
+    <span class="prop">memoizeOptions</span>: {
+      <span class="prop">resultEqualityCheck</span>: <span class="fn">deepEqual</span>
+    }
+  }
+)
+        </div>
+
+        <h3>Когда custom equality помогает?</h3>
+        <ul>
+          <li>Входной селектор <strong>реконструирует объект</strong> каждый вызов (filter, map, slice)</li>
+          <li>Данные структурно одинаковые, но <code>===</code> даёт false (новая ссылка)</li>
+          <li>Вы хотите избежать пересчёта тяжёлой результирующей функции</li>
+        </ul>
+
+        <h3>Компромиссы производительности</h3>
+        <p>
+          Deep equality — это <strong>не бесплатно</strong>. JSON.stringify или рекурсивное
+          сравнение имеют свою цену. Выбирайте стратегию в зависимости от ситуации:
+        </p>
+        <ul>
+          <li><strong>===</strong> — O(1), но ложные пересчёты при новых ссылках</li>
+          <li><strong>shallow equal</strong> — O(n) по ключам верхнего уровня, хороший баланс</li>
+          <li><strong>deep equal</strong> — O(n·m) по всем вложенностям, максимальный кэш, но затраты</li>
+        </ul>
+
+        <div class="quote">
+          «createSelector uses referential equality (===) to check if an input has changed.
+          You can customize this behavior by passing an equalityCheck function in
+          the memoizeOptions argument.»
+          <br>— <a href="https://reselect.js.org/api/createSelector/" target="_blank">Reselect Documentation — createSelector</a>
+        </div>
+
+        <div class="tip">
+          Используйте кастомное сравнение <strong>точечно</strong> — только для селекторов,
+          где входные значения гарантированно создают новые ссылки при каждом вызове.
+          Для большинства случаев <code>===</code> достаточно.
+        </div>
+
+        <div class="warning">
+          <code>JSON.stringify</code> — плохой выбор для production-кода. Он не обрабатывает
+          <code>undefined</code>, функции, циклические ссылки и порядок ключей нестабилен.
+          Используйте проверенные библиотеки (lodash.isEqual, fast-deep-equal).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>94 — Immer внутри Redux-редьюсеров</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">94 / 100</span>
+      Immer внутри Redux-редьюсеров
+    </div>
+    <nav class="site-header__nav">
+      <a href="../93-immer-intro/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">94</span>
+      <a href="../95-immer-nested-updates/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Классический spread vs Immer produce в Redux-редьюсерах</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+          Один и тот же Todo-редьюсер, написанный двумя способами. Переключайте активный редьюсер
+          кнопкой — результат в DevTools <strong>одинаковый</strong>.
+        </p>
+
+        <div class="two-col" style="margin-bottom: 20px;">
+          <!-- Left: Classic -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px;">
+            <div style="font-size: 0.75rem; color: var(--accent-yellow); text-transform: uppercase; margin-bottom: 8px;">Классический spread-reducer</div>
+            <pre style="color: var(--text-secondary); font-size: 0.76rem; margin: 0; white-space: pre-wrap;">case 'todos/add':
+  return {
+    ...state,
+    todos: [...state.todos, {
+      id: state.nextId,
+      text: action.payload,
+      completed: false
+    }],
+    nextId: state.nextId + 1
+  }
+
+case 'todos/toggle':
+  return {
+    ...state,
+    todos: state.todos.map(t =>
+      t.id === action.payload
+        ? { ...t, completed: !t.completed }
+        : t
+    )
+  }
+
+case 'todos/delete':
+  return {
+    ...state,
+    todos: state.todos.filter(
+      t => t.id !== action.payload
+    )
+  }</pre>
+          </div>
+
+          <!-- Right: Immer -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--accent-green); border-radius: var(--radius-sm); padding: 16px;">
+            <div style="font-size: 0.75rem; color: var(--accent-green); text-transform: uppercase; margin-bottom: 8px;">Immer produce-reducer</div>
+            <pre style="color: var(--text-secondary); font-size: 0.76rem; margin: 0; white-space: pre-wrap;">case 'todos/add':
+  draft.todos.push({
+    id: draft.nextId,
+    text: action.payload,
+    completed: false
+  })
+  draft.nextId++
+  break
+
+case 'todos/toggle':
+  const todo = draft.todos.find(
+    t => t.id === action.payload
+  )
+  if (todo) todo.completed = !todo.completed
+  break
+
+case 'todos/delete':
+  const idx = draft.todos.findIndex(
+    t => t.id === action.payload
+  )
+  if (idx !== -1) draft.todos.splice(idx, 1)
+  break</pre>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+          <span style="color: var(--text-secondary); font-size: 0.82rem;">Активный редьюсер:</span>
+          <button class="btn" id="btn-toggle-reducer" style="border-color: var(--accent-cyan); color: var(--accent-cyan); min-width: 200px;">
+            Классический (spread)
+          </button>
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+          <input type="text" id="input-todo" placeholder="Новая задача..." style="max-width: 300px;">
+          <button class="btn btn--accent" id="btn-add">Добавить</button>
+          <button class="btn btn--success" id="btn-toggle-first">Toggle #1</button>
+          <button class="btn btn--danger" id="btn-delete-first">Удалить #1</button>
+          <button class="btn" id="btn-reset">Сбросить</button>
+        </div>
+
+        <div class="state-display">
+          <div class="state-display__label">Текущее состояние</div>
+          <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.82rem;"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Immer produce внутри Redux-редьюсеров</div>
+      <div class="theory__body">
+        <h3>Зачем Immer в Redux?</h3>
+        <p>
+          Redux требует <strong>иммутабельных обновлений</strong>. Классический подход — каскады
+          spread-операторов. С <strong>Immer</strong> вы пишете «мутирующий» код, а библиотека
+          создаёт иммутабельный результат автоматически.
+        </p>
+
+        <h3>Оборачиваем каждый case в produce</h3>
+        <p>
+          Простейший способ — обернуть весь reducer в <code>produce</code>:
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">produce</span> } <span class="kw">from</span> <span class="str">'immer'</span>
+
+<span class="kw">const</span> <span class="fn">reducer</span> = <span class="fn">produce</span>((<span class="prop">draft</span>: <span class="type">TodoState</span>, <span class="prop">action</span>: <span class="type">TodoAction</span>) => {
+  <span class="kw">switch</span> (<span class="prop">action</span>.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'todos/add'</span>:
+      <span class="prop">draft</span>.<span class="prop">todos</span>.<span class="fn">push</span>({ <span class="prop">id</span>: <span class="prop">draft</span>.<span class="prop">nextId</span>, <span class="prop">text</span>: <span class="prop">action</span>.<span class="prop">payload</span>, <span class="prop">completed</span>: <span class="num">false</span> })
+      <span class="prop">draft</span>.<span class="prop">nextId</span>++
+      <span class="kw">break</span>
+  }
+})
+        </div>
+
+        <h3>Сравнение объёма кода по операциям</h3>
+        <ul>
+          <li><strong>Добавление (add)</strong>: spread — 7 строк, Immer — 3 строки (push + break)</li>
+          <li><strong>Переключение (toggle)</strong>: spread — 5 строк (map + spread), Immer — 2 строки (find + присвоение)</li>
+          <li><strong>Вложенное обновление</strong>: spread — 10+ строк каскада, Immer — 1 строка прямого присвоения</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// spread: toggle — 5 строк</span>
+<span class="kw">case</span> <span class="str">'todos/toggle'</span>:
+  <span class="kw">return</span> {
+    ...<span class="prop">state</span>,
+    <span class="prop">todos</span>: <span class="prop">state</span>.<span class="prop">todos</span>.<span class="fn">map</span>(<span class="prop">t</span> =>
+      <span class="prop">t</span>.<span class="prop">id</span> === <span class="prop">action</span>.<span class="prop">payload</span> ? { ...<span class="prop">t</span>, <span class="prop">completed</span>: !<span class="prop">t</span>.<span class="prop">completed</span> } : <span class="prop">t</span>
+    )
+  }
+
+<span class="cm">// Immer: toggle — 1 строка логики</span>
+<span class="kw">case</span> <span class="str">'todos/toggle'</span>:
+  <span class="kw">const</span> <span class="prop">todo</span> = <span class="prop">draft</span>.<span class="prop">todos</span>.<span class="fn">find</span>(<span class="prop">t</span> => <span class="prop">t</span>.<span class="prop">id</span> === <span class="prop">action</span>.<span class="prop">payload</span>)
+  <span class="kw">if</span> (<span class="prop">todo</span>) <span class="prop">todo</span>.<span class="prop">completed</span> = !<span class="prop">todo</span>.<span class="prop">completed</span>
+  <span class="kw">break</span>
+        </div>
+
+        <h3>Это ИМЕННО то, что делает createSlice</h3>
+        <p>
+          <strong>Redux Toolkit</strong> оборачивает каждый reducer в <code>produce</code> автоматически.
+          Когда вы пишете «мутирующий» код внутри <code>createSlice</code>, это Immer под капотом.
+          Понимание этого урока = понимание того, как работает RTK.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Redux Toolkit — Immer скрыт внутри createSlice:</span>
+<span class="kw">const</span> <span class="prop">todosSlice</span> = <span class="fn">createSlice</span>({
+  <span class="prop">name</span>: <span class="str">'todos'</span>,
+  <span class="prop">initialState</span>,
+  <span class="prop">reducers</span>: {
+    <span class="fn">add</span>(<span class="prop">state</span>, <span class="prop">action</span>) {
+      <span class="prop">state</span>.<span class="prop">todos</span>.<span class="fn">push</span>(<span class="prop">action</span>.<span class="prop">payload</span>) <span class="cm">// «мутация» = produce!</span>
+    },
+    <span class="fn">toggle</span>(<span class="prop">state</span>, <span class="prop">action</span>) {
+      <span class="kw">const</span> <span class="prop">todo</span> = <span class="prop">state</span>.<span class="prop">todos</span>.<span class="fn">find</span>(<span class="prop">t</span> => <span class="prop">t</span>.<span class="prop">id</span> === <span class="prop">action</span>.<span class="prop">payload</span>)
+      <span class="kw">if</span> (<span class="prop">todo</span>) <span class="prop">todo</span>.<span class="prop">completed</span> = !<span class="prop">todo</span>.<span class="prop">completed</span>
+    }
+  }
+})
+        </div>
+
+        <div class="quote">
+          «Using Immer is like having a personal assistant. The assistant takes a letter
+          (the current state) and gives you a copy (draft) to jot changes onto. Once you
+          are done, the assistant will take your draft and produce the real immutable,
+          final letter for you (the next state).»
+          <br>— <a href="https://immerjs.github.io/immer/" target="_blank">Immer Documentation</a>
+        </div>
+
+        <div class="tip">
+          Оба подхода дают <strong>идентичный результат</strong> — одинаковые state-объекты
+          в DevTools. Разница только в количестве кода и читаемости. Имейте в виду: с Immer
+          не забывайте <code>break</code> (или <code>return</code>) в каждом case!
+        </div>
+
+        <div class="warning">
+          Не смешивайте мутации draft и return в одном case! Если вы используете Immer —
+          только мутируйте draft. Если хотите вернуть новое значение — не мутируйте ничего.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

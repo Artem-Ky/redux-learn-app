@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>99 — redux-thunk: исходный код и withExtraArgument</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">99 / 100</span>
+      redux-thunk: исходный код и withExtraArgument
+    </div>
+    <nav class="site-header__nav">
+      <a href="../98-reselect-custom-equality/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">99</span>
+      <a href="../100-putting-it-all-together/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Исходный код redux-thunk (~14 строк!)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+          Весь исходный код <code>redux-thunk</code> — это одна функция.
+          Слева — настоящий код из npm-пакета. Справа — наша идентичная реализация.
+        </p>
+
+        <div class="two-col" style="margin-bottom: 20px;">
+          <!-- Left: real source -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 16px;">
+            <div style="font-size: 0.75rem; color: var(--accent); text-transform: uppercase; margin-bottom: 8px;">Оригинал redux-thunk (npm)</div>
+            <pre style="color: var(--text-secondary); font-size: 0.76rem; margin: 0; white-space: pre-wrap;">function createThunkMiddleware(
+  extraArgument
+) {
+  const middleware = ({ dispatch, getState }) =>
+    (next) =>
+      (action) => {
+        if (typeof action === 'function') {
+          return action(
+            dispatch,
+            getState,
+            extraArgument
+          )
+        }
+        return next(action)
+      }
+
+  middleware.withExtraArgument =
+    createThunkMiddleware
+
+  return middleware
+}
+
+export default createThunkMiddleware()</pre>
+          </div>
+
+          <!-- Right: our implementation -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--accent-green); border-radius: var(--radius-sm); padding: 16px;">
+            <div style="font-size: 0.75rem; color: var(--accent-green); text-transform: uppercase; margin-bottom: 8px;">Наша реализация (идентична)</div>
+            <pre style="color: var(--text-secondary); font-size: 0.76rem; margin: 0; white-space: pre-wrap;">function myCreateThunkMiddleware(
+  extraArgument?
+) {
+  const middleware = ({ dispatch, getState }) =>
+    (next) =>
+      (action) => {
+        if (typeof action === 'function') {
+          return action(
+            dispatch,
+            getState,
+            extraArgument
+          )
+        }
+        return next(action)
+      }
+
+  middleware.withExtraArgument =
+    myCreateThunkMiddleware
+
+  return middleware
+}
+
+export const myThunk = myCreateThunkMiddleware()</pre>
+          </div>
+        </div>
+
+        <div class="btn-group" style="margin-bottom: 16px; flex-wrap: wrap;">
+          <button class="btn btn--accent" id="btn-official">Dispatch (official thunk)</button>
+          <button class="btn btn--success" id="btn-custom">Dispatch (наш thunk)</button>
+          <button class="btn" id="btn-extra" style="border-color: var(--accent-purple); color: var(--accent-purple);">withExtraArgument</button>
+          <button class="btn" id="btn-async" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">Async Thunk</button>
+          <button class="btn btn--danger" id="btn-reset">Сбросить</button>
+        </div>
+
+        <div class="state-display">
+          <div class="state-display__label">Текущее состояние</div>
+          <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.82rem;"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Разбор исходного кода redux-thunk</div>
+      <div class="theory__body">
+        <h3>Весь redux-thunk — ~14 строк</h3>
+        <p>
+          <code>redux-thunk</code> — один из самых маленьких и элегантных npm-пакетов.
+          Вся логика — в одной функции <code>createThunkMiddleware</code>. Разберём
+          его <strong>построчно</strong>.
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">createThunkMiddleware</span>(<span class="prop">extraArgument</span>) {
+  <span class="cm">// Возвращаем middleware с сигнатурой Redux:</span>
+  <span class="cm">// ({ dispatch, getState }) => (next) => (action) => result</span>
+
+  <span class="kw">const</span> <span class="fn">middleware</span> = ({ <span class="prop">dispatch</span>, <span class="prop">getState</span> }) =>
+    (<span class="prop">next</span>) =>
+      (<span class="prop">action</span>) => {
+        <span class="cm">// Ключевая проверка: action — это функция?</span>
+        <span class="kw">if</span> (<span class="kw">typeof</span> <span class="prop">action</span> === <span class="str">'function'</span>) {
+          <span class="cm">// Да → вызываем её, передавая dispatch, getState, extra</span>
+          <span class="kw">return</span> <span class="fn">action</span>(<span class="prop">dispatch</span>, <span class="prop">getState</span>, <span class="prop">extraArgument</span>)
+        }
+        <span class="cm">// Нет → пропускаем дальше по цепочке middleware</span>
+        <span class="kw">return</span> <span class="fn">next</span>(<span class="prop">action</span>)
+      }
+
+  <span class="cm">// Метод для создания middleware с «доп. аргументом»</span>
+  <span class="prop">middleware</span>.<span class="prop">withExtraArgument</span> = <span class="fn">createThunkMiddleware</span>
+
+  <span class="kw">return</span> <span class="prop">middleware</span>
+}
+
+<span class="cm">// Экспорт — middleware без extraArgument:</span>
+<span class="kw">export default</span> <span class="fn">createThunkMiddleware</span>()
+        </div>
+
+        <h3>Построчный разбор</h3>
+        <ol>
+          <li><strong>createThunkMiddleware(extraArgument)</strong> — фабрика, принимающая опциональный аргумент</li>
+          <li><strong>({ dispatch, getState })</strong> — из store получаем dispatch и getState</li>
+          <li><strong>(next)</strong> — следующий middleware в цепочке (или сам dispatch store)</li>
+          <li><strong>(action)</strong> — action, который был dispatch-нут</li>
+          <li><strong>typeof action === 'function'</strong> — если action — функция (thunk), вызываем её</li>
+          <li><strong>action(dispatch, getState, extraArgument)</strong> — передаём в thunk всё необходимое</li>
+          <li><strong>next(action)</strong> — обычный объект-action пропускаем дальше</li>
+        </ol>
+
+        <h3>Паттерн замыкания (closure)</h3>
+        <p>
+          Три стрелочные функции создают <strong>замыкание</strong>. Каждый уровень
+          «запоминает» переменные верхнего уровня: <code>dispatch</code>, <code>getState</code>,
+          <code>next</code>. Это стандартный паттерн Redux middleware.
+        </p>
+
+        <h3>withExtraArgument — Dependency Injection</h3>
+        <p>
+          <code>withExtraArgument</code> позволяет передать дополнительный объект (API-клиент,
+          конфиг, сервис) в каждый thunk. Thunk получит его третьим аргументом:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">api</span> = { <span class="fn">fetchUsers</span>: () => <span class="fn">fetch</span>(<span class="str">'/api/users'</span>) }
+
+<span class="cm">// Создаём thunk middleware с extra:</span>
+<span class="kw">const</span> <span class="prop">thunkWithApi</span> = <span class="prop">thunk</span>.<span class="fn">withExtraArgument</span>(<span class="prop">api</span>)
+
+<span class="cm">// Теперь thunk получает api третьим аргументом:</span>
+<span class="kw">const</span> <span class="fn">loadUsers</span> = () =>
+  (<span class="prop">dispatch</span>, <span class="prop">getState</span>, <span class="prop">api</span>) => {
+    <span class="prop">api</span>.<span class="fn">fetchUsers</span>()
+      .<span class="fn">then</span>(<span class="prop">users</span> => <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'users/loaded'</span>, <span class="prop">payload</span>: <span class="prop">users</span> }))
+  }
+        </div>
+
+        <h3>Почему thunk такой маленький?</h3>
+        <p>
+          Thunk <strong>делегирует всю логику</strong> пользовательским функциям. Middleware
+          лишь проверяет <code>typeof action === 'function'</code> и вызывает её.
+          Вся бизнес-логика, async/await, обработка ошибок — в ваших thunk-функциях.
+        </p>
+
+        <h3>RTK и thunk</h3>
+        <p>
+          Redux Toolkit включает thunk <strong>по умолчанию</strong> в <code>configureStore</code>.
+          Не нужно устанавливать отдельно — он уже встроен.
+        </p>
+
+        <div class="quote">
+          «Redux Thunk middleware allows you to write action creators that return a function
+          instead of an action. The thunk can be used to delay the dispatch of an action,
+          or to dispatch only if a certain condition is met.»
+          <br>— <a href="https://github.com/reduxjs/redux-thunk" target="_blank">redux-thunk — GitHub README</a>
+        </div>
+
+        <div class="tip">
+          Понимание исходного кода redux-thunk — ключ к пониманию всей middleware-архитектуры
+          Redux. Если вы разобрались в этих 14 строках — вы понимаете middleware.
+        </div>
+
+        <div class="warning">
+          Для production-кода используйте npm-пакет <code>redux-thunk</code>, а не свою
+          реализацию. Пакет поддерживается командой Redux и включает TypeScript-типы.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

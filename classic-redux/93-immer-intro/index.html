@@ -56,10 +56,14 @@
             </div>
           </div>
 
-          <div class="btn-group" style="margin-bottom: 16px;">
-            <button class="btn btn--accent" id="btn-spread">Обновить через Spread</button>
-            <button class="btn btn--success" id="btn-immer">Обновить через Immer</button>
-            <button class="btn" id="btn-reset">Сбросить</button>
+          <div class="btn-group" style="margin-bottom: 16px; flex-wrap: wrap;">
+            <button class="btn btn--accent" id="btn-spread">Spread</button>
+            <button class="btn btn--success" id="btn-immer">Immer produce</button>
+            <button class="btn" id="btn-sharing" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">Structural Sharing</button>
+            <button class="btn" id="btn-array" style="border-color: var(--accent-purple); color: var(--accent-purple);">Массивы</button>
+            <button class="btn" id="btn-curried" style="border-color: var(--accent-orange); color: var(--accent-orange);">Curried</button>
+            <button class="btn" id="btn-reducer" style="border-color: var(--accent-yellow); color: var(--accent-yellow);">Immer-reducer</button>
+            <button class="btn btn--danger" id="btn-reset">Сбросить</button>
           </div>
 
           <div class="state-display">
@@ -75,13 +79,14 @@
 
     <!-- THEORY -->
     <div class="theory">
-      <div class="theory__header">Теория — Immer: иммутабельные обновления через «мутации»</div>
+      <div class="theory__header">Теория — Immer: полный разбор</div>
       <div class="theory__body">
         <h3>Что такое Immer?</h3>
         <p>
-          <strong>Immer</strong> — библиотека, которая позволяет писать код, <em>выглядящий</em>
-          как мутация, но под капотом создающий иммутабельные обновления. Вы «мутируете»
-          черновик (draft), а Immer на основе ваших изменений создаёт новый объект.
+          <strong>Immer</strong> (нем. «всегда») — библиотека Михеля Вестстрате (автора MobX),
+          которая позволяет писать код, <em>выглядящий</em> как мутация, но под капотом
+          создающий иммутабельные обновления. Вы «мутируете» черновик (draft), а Immer
+          на основе ваших изменений создаёт новый объект.
         </p>
 
         <div class="code-block">
@@ -106,8 +111,7 @@
         <p>
           <code>draft</code> — это <strong>Proxy-объект</strong>, который записывает
           все ваши «мутации». Когда recipe завершается, Immer строит новый объект,
-          применяя записанные изменения к оригиналу. Неизменённые части переиспользуются
-          (structural sharing).
+          применяя записанные изменения к оригиналу.
         </p>
 
         <div class="code-block">
@@ -121,12 +125,133 @@
 <span class="cm">// 6. Неизменённые ветви === оригинал (structural sharing)</span>
         </div>
 
+        <h3>Structural Sharing</h3>
+        <p>
+          Immer <strong>не</strong> копирует весь объект целиком. Он переиспользует
+          все ветви дерева, которые не были изменены. Это означает, что <code>===</code>
+          сравнение работает для определения, изменилась ли часть state:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">state</span> = { <span class="prop">user</span>: { <span class="prop">name</span>: <span class="str">'Иван'</span>, <span class="prop">tags</span>: [<span class="str">'a'</span>, <span class="str">'b'</span>] }, <span class="prop">config</span>: { <span class="prop">theme</span>: <span class="str">'dark'</span> } }
+
+<span class="kw">const</span> <span class="prop">next</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="prop">draft</span>.<span class="prop">user</span>.<span class="prop">name</span> = <span class="str">'Пётр'</span>
+})
+
+<span class="prop">next</span> === <span class="prop">state</span>              <span class="cm">// false (корень изменился)</span>
+<span class="prop">next</span>.<span class="prop">user</span> === <span class="prop">state</span>.<span class="prop">user</span>      <span class="cm">// false (user изменился)</span>
+<span class="prop">next</span>.<span class="prop">user</span>.<span class="prop">tags</span> === <span class="prop">state</span>.<span class="prop">user</span>.<span class="prop">tags</span>  <span class="cm">// TRUE! (tags не трогали)</span>
+<span class="prop">next</span>.<span class="prop">config</span> === <span class="prop">state</span>.<span class="prop">config</span>  <span class="cm">// TRUE! (config не трогали)</span>
+        </div>
+
+        <div class="tip">
+          Structural sharing — ключ к производительности. React/Redux используют <code>===</code>
+          для определения, нужен ли ре-рендер. Благодаря sharing, компоненты,
+          зависящие от <code>config</code>, не перерисуются при изменении <code>user</code>.
+        </div>
+
+        <h3>Работа с массивами</h3>
+        <p>
+          В отличие от ручного иммутабельного подхода, с Immer можно использовать
+          <strong>все мутирующие методы массивов</strong>: <code>push</code>, <code>pop</code>,
+          <code>splice</code>, <code>sort</code>, <code>reverse</code>, присвоение по индексу.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Без Immer (ручная иммутабельность):</span>
+<span class="kw">const</span> <span class="prop">added</span> = { ...<span class="prop">state</span>, <span class="prop">items</span>: [...<span class="prop">state</span>.<span class="prop">items</span>, <span class="prop">newItem</span>] }
+<span class="kw">const</span> <span class="prop">removed</span> = { ...<span class="prop">state</span>, <span class="prop">items</span>: <span class="prop">state</span>.<span class="prop">items</span>.<span class="fn">filter</span>(<span class="prop">i</span> => <span class="prop">i</span>.<span class="prop">id</span> !== <span class="prop">id</span>) }
+<span class="kw">const</span> <span class="prop">sorted</span> = { ...<span class="prop">state</span>, <span class="prop">items</span>: [...<span class="prop">state</span>.<span class="prop">items</span>].<span class="fn">sort</span>(<span class="prop">cmp</span>) }
+
+<span class="cm">// С Immer — как обычный JS:</span>
+<span class="kw">const</span> <span class="prop">next</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="prop">draft</span>.<span class="prop">items</span>.<span class="fn">push</span>(<span class="prop">newItem</span>)
+  <span class="prop">draft</span>.<span class="prop">items</span>.<span class="fn">splice</span>(<span class="prop">index</span>, <span class="num">1</span>)
+  <span class="prop">draft</span>.<span class="prop">items</span>.<span class="fn">sort</span>(<span class="prop">cmp</span>)
+  <span class="prop">draft</span>.<span class="prop">items</span>[<span class="num">0</span>].<span class="prop">name</span> = <span class="str">'Updated'</span>
+})
+        </div>
+
+        <h3>Curried Producers</h3>
+        <p>
+          Если <code>produce</code> вызвать <strong>без первого аргумента</strong>
+          (только с recipe), он возвращает <em>функцию</em>, которая принимает state.
+          Это называется <strong>curried producer</strong> — переиспользуемый трансформер:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Обычный produce:</span>
+<span class="kw">const</span> <span class="prop">next</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => { <span class="prop">draft</span>.<span class="prop">count</span>++ })
+
+<span class="cm">// Curried produce (без state):</span>
+<span class="kw">const</span> <span class="fn">increment</span> = <span class="fn">produce</span>((<span class="prop">draft</span>: <span class="type">CounterState</span>) => {
+  <span class="prop">draft</span>.<span class="prop">count</span>++
+})
+
+<span class="cm">// Теперь increment — это функция (state) => newState</span>
+<span class="kw">const</span> <span class="prop">next</span> = <span class="fn">increment</span>(<span class="prop">currentState</span>)
+
+<span class="cm">// С дополнительными аргументами:</span>
+<span class="kw">const</span> <span class="fn">setCity</span> = <span class="fn">produce</span>((<span class="prop">draft</span>: <span class="type">AppState</span>, <span class="prop">city</span>: <span class="type">string</span>) => {
+  <span class="prop">draft</span>.<span class="prop">user</span>.<span class="prop">address</span>.<span class="prop">city</span> = <span class="prop">city</span>
+})
+<span class="kw">const</span> <span class="prop">next</span> = <span class="fn">setCity</span>(<span class="prop">state</span>, <span class="str">'Казань'</span>)
+        </div>
+
+        <h3>Immer как Redux Reducer</h3>
+        <p>
+          Curried producer — это готовый reducer! Сигнатура <code>(state, action) => newState</code>
+          совпадает с тем, что ожидает Redux. Именно это делает <code>createSlice</code> под капотом:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Классический reducer (spread-каскады):</span>
+<span class="kw">function</span> <span class="fn">reducer</span>(<span class="prop">state</span>, <span class="prop">action</span>) {
+  <span class="kw">switch</span> (<span class="prop">action</span>.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'user/setCity'</span>:
+      <span class="kw">return</span> { ...<span class="prop">state</span>, <span class="prop">user</span>: { ...<span class="prop">state</span>.<span class="prop">user</span>, <span class="prop">address</span>: { ...<span class="prop">state</span>.<span class="prop">user</span>.<span class="prop">address</span>, <span class="prop">city</span>: <span class="prop">action</span>.<span class="prop">payload</span> } } }
+  }
+}
+
+<span class="cm">// Immer reducer (curried produce):</span>
+<span class="kw">const</span> <span class="fn">reducer</span> = <span class="fn">produce</span>((<span class="prop">draft</span>, <span class="prop">action</span>) => {
+  <span class="kw">switch</span> (<span class="prop">action</span>.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'user/setCity'</span>:
+      <span class="prop">draft</span>.<span class="prop">user</span>.<span class="prop">address</span>.<span class="prop">city</span> = <span class="prop">action</span>.<span class="prop">payload</span>
+      <span class="kw">break</span>
+  }
+})
+
+<span class="cm">// createSlice делает ИМЕННО ЭТО под капотом</span>
+        </div>
+
         <div class="quote">
           «Immer works by writing producers, which are functions that receive a proxy
           of the current state (the draft) and can freely mutate it. Once the producer
           finishes, Immer will produce the next immutable state based on the mutations
           to the draft.»
           <br>— <a href="https://immerjs.github.io/immer/" target="_blank">Immer Documentation — Introduction</a>
+        </div>
+
+        <h3>produce — мутация или return?</h3>
+        <p>
+          Внутри recipe можно <strong>либо</strong> мутировать draft, <strong>либо</strong>
+          вернуть новый объект. Нельзя делать и то, и другое:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ✅ Мутация draft:</span>
+<span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => { <span class="prop">draft</span>.<span class="prop">count</span>++ })
+
+<span class="cm">// ✅ Полная замена через return:</span>
+<span class="fn">produce</span>(<span class="prop">state</span>, () => ({ <span class="prop">count</span>: <span class="num">0</span> }))
+
+<span class="cm">// ❌ И то, и другое — ошибка!</span>
+<span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="prop">draft</span>.<span class="prop">count</span>++
+  <span class="kw">return</span> { <span class="prop">count</span>: <span class="num">0</span> }  <span class="cm">// Error!</span>
+})
         </div>
 
         <h3>Immer — основа Redux Toolkit</h3>
@@ -136,10 +261,21 @@
           мутация — это Immer produce под капотом. Понимание Immer = понимание RTK.
         </p>
 
-        <div class="tip">
-          Immer не просто удобство — это фундамент современного Redux. Изучив Immer
-          сейчас, вы будете точно понимать, что происходит в Redux Toolkit, когда
-          «мутируете» state в createSlice.
+        <div class="code-block">
+<span class="cm">// Redux Toolkit (createSlice) — Immer под капотом:</span>
+<span class="kw">const</span> <span class="prop">todosSlice</span> = <span class="fn">createSlice</span>({
+  <span class="prop">name</span>: <span class="str">'todos'</span>,
+  <span class="prop">initialState</span>: [],
+  <span class="prop">reducers</span>: {
+    <span class="fn">add</span>(<span class="prop">state</span>, <span class="prop">action</span>) {
+      <span class="prop">state</span>.<span class="fn">push</span>(<span class="prop">action</span>.<span class="prop">payload</span>)  <span class="cm">// «мутация» — на самом деле produce!</span>
+    },
+    <span class="fn">toggle</span>(<span class="prop">state</span>, <span class="prop">action</span>) {
+      <span class="kw">const</span> <span class="prop">todo</span> = <span class="prop">state</span>.<span class="fn">find</span>(<span class="prop">t</span> => <span class="prop">t</span>.<span class="prop">id</span> === <span class="prop">action</span>.<span class="prop">payload</span>)
+      <span class="kw">if</span> (<span class="prop">todo</span>) <span class="prop">todo</span>.<span class="prop">completed</span> = !<span class="prop">todo</span>.<span class="prop">completed</span>
+    }
+  }
+})
         </div>
 
         <div class="warning">
@@ -152,10 +288,13 @@
         <ul>
           <li><code>produce(state, recipe)</code> — основная функция Immer</li>
           <li>Draft — Proxy-объект, перехватывающий «мутации»</li>
-          <li>Результат — новый иммутабельный объект</li>
-          <li>Оригинал не изменяется</li>
-          <li>Structural sharing — неизменённые части переиспользуются</li>
-          <li>Immer — основа createSlice в Redux Toolkit</li>
+          <li>Результат — новый иммутабельный объект, оригинал не изменяется</li>
+          <li><strong>Structural sharing</strong> — неизменённые ветви переиспользуются (<code>===</code>)</li>
+          <li>Массивы: <code>push</code>, <code>splice</code>, <code>sort</code> — всё работает</li>
+          <li><strong>Curried produce</strong> — функция-трансформер <code>(state) => newState</code></li>
+          <li><code>produce(recipe)</code> = готовый Redux reducer</li>
+          <li>Мутация draft <strong>ИЛИ</strong> return — нельзя оба сразу</li>
+          <li>Immer — основа <code>createSlice</code> в Redux Toolkit</li>
         </ul>
       </div>
     </div>

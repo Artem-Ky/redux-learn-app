@@ -797,6 +797,7 @@ export class DevToolsPanel {
 
     store.dispatch = ((action: Action) => {
       if (this.locked) return action
+      if (typeof action === 'function') return originalDispatch(action)
       const stateBefore = store.getState()
       const result = originalDispatch(action)
       const stateAfter = store.getState()

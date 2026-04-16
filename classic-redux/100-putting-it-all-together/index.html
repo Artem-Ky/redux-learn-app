@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>100 — Итоговый проект: Todo Manager на классическом Redux</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .todo-app { max-width: 900px; margin: 0 auto; }
+
+    .todo-input-row {
+      display: flex; gap: 8px; margin-bottom: 16px;
+    }
+    .todo-input-row input {
+      flex: 1; min-width: 0;
+    }
+
+    .todo-filters {
+      display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+    }
+    .todo-filter-btn {
+      padding: 5px 14px; border: 1px solid var(--border-light); border-radius: var(--radius-sm);
+      background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer;
+      font-size: 0.82rem; transition: all 0.15s; font-family: var(--font-sans);
+    }
+    .todo-filter-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+    .todo-filter-btn--active { background: #264f78; border-color: var(--accent); color: #fff; }
+
+    .color-tag {
+      display: inline-block; width: 16px; height: 16px; border-radius: 50%;
+      cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s;
+      vertical-align: middle;
+    }
+    .color-tag:hover { opacity: 0.8; }
+    .color-tag--active { border-color: #fff; }
+
+    .todo-list-container {
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--bg-panel); min-height: 80px; max-height: 400px; overflow-y: auto;
+    }
+
+    .todo-item {
+      display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.1s;
+    }
+    .todo-item:hover { background: rgba(255,255,255,0.02); }
+    .todo-item:last-child { border-bottom: none; }
+
+    .todo-item__checkbox {
+      width: 18px; height: 18px; accent-color: var(--success); cursor: pointer; flex-shrink: 0;
+    }
+    .todo-item__text {
+      flex: 1; color: var(--text-bright); font-size: 0.9rem; min-width: 0;
+      outline: none; padding: 2px 4px; border-radius: 3px;
+    }
+    .todo-item__text--completed {
+      text-decoration: line-through; opacity: 0.45;
+    }
+    .todo-item__text--editing {
+      background: var(--bg-input); border: 1px solid var(--accent);
+    }
+
+    .todo-item__color-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+    }
+    .todo-item__delete {
+      background: none; border: none; color: var(--text-muted); cursor: pointer;
+      font-size: 1.1rem; padding: 0 4px; transition: color 0.15s; flex-shrink: 0;
+      font-family: var(--font-sans); line-height: 1;
+    }
+    .todo-item__delete:hover { color: var(--error); }
+
+    .todo-footer {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-top: 12px; flex-wrap: wrap;
+    }
+    .todo-footer__count {
+      color: var(--text-secondary); font-size: 0.82rem;
+    }
+
+    .todo-bulk-actions { display: flex; gap: 6px; }
+
+    .spinner {
+      display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border-light);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-overlay {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      padding: 32px; color: var(--accent);
+    }
+
+    .error-banner {
+      background: rgba(244,71,71,0.1); border: 1px solid var(--error); border-radius: var(--radius-sm);
+      padding: 10px 16px; color: var(--error); font-size: 0.85rem; margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">100 / 100</span>
+      Итоговый проект: Todo Manager
+    </div>
+    <nav class="site-header__nav">
+      <a href="../99-redux-thunk-deep/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">100</span>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Todo Manager — все концепции классического Redux в одном проекте</div>
+      <div class="demo-section__body">
+        <div class="todo-app">
+          <!-- Error display -->
+          <div id="error-banner" class="error-banner" style="display: none;"></div>
+
+          <!-- Input -->
+          <div class="todo-input-row">
+            <input type="text" id="input-todo" placeholder="Что нужно сделать?">
+            <button class="btn btn--accent" id="btn-add">Добавить</button>
+            <button class="btn" id="btn-load" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">Загрузить</button>
+            <button class="btn" id="btn-save" style="border-color: var(--accent-purple); color: var(--accent-purple);">Сохранить</button>
+          </div>
+
+          <!-- Status filter tabs -->
+          <div class="todo-filters">
+            <span style="color: var(--text-muted); font-size: 0.78rem; margin-right: 4px;">Статус:</span>
+            <button class="todo-filter-btn todo-filter-btn--active" data-filter="all">Все</button>
+            <button class="todo-filter-btn" data-filter="active">Активные</button>
+            <button class="todo-filter-btn" data-filter="completed">Завершённые</button>
+
+            <span style="color: var(--text-muted); font-size: 0.78rem; margin-left: 12px; margin-right: 4px;">Цвет:</span>
+            <span class="color-tag" data-color="red" style="background: #f44747;" title="Красный"></span>
+            <span class="color-tag" data-color="blue" style="background: #569cd6;" title="Синий"></span>
+            <span class="color-tag" data-color="green" style="background: #4caf50;" title="Зелёный"></span>
+          </div>
+
+          <!-- Todo list -->
+          <div class="todo-list-container" id="todo-list">
+            <div style="color: var(--text-muted); padding: 24px; text-align: center;">
+              Список пуст — добавьте задачу или нажмите «Загрузить»
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="todo-footer">
+            <div class="todo-footer__count" id="todo-count">0 задач</div>
+            <div class="todo-bulk-actions">
+              <button class="btn btn--sm btn--success" id="btn-complete-all">Завершить все</button>
+              <button class="btn btn--sm btn--danger" id="btn-clear-completed">Очистить завершённые</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Все 100 уроков: итоговая карта знаний</div>
+      <div class="theory__body">
+        <h3>Поздравляем! Вы прошли все 100 уроков!</h3>
+        <p>
+          Этот проект объединяет <strong>все ключевые концепции</strong> классического Redux,
+          которые мы изучили за 100 уроков. Давайте вспомним каждую из них.
+        </p>
+
+        <h3>Ключевые концепции</h3>
+        <ul>
+          <li><strong>Actions</strong> — простые объекты с полем <code>type</code>, описывающие «что произошло»</li>
+          <li><strong>Action Creators</strong> — функции, возвращающие action-объекты</li>
+          <li><strong>Reducers</strong> — чистые функции <code>(state, action) => newState</code>, обновляющие состояние иммутабельно</li>
+          <li><strong>Store</strong> — единственный объект, хранящий всё состояние приложения (<code>createStore</code>, <code>getState</code>, <code>dispatch</code>, <code>subscribe</code>)</li>
+          <li><strong>combineReducers</strong> — объединение нескольких slice-reducer'ов в один корневой</li>
+          <li><strong>Middleware</strong> — расширение dispatch: логгеры, аналитика, обработка ошибок</li>
+          <li><strong>applyMiddleware</strong> — enhancer для подключения цепочки middleware к store</li>
+          <li><strong>Thunks</strong> — action-функции для async-логики: <code>(dispatch, getState) => void</code></li>
+          <li><strong>Selectors</strong> — функции извлечения данных из state</li>
+          <li><strong>createSelector / Reselect</strong> — мемоизированные селекторы с кэшированием</li>
+          <li><strong>Immer</strong> — иммутабельные обновления через «мутации» draft-объектов</li>
+          <li><strong>Normalized State</strong> — хранение сущностей как <code>{ entities: {}, ids: [] }</code></li>
+          <li><strong>DevTools</strong> — инструменты отладки: time-travel, diff, export/import</li>
+        </ul>
+
+        <h3>Архитектура этого проекта</h3>
+
+        <div class="code-block">
+<span class="cm">// Нормализованный state:</span>
+{
+  <span class="prop">todos</span>: {
+    <span class="prop">entities</span>: { <span class="num">1</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">text</span>: <span class="str">'...'</span>, <span class="prop">completed</span>: <span class="kw">false</span>, <span class="prop">color</span>: <span class="str">''</span> }, ... },
+    <span class="prop">ids</span>: [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+  },
+  <span class="prop">filters</span>: {
+    <span class="prop">status</span>: <span class="str">'all'</span>,     <span class="cm">// 'all' | 'active' | 'completed'</span>
+    <span class="prop">colors</span>: []          <span class="cm">// ['red', 'blue', 'green']</span>
+  },
+  <span class="prop">ui</span>: {
+    <span class="prop">status</span>: <span class="str">'idle'</span>,    <span class="cm">// 'idle' | 'loading' | 'error'</span>
+    <span class="prop">error</span>: <span class="kw">null</span>
+  }
+}
+        </div>
+
+        <div class="code-block">
+<span class="cm">// combineReducers:</span>
+<span class="kw">const</span> <span class="fn">rootReducer</span> = <span class="fn">combineReducers</span>({
+  <span class="prop">todos</span>: <span class="fn">todosReducer</span>,     <span class="cm">// Immer produce</span>
+  <span class="prop">filters</span>: <span class="fn">filtersReducer</span>, <span class="cm">// Immer produce</span>
+  <span class="prop">ui</span>: <span class="fn">uiReducer</span>            <span class="cm">// Immer produce</span>
+})
+
+<span class="cm">// Middleware chain:</span>
+<span class="fn">applyMiddleware</span>(<span class="prop">thunk</span>, <span class="prop">loggerMiddleware</span>)
+
+<span class="cm">// Мемоизированные селекторы (Reselect):</span>
+<span class="fn">selectAllTodos</span>        <span class="cm">// ids → entities → массив</span>
+<span class="fn">selectFilteredTodos</span>   <span class="cm">// allTodos + filters → отфильтрованные</span>
+<span class="fn">selectTodoCount</span>       <span class="cm">// filteredTodos.length</span>
+<span class="fn">selectActiveTodoCount</span> <span class="cm">// allTodos.filter(not completed).length</span>
+        </div>
+
+        <h3>Что дальше?</h3>
+        <p>
+          Вы освоили <strong>фундамент</strong> Redux. Следующие шаги:
+        </p>
+        <ul>
+          <li><strong>React-Redux</strong> — подключение Redux к React-приложению (<code>Provider</code>, <code>useSelector</code>, <code>useDispatch</code>)</li>
+          <li><strong>Redux Toolkit (RTK)</strong> — современный способ писать Redux: <code>configureStore</code>, <code>createSlice</code>, <code>createAsyncThunk</code></li>
+          <li><strong>RTK Query</strong> — кэширование серверных данных и автоматическая синхронизация</li>
+        </ul>
+
+        <div class="quote">
+          «Redux Toolkit is our official, opinionated, batteries-included toolset for efficient
+          Redux development. It is intended to be the standard way to write Redux logic.»
+          <br>— <a href="https://redux-toolkit.js.org/" target="_blank">Redux Toolkit Documentation</a>
+        </div>
+
+        <div class="tip">
+          Знание классического Redux — <strong>бесценно</strong>. Redux Toolkit не заменяет
+          понимание принципов, а автоматизирует шаблонный код. Всё, что вы узнали за 100
+          уроков, работает внутри RTK. Вы теперь понимаете, <em>почему</em> RTK делает то, что делает.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

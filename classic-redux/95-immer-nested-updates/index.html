@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>95 — Immer для глубоко вложенных обновлений</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">95 / 100</span>
+      Immer для глубоко вложенных обновлений
+    </div>
+    <nav class="site-header__nav">
+      <a href="../94-immer-reducer/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">95</span>
+      <a href="../96-immer-gotchas/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — 4 уровня вложенности: spread vs Immer</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+          Структура: <code>company → departments[] → teams[] → members[]</code>.
+          Задача: обновить зарплату конкретного сотрудника. Сравните два подхода.
+        </p>
+
+        <div class="two-col" style="margin-bottom: 20px;">
+          <!-- Left: Spread -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px;">
+            <div style="font-size: 0.75rem; color: var(--accent-yellow); text-transform: uppercase; margin-bottom: 8px;">Без Immer (8+ строк spread)</div>
+            <pre style="color: var(--text-secondary); font-size: 0.74rem; margin: 0; white-space: pre-wrap;">const newState = {
+  ...state,
+  departments: state.departments.map(
+    (dep, di) => di !== 0 ? dep : {
+      ...dep,
+      teams: dep.teams.map(
+        (team, ti) => ti !== 1 ? team : {
+          ...team,
+          members: team.members.map(
+            (m, mi) => mi !== 0
+              ? m
+              : { ...m, salary: 100000 }
+          )
+        }
+      )
+    }
+  )
+}</pre>
+          </div>
+
+          <!-- Right: Immer -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--accent-green); border-radius: var(--radius-sm); padding: 16px;">
+            <div style="font-size: 0.75rem; color: var(--accent-green); text-transform: uppercase; margin-bottom: 8px;">С Immer (1 строка)</div>
+            <pre style="color: var(--text-secondary); font-size: 0.74rem; margin: 0; white-space: pre-wrap;">const newState = produce(state, draft => {
+  draft.departments[0]
+    .teams[1]
+    .members[0]
+    .salary = 100000
+})</pre>
+          </div>
+        </div>
+
+        <div class="btn-group" style="margin-bottom: 16px; flex-wrap: wrap;">
+          <button class="btn btn--accent" id="btn-spread">Spread (каскад)</button>
+          <button class="btn btn--success" id="btn-immer">Immer (1 строка)</button>
+          <button class="btn" id="btn-add-member" style="border-color: var(--accent-purple); color: var(--accent-purple);">Добавить сотрудника</button>
+          <button class="btn" id="btn-rename-team" style="border-color: var(--accent-cyan); color: var(--accent-cyan);">Переименовать команду</button>
+          <button class="btn" id="btn-immutability" style="border-color: var(--accent-orange); color: var(--accent-orange);">Проверить иммутабельность</button>
+          <button class="btn btn--danger" id="btn-reset">Сбросить</button>
+        </div>
+
+        <div class="state-display">
+          <div class="state-display__label">Текущая структура компании</div>
+          <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.78rem;"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Глубоко вложенные обновления: главная боль Redux</div>
+      <div class="theory__body">
+        <h3>Проблема глубокой вложенности</h3>
+        <p>
+          Самая большая боль классического Redux — <strong>каскады spread-операторов</strong>
+          при обновлении глубоко вложенных данных. Каждый уровень вложенности добавляет
+          ещё один spread, делая код нечитаемым и подверженным ошибкам.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// 4 уровня вложенности: company.departments[].teams[].members[].salary</span>
+<span class="cm">// Без Immer — каскад map + spread на КАЖДОМ уровне:</span>
+
+<span class="kw">return</span> {
+  ...<span class="prop">state</span>,
+  <span class="prop">departments</span>: <span class="prop">state</span>.<span class="prop">departments</span>.<span class="fn">map</span>((<span class="prop">dep</span>, <span class="prop">di</span>) =>
+    <span class="prop">di</span> !== <span class="prop">deptIdx</span> ? <span class="prop">dep</span> : {
+      ...<span class="prop">dep</span>,
+      <span class="prop">teams</span>: <span class="prop">dep</span>.<span class="prop">teams</span>.<span class="fn">map</span>((<span class="prop">team</span>, <span class="prop">ti</span>) =>
+        <span class="prop">ti</span> !== <span class="prop">teamIdx</span> ? <span class="prop">team</span> : {
+          ...<span class="prop">team</span>,
+          <span class="prop">members</span>: <span class="prop">team</span>.<span class="prop">members</span>.<span class="fn">map</span>((<span class="prop">m</span>, <span class="prop">mi</span>) =>
+            <span class="prop">mi</span> !== <span class="prop">memberIdx</span> ? <span class="prop">m</span> : { ...<span class="prop">m</span>, <span class="prop">salary</span>: <span class="prop">newSalary</span> }
+          )
+        }
+      )
+    }
+  )
+}
+        </div>
+
+        <h3>Immer делает это тривиальным</h3>
+        <p>
+          С Immer весь каскад выше заменяется <strong>одной строкой</strong>.
+          Вы просто «мутируете» draft напрямую:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// С Immer — прямое присвоение через proxy:</span>
+<span class="kw">const</span> <span class="prop">next</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="prop">draft</span>.<span class="prop">departments</span>[<span class="num">0</span>].<span class="prop">teams</span>[<span class="num">1</span>].<span class="prop">members</span>[<span class="num">2</span>].<span class="prop">salary</span> = <span class="num">100000</span>
+})
+        </div>
+
+        <h3>Массивы — push, splice, sort</h3>
+        <p>
+          На draft-массивах работают <strong>все мутирующие методы</strong>:
+        </p>
+
+        <div class="code-block">
+<span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="cm">// Добавить сотрудника в команду:</span>
+  <span class="prop">draft</span>.<span class="prop">departments</span>[<span class="num">0</span>].<span class="prop">teams</span>[<span class="num">0</span>].<span class="prop">members</span>.<span class="fn">push</span>(<span class="prop">newMember</span>)
+
+  <span class="cm">// Удалить второй отдел:</span>
+  <span class="prop">draft</span>.<span class="prop">departments</span>.<span class="fn">splice</span>(<span class="num">1</span>, <span class="num">1</span>)
+
+  <span class="cm">// Отсортировать по зарплате:</span>
+  <span class="prop">draft</span>.<span class="prop">departments</span>[<span class="num">0</span>].<span class="prop">teams</span>[<span class="num">0</span>].<span class="prop">members</span>.<span class="fn">sort</span>(
+    (<span class="prop">a</span>, <span class="prop">b</span>) => <span class="prop">b</span>.<span class="prop">salary</span> - <span class="prop">a</span>.<span class="prop">salary</span>
+  )
+})
+        </div>
+
+        <h3>Proxy-based copy-on-write</h3>
+        <p>
+          Immer создаёт Proxy на каждом уровне вложенности. При первом изменении
+          создаётся копия <em>только</em> того узла и всех его предков (copy-on-write).
+          Неизменённые ветви <strong>переиспользуются</strong> (structural sharing).
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">next</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="prop">draft</span>.<span class="prop">departments</span>[<span class="num">0</span>].<span class="prop">teams</span>[<span class="num">1</span>].<span class="prop">members</span>[<span class="num">0</span>].<span class="prop">salary</span> = <span class="num">100000</span>
+})
+
+<span class="cm">// Что изменилось:</span>
+<span class="prop">next</span> !== <span class="prop">state</span>                                    <span class="cm">// true (новый корень)</span>
+<span class="prop">next</span>.<span class="prop">departments</span>[<span class="num">0</span>] !== <span class="prop">state</span>.<span class="prop">departments</span>[<span class="num">0</span>]        <span class="cm">// true (путь к изменению)</span>
+<span class="prop">next</span>.<span class="prop">departments</span>[<span class="num">0</span>].<span class="prop">teams</span>[<span class="num">1</span>] !== ...              <span class="cm">// true</span>
+
+<span class="cm">// Что НЕ изменилось (structural sharing):</span>
+<span class="prop">next</span>.<span class="prop">departments</span>[<span class="num">0</span>].<span class="prop">teams</span>[<span class="num">0</span>] === <span class="prop">state</span>.<span class="prop">departments</span>[<span class="num">0</span>].<span class="prop">teams</span>[<span class="num">0</span>]  <span class="cm">// TRUE!</span>
+        </div>
+
+        <div class="quote">
+          «The beauty of Immer is that you can use all the natural JavaScript APIs
+          and language features you are used to when working with plain objects, arrays
+          and other data structures to define your state updates.»
+          <br>— <a href="https://immerjs.github.io/immer/" target="_blank">Immer Documentation</a>
+        </div>
+
+        <div class="tip">
+          Глубоко вложенные обновления — <strong>killer feature</strong> Immer.
+          Это главная причина, почему Redux Toolkit использует Immer в каждом
+          <code>createSlice</code> reducer. Больше никаких каскадов spread!
+        </div>
+
+        <div class="warning">
+          Immer не делает глубокое клонирование! Он использует Proxy и copy-on-write.
+          Это важно для производительности — клонируются только изменённые ветви.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
