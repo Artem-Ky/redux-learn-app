@@ -24,18 +24,21 @@ function counterReducer(state: CounterState = initialState, action: CounterActio
   }
 }
 
-const store = createStore(counterReducer)
+const reduxDevToolsEnhancer =
+  (window as any).__REDUX_DEVTOOLS_EXTENSION__?.({ trace: true, traceLimit: 25 }) ?? undefined
+
+const store = createStore(counterReducer, reduxDevToolsEnhancer)
 
 const traceMap = new Map<string, string>()
 
 const originalDispatch = store.dispatch
-store.dispatch = (action: AnyAction): AnyAction => {
+store.dispatch = ((action: AnyAction): AnyAction => {
   const trace = new Error().stack || 'Stack trace unavailable'
   const key = `${action.type}_${Date.now()}`
   traceMap.set(key, trace)
   ;(action as AnyAction & { _traceKey: string })._traceKey = key
   return originalDispatch(action)
-}
+}) as any
 
 const devtools = new DevToolsPanel(document.getElementById('devtools-container')!)
 devtools.connectStore(store)

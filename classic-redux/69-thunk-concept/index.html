@@ -130,7 +130,7 @@ store.<span class="fn">dispatch</span>(<span class="fn">incrementAsync</span>())
 <span class="cm">// Thunk имеет доступ к dispatch и getState</span>
 <span class="kw">const</span> <span class="fn">conditionalIncrement</span> = () => (<span class="prop">dispatch</span>: <span class="type">any</span>, <span class="prop">getState</span>: <span class="type">any</span>) => {
   <span class="kw">const</span> state = <span class="fn">getState</span>()
-  <span class="kw">if</span> (state.<span class="prop">value</span> < <span class="num">10</span>) {
+  <span class="kw">if</span> (state.<span class="prop">value</span> &lt; <span class="num">10</span>) {
     <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
   }
 }

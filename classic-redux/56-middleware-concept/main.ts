@@ -23,29 +23,23 @@ function rootReducer(state: AppState = initialState, action: AppAction): AppStat
 
 const con = new ConsolePanel(document.getElementById('console-container')!, 'Лог прохождения через middleware')
 
-const loggerMiddleware: (storeAPI: any) => (next: any) => (action: any) => any =
-  (storeAPI: any) => (next: any) => (action: any) => {
-    con.log('  🟣 [Middleware 1 — Логирование] action: ' + JSON.stringify(action))
-    highlightStep('step-mw1')
-    return next(action)
-  }
+const loggerMiddleware = (_storeAPI: any) => (next: any) => (action: any) => {
+  con.log('  🟣 [Middleware 1 — Логирование] action: ' + JSON.stringify(action))
+  return next(action)
+}
 
-const analyticsMiddleware: (storeAPI: any) => (next: any) => (action: any) => any =
-  (storeAPI: any) => (next: any) => (action: any) => {
-    con.log('  🟠 [Middleware 2 — Аналитика] Записываем событие: ' + action.type)
-    highlightStep('step-mw2')
-    return next(action)
-  }
+const analyticsMiddleware = (_storeAPI: any) => (next: any) => (action: any) => {
+  con.log('  🟠 [Middleware 2 — Аналитика] Записываем событие: ' + action.type)
+  return next(action)
+}
 
-const timerMiddleware: (storeAPI: any) => (next: any) => (action: any) => any =
-  (storeAPI: any) => (next: any) => (action: any) => {
-    const start = performance.now()
-    highlightStep('step-mw3')
-    const result = next(action)
-    const duration = (performance.now() - start).toFixed(2)
-    con.log('  🔵 [Middleware 3 — Таймер] Обработка заняла ' + duration + ' мс')
-    return result
-  }
+const timerMiddleware = (_storeAPI: any) => (next: any) => (action: any) => {
+  const start = performance.now()
+  const result = next(action)
+  const duration = (performance.now() - start).toFixed(2)
+  con.log('  🔵 [Middleware 3 — Таймер] Обработка заняла ' + duration + ' мс')
+  return result
+}
 
 const store = createStore(
   rootReducer,
@@ -61,7 +55,8 @@ function clearHighlights(): void {
   })
 }
 
-function highlightStep(id: string): void {
+function highlightOnly(id: string): void {
+  clearHighlights()
   document.getElementById(id)?.classList.add('active')
 }
 
@@ -77,17 +72,29 @@ async function runDispatch(): Promise<void> {
   const count = store.getState().dispatchCount + 1
   con.info(`─── Dispatch #${count} ───`)
 
-  highlightStep('step-action')
+  highlightOnly('step-action')
   con.log('📤 dispatch({ type: "demo/dispatched" })')
-  await sleep(600)
+  await sleep(900)
 
+  highlightOnly('step-mw1')
+  con.log('  🟣 → Action входит в Middleware 1 (Логирование)...')
+  await sleep(900)
+
+  highlightOnly('step-mw2')
+  con.log('  🟠 → Action проходит в Middleware 2 (Аналитика)...')
+  await sleep(900)
+
+  highlightOnly('step-mw3')
+  con.log('  🔵 → Action проходит в Middleware 3 (Таймер)...')
+  await sleep(900)
+
+  highlightOnly('step-reducer')
   store.dispatch({ type: 'demo/dispatched' })
-
-  await sleep(400)
-  highlightStep('step-reducer')
   con.success('  ✔ Reducer обработал action → новый state: ' + JSON.stringify(store.getState()))
   con.log('')
 
+  await sleep(1000)
+  clearHighlights()
   animating = false
 }
 

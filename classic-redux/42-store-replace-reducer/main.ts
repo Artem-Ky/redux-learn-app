@@ -82,8 +82,10 @@ document.getElementById('btn-switch-double')!.addEventListener('click', (): void
     consolePanel.warn('doubleReducer уже активен')
     return
   }
+  const stateBefore = store.getState()
   store.replaceReducer(doubleReducer)
   isDouble = true
+  devtools.addSnapshot({ type: '@@INIT (replaceReducer → doubleReducer)' }, stateBefore, store.getState())
   consolePanel.success('replaceReducer → doubleReducer (шаг ×2)')
   consolePanel.info('Redux автоматически dispatched @@INIT')
   consolePanel.log('State сохранён:', store.getState())
@@ -95,8 +97,10 @@ document.getElementById('btn-switch-normal')!.addEventListener('click', (): void
     consolePanel.warn('counterReducer уже активен')
     return
   }
+  const stateBefore = store.getState()
   store.replaceReducer(counterReducer)
   isDouble = false
+  devtools.addSnapshot({ type: '@@INIT (replaceReducer → counterReducer)' }, stateBefore, store.getState())
   consolePanel.success('replaceReducer → counterReducer (шаг +1)')
   consolePanel.info('Redux автоматически dispatched @@INIT')
   consolePanel.log('State сохранён:', store.getState())

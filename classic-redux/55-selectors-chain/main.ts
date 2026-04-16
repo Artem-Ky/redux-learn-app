@@ -44,6 +44,7 @@ function todosReducer(state: Todo[] = initialTodos, action: AppAction): Todo[] {
 function filterReducer(state: FilterValue = 'all', action: AppAction): FilterValue {
   switch (action.type) {
     case 'filter/filterChanged':
+      if (state === action.payload) return state
       return action.payload
     default:
       return state

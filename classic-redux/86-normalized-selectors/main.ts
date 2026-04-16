@@ -109,9 +109,8 @@ function render(): void {
 
   todoList.innerHTML = todos.map(todo => `
     <div style="display: flex; gap: 12px; padding: 8px; border-bottom: 1px solid var(--border); align-items: center;">
-      <button class="btn btn--sm" data-toggle="${todo.id}" style="width: 28px; padding: 4px;">
-        ${todo.completed ? '✔' : '○'}
-      </button>
+      <input type="checkbox" data-toggle="${todo.id}" ${todo.completed ? 'checked' : ''}
+             style="cursor: pointer; width: 16px; height: 16px; accent-color: var(--success); flex-shrink: 0;">
       <span style="flex: 1; color: var(--text-bright); ${todo.completed ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
         ${todo.text}
       </span>
@@ -120,9 +119,9 @@ function render(): void {
     </div>
   `).join('')
 
-  todoList.querySelectorAll('[data-toggle]').forEach(btn => {
-    btn.addEventListener('click', (): void => {
-      const id = parseInt((btn as HTMLElement).dataset.toggle!, 10)
+  todoList.querySelectorAll('[data-toggle]').forEach(el => {
+    el.addEventListener('change', (): void => {
+      const id = parseInt((el as HTMLInputElement).dataset.toggle!, 10)
       store.dispatch({ type: 'todos/toggle', payload: id })
       consolePanel.log(`selectTodoById(state, ${id}) → O(1) доступ`)
     })

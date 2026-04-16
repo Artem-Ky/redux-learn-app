@@ -54,8 +54,10 @@ function todosReducer(state: Todo[] = initialTodos, action: AppAction): Todo[] {
 function filtersReducer(state: Filters = initialFilters, action: AppAction): Filters {
   switch (action.type) {
     case 'filters/statusChanged':
+      if (state.status === action.payload) return state
       return { ...state, status: action.payload }
     case 'filters/colorChanged':
+      if (state.color === action.payload) return state
       return { ...state, color: action.payload }
     default:
       return state

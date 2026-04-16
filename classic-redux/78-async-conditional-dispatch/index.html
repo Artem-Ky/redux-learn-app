@@ -101,7 +101,7 @@
           <li><code>status !== 'idle'</code> — данные уже загружены или загружаются</li>
           <li><code>status === 'loading'</code> — запрос уже в процессе</li>
           <li><code>data.length > 0</code> — данные уже есть в кэше</li>
-          <li><code>Date.now() - lastFetchTime < 60000</code> — кэш ещё не устарел</li>
+          <li><code>Date.now() - lastFetchTime &lt; 60000</code> — кэш ещё не устарел</li>
         </ul>
 
         <div class="code-block">

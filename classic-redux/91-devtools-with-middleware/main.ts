@@ -88,20 +88,13 @@ const loggerMiddleware: Middleware = (storeAPI) => (next) => (action: unknown): 
   return result
 }
 
-declare global {
-  interface Window {
-    __REDUX_DEVTOOLS_EXTENSION__?: () => ReturnType<typeof compose>
-  }
-}
-
-const devtoolsEnhancer = window.__REDUX_DEVTOOLS_EXTENSION__?.() || ((f: unknown) => f)
+const devtoolsEnhancer = (window as any).__REDUX_DEVTOOLS_EXTENSION__?.()
 
 const store = createStore(
   todosReducer,
-  compose(
-    applyMiddleware(thunk, loggerMiddleware),
-    devtoolsEnhancer as ReturnType<typeof compose>
-  )
+  devtoolsEnhancer
+    ? compose(applyMiddleware(thunk as any, loggerMiddleware), devtoolsEnhancer)
+    : applyMiddleware(thunk as any, loggerMiddleware)
 )
 
 const devtools = new DevToolsPanel(document.getElementById('devtools-container')!)

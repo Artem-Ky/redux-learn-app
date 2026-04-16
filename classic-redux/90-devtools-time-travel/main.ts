@@ -56,7 +56,10 @@ function todosReducer(state: TodoState = initialState, action: TodoAction): Todo
   }
 }
 
-const store = createStore(todosReducer)
+const reduxDevToolsEnhancer =
+  (window as any).__REDUX_DEVTOOLS_EXTENSION__?.() ?? undefined
+
+const store = createStore(todosReducer, reduxDevToolsEnhancer)
 
 const devtools = new DevToolsPanel(document.getElementById('devtools-container')!)
 devtools.connectStore(store)

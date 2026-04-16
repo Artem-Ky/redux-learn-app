@@ -1,5 +1,4 @@
-import { legacy_createStore as createStore, applyMiddleware } from 'redux'
-import { thunk } from 'redux-thunk'
+import { legacy_createStore as createStore } from 'redux'
 import { DevToolsPanel } from '../shared/devtools-panel'
 import { ConsolePanel } from '../shared/console-panel'
 
@@ -94,7 +93,7 @@ function todosReducer(state: TodoState = initialState, action: TodoAction): Todo
   }
 }
 
-const store = createStore(todosReducer, applyMiddleware(thunk as any))
+const store = createStore(todosReducer)
 
 const devtools = new DevToolsPanel(document.getElementById('devtools-container')!)
 devtools.connectStore(store)

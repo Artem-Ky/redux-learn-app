@@ -21,7 +21,7 @@ function getInputs() {
   const inputs = { main: resolve(__dirname, 'index.html') }
   const dirs = readdirSync(__dirname).filter(f => {
     const full = resolve(__dirname, f)
-    return statSync(full).isDirectory() && /^\d{2}-/.test(f)
+    return statSync(full).isDirectory() && /^\d{2}[a-z]?-/.test(f)
   })
   dirs.forEach(dir => {
     const html = resolve(__dirname, dir, 'index.html')

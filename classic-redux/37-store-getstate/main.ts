@@ -88,3 +88,7 @@ document.getElementById('btn-decrement')!.addEventListener('click', (): void => 
 document.getElementById('btn-reset')!.addEventListener('click', (): void => {
   dispatchAndLog({ type: 'counter/reset' })
 })
+
+document.getElementById('btn-unknown')!.addEventListener('click', (): void => {
+  dispatchAndLog({ type: 'some/unknownAction' })
+})
