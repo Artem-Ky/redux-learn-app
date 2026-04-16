@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>92 — Trace в DevTools</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">92 / 100</span>
+      Trace в DevTools
+    </div>
+    <nav class="site-header__nav">
+      <a href="../91-devtools-with-middleware/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">92</span>
+      <a href="../93-immer-intro/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Trace: находим источник dispatch</div>
+      <div class="demo-section__body">
+        <div style="max-width: 700px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Счётчик с кнопками в <strong>разных частях</strong> страницы. При каждом dispatch
+            сохраняется stack trace. Кликните на экшен в DevTools-панели, чтобы увидеть
+            откуда он был вызван.
+          </p>
+
+          <div style="display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 16px;">
+            <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; flex: 1; min-width: 200px;">
+              <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">Панель A — Основные</div>
+              <div class="btn-group">
+                <button class="btn btn--accent" id="btn-inc-a">+1 (Panel A)</button>
+                <button class="btn" id="btn-dec-a">−1 (Panel A)</button>
+              </div>
+            </div>
+            <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; flex: 1; min-width: 200px;">
+              <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">Панель B — Быстрые</div>
+              <div class="btn-group">
+                <button class="btn btn--success" id="btn-inc5-b">+5 (Panel B)</button>
+                <button class="btn btn--danger" id="btn-reset-b">Reset (Panel B)</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Текущее значение</div>
+            <pre id="counter-display" style="color: var(--accent-cyan); font-size: 1.4rem; text-align: center;">0</pre>
+          </div>
+
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Инструкция</div>
+            <ol style="font-size: 0.82rem; color: var(--text-secondary); padding-left: 20px; margin: 0;">
+              <li>Нажмите несколько кнопок из разных панелей</li>
+              <li>В DevTools-панели кликните на любой экшен</li>
+              <li>В консоли появится stack trace — откуда был вызван dispatch</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Trace в DevTools</div>
+      <div class="theory__body">
+        <h3>Зачем нужен Trace?</h3>
+        <p>
+          В большом приложении один и тот же тип экшена может диспатчиться из <em>десятков</em>
+          мест: из компонентов, middleware, thunks, обработчиков событий. Trace показывает
+          <strong>точное место в коде</strong>, откуда был вызван <code>dispatch</code>.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Включение trace в DevTools Extension:</span>
+<span class="kw">const</span> <span class="prop">store</span> = <span class="fn">createStore</span>(
+  <span class="prop">reducer</span>,
+  <span class="prop">window</span>.<span class="prop">__REDUX_DEVTOOLS_EXTENSION__</span>?.({
+    <span class="prop">trace</span>: <span class="num">true</span>,          <span class="cm">// включить трейсинг</span>
+    <span class="prop">traceLimit</span>: <span class="num">25</span>       <span class="cm">// глубина стека (по умолчанию 10)</span>
+  })
+)
+        </div>
+
+        <h3>Как это работает?</h3>
+        <p>
+          Когда <code>trace: true</code> включен, DevTools перехватывает каждый
+          <code>dispatch</code> и вызывает <code>new Error().stack</code> для захвата
+          текущего стека вызовов. При выборе экшена во вкладке «Trace» вы увидите
+          полный путь от корня до вызова <code>dispatch</code>.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Как мы эмулируем trace в нашем DevTools:</span>
+<span class="kw">const</span> <span class="prop">originalDispatch</span> = <span class="prop">store</span>.<span class="prop">dispatch</span>
+
+<span class="prop">store</span>.<span class="prop">dispatch</span> = (<span class="prop">action</span>: <span class="type">AnyAction</span>): <span class="type">AnyAction</span> => {
+  <span class="kw">const</span> <span class="prop">trace</span> = <span class="kw">new</span> <span class="fn">Error</span>().<span class="prop">stack</span>
+  <span class="prop">traceMap</span>.<span class="fn">set</span>(<span class="prop">action</span>.<span class="prop">type</span>, <span class="prop">trace</span>)
+  <span class="kw">return</span> <span class="fn">originalDispatch</span>(<span class="prop">action</span>)
+}
+        </div>
+
+        <div class="quote">
+          «The Trace tab in Redux DevTools shows the JavaScript stack trace
+          that led to the action being dispatched. This is useful for tracking
+          down exactly where a particular action is coming from.»
+          <br>— <a href="https://github.com/reduxjs/redux-devtools/blob/main/extension/docs/Features/Trace.md" target="_blank">Redux DevTools Extension — Trace</a>
+        </div>
+
+        <h3>Отладка сложных цепочек dispatch</h3>
+        <p>
+          Trace особенно полезен для отладки <strong>сложных цепочек</strong>: когда один
+          thunk диспатчит несколько экшенов, или middleware трансформирует один экшен
+          в другой. Trace покажет, что <code>todos/loaded</code> был вызван из
+          <code>loadTodos</code> thunk, а не из компонента напрямую.
+        </p>
+
+        <div class="tip">
+          Trace добавляет незначительные накладные расходы (захват стека вызовов).
+          В большинстве случаев это не заметно, но для production-сборки рекомендуется
+          отключить DevTools полностью.
+        </div>
+
+        <div class="warning">
+          Trace не работает с минифицированным кодом — имена функций будут нечитаемыми.
+          Для отладки используйте development-сборку с source maps. В production
+          DevTools всё равно следует отключать.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>trace: true</code> включает захват стека вызовов при dispatch</li>
+          <li><code>traceLimit</code> задаёт глубину стека (по умолчанию 10)</li>
+          <li>Trace показывает точное место в коде, откуда вызван dispatch</li>
+          <li>Незаменим для отладки цепочек dispatch в thunks и middleware</li>
+          <li>Работает через <code>new Error().stack</code></li>
+          <li>Используйте source maps для читаемых имён функций</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

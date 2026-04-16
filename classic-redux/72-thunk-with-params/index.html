@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>72 — Thunk с параметрами</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">72 / 100</span>
+      Thunk с параметрами
+    </div>
+    <nav class="site-header__nav">
+      <a href="../71-thunk-action-creator/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">72</span>
+      <a href="../73-async-loading-state/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Thunk Action Creator с параметрами</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Функция <code>saveNewTodo(text)</code> принимает текст и возвращает thunk.
+            Внутренняя функция замыкается на <code>text</code> и использует его при dispatch.
+          </p>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <input type="text" id="todo-input" placeholder="Введите текст todo..." style="flex: 1;">
+            <button class="btn btn--accent" id="btn-save">💾 saveNewTodo(text)</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Статус</div>
+            <pre id="status-display" style="color: var(--text-secondary); font-size: 0.9rem;">idle</pre>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Todos</div>
+            <div id="todos-display" style="min-height: 60px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Добавьте todo через поле выше ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Thunk с параметрами</div>
+      <div class="theory__body">
+        <h3>Внешняя функция принимает параметры</h3>
+        <p>
+          Thunk Action Creator — это обычная функция. Она может принимать
+          любые аргументы. Внутренняя thunk-функция <strong>замыкается</strong>
+          (closure) на этих аргументах и использует их внутри.
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">saveNewTodo</span>(<span class="prop">text</span>: <span class="type">string</span>) {
+  <span class="cm">// Внешняя функция получает параметр text</span>
+  <span class="kw">return</span> <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>, <span class="prop">getState</span>: <span class="type">any</span>) => {
+    <span class="cm">// Внутренняя thunk замыкается на text</span>
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/saving'</span> })
+
+    <span class="kw">const</span> response = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/todos'</span>, {
+      <span class="prop">method</span>: <span class="str">'POST'</span>,
+      <span class="prop">body</span>: <span class="prop">JSON</span>.<span class="fn">stringify</span>({ <span class="prop">text</span> })
+    })
+    <span class="kw">const</span> todo = <span class="kw">await</span> response.<span class="fn">json</span>()
+
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/todoAdded'</span>, <span class="prop">payload</span>: todo })
+  }
+}
+        </div>
+
+        <h3>Замыкание (Closure)</h3>
+        <p>
+          Внутренняя thunk-функция имеет доступ к переменным внешней функции.
+          Это стандартный механизм JavaScript — замыкание. Параметр <code>text</code>
+          «захватывается» и доступен в момент выполнения thunk.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Вызов: dispatch передаёт text через замыкание</span>
+store.<span class="fn">dispatch</span>(<span class="fn">saveNewTodo</span>(<span class="str">'Купить молоко'</span>))
+
+<span class="cm">// Что происходит:</span>
+<span class="cm">// 1. saveNewTodo('Купить молоко') → возвращает thunk</span>
+<span class="cm">// 2. thunk замкнут на text = 'Купить молоко'</span>
+<span class="cm">// 3. middleware вызывает thunk(dispatch, getState)</span>
+<span class="cm">// 4. внутри thunk text === 'Купить молоко'</span>
+        </div>
+
+        <div class="quote">
+          «We can write a function that accepts 'text' as its parameter,
+          and creates the thunk function to be dispatched... then our component
+          only needs to dispatch the thunk with the text value.»
+          <br>— <a href="https://redux.js.org/tutorials/essentials/part-5-async-logic" target="_blank">Redux Essentials, Part 5: Async Logic and Data Fetching</a>
+        </div>
+
+        <h3>Несколько параметров</h3>
+        <p>
+          Внешняя функция может принимать сколько угодно параметров — все они
+          будут доступны внутри thunk через замыкание.
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">updateTodo</span>(<span class="prop">id</span>: <span class="type">number</span>, <span class="prop">changes</span>: <span class="type">Partial&lt;Todo&gt;</span>) {
+  <span class="kw">return</span> <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>) => {
+    <span class="cm">// id и changes доступны через замыкание</span>
+    <span class="kw">await</span> <span class="fn">apiUpdateTodo</span>(<span class="prop">id</span>, <span class="prop">changes</span>)
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/updated'</span>, <span class="prop">payload</span>: { <span class="prop">id</span>, ...<span class="prop">changes</span> } })
+  }
+}
+        </div>
+
+        <div class="tip">
+          Параметры thunk action creator — это данные от UI (текст из формы,
+          ID элемента, фильтры). Thunk получает системные аргументы
+          <code>(dispatch, getState)</code> от middleware. Разделение обязанностей!
+        </div>
+
+        <div class="warning">
+          Не передавайте <code>dispatch</code> как параметр внешней функции — его
+          предоставляет middleware. Внешняя функция только для данных от пользователя.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Внешняя функция принимает параметры от UI</li>
+          <li>Внутренняя thunk замыкается на этих параметрах</li>
+          <li><code>saveNewTodo(text)</code> → thunk имеет доступ к <code>text</code></li>
+          <li>Closure — стандартный механизм JS для захвата переменных</li>
+          <li>Чёткое разделение: данные от UI vs. системные аргументы</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

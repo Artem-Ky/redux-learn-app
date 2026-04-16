@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>93 — Immer: иммутабельность через «мутации»</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">93 / 100</span>
+      Immer: иммутабельность через «мутации»
+    </div>
+    <nav class="site-header__nav">
+      <a href="../92-devtools-trace/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">93</span>
+      <a href="../94-immer-reducer/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Ручной spread vs Immer produce</div>
+      <div class="demo-section__body">
+        <div style="max-width: 750px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Задача: обновить <code>user.company.address.city</code> на «Новосибирск».
+            Слева — классический каскад spread. Справа — одна строка с Immer.
+          </p>
+
+          <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;">
+            <div style="flex: 1; min-width: 300px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px;">
+              <div style="font-size: 0.75rem; color: var(--accent-yellow); text-transform: uppercase; margin-bottom: 8px;">Ручной spread (8 строк)</div>
+              <pre style="color: var(--text-secondary); font-size: 0.78rem; margin: 0; white-space: pre-wrap;">const newState = {
+  ...state,
+  user: {
+    ...state.user,
+    company: {
+      ...state.user.company,
+      address: {
+        ...state.user.company.address,
+        city: 'Новосибирск'
+      }
+    }
+  }
+}</pre>
+            </div>
+            <div style="flex: 1; min-width: 300px; background: var(--bg-tertiary); border: 1px solid var(--accent-green); border-radius: var(--radius-sm); padding: 16px;">
+              <div style="font-size: 0.75rem; color: var(--accent-green); text-transform: uppercase; margin-bottom: 8px;">Immer produce (1 строка)</div>
+              <pre style="color: var(--text-secondary); font-size: 0.78rem; margin: 0; white-space: pre-wrap;">const newState = produce(state, draft => {
+  draft.user.company.address.city = 'Новосибирск'
+})</pre>
+            </div>
+          </div>
+
+          <div class="btn-group" style="margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-spread">Обновить через Spread</button>
+            <button class="btn btn--success" id="btn-immer">Обновить через Immer</button>
+            <button class="btn" id="btn-reset">Сбросить</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Текущий объект</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.82rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Immer: иммутабельные обновления через «мутации»</div>
+      <div class="theory__body">
+        <h3>Что такое Immer?</h3>
+        <p>
+          <strong>Immer</strong> — библиотека, которая позволяет писать код, <em>выглядящий</em>
+          как мутация, но под капотом создающий иммутабельные обновления. Вы «мутируете»
+          черновик (draft), а Immer на основе ваших изменений создаёт новый объект.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">produce</span> } <span class="kw">from</span> <span class="str">'immer'</span>
+
+<span class="kw">const</span> <span class="prop">nextState</span> = <span class="fn">produce</span>(<span class="prop">currentState</span>, <span class="prop">draft</span> => {
+  <span class="cm">// «мутируем» draft — на самом деле это Proxy</span>
+  <span class="prop">draft</span>.<span class="prop">user</span>.<span class="prop">company</span>.<span class="prop">address</span>.<span class="prop">city</span> = <span class="str">'Новосибирск'</span>
+})
+<span class="cm">// nextState — новый иммутабельный объект</span>
+<span class="cm">// currentState — не изменился</span>
+        </div>
+
+        <h3>Как работает produce?</h3>
+        <p>
+          Функция <code>produce(currentState, recipe)</code> принимает два аргумента:
+        </p>
+        <ul>
+          <li><code>currentState</code> — текущее (замороженное) состояние</li>
+          <li><code>recipe</code> — функция-рецепт, получающая <code>draft</code></li>
+        </ul>
+        <p>
+          <code>draft</code> — это <strong>Proxy-объект</strong>, который записывает
+          все ваши «мутации». Когда recipe завершается, Immer строит новый объект,
+          применяя записанные изменения к оригиналу. Неизменённые части переиспользуются
+          (structural sharing).
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Как это работает внутри (упрощённо):</span>
+<span class="cm">//</span>
+<span class="cm">// 1. Immer создаёт Proxy вокруг currentState</span>
+<span class="cm">// 2. draft = new Proxy(currentState, handler)</span>
+<span class="cm">// 3. handler.set() перехватывает записи</span>
+<span class="cm">// 4. Записи сохраняются в «патчи»</span>
+<span class="cm">// 5. Из патчей строится новый объект</span>
+<span class="cm">// 6. Неизменённые ветви === оригинал (structural sharing)</span>
+        </div>
+
+        <div class="quote">
+          «Immer works by writing producers, which are functions that receive a proxy
+          of the current state (the draft) and can freely mutate it. Once the producer
+          finishes, Immer will produce the next immutable state based on the mutations
+          to the draft.»
+          <br>— <a href="https://immerjs.github.io/immer/" target="_blank">Immer Documentation — Introduction</a>
+        </div>
+
+        <h3>Immer — основа Redux Toolkit</h3>
+        <p>
+          <strong>Redux Toolkit</strong> использует Immer внутри <code>createSlice</code>.
+          Когда вы пишете «мутирующий» код в reducers объекта createSlice, это не настоящая
+          мутация — это Immer produce под капотом. Понимание Immer = понимание RTK.
+        </p>
+
+        <div class="tip">
+          Immer не просто удобство — это фундамент современного Redux. Изучив Immer
+          сейчас, вы будете точно понимать, что происходит в Redux Toolkit, когда
+          «мутируете» state в createSlice.
+        </div>
+
+        <div class="warning">
+          Draft — это Proxy, а не реальный объект. Нельзя выносить draft за пределы
+          recipe-функции, передавать его в async-функции или сохранять в переменные
+          вне produce. Draft «живёт» только внутри callback.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>produce(state, recipe)</code> — основная функция Immer</li>
+          <li>Draft — Proxy-объект, перехватывающий «мутации»</li>
+          <li>Результат — новый иммутабельный объект</li>
+          <li>Оригинал не изменяется</li>
+          <li>Structural sharing — неизменённые части переиспользуются</li>
+          <li>Immer — основа createSlice в Redux Toolkit</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>79 — Последовательные dispatch в thunk</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">79 / 100</span>
+      Последовательные dispatch в thunk
+    </div>
+    <nav class="site-header__nav">
+      <a href="../78-async-conditional-dispatch/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">79</span>
+      <a href="../80-async-optimistic-update/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Последовательная загрузка: users → posts</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Thunk сначала загружает пользователей (1 сек), потом для каждого — посты (0.5 сек).
+            Прогресс отображается в реальном времени.
+          </p>
+
+          <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-load-all">📦 Load All</button>
+            <button class="btn" id="btn-reset">🗑 Reset</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Прогресс</div>
+            <div style="padding: 8px;">
+              <div id="progress-bar" style="height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
+                <div id="progress-fill" style="height: 100%; width: 0%; background: var(--accent-green); border-radius: 4px; transition: width 0.3s ease;"></div>
+              </div>
+              <div id="progress-text" style="color: var(--text-secondary); font-size: 0.8rem;">Ожидание запуска...</div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Пользователи</div>
+            <div id="users-display" style="min-height: 40px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">—</span>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Посты</div>
+            <div id="posts-display" style="min-height: 40px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">—</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Последовательные dispatch в одном thunk</div>
+      <div class="theory__body">
+        <h3>Множественные await + dispatch</h3>
+        <p>
+          Один thunk может содержать <strong>несколько последовательных</strong> async-операций,
+          каждая из которых завершается dispatch'ем. Это позволяет моделировать
+          сложные цепочки загрузки.
+        </p>
+
+        <div class="quote">
+          «Thunks may contain any arbitrary logic, sync or async, and can call
+          dispatch or getState at any time. This makes them a great place
+          for putting complex synchronous logic as well as moderate async logic
+          that needs access to the store.»
+          <br>— <a href="https://redux.js.org/usage/writing-logic-thunks" target="_blank">Redux — Writing Logic with Thunks</a>
+        </div>
+
+        <h3>Паттерн: chaining async operations</h3>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">loadAll</span> = () => <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>): <span class="type">Promise</span>&lt;<span class="type">void</span>&gt; => {
+  <span class="cm">// Шаг 1: загрузка пользователей</span>
+  <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'users/loading'</span> })
+  <span class="kw">const</span> users = <span class="kw">await</span> <span class="fn">fetchUsers</span>()
+  <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'users/loaded'</span>, <span class="prop">payload</span>: users })
+
+  <span class="cm">// Шаг 2: загрузка постов для каждого пользователя</span>
+  <span class="kw">for</span> (<span class="kw">const</span> user <span class="kw">of</span> users) {
+    <span class="kw">const</span> posts = <span class="kw">await</span> <span class="fn">fetchPosts</span>(user.<span class="prop">id</span>)
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'posts/loaded'</span>, <span class="prop">payload</span>: { userId: user.<span class="prop">id</span>, posts } })
+  }
+}
+        </div>
+
+        <h3>Отслеживание прогресса</h3>
+        <p>
+          Последовательные dispatch'ы позволяют обновлять UI по мере выполнения —
+          показывать прогресс-бар, пошаговый статус, счётчики.
+        </p>
+
+        <div class="code-block">
+<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'progress/update'</span>, <span class="prop">payload</span>: {
+  <span class="prop">step</span>: <span class="num">2</span>,
+  <span class="prop">total</span>: <span class="num">5</span>,
+  <span class="prop">message</span>: <span class="str">'Loading posts for user 2/3...'</span>
+}})
+        </div>
+
+        <h3>Последовательная vs параллельная загрузка</h3>
+        <ul>
+          <li><strong>Последовательная</strong> (<code>for...of + await</code>) — когда следующий шаг зависит от предыдущего</li>
+          <li><strong>Параллельная</strong> (<code>Promise.all</code>) — когда шаги независимы (быстрее)</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Параллельная загрузка (быстрее, но нет пошагового прогресса)</span>
+<span class="kw">const</span> results = <span class="kw">await</span> <span class="type">Promise</span>.<span class="fn">all</span>(
+  users.<span class="fn">map</span>(u => <span class="fn">fetchPosts</span>(u.<span class="prop">id</span>))
+)
+        </div>
+
+        <div class="tip">
+          Последовательная загрузка даёт лучший UX при отображении прогресса —
+          пользователь видит, что происходит, шаг за шагом. Параллельная — быстрее,
+          но прогресс скачкообразный.
+        </div>
+
+        <div class="warning">
+          Длинные цепочки <code>await</code> блокируют thunk. Если пользователь может
+          отменить операцию, добавьте проверку флага отмены между шагами.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Один thunk может содержать несколько <code>await</code> + <code>dispatch</code></li>
+          <li>Каждый dispatch обновляет state и UI в реальном времени</li>
+          <li>Удобно для цепочки зависимых запросов</li>
+          <li>Используйте <code>for...of</code> для последовательной, <code>Promise.all</code> для параллельной загрузки</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

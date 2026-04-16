@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>71 — Thunk Action Creator — паттерн</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">71 / 100</span>
+      Thunk Action Creator — паттерн
+    </div>
+    <nav class="site-header__nav">
+      <a href="../70-thunk-middleware-official/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">71</span>
+      <a href="../72-thunk-with-params/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Thunk Action Creator</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Функция <code>fetchTodos()</code> возвращает thunk-функцию.
+            При вызове <code>store.dispatch(fetchTodos())</code> thunk middleware
+            перехватывает функцию и вызывает её с <code>dispatch</code> и <code>getState</code>.
+          </p>
+
+          <button class="btn btn--accent" id="btn-fetch" style="margin-bottom: 16px;">
+            📋 fetchTodos()
+          </button>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Статус</div>
+            <pre id="status-display" style="color: var(--text-secondary); font-size: 0.9rem;">idle</pre>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Todos</div>
+            <div id="todos-display" style="min-height: 60px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Нажмите "fetchTodos()" ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Thunk Action Creator</div>
+      <div class="theory__body">
+        <h3>Зачем оборачивать thunk в функцию?</h3>
+        <p>
+          Thunk — это функция <code>(dispatch, getState) => ...</code>. Но мы не передаём
+          её напрямую — мы создаём <strong>action creator</strong>, который <em>возвращает</em>
+          thunk-функцию. Это даёт переиспользуемость и единообразный интерфейс.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Thunk Action Creator</span>
+<span class="kw">function</span> <span class="fn">fetchTodos</span>() {
+  <span class="cm">// Возвращаем thunk-функцию</span>
+  <span class="kw">return</span> <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>, <span class="prop">getState</span>: <span class="type">any</span>) => {
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/loading'</span> })
+    <span class="kw">const</span> response = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/todos'</span>)
+    <span class="kw">const</span> todos = <span class="kw">await</span> response.<span class="fn">json</span>()
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/loaded'</span>, <span class="prop">payload</span>: todos })
+  }
+}
+        </div>
+
+        <h3>Как это работает</h3>
+        <p>
+          <code>fetchTodos()</code> вызывается — возвращает thunk-функцию.
+          <code>dispatch(fetchTodos())</code> передаёт эту функцию в middleware.
+          Thunk middleware видит, что action — это функция, и вызывает её
+          с аргументами <code>(dispatch, getState)</code>.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Вызов thunk action creator</span>
+store.<span class="fn">dispatch</span>(<span class="fn">fetchTodos</span>())
+
+<span class="cm">// Что происходит внутри:</span>
+<span class="cm">// 1. fetchTodos() → возвращает async (dispatch, getState) => { ... }</span>
+<span class="cm">// 2. dispatch(thunkFn) → middleware перехватывает</span>
+<span class="cm">// 3. middleware вызывает thunkFn(dispatch, getState)</span>
+        </div>
+
+        <div class="quote">
+          «We said that Redux reducers must never contain 'side effects'...
+          However, any real app needs to do these things <em>somewhere</em>.
+          Thunk functions... can contain side effects.»
+          <br>— <a href="https://redux.js.org/tutorials/essentials/part-5-async-logic" target="_blank">Redux Essentials, Part 5: Async Logic and Data Fetching</a>
+        </div>
+
+        <h3>Переиспользуемость</h3>
+        <p>
+          Thunk action creator можно вызывать в любом месте приложения.
+          Логика загрузки данных инкапсулирована в одном месте — компоненты
+          просто вызывают <code>dispatch(fetchTodos())</code>.
+        </p>
+
+        <div class="tip">
+          Thunk Action Creator — это обычная функция, которая возвращает другую функцию.
+          Внешняя функция — action creator. Внутренняя — thunk. Этот паттерн
+          обеспечивает чистый и предсказуемый интерфейс для асинхронных операций.
+        </div>
+
+        <div class="warning">
+          Не путайте: <code>fetchTodos</code> — это action creator,
+          <code>fetchTodos()</code> — это результат вызова (thunk-функция),
+          <code>dispatch(fetchTodos())</code> — это запуск thunk через middleware.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Thunk Action Creator — функция, которая <em>возвращает</em> thunk</li>
+          <li><code>fetchTodos()</code> возвращает <code>(dispatch, getState) => { ... }</code></li>
+          <li><code>dispatch(fetchTodos())</code> — middleware вызывает возвращённую функцию</li>
+          <li>Инкапсуляция async-логики в одном месте</li>
+          <li>Переиспользуемость: один action creator — много точек вызова</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

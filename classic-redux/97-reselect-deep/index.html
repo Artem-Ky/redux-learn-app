@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>97 — Reselect: глубокое погружение в кэширование</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">97 / 100</span>
+      Reselect: кэширование (deep dive)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../96-immer-gotchas/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">97</span>
+      <a href="../98-reselect-custom-equality/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Кэширование селекторов Reselect</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 20px;">
+          Todo-список с <code>createSelector</code>. Счётчик показывает, сколько раз
+          output-селектор <em>действительно</em> пересчитывался. Если кэш сработал — счётчик не растёт.
+        </p>
+
+        <div style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+          <div class="state-display" style="flex: 1; min-width: 180px;">
+            <div class="state-display__label">Вычислений селектора</div>
+            <div class="state-display__value" id="recompute-count">0</div>
+          </div>
+          <div class="state-display" style="flex: 1; min-width: 180px;">
+            <div class="state-display__label">Вызовов селектора</div>
+            <div class="state-display__value" id="call-count">0</div>
+          </div>
+          <div class="state-display" style="flex: 1; min-width: 180px;">
+            <div class="state-display__label">Кэш-хиты</div>
+            <div class="state-display__value" id="cache-hits" style="color: var(--accent-green);">0</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+          <input type="text" id="input-todo" placeholder="Новый todo..." style="flex: 1;">
+          <button class="btn btn--accent" id="btn-add">+ Добавить</button>
+        </div>
+
+        <div id="todo-list" style="margin-bottom: 16px; min-height: 40px;"></div>
+
+        <div class="btn-group" style="margin-bottom: 16px;">
+          <button class="btn" id="btn-no-change">Dispatch без изменений todos</button>
+          <button class="btn" id="btn-call-selector">Вызвать селектор ещё раз</button>
+          <button class="btn btn--danger" id="btn-new-ref">Новая ссылка (сломать кэш)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Кэширование в Reselect</div>
+      <div class="theory__body">
+        <h3>Кэш размером 1</h3>
+        <p>
+          Reselect кэширует <strong>только последний результат</strong> (cache size = 1).
+          Если входные данные не изменились — возвращается закэшированный результат
+          без вызова output-функции.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">selectCompletedTodos</span> = <span class="fn">createSelector</span>(
+  <span class="prop">state</span> => <span class="prop">state</span>.<span class="prop">todos</span>,   <span class="cm">// input selector</span>
+  <span class="prop">todos</span> => <span class="prop">todos</span>.<span class="fn">filter</span>(<span class="prop">t</span> => <span class="prop">t</span>.<span class="prop">completed</span>)  <span class="cm">// output selector</span>
+)
+
+<span class="cm">// Первый вызов: вычисляет output</span>
+<span class="fn">selectCompletedTodos</span>(<span class="prop">state</span>)  <span class="cm">// recompute = 1</span>
+
+<span class="cm">// Повторный вызов: state.todos === прежний → кэш!</span>
+<span class="fn">selectCompletedTodos</span>(<span class="prop">state</span>)  <span class="cm">// recompute = 1 (не изменился)</span>
+        </div>
+
+        <h3>Проверка равенства входов (===)</h3>
+        <p>
+          Input selectors проверяются через строгое равенство <code>===</code>.
+          Если ссылка на результат input selector'а не изменилась — кэш действителен.
+          Если ссылка новая — output пересчитывается.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Dispatch действия, не меняющего todos:</span>
+<span class="prop">store</span>.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'ui/toggle'</span> })
+
+<span class="cm">// state.todos === previousState.todos → кэш сработает!</span>
+<span class="fn">selectCompletedTodos</span>(<span class="prop">store</span>.<span class="fn">getState</span>())  <span class="cm">// без пересчёта</span>
+        </div>
+
+        <h3>Когда кэш «ломается»</h3>
+        <p>
+          Кэш инвалидируется, когда input selector возвращает <strong>новую ссылку</strong>.
+          Даже если данные структурно одинаковые — другая ссылка = пересчёт.
+        </p>
+        <div class="code-block">
+<span class="cm">// ❌ Каждый вызов создаёт новый массив — кэш ломается!</span>
+<span class="kw">const</span> <span class="prop">badSelector</span> = <span class="fn">createSelector</span>(
+  <span class="prop">state</span> => <span class="prop">state</span>.<span class="prop">todos</span>.<span class="fn">filter</span>(<span class="prop">t</span> => <span class="prop">t</span>.<span class="prop">active</span>),  <span class="cm">// новый массив!</span>
+  <span class="prop">active</span> => <span class="prop">active</span>.<span class="prop">length</span>
+)
+        </div>
+
+        <div class="quote">
+          «Reselect provides a function called createSelector to generate
+          memoized selectors. createSelector accepts one or more "input selector"
+          functions, plus an "output selector", and returns a new selector function.
+          Every time you call the selector, it checks the inputs — if any input
+          changed, it re-runs the output selector.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-7-standard-patterns#memoized-selectors" target="_blank">Redux Fundamentals: Memoized Selectors</a>
+        </div>
+
+        <h3>defaultMemoize</h3>
+        <p>
+          Внутри Reselect использует функцию <code>defaultMemoize</code> (или <code>lruMemoize</code>
+          в новых версиях). Она хранит <strong>один</strong> последний результат и сравнивает
+          аргументы по ссылке (<code>===</code>). Это оптимально для Redux, где
+          <code>getState()</code> возвращает тот же объект до dispatch.
+        </p>
+
+        <h3>Влияние на производительность</h3>
+        <ul>
+          <li><code>createSelector</code> предотвращает лишние пересчёты тяжёлых операций (filter, map, sort)</li>
+          <li>Cache size = 1 — подходит для Redux, где state меняется через dispatch</li>
+          <li>Не подходит для параметризованных селекторов с разными аргументами в одном рендере</li>
+          <li>Для мульти-кэша используйте <code>createSelector</code> с кастомным memoize</li>
+        </ul>
+
+        <div class="tip">
+          Правило: input selectors должны быть «чистыми извлекателями». Они просто
+          достают кусочек state. Вся трансформация — в output selector.
+        </div>
+
+        <div class="warning">
+          Если input selector создаёт новый объект/массив при каждом вызове —
+          кэш <em>никогда</em> не сработает. Это самая частая ошибка с Reselect.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

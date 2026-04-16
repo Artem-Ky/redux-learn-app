@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>75 — Полный async-паттерн: request/success/failure</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">75 / 100</span>
+      Полный async-паттерн
+    </div>
+    <nav class="site-header__nav">
+      <a href="../74-async-loading-enum-vs-boolean/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">75</span>
+      <a href="../76-async-thunk-promise/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Request / Success / Failure</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Три экшена: <code>users/fetchStarted</code>, <code>users/fetchSucceeded</code>,
+            <code>users/fetchFailed</code>. Thunk dispatches их последовательно.
+            Переключите чекбокс для имитации ошибки.
+          </p>
+
+          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-fetch">👥 Fetch Users</button>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
+              <input type="checkbox" id="chk-error" style="width: 16px; height: 16px; cursor: pointer;">
+              Simulate error
+            </label>
+          </div>
+
+          <div id="status-indicator" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px;">
+            <span id="status-dot" style="width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted);"></span>
+            <span id="status-label" style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--text-secondary);">idle</span>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Users</div>
+            <div id="users-display" style="min-height: 80px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Нажмите "Fetch Users" ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Стандартный 3-action async паттерн</div>
+      <div class="theory__body">
+        <h3>Три экшена для async-операции</h3>
+        <p>
+          Это <strong>THE паттерн</strong> для асинхронных операций в классическом Redux.
+          Каждая async-операция сопровождается тремя экшенами:
+        </p>
+        <ul>
+          <li><strong>request</strong> (started) — запрос начат</li>
+          <li><strong>success</strong> (succeeded) — данные получены</li>
+          <li><strong>failure</strong> (failed) — произошла ошибка</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Три action types</span>
+<span class="kw">const</span> <span class="prop">FETCH_STARTED</span>   = <span class="str">'users/fetchStarted'</span>
+<span class="kw">const</span> <span class="prop">FETCH_SUCCEEDED</span> = <span class="str">'users/fetchSucceeded'</span>
+<span class="kw">const</span> <span class="prop">FETCH_FAILED</span>    = <span class="str">'users/fetchFailed'</span>
+        </div>
+
+        <h3>Reducer обрабатывает каждый</h3>
+        <p>
+          Reducer — конечный автомат. Каждый case — переход между состояниями.
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">usersReducer</span>(<span class="prop">state</span> = <span class="prop">initialState</span>, <span class="prop">action</span>) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'users/fetchStarted'</span>:
+      <span class="kw">return</span> { ...<span class="prop">state</span>, <span class="prop">status</span>: <span class="str">'loading'</span>, <span class="prop">error</span>: <span class="num">null</span> }
+    <span class="kw">case</span> <span class="str">'users/fetchSucceeded'</span>:
+      <span class="kw">return</span> { ...<span class="prop">state</span>, <span class="prop">status</span>: <span class="str">'succeeded'</span>, <span class="prop">entities</span>: action.<span class="prop">payload</span> }
+    <span class="kw">case</span> <span class="str">'users/fetchFailed'</span>:
+      <span class="kw">return</span> { ...<span class="prop">state</span>, <span class="prop">status</span>: <span class="str">'failed'</span>, <span class="prop">error</span>: action.<span class="prop">payload</span> }
+    <span class="kw">default</span>:
+      <span class="kw">return</span> <span class="prop">state</span>
+  }
+}
+        </div>
+
+        <h3>Thunk с try/catch</h3>
+        <p>
+          Полный thunk action creator: dispatch started, try fetch, dispatch
+          succeeded или catch → dispatch failed.
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">fetchUsers</span>() {
+  <span class="kw">return</span> <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>) => {
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'users/fetchStarted'</span> })
+    <span class="kw">try</span> {
+      <span class="kw">const</span> response = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/users'</span>)
+      <span class="kw">const</span> users = <span class="kw">await</span> response.<span class="fn">json</span>()
+      <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'users/fetchSucceeded'</span>, <span class="prop">payload</span>: users })
+    } <span class="kw">catch</span> (err) {
+      <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'users/fetchFailed'</span>, <span class="prop">payload</span>: err.<span class="prop">message</span> })
+    }
+  }
+}
+        </div>
+
+        <h3>Именование: request / success / failure</h3>
+        <p>
+          Redux не диктует конкретные имена, но паттерн устоялся:
+          <code>started/succeeded/failed</code> или <code>pending/fulfilled/rejected</code>
+          (как в Redux Toolkit <code>createAsyncThunk</code>).
+        </p>
+
+        <div class="quote">
+          «For any async operation, you need to dispatch actions to track the
+          loading state. A typical pattern is dispatching a 'pending' action
+          before the request, then either a 'fulfilled' or 'rejected' action
+          based on the request result.»
+          <br>— <a href="https://redux.js.org/tutorials/essentials/part-5-async-logic" target="_blank">Redux Essentials, Part 5: Async Logic and Data Fetching</a>
+        </div>
+
+        <div class="tip">
+          Этот 3-action паттерн настолько стандартный, что Redux Toolkit
+          автоматизирует его через <code>createAsyncThunk</code>. Но важно
+          понимать, как он работает изнутри.
+        </div>
+
+        <div class="warning">
+          Всегда оборачивайте async-логику в <code>try/catch</code>. Без этого
+          ошибка API не будет обработана, и приложение останется в состоянии
+          <code>loading</code> навсегда.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>3 экшена: <code>started</code> → <code>succeeded</code> | <code>failed</code></li>
+          <li>Reducer обрабатывает каждый как переход state machine</li>
+          <li>Thunk: dispatch started → try/catch → dispatch succeeded/failed</li>
+          <li>Стандартное именование: started/succeeded/failed или pending/fulfilled/rejected</li>
+          <li>Это базовый паттерн для всех async-операций в Redux</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

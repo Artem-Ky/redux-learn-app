@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>76a — Почему нельзя без Thunk?</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .approach { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+    .approach__title { font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .approach__result { font-family: var(--font-mono); font-size: 0.82rem; margin-top: 8px; padding: 8px; background: #0d0d0d; border-radius: var(--radius-sm); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">76a / 100</span>
+      Почему нельзя без Thunk?
+    </div>
+    <nav class="site-header__nav">
+      <a href="../76-async-thunk-promise/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">76a</span>
+      <a href="../76b-thunk-internals/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Три подхода к асинхронности в Redux</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.85rem;">
+          Задача: загрузить данные с «сервера» (симуляция 1с) и положить в store.
+          Попробуем три подхода — и увидим, почему первые два плохие:
+        </p>
+
+        <div class="approach">
+          <div class="approach__title">
+            <span class="tag tag--bad">Подход 1</span>
+            Async в reducer (НЕЛЬЗЯ!)
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.82rem;">
+            Попытка сделать fetch прямо внутри reducer — нарушает правило чистоты.
+          </p>
+          <button class="btn btn--danger" id="btn-approach1">Попробовать</button>
+          <div class="approach__result" id="result-1" style="color: var(--error);">—</div>
+        </div>
+
+        <div class="approach">
+          <div class="approach__title">
+            <span class="tag tag--bad">Подход 2</span>
+            Async снаружи, dispatch вручную (работает, но...)
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.82rem;">
+            Делаем fetch снаружи, потом dispatch результата. Работает, но логика разбросана и не переиспользуется.
+          </p>
+          <button class="btn" id="btn-approach2">Попробовать</button>
+          <div class="approach__result" id="result-2">—</div>
+        </div>
+
+        <div class="approach">
+          <div class="approach__title">
+            <span class="tag tag--good">Подход 3</span>
+            Thunk — dispatch функции вместо объекта
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.82rem;">
+            Dispatch'им функцию. Thunk middleware перехватывает её и вызывает с (dispatch, getState).
+            Логика инкапсулирована и переиспользуема.
+          </p>
+          <button class="btn btn--success" id="btn-approach3">Попробовать</button>
+          <div class="approach__result" id="result-3" style="color: var(--success);">—</div>
+        </div>
+
+        <button class="btn" id="btn-reset" style="margin-top: 12px;">Сбросить state</button>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+    <div id="devtools-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Зачем нужны Thunks? Почему без них нельзя?</div>
+      <div class="theory__body">
+        <h3>Корень проблемы: Redux store — синхронный</h3>
+        <p>
+          Redux store сам по себе <strong>ничего не знает об асинхронности</strong>.
+          Он умеет только:
+        </p>
+        <ol>
+          <li>Синхронно вызвать reducer: <code>newState = reducer(currentState, action)</code></li>
+          <li>Сохранить новый state</li>
+          <li>Оповестить подписчиков</li>
+        </ol>
+        <p>
+          Всё. Никаких промисов, таймаутов, HTTP-запросов. Store — это <em>синхронная машина</em>.
+        </p>
+
+        <div class="quote">
+          «By itself, a Redux store doesn't know anything about async logic.
+          It only knows how to synchronously dispatch actions, update the state
+          by calling the root reducer function, and notify the UI that something has changed.
+          Any asynchronicity has to happen outside the store.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-6-async-logic" target="_blank">Redux Fundamentals, Part 6</a>
+        </div>
+
+        <h3>Подход 1: Async в reducer — ЗАПРЕЩЕНО</h3>
+        <p>Reducer — это <strong>чистая функция</strong>. Нельзя делать в нём:</p>
+        <ul>
+          <li>HTTP-запросы (fetch, axios)</li>
+          <li>Таймеры (setTimeout, setInterval)</li>
+          <li>Обращения к localStorage / sessionStorage</li>
+          <li>Генерацию случайных чисел или Date.now()</li>
+          <li>Любые побочные эффекты</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// ❌ НЕЛЬЗЯ! Reducer должен быть чистой функцией</span>
+<span class="kw">function</span> <span class="fn">todosReducer</span>(state, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'todos/fetch'</span>:
+      <span class="cm">// ❌ fetch — побочный эффект!</span>
+      <span class="fn">fetch</span>(<span class="str">'/api/todos'</span>)
+        .<span class="fn">then</span>(r => r.<span class="fn">json</span>())
+        .<span class="fn">then</span>(data => {
+          <span class="cm">// ❌ Мутация state!</span>
+          state.<span class="prop">todos</span> = data
+        })
+      <span class="kw">return</span> state  <span class="cm">// ← state не изменился синхронно!</span>
+  }
+}
+        </div>
+
+        <div class="warning">
+          Даже если этот код «работает» технически, он ломает:
+          <br>— <strong>Time-travel debugging</strong> (нельзя воспроизвести)
+          <br>— <strong>Тестируемость</strong> (нужно мокать fetch)
+          <br>— <strong>Предсказуемость</strong> (результат зависит от сети)
+          <br>— <strong>Иммутабельность</strong> (state мутируется асинхронно)
+        </div>
+
+        <h3>Подход 2: Async снаружи — работает, но проблемы</h3>
+        <div class="code-block">
+<span class="cm">// Это работает, но...</span>
+<span class="kw">async function</span> <span class="fn">loadTodos</span>() {
+  store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/loading'</span> })
+  <span class="kw">const</span> response = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/todos'</span>)
+  <span class="kw">const</span> data = <span class="kw">await</span> response.<span class="fn">json</span>()
+  store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/loaded'</span>, <span class="prop">payload</span>: data })
+}
+
+<span class="cm">// Проблемы:</span>
+<span class="cm">// 1. Функция ЖЁСТКО привязана к конкретному store</span>
+<span class="cm">// 2. Нельзя переиспользовать (другой store? SSR?)</span>
+<span class="cm">// 3. Логика размазана по UI-коду</span>
+<span class="cm">// 4. Нельзя тестировать без реального store</span>
+        </div>
+
+        <h3>Подход 3: Thunk — элегантное решение</h3>
+        <div class="code-block">
+<span class="cm">// Thunk — функция, которая получает dispatch и getState как аргументы</span>
+<span class="kw">const</span> <span class="fn">fetchTodos</span> = () => <span class="kw">async</span> (<span class="prop">dispatch</span>, <span class="prop">getState</span>) => {
+  dispatch({ <span class="prop">type</span>: <span class="str">'todos/loading'</span> })
+  <span class="kw">const</span> response = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/todos'</span>)
+  <span class="kw">const</span> data = <span class="kw">await</span> response.<span class="fn">json</span>()
+  dispatch({ <span class="prop">type</span>: <span class="str">'todos/loaded'</span>, <span class="prop">payload</span>: data })
+}
+
+<span class="cm">// Используем как обычный dispatch:</span>
+store.<span class="fn">dispatch</span>(<span class="fn">fetchTodos</span>())
+
+<span class="cm">// Преимущества:</span>
+<span class="cm">// ✅ Не привязан к конкретному store</span>
+<span class="cm">// ✅ Переиспользуем в любом месте</span>
+<span class="cm">// ✅ Логика инкапсулирована в action creator</span>
+<span class="cm">// ✅ Легко тестировать (передаём mock dispatch)</span>
+<span class="cm">// ✅ Может читать state через getState()</span>
+        </div>
+
+        <h3>Что такое «thunk» вообще?</h3>
+
+        <div class="quote">
+          «The word "thunk" is a programming term that means "a piece of code
+          that does some delayed work". Rather than execute some logic now,
+          we can write a function body or code that can be used to perform
+          the work later.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-6-async-logic#using-the-redux-thunk-middleware" target="_blank">Redux Fundamentals, Part 6</a>
+        </div>
+
+        <p>
+          Слово «thunk» пришло из функционального программирования.
+          <strong>Thunk — это функция, которая оборачивает вычисление для отложенного выполнения.</strong>
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Это НЕ thunk — значение вычисляется СРАЗУ:</span>
+<span class="kw">const</span> x = <span class="num">1</span> + <span class="num">2</span>  <span class="cm">// → 3 прямо сейчас</span>
+
+<span class="cm">// Это THUNK — вычисление отложено до вызова:</span>
+<span class="kw">const</span> <span class="fn">thunk</span> = () => <span class="num">1</span> + <span class="num">2</span>  <span class="cm">// → функция, вычислит 3 когда вызовем</span>
+<span class="fn">thunk</span>()  <span class="cm">// → 3</span>
+        </div>
+
+        <h3>Итог: почему именно middleware?</h3>
+        <div class="tip">
+          Middleware — идеальное место для побочных эффектов в Redux:
+          <br>— Middleware <strong>перехватывает</strong> dispatch до того, как action дойдёт до reducer
+          <br>— Может <strong>решить</strong>: пропустить, задержать, изменить или заменить action
+          <br>— Имеет доступ к <strong>dispatch</strong> (отправить новые экшены) и <strong>getState</strong> (прочитать state)
+          <br>— Reducer остаётся <strong>чистым</strong> — только синхронные вычисления
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

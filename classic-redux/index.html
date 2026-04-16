@@ -305,6 +305,11 @@
         <div class="index-card__title">Цепочка мемоизации</div>
         <div class="index-card__desc">Мемоизированные селекторы как input</div>
       </a>
+      <a href="./55a-selectors-factory/" class="index-card">
+        <div class="index-card__num">55a</div>
+        <div class="index-card__title">Фабрика селекторов</div>
+        <div class="index-card__desc">Свой мемоизированный селектор на каждую строку</div>
+      </a>
     </div>
 
     <div class="section-title">F. Middleware — Промежуточное ПО</div>
@@ -383,6 +388,133 @@
         <div class="index-card__num">70</div>
         <div class="index-card__title">redux-thunk</div>
         <div class="index-card__desc">Официальный thunk middleware</div>
+      </a>
+      <a href="./71-thunk-action-creator/" class="index-card">
+        <div class="index-card__num">71</div>
+        <div class="index-card__title">Thunk Action Creator</div>
+        <div class="index-card__desc">Обёртка thunk в action creator</div>
+      </a>
+      <a href="./72-thunk-with-params/" class="index-card">
+        <div class="index-card__num">72</div>
+        <div class="index-card__title">Thunk с параметрами</div>
+        <div class="index-card__desc">saveNewTodo(text) → thunk</div>
+      </a>
+    </div>
+
+    <div class="section-title">G. Async Patterns — Асинхронные паттерны</div>
+    <div class="index-grid">
+      <a href="./73-async-loading-state/" class="index-card">
+        <div class="index-card__num">73</div>
+        <div class="index-card__title">Статус загрузки</div>
+        <div class="index-card__desc">idle / loading / succeeded / failed</div>
+      </a>
+      <a href="./74-async-loading-enum-vs-boolean/" class="index-card">
+        <div class="index-card__num">74</div>
+        <div class="index-card__title">Enum vs Boolean</div>
+        <div class="index-card__desc">Почему enum лучше isLoading</div>
+      </a>
+      <a href="./75-async-fetch-pattern/" class="index-card">
+        <div class="index-card__num">75</div>
+        <div class="index-card__title">Request / Success / Failure</div>
+        <div class="index-card__desc">Полный паттерн async request</div>
+      </a>
+      <a href="./76-async-thunk-promise/" class="index-card">
+        <div class="index-card__num">76</div>
+        <div class="index-card__title">Thunk + Promise</div>
+        <div class="index-card__desc">await dispatch(thunk)</div>
+      </a>
+      <a href="./76a-why-thunks/" class="index-card">
+        <div class="index-card__num">76a</div>
+        <div class="index-card__title">Почему нельзя без Thunk?</div>
+        <div class="index-card__desc">3 подхода к async: запрещённый, хрупкий, правильный</div>
+      </a>
+      <a href="./76b-thunk-internals/" class="index-card">
+        <div class="index-card__num">76b</div>
+        <div class="index-card__title">Thunk изнутри</div>
+        <div class="index-card__desc">Pipeline, typeof проверка, sync vs async</div>
+      </a>
+      <a href="./76c-redux-thunk-full-api/" class="index-card">
+        <div class="index-card__num">76c</div>
+        <div class="index-card__title">redux-thunk: полный API</div>
+        <div class="index-card__desc">withExtraArgument, композиция, тестирование</div>
+      </a>
+      <a href="./77-async-error-handling/" class="index-card">
+        <div class="index-card__num">77</div>
+        <div class="index-card__title">Обработка ошибок</div>
+        <div class="index-card__desc">try/catch в thunk</div>
+      </a>
+      <a href="./78-async-conditional-dispatch/" class="index-card">
+        <div class="index-card__num">78</div>
+        <div class="index-card__title">Условный dispatch</div>
+        <div class="index-card__desc">getState() для принятия решений</div>
+      </a>
+      <a href="./79-async-sequential-dispatch/" class="index-card">
+        <div class="index-card__num">79</div>
+        <div class="index-card__title">Последовательные dispatch</div>
+        <div class="index-card__desc">Несколько await подряд</div>
+      </a>
+      <a href="./80-async-optimistic-update/" class="index-card">
+        <div class="index-card__num">80</div>
+        <div class="index-card__title">Оптимистичное обновление</div>
+        <div class="index-card__desc">Dispatch до запроса, rollback</div>
+      </a>
+      <a href="./81-async-debounce-middleware/" class="index-card">
+        <div class="index-card__num">81</div>
+        <div class="index-card__title">Debounce middleware</div>
+        <div class="index-card__desc">Задержка поисковых запросов</div>
+      </a>
+      <a href="./82-async-custom-middleware-api/" class="index-card">
+        <div class="index-card__num">82</div>
+        <div class="index-card__title">API middleware</div>
+        <div class="index-card__desc">Кастомный middleware для HTTP</div>
+      </a>
+    </div>
+
+    <div class="section-title">H. Normalized State — Нормализация</div>
+    <div class="index-grid">
+      <a href="./83-normalized-intro/" class="index-card">
+        <div class="index-card__num">83</div>
+        <div class="index-card__title">Что такое нормализация?</div>
+        <div class="index-card__desc">Дублирование vs ID-ссылки</div>
+      </a>
+      <a href="./84-normalized-structure/" class="index-card">
+        <div class="index-card__num">84</div>
+        <div class="index-card__title">Структура нормализации</div>
+        <div class="index-card__desc">entities + ids паттерн</div>
+      </a>
+      <a href="./85-normalized-crud/" class="index-card">
+        <div class="index-card__num">85</div>
+        <div class="index-card__title">CRUD (нормализованный)</div>
+        <div class="index-card__desc">Add / Update / Delete в entities</div>
+      </a>
+      <a href="./86-normalized-selectors/" class="index-card">
+        <div class="index-card__num">86</div>
+        <div class="index-card__title">Selectors (нормализованный)</div>
+        <div class="index-card__desc">O(1) lookup по ID</div>
+      </a>
+      <a href="./87-normalized-relations/" class="index-card">
+        <div class="index-card__num">87</div>
+        <div class="index-card__title">Связи между сущностями</div>
+        <div class="index-card__desc">Posts ↔ Comments по ID</div>
+      </a>
+      <a href="./88-normalized-complex/" class="index-card">
+        <div class="index-card__num">88</div>
+        <div class="index-card__title">Сложная нормализация</div>
+        <div class="index-card__desc">Users + Posts + Comments</div>
+      </a>
+    </div>
+
+    <div class="section-title">I. DevTools и дебаг</div>
+    <div class="index-grid">
+      <a href="./89-devtools-setup/" class="index-card">
+        <div class="index-card__num">89</div>
+        <div class="index-card__title">Подключение DevTools</div>
+        <div class="index-card__desc">Chrome extension + встроенная панель</div>
+      </a>
+      <a href="./90-devtools-time-travel/" class="index-card">
+        <div class="index-card__num">90</div>
+        <div class="index-card__title">Time-Travel Debugging</div>
+        <div class="index-card__desc">Перемотка и воспроизведение</div>
       </a>
     </div>
   </div>

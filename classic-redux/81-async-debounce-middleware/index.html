@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>81 — Debounce middleware для поиска</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">81 / 100</span>
+      Debounce middleware для поиска
+    </div>
+    <nav class="site-header__nav">
+      <a href="../80-async-optimistic-update/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">81</span>
+      <a href="../82-async-custom-middleware-api/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Debounce Middleware</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Введите текст в поле поиска. Middleware с debounce (400 мс) блокирует промежуточные
+            вводы — в store попадает только последний запрос. Консоль показывает,
+            какие действия заблокированы, а какие прошли.
+          </p>
+
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 6px;">
+              Поиск:
+            </label>
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Начните вводить..."
+              style="width: 100%; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-bright); font-size: 0.95rem; font-family: var(--font-sans); outline: none;"
+            />
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Текущий запрос в store</div>
+            <pre id="query-display" style="color: var(--accent-cyan); font-size: 0.9rem;">""</pre>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Результаты поиска</div>
+            <div id="results-display" style="min-height: 60px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Введите запрос ↑</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Debounce Middleware</div>
+      <div class="theory__body">
+        <h3>Паттерн debounce в middleware</h3>
+        <p>
+          Debounce — это техника, при которой действие выполняется только после того, как
+          пользователь <strong>прекратил</strong> ввод на заданное время. Middleware —
+          идеальное место для debounce, потому что оно перехватывает действия
+          <em>до</em> попадания в reducer.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">debounceMiddleware</span> = (<span class="prop">store</span>: <span class="type">any</span>) => {
+  <span class="kw">let</span> <span class="prop">timer</span>: <span class="type">number</span> | <span class="type">null</span> = <span class="kw">null</span>
+
+  <span class="kw">return</span> (<span class="prop">next</span>: <span class="type">any</span>) => (<span class="prop">action</span>: <span class="type">any</span>) => {
+    <span class="kw">if</span> (action.type === <span class="str">'search/queryChanged'</span>) {
+      <span class="kw">if</span> (timer) <span class="fn">clearTimeout</span>(timer)
+      timer = <span class="fn">setTimeout</span>(() => {
+        <span class="fn">next</span>(action)
+      }, <span class="num">400</span>)
+      <span class="kw">return</span>
+    }
+    <span class="kw">return</span> <span class="fn">next</span>(action)
+  }
+}
+        </div>
+
+        <h3>clearTimeout / setTimeout</h3>
+        <p>
+          Каждый раз, когда приходит целевой action, предыдущий таймер <strong>сбрасывается</strong>
+          через <code>clearTimeout</code>, и запускается новый <code>setTimeout</code>.
+          Только когда пользователь перестаёт печатать на 400 мс, действие пропускается в reducer
+          через <code>next(action)</code>.
+        </p>
+
+        <h3>Проходит только последнее действие</h3>
+        <p>
+          Если пользователь вводит «redux» по одной букве — будет 5 dispatch, но в reducer
+          попадёт только последний action с <code>payload: "redux"</code>. Промежуточные
+          «r», «re», «red», «redu» — все заблокированы middleware.
+        </p>
+
+        <div class="quote">
+          «Middleware provides a third-party extension point between dispatching an action,
+          and the moment it reaches the reducer.»
+          <br>— <a href="https://redux.js.org/understanding/history-and-design/middleware" target="_blank">Redux Docs — Middleware</a>
+        </div>
+
+        <h3>Случаи применения</h3>
+        <ul>
+          <li><strong>Поиск</strong> — не отправлять запрос на каждый символ</li>
+          <li><strong>Авто-сохранение</strong> — сохранять только после паузы в редактировании</li>
+          <li><strong>Resize/scroll</strong> — не реагировать на каждый пиксель</li>
+          <li><strong>Валидация</strong> — проверять форму после остановки ввода</li>
+        </ul>
+
+        <h3>Состояние middleware (замыкание)</h3>
+        <p>
+          Переменная <code>timer</code> живёт в <strong>замыкании</strong> (closure) middleware.
+          Она создаётся один раз при инициализации middleware и сохраняется между вызовами.
+          Это легальный способ хранить состояние вне Redux store — middleware
+          имеет на это право, в отличие от reducer.
+        </p>
+
+        <div class="tip">
+          Переменная таймера в замыкании middleware — это приватное состояние middleware.
+          Оно не попадает в store и не видно в DevTools, но позволяет middleware
+          координировать действия между вызовами.
+        </div>
+
+        <div class="warning">
+          Debounce в middleware блокирует action полностью — reducer его не увидит.
+          Если нужно показать промежуточное состояние (например, «печатает...»),
+          диспатчьте отдельный action перед debounce.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Debounce middleware перехватывает action и задерживает его на N мс</li>
+          <li><code>clearTimeout</code> + <code>setTimeout</code> — ядро debounce</li>
+          <li>В reducer попадает только последнее действие после паузы</li>
+          <li>Таймер хранится в замыкании middleware</li>
+          <li>Типичные случаи: поиск, авто-сохранение, resize</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

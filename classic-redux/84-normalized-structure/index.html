@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>84 — Структура нормализованного state</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">84 / 100</span>
+      Структура нормализованного state
+    </div>
+    <nav class="site-header__nav">
+      <a href="../83-normalized-intro/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">84</span>
+      <a href="../85-normalized-crud/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — entities + ids</div>
+      <div class="demo-section__body">
+        <div style="max-width: 650px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Нормализованная структура: <code>entities</code> (объект по ID) +
+            <code>ids</code> (массив для порядка). Добавляйте и удаляйте элементы —
+            наблюдайте, как обе части обновляются синхронно.
+          </p>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-add">
+              ➕ Добавить элемент
+            </button>
+            <button class="btn" id="btn-remove" disabled>
+              ➖ Удалить последний
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div class="state-display">
+              <div class="state-display__label">entities (объект по ID)</div>
+              <pre id="entities-display" style="color: var(--accent-cyan); font-size: 0.8rem; white-space: pre-wrap; max-height: 300px; overflow-y: auto;"></pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">ids (массив порядка)</div>
+              <pre id="ids-display" style="color: var(--accent-yellow); font-size: 0.8rem; white-space: pre-wrap; max-height: 300px; overflow-y: auto;"></pre>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State (JSON tree)</div>
+            <pre id="state-display" style="color: var(--accent-green); font-size: 0.75rem; white-space: pre-wrap; max-height: 250px; overflow-y: auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Структура нормализованного state</div>
+      <div class="theory__body">
+        <h3>entities — объект по ключу ID</h3>
+        <p>
+          <code>entities</code> — это объект, где ключи — это ID сущностей, а значения —
+          сами объекты. Это даёт <strong>O(1)</strong> доступ к любому элементу по ID,
+          без необходимости перебирать массив.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">entities</span>: <span class="type">Record</span>&lt;<span class="type">number</span>, <span class="type">Item</span>&gt; = {
+  <span class="num">1</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">name</span>: <span class="str">'Redux'</span> },
+  <span class="num">2</span>: { <span class="prop">id</span>: <span class="num">2</span>, <span class="prop">name</span>: <span class="str">'React'</span> },
+  <span class="num">3</span>: { <span class="prop">id</span>: <span class="num">3</span>, <span class="prop">name</span>: <span class="str">'TypeScript'</span> }
+}
+
+<span class="cm">// O(1) — мгновенный доступ</span>
+<span class="kw">const</span> <span class="prop">item</span> = entities[<span class="num">2</span>]  <span class="cm">// → { id: 2, name: 'React' }</span>
+        </div>
+
+        <h3>ids — массив для порядка</h3>
+        <p>
+          Объект не гарантирует порядок ключей. Массив <code>ids</code> хранит
+          порядок элементов. Для итерации мы проходим по <code>ids</code> и достаём
+          элементы из <code>entities</code>.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">ids</span>: <span class="type">number</span>[] = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+
+<span class="cm">// O(n) итерация в правильном порядке</span>
+<span class="kw">const</span> <span class="prop">orderedItems</span> = ids.<span class="fn">map</span>(<span class="prop">id</span> => entities[id])
+        </div>
+
+        <h3>Паттерн { entities, ids }</h3>
+        <p>
+          Вместе <code>entities</code> и <code>ids</code> формируют стандартный
+          паттерн нормализованного состояния:
+        </p>
+
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">NormalizedState</span>&lt;<span class="type">T</span>&gt; {
+  <span class="prop">entities</span>: <span class="type">Record</span>&lt;<span class="type">number</span>, <span class="type">T</span>&gt;
+  <span class="prop">ids</span>: <span class="type">number</span>[]
+}
+
+<span class="cm">// Пример</span>
+<span class="kw">const</span> <span class="prop">state</span>: <span class="type">NormalizedState</span>&lt;<span class="type">Item</span>&gt; = {
+  <span class="prop">entities</span>: {
+    <span class="num">1</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">name</span>: <span class="str">'Redux'</span> },
+    <span class="num">2</span>: { <span class="prop">id</span>: <span class="num">2</span>, <span class="prop">name</span>: <span class="str">'React'</span> }
+  },
+  <span class="prop">ids</span>: [<span class="num">1</span>, <span class="num">2</span>]
+}
+        </div>
+
+        <h3>O(1) поиск vs O(n) перебор</h3>
+        <p>
+          В массиве, чтобы найти элемент с <code>id === 42</code>, нужно перебрать
+          все элементы — <strong>O(n)</strong>. В нормализованном state —
+          <code>entities[42]</code> — <strong>O(1)</strong>, мгновенно.
+        </p>
+
+        <div class="quote">
+          «By defining a normalized state structure, we can keep the same data in multiple places
+          without having to duplicate it, and we can efficiently look up items by their IDs.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/normalizing-state-shape" target="_blank">Redux Docs — Normalizing State Shape</a>
+        </div>
+
+        <div class="tip">
+          Паттерн <code>{ entities: Record&lt;id, Entity&gt;, ids: id[] }</code> — это
+          стандарт Redux для нормализованных данных. Redux Toolkit даже имеет встроенный
+          <code>createEntityAdapter</code>, который генерирует этот формат автоматически.
+        </div>
+
+        <div class="warning">
+          Не забывайте синхронизировать <code>entities</code> и <code>ids</code>!
+          При добавлении элемента нужно записать его и в entities, и добавить ID в ids.
+          При удалении — удалить из обоих.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>entities</code> — объект <code>Record&lt;id, Entity&gt;</code> для O(1) доступа</li>
+          <li><code>ids</code> — массив <code>id[]</code> для порядка итерации</li>
+          <li>Вместе формируют паттерн <code>{ entities, ids }</code></li>
+          <li>O(1) поиск по ID вместо O(n) перебора массива</li>
+          <li>Нужна синхронизация entities и ids при мутациях</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

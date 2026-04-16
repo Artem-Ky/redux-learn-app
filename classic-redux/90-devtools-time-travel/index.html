@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>90 — Time-Travel отладка</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">90 / 100</span>
+      Time-Travel отладка
+    </div>
+    <nav class="site-header__nav">
+      <a href="../89-devtools-setup/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">90</span>
+      <a href="../91-devtools-with-middleware/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Time-Travel с todo-списком</div>
+      <div class="demo-section__body">
+        <div style="max-width: 650px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Добавьте несколько todos, затем используйте ползунок (Slider) в DevTools-панели ниже
+            для путешествия во времени. Кнопка ▶ запускает авто-воспроизведение всех экшенов.
+          </p>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+            <input type="text" id="input-todo" placeholder="Новый todo..." style="flex: 1;">
+            <button class="btn btn--accent" id="btn-add">+ Добавить</button>
+          </div>
+
+          <div style="margin-bottom: 12px;">
+            <button class="btn btn--sm" id="btn-demo">🎬 Добавить 5 демо-todo</button>
+          </div>
+
+          <div id="todo-list" style="margin-bottom: 16px; min-height: 40px;"></div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Состояние</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Инструкция</div>
+            <ol style="font-size: 0.82rem; color: var(--text-secondary); padding-left: 20px; margin: 0;">
+              <li>Добавьте несколько todos или нажмите «Добавить 5 демо-todo»</li>
+              <li>В DevTools-панели ниже нажмите кнопку <strong>⏩ Slider</strong></li>
+              <li>Двигайте ползунок влево — состояние «перематывается» назад</li>
+              <li>Нажмите <strong>▶</strong> для авто-воспроизведения всех экшенов</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Time-Travel отладка</div>
+      <div class="theory__body">
+        <h3>Что такое Time-Travel?</h3>
+        <p>
+          Time-Travel (путешествие во времени) — это возможность <strong>«перемотать»</strong>
+          приложение к любому предыдущему состоянию. Каждый dispatch создаёт снимок (snapshot)
+          состояния. Можно перейти к любому из них и увидеть, как выглядело приложение
+          в тот момент.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Каждый dispatch создаёт снимок:</span>
+<span class="cm">// [@@INIT] → state₀</span>
+<span class="cm">// [todos/add] → state₁</span>
+<span class="cm">// [todos/add] → state₂</span>
+<span class="cm">// [todos/toggle] → state₃</span>
+<span class="cm">//</span>
+<span class="cm">// Слайдер: ◀──────●── → переход к state₁</span>
+        </div>
+
+        <h3>Replay (воспроизведение) экшенов</h3>
+        <p>
+          Time-Travel работает через <em>replay</em>: чтобы получить состояние N,
+          DevTools «проигрывает» все экшены от <code>@@INIT</code> до N через reducer.
+          Так как reducer — чистая функция, результат всегда одинаковый.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Replay = прогон экшенов через reducer</span>
+<span class="kw">let</span> <span class="prop">state</span> = <span class="prop">initialState</span>
+<span class="kw">for</span> (<span class="kw">const</span> <span class="prop">action</span> <span class="kw">of</span> <span class="prop">actions</span>.<span class="fn">slice</span>(<span class="num">0</span>, <span class="prop">targetIndex</span>)) {
+  <span class="prop">state</span> = <span class="fn">reducer</span>(<span class="prop">state</span>, <span class="prop">action</span>)
+}
+<span class="cm">// state = точное состояние на момент targetIndex</span>
+        </div>
+
+        <div class="quote">
+          «Redux makes it possible to implement time-travel debugging, because
+          reducers are pure functions with no side effects. Given the same actions
+          and initial state, you always get the same result.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store" target="_blank">Redux Fundamentals, Part 4: Store</a>
+        </div>
+
+        <h3>Почему иммутабельность важна</h3>
+        <p>
+          Time-Travel возможен <strong>только</strong> благодаря иммутабельности.
+          Если reducer мутирует state, снимки будут указывать на один и тот же объект,
+          и все они покажут последнее состояние. Иммутабельные обновления создают
+          <em>новый объект</em> при каждом изменении — все снимки сохраняются.
+        </p>
+
+        <h3>Почему чистые reducers важны</h3>
+        <p>
+          Replay работает потому, что reducer — <strong>чистая функция</strong>:
+          одинаковые входные данные (state + action) всегда дают одинаковый результат.
+          Если reducer содержит side effects (запись в localStorage, HTTP-запросы),
+          replay будет вызывать эти эффекты повторно и давать непредсказуемый результат.
+        </p>
+
+        <div class="tip">
+          Time-Travel — одна из «киллер-фич» Redux. Это не просто удобство —
+          это мощнейший инструмент отладки. Вы можете найти баг, перемотать к моменту
+          его возникновения, увидеть какой экшен привёл к ошибке и какие данные
+          были в payload.
+        </div>
+
+        <div class="warning">
+          Time-Travel «ломается», если: reducer мутирует state, reducer имеет side effects,
+          в reducer используется <code>Date.now()</code> или <code>Math.random()</code>.
+          Всегда создавайте новый объект вместо мутации и генерируйте случайные значения
+          в action creator, а не в reducer.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Time-Travel = replay экшенов от начала до нужной точки</li>
+          <li>Каждый экшен создаёт снимок состояния</li>
+          <li>Можно «перемотать» к любому снимку с помощью слайдера</li>
+          <li>Кнопка авто-воспроизведения проигрывает все экшены последовательно</li>
+          <li>Иммутабельность + чистые reducers = основа time-travel</li>
+          <li>«Киллер-фича» Redux для отладки сложных приложений</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

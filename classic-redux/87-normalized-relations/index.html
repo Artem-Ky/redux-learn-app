@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>87 — Связи между сущностями</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">87 / 100</span>
+      Связи между сущностями
+    </div>
+    <nav class="site-header__nav">
+      <a href="../86-normalized-selectors/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">87</span>
+      <a href="../88-normalized-complex/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Блог: посты и комментарии</div>
+      <div class="demo-section__body">
+        <div style="max-width: 800px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Блог с нормализованными постами и комментариями. Каждый комментарий ссылается
+            на пост через <code>postId</code>. Выберите пост, чтобы увидеть его комментарии.
+          </p>
+
+          <div class="two-col">
+            <div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Посты</div>
+              <div id="posts-list"></div>
+            </div>
+
+            <div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+                Комментарии к посту <span id="selected-post-title" style="color: var(--accent-cyan);"></span>
+              </div>
+              <div id="comments-list" style="margin-bottom: 12px;"></div>
+
+              <div id="add-comment-form" style="display: none;">
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="input-comment" placeholder="Написать комментарий..." style="flex: 1;">
+                  <button class="btn btn--accent btn--sm" id="btn-add-comment">Отправить</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-top: 16px;">
+            <div class="state-display__label">Нормализованное состояние</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.75rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Связи между сущностями</div>
+      <div class="theory__body">
+        <h3>Ссылки по ID между сущностями</h3>
+        <p>
+          В нормализованном состоянии сущности хранятся независимо друг от друга.
+          <strong>Связи</strong> между ними выражаются через ссылки по ID — аналогично
+          внешним ключам в реляционных базах данных.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Комментарий ссылается на пост через postId</span>
+<span class="kw">interface</span> <span class="type">Comment</span> {
+  <span class="prop">id</span>: <span class="type">number</span>
+  <span class="prop">postId</span>: <span class="type">number</span>  <span class="cm">// ← ссылка на Post.id</span>
+  <span class="prop">text</span>: <span class="type">string</span>
+  <span class="prop">author</span>: <span class="type">string</span>
+}
+        </div>
+
+        <h3>«Join» данных в селекторах</h3>
+        <p>
+          Чтобы получить все комментарии к посту, мы делаем «join» — фильтруем
+          комментарии по <code>postId</code>:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectCommentsByPostId</span> = (
+  <span class="prop">state</span>: <span class="type">RootState</span>,
+  <span class="prop">postId</span>: <span class="type">number</span>
+) =>
+  <span class="fn">selectAllComments</span>(<span class="prop">state</span>).<span class="fn">filter</span>(
+    <span class="prop">c</span> => <span class="prop">c</span>.<span class="prop">postId</span> === <span class="prop">postId</span>
+  )
+        </div>
+
+        <div class="quote">
+          «Any references to other individual items should be done by storing the
+          item's ID... This approach of storing items by ID in an object and using
+          IDs as references is called 'normalization'.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/normalizing-state-shape" target="_blank">Redux Docs: Normalizing State Shape</a>
+        </div>
+
+        <h3>Независимость сущностей</h3>
+        <p>
+          Посты и комментарии хранятся в <em>отдельных</em> слайсах состояния.
+          Это даёт несколько преимуществ:
+        </p>
+        <ul>
+          <li>Обновление комментария не затрагивает объект поста</li>
+          <li>Один комментарий может быть связан с разными сущностями</li>
+          <li>Удаление поста не требует обхода вложенных массивов</li>
+          <li>Каждый reducer управляет только своей сущностью</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Состояние: два независимых слайса</span>
+{
+  <span class="prop">posts</span>:    { <span class="prop">ids</span>: [...], <span class="prop">entities</span>: { ... } },
+  <span class="prop">comments</span>: { <span class="prop">ids</span>: [...], <span class="prop">entities</span>: { ... } }
+}
+        </div>
+
+        <h3>Загрузка связанных данных</h3>
+        <p>
+          При загрузке данных с сервера ответ часто приходит вложенным.
+          Перед сохранением в store его нужно <em>нормализовать</em> —
+          разложить по отдельным таблицам и заменить вложенные объекты на ID.
+        </p>
+
+        <div class="tip">
+          Паттерн <code>comment.postId</code> → <code>post.id</code> — это «внешний ключ»
+          из мира SQL. В Redux мы используем тот же подход, но «join» выполняется
+          в селекторах, а не в базе данных.
+        </div>
+
+        <div class="warning">
+          Фильтрация <code>selectAllComments(state).filter(c => c.postId === postId)</code>
+          выполняется за O(n). Для больших объёмов данных лучше хранить обратный индекс
+          <code>commentsByPostId: { [postId]: number[] }</code> или использовать мемоизацию.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Связи между сущностями — через ссылки по ID (<code>comment.postId</code>)</li>
+          <li>«Join» данных выполняется в селекторах, а не в reducer</li>
+          <li>Сущности хранятся независимо в отдельных слайсах</li>
+          <li>Подход аналогичен внешним ключам в реляционных базах данных</li>
+          <li>Нормализация вложенных ответов API — стандартная практика</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

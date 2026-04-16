@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>74 — Enum vs Boolean для loading state</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">74 / 100</span>
+      Enum vs Boolean для loading state
+    </div>
+    <nav class="site-header__nav">
+      <a href="../73-async-loading-state/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">74</span>
+      <a href="../75-async-fetch-pattern/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Boolean vs Enum</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <!-- Boolean approach -->
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <span class="tag tag--bad">проблема</span>
+              <strong style="color: var(--accent-red);">Boolean подход</strong>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 12px;">
+              <code>{ isLoading: true/false }</code> — только 2 состояния
+            </div>
+
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">State</div>
+              <pre id="bool-state" style="color: var(--accent-cyan); font-size: 0.78rem;"></pre>
+            </div>
+
+            <div id="bool-display" style="min-height: 80px; padding: 12px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px;">
+            </div>
+
+            <div class="btn-group">
+              <button class="btn btn--sm" id="bool-load">Load</button>
+              <button class="btn btn--sm btn--danger" id="bool-error">Simulate Error</button>
+              <button class="btn btn--sm" id="bool-reset">Reset</button>
+            </div>
+          </div>
+
+          <!-- Enum approach -->
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <span class="tag tag--good">решение</span>
+              <strong style="color: var(--accent-green);">Enum подход</strong>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 12px;">
+              <code>{ status: 'idle' | 'loading' | 'succeeded' | 'failed' }</code> — 4 состояния
+            </div>
+
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">State</div>
+              <pre id="enum-state" style="color: var(--accent-cyan); font-size: 0.78rem;"></pre>
+            </div>
+
+            <div id="enum-display" style="min-height: 80px; padding: 12px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px;">
+            </div>
+
+            <div class="btn-group">
+              <button class="btn btn--sm" id="enum-load">Load</button>
+              <button class="btn btn--sm btn--danger" id="enum-error">Simulate Error</button>
+              <button class="btn btn--sm" id="enum-reset">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Почему enum, а не boolean?</div>
+      <div class="theory__body">
+        <h3>Boolean ограничивает до 2 состояний</h3>
+        <p>
+          <code>isLoading: boolean</code> может быть только <code>true</code> или
+          <code>false</code>. Но реальные приложения имеют минимум 4 состояния:
+        </p>
+        <ul>
+          <li><strong>idle</strong> — данные ещё не запрашивались</li>
+          <li><strong>loading</strong> — запрос в процессе</li>
+          <li><strong>succeeded</strong> — данные получены</li>
+          <li><strong>failed</strong> — произошла ошибка</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// ❌ Boolean: невозможно отличить "ещё не загружали" от "загрузка завершена"</span>
+<span class="kw">interface</span> <span class="type">BooleanState</span> {
+  <span class="prop">isLoading</span>: <span class="type">boolean</span>    <span class="cm">// false... но загружено? или ещё нет?</span>
+  <span class="prop">data</span>: <span class="type">Item</span>[]
+  <span class="prop">error</span>: <span class="type">string</span> | <span class="type">null</span>  <span class="cm">// нужен отдельный флаг</span>
+}
+
+<span class="cm">// ✔ Enum: каждое состояние чётко определено</span>
+<span class="kw">interface</span> <span class="type">EnumState</span> {
+  <span class="prop">status</span>: <span class="str">'idle'</span> | <span class="str">'loading'</span> | <span class="str">'succeeded'</span> | <span class="str">'failed'</span>
+  <span class="prop">data</span>: <span class="type">Item</span>[]
+  <span class="prop">error</span>: <span class="type">string</span> | <span class="type">null</span>
+}
+        </div>
+
+        <h3>Проблема «невозможных состояний»</h3>
+        <p>
+          С boolean можно попасть в невозможное состояние:
+          <code>{ isLoading: true, error: "Network error" }</code> — загрузка
+          <em>и</em> ошибка одновременно? Enum делает такое невозможным:
+          <code>status</code> может быть только одним значением.
+        </p>
+
+        <h3>State Machine (конечный автомат)</h3>
+        <p>
+          Enum-подход — это по сути <strong>конечный автомат</strong>.
+          Каждое состояние имеет определённые допустимые переходы:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Допустимые переходы:</span>
+<span class="cm">// idle     → loading</span>
+<span class="cm">// loading  → succeeded | failed</span>
+<span class="cm">// succeeded → loading (перезагрузка)</span>
+<span class="cm">// failed   → loading (повторная попытка)</span>
+        </div>
+
+        <div class="quote">
+          «Treat Reducers as State Machines. Many reducers don't model their
+          logic as state machines. Treat the reducer as a state machine, where
+          the combination of both the current state and the dispatched action
+          determines whether a new state value is actually computed.»
+          <br>— <a href="https://redux.js.org/style-guide/#treat-reducers-as-state-machines" target="_blank">Redux Style Guide — Treat Reducers as State Machines</a>
+        </div>
+
+        <div class="tip">
+          Enum-подход масштабируется. Нужно состояние <code>'refreshing'</code>
+          для pull-to-refresh? Просто добавьте его к union type. С boolean
+          пришлось бы добавлять ещё один флаг.
+        </div>
+
+        <div class="warning">
+          Избегайте множественных boolean-флагов: <code>isLoading</code>,
+          <code>isError</code>, <code>isSuccess</code>. Это создаёт 2³ = 8 возможных
+          комбинаций, из которых только 4 валидны. Один enum решает проблему.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Boolean = 2 состояния, реальные приложения требуют 4+</li>
+          <li><code>isLoading: false</code> — это «ещё не загружали» или «загрузка завершена»?</li>
+          <li>Enum исключает невозможные комбинации состояний</li>
+          <li>Конечный автомат = чёткие переходы между состояниями</li>
+          <li>Redux Style Guide рекомендует подход state machine</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

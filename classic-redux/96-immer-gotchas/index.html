@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>96 — Immer: подводные камни и правила</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">96 / 100</span>
+      Immer: подводные камни и правила
+    </div>
+    <nav class="site-header__nav">
+      <a href="../95-immer-nested-updates/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">96</span>
+      <a href="../97-reselect-deep/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Типичные ошибки при работе с Immer</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 20px;">
+          Три интерактивных примера частых ошибок с <code>produce</code>.
+          Нажимайте «Попробовать» и смотрите в консоль, что происходит.
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <!-- Gotcha 1 -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <span class="tag tag--bad">Ошибка #1</span>
+              <strong style="color: var(--text-bright);">Мутация draft + возврат нового значения</strong>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.82rem; margin-bottom: 12px;">
+              Нельзя одновременно мутировать draft <em>и</em> возвращать новое значение.
+              Immer не знает, какой результат использовать.
+            </p>
+            <button class="btn btn--danger" id="btn-gotcha1">Попробовать</button>
+          </div>
+
+          <!-- Gotcha 2 -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <span class="tag tag--bad">Ошибка #2</span>
+              <strong style="color: var(--text-bright);">Использование draft за пределами produce</strong>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.82rem; margin-bottom: 12px;">
+              Draft-объект действителен <em>только</em> внутри callback функции <code>produce</code>.
+              За её пределами draft «протухает» и его нельзя использовать.
+            </p>
+            <button class="btn btn--danger" id="btn-gotcha2">Попробовать</button>
+          </div>
+
+          <!-- Gotcha 3 -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <span class="tag tag--bad">Ошибка #3</span>
+              <strong style="color: var(--text-bright);">Забыли return при полной замене состояния</strong>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.82rem; margin-bottom: 12px;">
+              Если нужно заменить состояние целиком (не мутировать), нужно <em>вернуть</em>
+              новое значение. Без <code>return</code> Immer вернёт исходный объект.
+            </p>
+            <button class="btn btn--danger" id="btn-gotcha3">Попробовать</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Правила работы с Immer</div>
+      <div class="theory__body">
+        <h3>Правило 1: Мутируй draft ИЛИ возвращай новое значение</h3>
+        <p>
+          Внутри <code>produce</code> можно <strong>либо</strong> мутировать draft,
+          <strong>либо</strong> вернуть новый объект. Нельзя делать и то, и другое
+          одновременно — Immer выбросит ошибку.
+        </p>
+        <div class="code-block">
+<span class="cm">// ✅ Правильно: мутируем draft</span>
+<span class="kw">const</span> <span class="prop">next1</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="prop">draft</span>.<span class="prop">count</span>++
+})
+
+<span class="cm">// ✅ Правильно: возвращаем новый объект</span>
+<span class="kw">const</span> <span class="prop">next2</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="kw">return</span> { ...<span class="prop">draft</span>, <span class="prop">count</span>: <span class="prop">draft</span>.<span class="prop">count</span> + <span class="num">1</span> }
+})
+
+<span class="cm">// ❌ Ошибка: и мутация, и return</span>
+<span class="kw">const</span> <span class="prop">bad</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="prop">draft</span>.<span class="prop">count</span>++
+  <span class="kw">return</span> { ...<span class="prop">draft</span>, <span class="prop">count</span>: <span class="prop">draft</span>.<span class="prop">count</span> + <span class="num">1</span> }
+})
+        </div>
+
+        <h3>Правило 2: Draft действителен только внутри produce</h3>
+        <p>
+          Draft-объект — это Proxy, который <strong>отслеживает мутации</strong>.
+          После завершения <code>produce</code> этот Proxy «отзывается» (revoked).
+          Попытка использовать draft снаружи приведёт к ошибке.
+        </p>
+        <div class="code-block">
+<span class="kw">let</span> <span class="prop">savedDraft</span>: <span class="type">any</span>
+
+<span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="prop">savedDraft</span> = <span class="prop">draft</span>  <span class="cm">// сохраняем ссылку</span>
+  <span class="prop">draft</span>.<span class="prop">count</span>++
+})
+
+<span class="cm">// ❌ draft уже «протух» (revoked)</span>
+<span class="prop">savedDraft</span>.<span class="prop">count</span> = <span class="num">42</span>  <span class="cm">// TypeError!</span>
+        </div>
+
+        <h3>Правило 3: Для полной замены состояния — return</h3>
+        <p>
+          Если вы хотите полностью заменить состояние новым объектом
+          (а не мутировать draft), вы <strong>должны вернуть</strong> новое значение
+          через <code>return</code>. Без return Immer вернёт первоначальный state.
+        </p>
+        <div class="code-block">
+<span class="cm">// ❌ Неправильно: state не изменится</span>
+<span class="kw">const</span> <span class="prop">oops</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="kw">const</span> <span class="prop">newState</span> = { <span class="prop">count</span>: <span class="num">0</span>, <span class="prop">items</span>: [] }
+  <span class="cm">// забыли return!</span>
+})
+
+<span class="cm">// ✅ Правильно: return заменяет state целиком</span>
+<span class="kw">const</span> <span class="prop">fixed</span> = <span class="fn">produce</span>(<span class="prop">state</span>, <span class="prop">draft</span> => {
+  <span class="kw">return</span> { <span class="prop">count</span>: <span class="num">0</span>, <span class="prop">items</span>: [] }
+})
+        </div>
+
+        <h3>Правило 4: produce возвращает замороженный объект</h3>
+        <p>
+          Результат <code>produce</code> автоматически <strong>замораживается</strong>
+          (Object.freeze). Это помогает обнаружить случайные мутации в другом коде.
+        </p>
+
+        <div class="quote">
+          «An Immer producer can either modify the draft or return a new value,
+          but not both. If you both modify the draft and return a new value,
+          Immer will throw an error.»
+          <br>— <a href="https://immerjs.github.io/immer/pitfalls" target="_blank">Immer Docs — Pitfalls</a>
+        </div>
+
+        <h3>Частые подводные камни</h3>
+        <ul>
+          <li><strong>Async/await внутри produce</strong> — не используйте async produce без специального паттерна. Стандартный produce синхронный.</li>
+          <li><strong>Деструктуризация draft</strong> — <code>const { items } = draft</code> даёт Proxy, но примитивы теряют связь: <code>const { count } = draft</code> — count не мутируемый.</li>
+          <li><strong>this в produce</strong> — стрелочная функция не имеет своего <code>this</code>, что может сбить с толку в классах.</li>
+          <li><strong>Map/Set</strong> — Immer поддерживает их, но нужно включить <code>enableMapSet()</code>.</li>
+        </ul>
+
+        <div class="tip">
+          Если вы сомневаетесь — используйте только мутации draft, никогда не
+          комбинируйте с return. Это самый безопасный подход.
+        </div>
+
+        <div class="warning">
+          Никогда не сохраняйте ссылку на draft вне produce! Proxy отзывается
+          сразу после завершения callback. Любое обращение к нему вызовет TypeError.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

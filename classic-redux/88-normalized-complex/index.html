@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>88 — Комплексная нормализация — полный пример</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">88 / 100</span>
+      Комплексная нормализация — полный пример
+    </div>
+    <nav class="site-header__nav">
+      <a href="../87-normalized-relations/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">88</span>
+      <a href="../89-devtools-setup/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Пользователи → Посты → Комментарии</div>
+      <div class="demo-section__body">
+        <div style="max-width: 900px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Три связанные сущности: пользователи, посты и комментарии. Всё нормализовано
+            через <code>combineReducers</code>. Выберите пользователя → его посты → комментарии к посту.
+          </p>
+
+          <!-- Add forms -->
+          <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+            <div style="display: flex; gap: 8px; flex: 1; min-width: 200px;">
+              <input type="text" id="input-user" placeholder="Имя пользователя" style="flex: 1;">
+              <button class="btn btn--sm btn--accent" id="btn-add-user">+ Автор</button>
+            </div>
+            <div style="display: flex; gap: 8px; flex: 2; min-width: 300px;">
+              <select id="select-author" style="background: var(--bg-input); border: 1px solid var(--border-light); border-radius: var(--radius-sm); color: var(--text-bright); padding: 6px 10px; font-size: 0.82rem; min-width: 120px;"></select>
+              <input type="text" id="input-post" placeholder="Заголовок поста" style="flex: 1;">
+              <button class="btn btn--sm btn--accent" id="btn-add-post">+ Пост</button>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 180px 1fr 1fr; gap: 12px;">
+            <!-- Users column -->
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Пользователи</div>
+              <div id="users-list"></div>
+            </div>
+
+            <!-- Posts column -->
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                Посты <span id="posts-author" style="color: var(--accent-cyan);"></span>
+              </div>
+              <div id="posts-list"></div>
+            </div>
+
+            <!-- Comments column -->
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                Комментарии <span id="comments-post" style="color: var(--accent-cyan);"></span>
+              </div>
+              <div id="comments-list"></div>
+              <div id="comment-form" style="display: none; margin-top: 8px;">
+                <div style="display: flex; gap: 6px;">
+                  <input type="text" id="input-comment" placeholder="Комментарий..." style="flex: 1; font-size: 0.8rem; padding: 6px 8px;">
+                  <button class="btn btn--sm btn--accent" id="btn-add-comment">↵</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-top: 16px;">
+            <div class="state-display__label">Полное нормализованное состояние</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.72rem; max-height: 300px; overflow: auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Комплексная нормализация</div>
+      <div class="theory__body">
+        <h3>Полностью нормализованное приложение</h3>
+        <p>
+          В реальных приложениях данные имеют сложные связи: пользователь создаёт посты,
+          к постам оставляют комментарии. <strong>Каждый тип сущности</strong> хранится
+          в своём слайсе с форматом <code>{ ids, entities }</code>.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Три сущности — три слайса</span>
+<span class="kw">const</span> <span class="prop">rootReducer</span> = <span class="fn">combineReducers</span>({
+  <span class="prop">users</span>: <span class="fn">usersReducer</span>,     <span class="cm">// { ids, entities, nextId }</span>
+  <span class="prop">posts</span>: <span class="fn">postsReducer</span>,     <span class="cm">// { ids, entities, nextId }</span>
+  <span class="prop">comments</span>: <span class="fn">commentsReducer</span> <span class="cm">// { ids, entities, nextId }</span>
+})
+        </div>
+
+        <h3>Реляционные селекторы</h3>
+        <p>
+          Связи между сущностями строятся через селекторы. Каждый «уровень»
+          фильтрует данные по ID родительской сущности:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Посты пользователя</span>
+<span class="kw">const</span> <span class="fn">selectPostsByUserId</span> = (<span class="prop">state</span>, <span class="prop">userId</span>) =>
+  <span class="fn">selectAllPosts</span>(<span class="prop">state</span>).<span class="fn">filter</span>(<span class="prop">p</span> => <span class="prop">p</span>.<span class="prop">authorId</span> === <span class="prop">userId</span>)
+
+<span class="cm">// Комментарии к посту</span>
+<span class="kw">const</span> <span class="fn">selectCommentsByPostId</span> = (<span class="prop">state</span>, <span class="prop">postId</span>) =>
+  <span class="fn">selectAllComments</span>(<span class="prop">state</span>).<span class="fn">filter</span>(<span class="prop">c</span> => <span class="prop">c</span>.<span class="prop">postId</span> === <span class="prop">postId</span>)
+
+<span class="cm">// Автор комментария</span>
+<span class="kw">const</span> <span class="fn">selectCommentAuthor</span> = (<span class="prop">state</span>, <span class="prop">comment</span>) =>
+  <span class="fn">selectUserById</span>(<span class="prop">state</span>, <span class="prop">comment</span>.<span class="prop">authorId</span>)
+        </div>
+
+        <div class="quote">
+          «In a Redux store, we typically organize data into 'slices' based on
+          what it's used for... Data that is used together should generally be
+          stored close together.»
+          <br>— <a href="https://redux.js.org/tutorials/essentials/part-6-performance-normalization" target="_blank">Redux Essentials, Part 6: Performance & Normalizing Data</a>
+        </div>
+
+        <h3>Когда нормализация оправдана</h3>
+        <p>
+          Нормализация добавляет сложность. Она оправдывает себя когда:
+        </p>
+        <ul>
+          <li>Одна сущность отображается в нескольких местах UI</li>
+          <li>Между сущностями есть связи «один ко многим»</li>
+          <li>Данные часто обновляются — обновление одной записи O(1)</li>
+          <li>Большой объём данных — прямой доступ по ID вместо поиска</li>
+        </ul>
+
+        <h3>Подготовка к createEntityAdapter</h3>
+        <p>
+          Паттерн <code>{ ids, entities }</code> настолько распространён,
+          что Redux Toolkit предоставляет <code>createEntityAdapter</code> —
+          утилиту, которая автоматически генерирует reducers и selectors
+          для нормализованных данных.
+        </p>
+
+        <div class="tip">
+          Комплексная нормализация — фундамент для масштабируемых приложений.
+          Redux Toolkit's <code>createEntityAdapter</code> автоматизирует всё, что мы
+          делали вручную: создание <code>{ ids, entities }</code>, CRUD-операции и селекторы.
+        </div>
+
+        <div class="warning">
+          При полной нормализации важно следить за целостностью ссылок. При удалении
+          пользователя нужно решить: удалить его посты или назначить «автор неизвестен».
+          Каскадное удаление в Redux нужно реализовывать вручную.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Каждая сущность — отдельный слайс через <code>combineReducers</code></li>
+          <li>Связи выражаются через ID: <code>post.authorId</code>, <code>comment.postId</code></li>
+          <li>Реляционные селекторы «join» данные из разных слайсов</li>
+          <li><code>createEntityAdapter</code> из RTK автоматизирует этот паттерн</li>
+          <li>Нормализация оправдана при сложных связях и частых обновлениях</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

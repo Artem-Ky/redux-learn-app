@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>78 — Условный dispatch с getState()</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">78 / 100</span>
+      Условный dispatch с getState()
+    </div>
+    <nav class="site-header__nav">
+      <a href="../77-async-error-handling/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">78</span>
+      <a href="../79-async-sequential-dispatch/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Условная загрузка: getState() в thunk</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Первый клик загружает данные. Повторный клик — thunk проверяет
+            <code>getState().status</code> и пропускает запрос. «Reset» позволяет загрузить заново.
+          </p>
+
+          <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-load">🔄 Загрузить данные</button>
+            <button class="btn" id="btn-reset">🗑 Reset</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Статус</div>
+            <pre id="status-display" style="color: var(--text-secondary); font-size: 0.9rem;">idle</pre>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Данные</div>
+            <div id="data-display" style="min-height: 40px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Нажмите «Загрузить данные» ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — getState() для условного dispatch</div>
+      <div class="theory__body">
+        <h3>Зачем getState() в thunk</h3>
+        <p>
+          Thunk получает <code>getState</code> вторым аргументом. Это позволяет
+          <strong>прочитать текущий state</strong> перед выполнением логики и принять решение —
+          нужно ли делать запрос или нет.
+        </p>
+
+        <div class="quote">
+          «The thunk can be used to delay the dispatch of an action, or to dispatch
+          only if a certain condition is met. The inner function receives the store
+          methods dispatch and getState as parameters.»
+          <br>— <a href="https://github.com/reduxjs/redux-thunk#motivation" target="_blank">redux-thunk — Motivation</a>
+        </div>
+
+        <h3>Guard-паттерн: предотвращение дублирующих запросов</h3>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">fetchDataIfNeeded</span> = () => {
+  <span class="kw">return</span> <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>, <span class="prop">getState</span>: <span class="type">any</span>): <span class="type">Promise</span>&lt;<span class="type">void</span>&gt; => {
+    <span class="kw">const</span> { <span class="prop">status</span> } = <span class="fn">getState</span>()
+
+    <span class="kw">if</span> (status !== <span class="str">'idle'</span>) {
+      console.<span class="fn">log</span>(<span class="str">'Data already loaded, skipping fetch'</span>)
+      <span class="kw">return</span> <span class="cm">// ← ранний выход</span>
+    }
+
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'fetch/pending'</span> })
+    <span class="kw">const</span> data = <span class="kw">await</span> <span class="fn">fetchFromApi</span>()
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'fetch/fulfilled'</span>, <span class="prop">payload</span>: data })
+  }
+}
+        </div>
+
+        <h3>Типичные проверки</h3>
+        <ul>
+          <li><code>status !== 'idle'</code> — данные уже загружены или загружаются</li>
+          <li><code>status === 'loading'</code> — запрос уже в процессе</li>
+          <li><code>data.length > 0</code> — данные уже есть в кэше</li>
+          <li><code>Date.now() - lastFetchTime < 60000</code> — кэш ещё не устарел</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Проверка нескольких условий</span>
+<span class="kw">const</span> <span class="fn">fetchUsersIfNeeded</span> = () => (<span class="prop">dispatch</span>: <span class="type">any</span>, <span class="prop">getState</span>: <span class="type">any</span>) => {
+  <span class="kw">const</span> state = <span class="fn">getState</span>()
+
+  <span class="kw">if</span> (state.<span class="prop">status</span> === <span class="str">'loading'</span>) <span class="kw">return</span> <span class="cm">// уже грузим</span>
+  <span class="kw">if</span> (state.<span class="prop">data</span>.<span class="prop">length</span> > <span class="num">0</span>) <span class="kw">return</span>  <span class="cm">// данные есть</span>
+
+  <span class="fn">dispatch</span>(<span class="fn">fetchUsers</span>())
+}
+        </div>
+
+        <div class="tip">
+          Guard-паттерн — простой и эффективный способ предотвратить лишние API-запросы.
+          Вместо отключения кнопки в UI, логика находится в thunk и работает
+          независимо от того, откуда вызывается dispatch.
+        </div>
+
+        <div class="warning">
+          <code>getState()</code> возвращает state на момент вызова. Если между вызовами
+          <code>getState()</code> и <code>dispatch()</code> проходит время (например, <code>await</code>),
+          state мог измениться. Проверяйте state непосредственно перед принятием решения.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>getState()</code> — второй аргумент thunk-функции</li>
+          <li>Используйте для проверки текущего состояния перед dispatch</li>
+          <li>Guard-паттерн: ранний <code>return</code> если данные уже загружены</li>
+          <li>Предотвращает дублирующие запросы на уровне логики, а не UI</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

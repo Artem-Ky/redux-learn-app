@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>91 — DevTools + Middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">91 / 100</span>
+      DevTools + Middleware
+    </div>
+    <nav class="site-header__nav">
+      <a href="../90-devtools-time-travel/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">91</span>
+      <a href="../92-devtools-trace/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — DevTools + middleware вместе</div>
+      <div class="demo-section__body">
+        <div style="max-width: 650px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Todo-список с <strong>thunk middleware</strong> (асинхронная загрузка) и
+            <strong>logger middleware</strong> (вывод в консоль). DevTools и middleware работают
+            вместе через <code>compose</code>.
+          </p>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+            <input type="text" id="input-todo" placeholder="Новый todo..." style="flex: 1;">
+            <button class="btn btn--accent" id="btn-add">+ Добавить</button>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+            <button class="btn btn--sm" id="btn-load">📥 Load todos (thunk)</button>
+            <button class="btn btn--sm" id="btn-clear">🗑 Очистить</button>
+          </div>
+
+          <div id="todo-list" style="margin-bottom: 16px; min-height: 40px;"></div>
+
+          <div class="state-display">
+            <div class="state-display__label">Состояние</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — DevTools + middleware вместе</div>
+      <div class="theory__body">
+        <h3>Правильная композиция</h3>
+        <p>
+          Когда в приложении нужны и middleware, и DevTools, их нужно объединить
+          через <code>compose</code>. У Redux есть своя функция <code>compose</code>,
+          которая комбинирует несколько enhancer-ов в один.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createStore</span>, <span class="fn">applyMiddleware</span>, <span class="fn">compose</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="cm">// DevTools enhancer (с фоллбэком для продакшена)</span>
+<span class="kw">const</span> <span class="prop">devtoolsEnhancer</span> =
+  <span class="prop">window</span>.<span class="prop">__REDUX_DEVTOOLS_EXTENSION__</span>?.() || (<span class="prop">f</span> => <span class="prop">f</span>)
+
+<span class="cm">// compose объединяет enhancer-ы справа налево</span>
+<span class="kw">const</span> <span class="prop">store</span> = <span class="fn">createStore</span>(
+  <span class="prop">reducer</span>,
+  <span class="fn">compose</span>(
+    <span class="fn">applyMiddleware</span>(<span class="prop">thunk</span>, <span class="prop">loggerMiddleware</span>),
+    <span class="prop">devtoolsEnhancer</span>
+  )
+)
+        </div>
+
+        <h3>Порядок имеет значение</h3>
+        <p>
+          <code>applyMiddleware</code> передаётся <strong>первым</strong> аргументом в
+          <code>compose</code>, а DevTools enhancer — вторым. Это означает, что DevTools
+          «оборачивает» store <em>снаружи</em> middleware, и может видеть все экшены,
+          включая те, что прошли через middleware.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// compose(A, B) = A(B(createStore))</span>
+<span class="cm">//</span>
+<span class="cm">// Порядок выполнения:</span>
+<span class="cm">// 1. devtoolsEnhancer оборачивает createStore</span>
+<span class="cm">// 2. applyMiddleware оборачивает результат</span>
+<span class="cm">//</span>
+<span class="cm">// Цепочка dispatch:</span>
+<span class="cm">// dispatch → middleware₁ → middleware₂ → DevTools → reducer</span>
+        </div>
+
+        <h3>composeWithDevTools</h3>
+        <p>
+          Пакет <code>redux-devtools-extension</code> предоставляет утилиту
+          <code>composeWithDevTools</code>, которая упрощает этот паттерн:
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">composeWithDevTools</span> } <span class="kw">from</span> <span class="str">'redux-devtools-extension'</span>
+
+<span class="kw">const</span> <span class="prop">store</span> = <span class="fn">createStore</span>(
+  <span class="prop">reducer</span>,
+  <span class="fn">composeWithDevTools</span>(
+    <span class="fn">applyMiddleware</span>(<span class="prop">thunk</span>, <span class="prop">logger</span>)
+  )
+)
+<span class="cm">// composeWithDevTools = compose + DevTools enhancer в одном</span>
+        </div>
+
+        <div class="quote">
+          «The Redux DevTools Extension can be composed with any other store enhancers.
+          applyMiddleware goes inside compose, and the DevTools enhancer wraps everything.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#integrating-devtools" target="_blank">Redux Fundamentals, Part 4: Store</a>
+        </div>
+
+        <h3>Logger middleware</h3>
+        <p>
+          Logger middleware перехватывает каждый dispatch и логирует: тип экшена, payload,
+          предыдущее и следующее состояние. Это простой, но мощный инструмент для отладки —
+          особенно когда DevTools расширение недоступно.
+        </p>
+
+        <div class="tip">
+          Для продакшена используйте фоллбэк <code>(f => f)</code> для DevTools enhancer.
+          Это «пустой» enhancer — функция-тождество, которая ничего не делает.
+          Так приложение не упадёт, если расширение DevTools не установлено.
+        </div>
+
+        <div class="warning">
+          Не путайте порядок аргументов в <code>compose</code>.
+          <code>applyMiddleware</code> должен идти <strong>первым</strong>, DevTools —
+          <strong>вторым</strong>. Если поменять местами, DevTools не увидит экшены,
+          прошедшие через middleware (например, thunk-функции).
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>compose</code> объединяет middleware и DevTools enhancer</li>
+          <li><code>applyMiddleware</code> идёт первым аргументом в compose</li>
+          <li>DevTools enhancer оборачивает всё снаружи</li>
+          <li><code>composeWithDevTools</code> — удобная обёртка из отдельного пакета</li>
+          <li>Фоллбэк <code>(f => f)</code> защищает от отсутствия расширения</li>
+          <li>Logger middleware пишет в консоль тип, payload, prev/next state</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>76 — Thunk возвращает Promise — await dispatch</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">76 / 100</span>
+      Thunk возвращает Promise — await dispatch
+    </div>
+    <nav class="site-header__nav">
+      <a href="../75-async-fetch-pattern/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">76</span>
+      <a href="../76a-why-thunks/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Thunk + Promise: await dispatch</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Нажмите «Save» — thunk вернёт Promise. После <code>await store.dispatch(...)</code>
+            UI покажет уведомление «Saved!».
+          </p>
+
+          <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+            <input type="text" id="input-name" placeholder="Имя элемента"
+              style="flex:1; padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-bright); border-radius: 4px; font-family: var(--font-mono); font-size: 0.85rem;">
+            <button class="btn btn--accent" id="btn-save">💾 Save</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Статус</div>
+            <pre id="status-display" style="color: var(--text-secondary); font-size: 0.9rem;">idle</pre>
+          </div>
+
+          <div id="toast" style="display:none; padding: 10px 16px; background: var(--accent-green); color: #000; border-radius: 6px; font-weight: 600; font-size: 0.9rem; text-align: center; margin-bottom: 16px;">
+            ✅ Saved!
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Сохранённые элементы</div>
+            <div id="items-display" style="min-height: 40px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Пока ничего не сохранено</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — dispatch(thunk) возвращает значение thunk'а</div>
+      <div class="theory__body">
+        <h3>Возвращаемое значение dispatch</h3>
+        <p>
+          Когда thunk middleware перехватывает функцию, он вызывает её и <strong>возвращает результат</strong>.
+          Если thunk — <code>async</code>-функция, то <code>dispatch(thunk())</code> вернёт <code>Promise</code>.
+        </p>
+
+        <div class="quote">
+          «Since dispatching a thunk returns the thunk's return value,
+          if we make the thunk function async, we can await it to know
+          when the async work is done.»
+          <br>— <a href="https://redux.js.org/tutorials/essentials/part-5-async-logic" target="_blank">Redux Essentials, Part 5 — Async Logic and Data Fetching</a>
+        </div>
+
+        <h3>Паттерн: await dispatch</h3>
+        <p>
+          Это позволяет выполнить код <strong>после</strong> завершения асинхронной операции —
+          показать уведомление, перенаправить пользователя, закрыть модальное окно.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">saveItem</span> = (<span class="prop">data</span>: <span class="type">string</span>) => {
+  <span class="kw">return</span> <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>): <span class="type">Promise</span>&lt;<span class="type">void</span>&gt; => {
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'save/pending'</span> })
+    <span class="kw">await</span> <span class="fn">fakeApiSave</span>(data)
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'save/fulfilled'</span>, <span class="prop">payload</span>: data })
+  }
+}
+
+<span class="cm">// В обработчике клика:</span>
+<span class="kw">await</span> store.<span class="fn">dispatch</span>(<span class="fn">saveItem</span>(<span class="str">'My item'</span>) <span class="kw">as</span> <span class="type">any</span>)
+<span class="fn">showToast</span>(<span class="str">'Saved!'</span>) <span class="cm">// выполнится после завершения</span>
+        </div>
+
+        <h3>Как это работает внутри</h3>
+        <p>
+          Thunk middleware возвращает результат вызова thunk-функции:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Упрощённый thunk middleware</span>
+<span class="kw">if</span> (<span class="kw">typeof</span> action === <span class="str">'function'</span>) {
+  <span class="kw">return</span> <span class="fn">action</span>(dispatch, getState) <span class="cm">// ← возвращает Promise</span>
+}
+        </div>
+
+        <div class="tip">
+          <code>dispatch(thunk())</code> возвращает то, что возвращает сама thunk-функция.
+          Для <code>async</code>-функции это всегда <code>Promise</code>. Используйте
+          <code>await</code> для последовательного UI-обновления.
+        </div>
+
+        <h3>Когда это полезно</h3>
+        <ul>
+          <li>Показать уведомление (toast) после сохранения</li>
+          <li>Закрыть модальное окно после успешного запроса</li>
+          <li>Перенаправить на другую страницу после создания ресурса</li>
+          <li>Обновить локальный state компонента на основе результата</li>
+        </ul>
+
+        <div class="warning">
+          Не забывайте обрабатывать ошибки при <code>await dispatch(...)</code> —
+          если thunk выбросит исключение, промис будет отклонён. Используйте <code>try/catch</code>
+          вокруг <code>await</code>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><code>dispatch(thunk())</code> возвращает возвращаемое значение thunk'а</li>
+          <li>Async thunk → <code>dispatch</code> возвращает <code>Promise</code></li>
+          <li>Можно <code>await store.dispatch(saveItem(data))</code></li>
+          <li>Полезно для UI-фидбека после асинхронных операций</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

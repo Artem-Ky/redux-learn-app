@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>85 — CRUD с нормализованным state</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">85 / 100</span>
+      CRUD с нормализованным state
+    </div>
+    <nav class="site-header__nav">
+      <a href="../84-normalized-structure/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">85</span>
+      <a href="../86-normalized-selectors/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — CRUD Todo (нормализованный state)</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Todo-приложение на нормализованном state. Все четыре операции CRUD:
+            Create (добавить), Read (список), Update (toggle/edit), Delete (удалить).
+          </p>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <input
+              type="text"
+              id="todo-input"
+              placeholder="Новая задача..."
+              style="flex: 1; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-bright); font-size: 0.9rem; font-family: var(--font-sans); outline: none;"
+            />
+            <button class="btn btn--accent" id="btn-add">➕ Добавить</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Список Todo</div>
+            <div id="todos-display" style="min-height: 80px; padding: 4px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Добавьте задачу ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Нормализованный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.75rem; white-space: pre-wrap; max-height: 250px; overflow-y: auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — CRUD с нормализованным state</div>
+      <div class="theory__body">
+        <h3>Create — добавление</h3>
+        <p>
+          Добавление нового элемента — это две операции: записать объект в <code>entities</code>
+          по ключу ID и добавить этот ID в массив <code>ids</code>.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ADD: entities[id] = todo, ids.push(id)</span>
+<span class="kw">case</span> <span class="str">'todos/add'</span>: {
+  <span class="kw">const</span> <span class="prop">todo</span> = action.payload
+  <span class="kw">return</span> {
+    ...state,
+    <span class="prop">entities</span>: { ...state.entities, [todo.id]: todo },
+    <span class="prop">ids</span>: [...state.ids, todo.id]
+  }
+}
+        </div>
+
+        <h3>Update — обновление (toggle / edit)</h3>
+        <p>
+          Обновление — просто spread сущности по ID. Не нужно искать индекс в массиве,
+          не нужно map всех элементов — прямой доступ <code>entities[id]</code>.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// TOGGLE: spread entity, инвертировать completed</span>
+<span class="kw">case</span> <span class="str">'todos/toggle'</span>: {
+  <span class="kw">const</span> <span class="prop">id</span> = action.payload
+  <span class="kw">const</span> <span class="prop">todo</span> = state.entities[id]
+  <span class="kw">return</span> {
+    ...state,
+    <span class="prop">entities</span>: {
+      ...state.entities,
+      [id]: { ...todo, <span class="prop">completed</span>: !todo.completed }
+    }
+  }
+}
+        </div>
+
+        <h3>Delete — удаление</h3>
+        <p>
+          Удаление — <code>delete</code> из entities + <code>filter</code> из ids.
+          Обе структуры должны быть обновлены синхронно.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// DELETE: delete entities[id], filter ids</span>
+<span class="kw">case</span> <span class="str">'todos/delete'</span>: {
+  <span class="kw">const</span> <span class="prop">id</span> = action.payload
+  <span class="kw">const</span> <span class="prop">newEntities</span> = { ...state.entities }
+  <span class="kw">delete</span> newEntities[id]
+  <span class="kw">return</span> {
+    ...state,
+    <span class="prop">entities</span>: newEntities,
+    <span class="prop">ids</span>: state.ids.<span class="fn">filter</span>(<span class="prop">i</span> => i !== id)
+  }
+}
+        </div>
+
+        <h3>Edit — редактирование текста</h3>
+
+        <div class="code-block">
+<span class="cm">// EDIT: spread entity, новый text</span>
+<span class="kw">case</span> <span class="str">'todos/edit'</span>: {
+  <span class="kw">const</span> { <span class="prop">id</span>, <span class="prop">text</span> } = action.payload
+  <span class="kw">return</span> {
+    ...state,
+    <span class="prop">entities</span>: {
+      ...state.entities,
+      [id]: { ...state.entities[id], <span class="prop">text</span>: text }
+    }
+  }
+}
+        </div>
+
+        <h3>Сравнение с массивом</h3>
+        <p>
+          В массиве toggle выглядит как <code>todos.map(t => t.id === id ? {...t, completed: !t.completed} : t)</code> —
+          мы перебираем <strong>все</strong> элементы, чтобы обновить один.
+          С нормализацией — обновляем <strong>напрямую</strong> по ключу: <code>entities[id]</code>.
+        </p>
+
+        <div class="quote">
+          «We recommend organizing your Redux store's data in a 'normalized' form.
+          Among other things, this enables looking up items by their IDs without
+          having to iterate over entire arrays.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/normalizing-state-shape" target="_blank">Redux Docs — Normalizing State Shape</a>
+        </div>
+
+        <div class="tip">
+          Нормализованный CRUD проще: Add = set + push, Update = spread по ключу,
+          Delete = delete + filter. Нет <code>.find()</code>, нет <code>.findIndex()</code>,
+          нет <code>.map()</code> для обновления одного элемента.
+        </div>
+
+        <div class="warning">
+          При delete не забудьте удалить ID из обоих мест — <code>entities</code>
+          и <code>ids</code>. Осиротевший ID в массиве приведёт к ошибке
+          <code>entities[id] → undefined</code>.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li><strong>Add</strong>: <code>entities[id] = entity</code> + <code>ids.push(id)</code></li>
+          <li><strong>Update</strong>: <code>{ ...entities[id], ...changes }</code></li>
+          <li><strong>Delete</strong>: <code>delete entities[id]</code> + <code>ids.filter()</code></li>
+          <li>Прямой доступ по ID вместо перебора массива</li>
+          <li>Проще и эффективнее, чем array-based CRUD</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

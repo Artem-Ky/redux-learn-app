@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>83 — Нормализация: что и зачем</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">83 / 100</span>
+      Нормализация: что и зачем
+    </div>
+    <nav class="site-header__nav">
+      <a href="../82-async-custom-middleware-api/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">83</span>
+      <a href="../84-normalized-structure/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Денормализованные vs Нормализованные данные</div>
+      <div class="demo-section__body">
+        <div style="max-width: 700px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Слева — денормализованные данные (вложенные, с дубликатами автора).
+            Справа — нормализованные (сущности разделены, без дубликатов).
+            Переключайтесь кнопками и смотрите разницу в консоли.
+          </p>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-denorm" style="flex: 1;">
+              📋 Денормализованные
+            </button>
+            <button class="btn" id="btn-norm" style="flex: 1;">
+              🗂️ Нормализованные
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="state-display">
+              <div class="state-display__label">Денормализованные</div>
+              <pre id="denorm-display" style="color: var(--accent-orange); font-size: 0.75rem; white-space: pre-wrap; max-height: 350px; overflow-y: auto;"></pre>
+            </div>
+            <div class="state-display">
+              <div class="state-display__label">Нормализованные</div>
+              <pre id="norm-display" style="color: var(--accent-cyan); font-size: 0.75rem; white-space: pre-wrap; max-height: 350px; overflow-y: auto;"></pre>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-top: 16px;">
+            <div class="state-display__label">Активный вид</div>
+            <pre id="active-display" style="color: var(--accent-green); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что такое нормализация?</div>
+      <div class="theory__body">
+        <h3>Нормализация = нет дубликатов + доступ по ID</h3>
+        <p>
+          Нормализация данных — это процесс структурирования данных так, чтобы
+          <strong>каждая сущность хранилась в одном месте</strong> и на неё ссылались по ID.
+          Точно как в реляционных базах данных — вместо дублирования данных автора
+          в каждом посте, мы храним авторов отдельно и используем <code>authorId</code>.
+        </p>
+
+        <h3>Аналогия с базами данных</h3>
+        <p>
+          В SQL нельзя хранить полный объект автора в каждой строке таблицы постов —
+          это нарушает нормальные формы. Вместо этого используется <code>FOREIGN KEY</code>.
+          Redux рекомендует тот же подход: отдельные «таблицы» для каждого типа сущностей.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ Денормализованные (вложенные, дубликаты)</span>
+<span class="kw">const</span> <span class="prop">posts</span> = [
+  { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">title</span>: <span class="str">'Redux'</span>,
+    <span class="prop">author</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">name</span>: <span class="str">'Иван'</span> } },  <span class="cm">// ← автор #1</span>
+  { <span class="prop">id</span>: <span class="num">2</span>, <span class="prop">title</span>: <span class="str">'React'</span>,
+    <span class="prop">author</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">name</span>: <span class="str">'Иван'</span> } }   <span class="cm">// ← ДУБЛИКАТ автора #1!</span>
+]
+        </div>
+
+        <div class="code-block">
+<span class="cm">// ✅ Нормализованные (раздельно, без дубликатов)</span>
+<span class="kw">const</span> <span class="prop">state</span> = {
+  <span class="prop">authors</span>: {
+    <span class="num">1</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">name</span>: <span class="str">'Иван'</span> }     <span class="cm">// ← один экземпляр</span>
+  },
+  <span class="prop">posts</span>: {
+    <span class="num">1</span>: { <span class="prop">id</span>: <span class="num">1</span>, <span class="prop">title</span>: <span class="str">'Redux'</span>, <span class="prop">authorId</span>: <span class="num">1</span> },
+    <span class="num">2</span>: { <span class="prop">id</span>: <span class="num">2</span>, <span class="prop">title</span>: <span class="str">'React'</span>, <span class="prop">authorId</span>: <span class="num">1</span> }
+  }
+}
+        </div>
+
+        <h3>Проблемы вложенных / дублированных данных</h3>
+        <p>
+          Если автор «Иван» меняет имя — нужно найти и обновить <strong>каждую копию</strong>
+          во всех постах. Забыли одну — данные рассинхронизированы. С нормализацией
+          обновляется <strong>одно место</strong> — <code>authors[1].name</code>.
+        </p>
+        <ul>
+          <li>Дубликаты → рассинхронизация при обновлении</li>
+          <li>Вложенность → сложные пути обновления (<code>posts[0].author.name</code>)</li>
+          <li>Лишние данные → больше памяти, медленнее перерисовка</li>
+        </ul>
+
+        <div class="quote">
+          «The recommended approach to managing relational or nested data in a Redux store
+          is to treat a portion of your store as if it were a database, and keep that data
+          in a normalized form.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/normalizing-state-shape" target="_blank">Redux Docs — Normalizing State Shape</a>
+        </div>
+
+        <div class="tip">
+          Нормализация в Redux — это тот же принцип, что и в реляционных базах данных:
+          «каждый факт хранится в одном месте». Это упрощает обновления и предотвращает
+          рассинхронизацию данных.
+        </div>
+
+        <div class="warning">
+          Не нормализуйте всё подряд. Данные, которые приходят только для отображения
+          и не обновляются, можно хранить вложенными. Нормализация нужна, когда
+          одни и те же сущности встречаются в нескольких местах.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Нормализация = каждая сущность хранится один раз, доступ по ID</li>
+          <li>Аналогия с SQL: отдельные таблицы + внешние ключи</li>
+          <li>Денормализация → дубликаты → рассинхронизация при обновлении</li>
+          <li>Redux рекомендует нормализованный state для связанных данных</li>
+          <li>Обновление одной сущности — в одном месте</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

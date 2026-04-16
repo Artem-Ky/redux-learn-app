@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>55a — Фабрика селекторов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .todo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+      background: var(--bg-tertiary);
+      transition: background 0.2s;
+    }
+    .todo-row:hover { background: var(--bg-hover); }
+    .todo-row__id {
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      min-width: 30px;
+    }
+    .todo-row__text { flex: 1; }
+    .todo-row__selector-info {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--accent-purple);
+      background: rgba(197, 134, 192, 0.1);
+      border: 1px solid rgba(197, 134, 192, 0.25);
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .todo-row__recompute {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      min-width: 90px;
+      text-align: right;
+    }
+    .todo-row__recompute.zero { color: var(--success); }
+    .todo-row__recompute.hit { color: var(--warning); }
+
+    .versus { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    .versus__panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .versus__title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+    .stat-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      margin-top: 8px;
+    }
+    .stat-badge--bad { background: rgba(244, 71, 71, 0.15); color: var(--error); border: 1px solid rgba(244, 71, 71, 0.3); }
+    .stat-badge--good { background: rgba(76, 175, 80, 0.15); color: var(--success); border: 1px solid rgba(76, 175, 80, 0.3); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">55a / 100</span>
+      Фабрика селекторов — свой селектор для каждой строки
+    </div>
+    <nav class="site-header__nav">
+      <a href="../55-selectors-chain/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">55a</span>
+      <a href="../56-middleware-concept/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Один селектор на всех vs фабрика (свой на каждую строку)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 0.85rem;">
+          5 задач. Каждая строка «подписана» на свой todo через селектор.
+          Нажимайте toggle/edit и следите за счётчиком пересчётов у каждой строки:
+        </p>
+
+        <div class="btn-group" style="margin-bottom: 16px;">
+          <button class="btn btn--accent" id="btn-toggle-0">Toggle #0</button>
+          <button class="btn btn--accent" id="btn-toggle-2">Toggle #2</button>
+          <button class="btn btn--accent" id="btn-toggle-4">Toggle #4</button>
+          <button class="btn" id="btn-unrelated">Unrelated dispatch</button>
+          <button class="btn btn--danger" id="btn-reset-counters">Сброс счётчиков</button>
+        </div>
+
+        <div class="versus">
+          <!-- LEFT: shared selector -->
+          <div class="versus__panel">
+            <div class="versus__title" style="color: var(--error);">
+              Один общий селектор <span class="tag tag--bad">shared</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 10px;">
+              <code>selectTodoById(state, id)</code> — один экземпляр createSelector на всех.
+              Каждый вызов с другим <code>id</code> сбрасывает кэш (cache size = 1).
+            </p>
+            <div id="shared-list"></div>
+            <div class="stat-badge stat-badge--bad" id="shared-total">Всего пересчётов: 0</div>
+          </div>
+
+          <!-- RIGHT: factory selector -->
+          <div class="versus__panel">
+            <div class="versus__title" style="color: var(--success);">
+              Фабрика — свой селектор на строку <span class="tag tag--good">factory</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 10px;">
+              <code>makeSelectTodoById()</code> — каждая строка создаёт свой экземпляр.
+              Кэш не сбрасывается при вызове с другим <code>id</code>.
+            </p>
+            <div id="factory-list"></div>
+            <div class="stat-badge stat-badge--good" id="factory-total">Всего пересчётов: 0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Фабрика селекторов (Selector Factory)</div>
+      <div class="theory__body">
+        <h3>Проблема: один мемоизированный селектор на всех</h3>
+        <p>
+          <code>createSelector</code> кэширует только <strong>последний результат</strong> (cache size&nbsp;=&nbsp;1).
+          Если вы вызываете один и тот же селектор с разными аргументами —
+          каждый вызов <em>сбрасывает кэш предыдущего</em>:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Один экземпляр селектора на ВСЁ приложение</span>
+<span class="kw">const</span> <span class="fn">selectTodoById</span> = <span class="fn">createSelector</span>(
+  (<span class="prop">state</span>: RootState) => state.<span class="prop">todos</span>,
+  (_: RootState, <span class="prop">id</span>: <span class="type">number</span>) => id,
+  (<span class="prop">todos</span>, <span class="prop">id</span>) => todos.<span class="fn">find</span>(t => t.<span class="prop">id</span> === id)  <span class="cm">// пересчитывается КАЖДЫЙ раз!</span>
+)
+
+<span class="cm">// Строка 0 вызывает selectTodoById(state, 0)  → cache MISS, вычисляем</span>
+<span class="cm">// Строка 1 вызывает selectTodoById(state, 1)  → id изменился → cache MISS!</span>
+<span class="cm">// Строка 2 вызывает selectTodoById(state, 2)  → id изменился → cache MISS!</span>
+<span class="cm">// ... мемоизация бесполезна — всегда пересчёт!</span>
+        </div>
+
+        <div class="warning">
+          Если в списке 100 строк, каждая вызывает <code>selectTodoById(state, id)</code>
+          с разным <code>id</code> — мемоизация не работает вообще.
+          Каждый вызов вытесняет кэш предыдущего.
+        </div>
+
+        <h3>Решение: фабрика селекторов</h3>
+        <p>
+          <strong>Selector Factory</strong> — функция, которая <em>создаёт новый экземпляр</em>
+          мемоизированного селектора при каждом вызове. Каждая строка списка
+          получает свой собственный селектор со своим кэшем:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ФАБРИКА: каждый вызов возвращает НОВЫЙ экземпляр createSelector</span>
+<span class="kw">const</span> <span class="fn">makeSelectTodoById</span> = () =>
+  <span class="fn">createSelector</span>(
+    (<span class="prop">state</span>: RootState) => state.<span class="prop">todos</span>,
+    (_: RootState, <span class="prop">id</span>: <span class="type">number</span>) => id,
+    (<span class="prop">todos</span>, <span class="prop">id</span>) => todos.<span class="fn">find</span>(t => t.<span class="prop">id</span> === id)
+  )
+
+<span class="cm">// Каждая строка создаёт СВОЙ экземпляр:</span>
+<span class="kw">const</span> selectTodo0 = <span class="fn">makeSelectTodoById</span>()  <span class="cm">// свой кэш для id=0</span>
+<span class="kw">const</span> selectTodo1 = <span class="fn">makeSelectTodoById</span>()  <span class="cm">// свой кэш для id=1</span>
+<span class="kw">const</span> selectTodo2 = <span class="fn">makeSelectTodoById</span>()  <span class="cm">// свой кэш для id=2</span>
+
+<span class="cm">// Теперь при изменении todo #2:</span>
+<span class="cm">// selectTodo0(state, 0) → cache HIT (todos массив тот же? нет, новый... но id=0 не менялся)</span>
+<span class="cm">// selectTodo2(state, 2) → cache MISS (id=2 изменился)</span>
+        </div>
+
+        <h3>Как это работает в React-Redux</h3>
+        <p>
+          В React-Redux (который мы изучим позже) это выглядит так:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// В React компоненте строки списка:</span>
+<span class="kw">const</span> <span class="fn">TodoRow</span> = ({ <span class="prop">id</span> }: { id: <span class="type">number</span> }) => {
+  <span class="cm">// useMemo создаёт ОДИН раз при монтировании</span>
+  <span class="kw">const</span> selectTodo = <span class="fn">useMemo</span>(<span class="fn">makeSelectTodoById</span>, [])
+
+  <span class="cm">// Этот селектор — уникальный для ЭТОЙ строки</span>
+  <span class="kw">const</span> todo = <span class="fn">useSelector</span>(state => <span class="fn">selectTodo</span>(state, id))
+
+  <span class="kw">return</span> &lt;div&gt;{todo.<span class="prop">text</span>}&lt;/div&gt;
+}
+        </div>
+
+        <div class="tip">
+          <strong>Паттерн именования:</strong> фабрику обычно называют с префиксом <code>make</code>:
+          <code>makeSelectTodoById</code>, <code>makeSelectUserPosts</code> и т.д.
+          Это сигнал другим разработчикам: «эта функция создаёт селектор, а не является селектором».
+        </div>
+
+        <h3>Когда нужна фабрика?</h3>
+        <ul>
+          <li>У вас <strong>список элементов</strong>, каждый элемент использует мемоизированный селектор с уникальным параметром (<code>id</code>)</li>
+          <li>Один и тот же селектор вызывается <strong>с разными аргументами</strong> в разных местах</li>
+          <li>Вы хотите, чтобы изменение элемента #5 <strong>не вызывало</strong> пересчёт селектора элемента #3</li>
+        </ul>
+
+        <h3>Когда фабрика НЕ нужна?</h3>
+        <ul>
+          <li>Селектор всегда вызывается с <strong>одними и теми же аргументами</strong> (или без аргументов)</li>
+          <li>Селектор используется только в <strong>одном месте</strong></li>
+          <li>Вы не используете <code>createSelector</code> (обычные селекторы не кэшируют)</li>
+        </ul>
+
+        <div class="quote">
+          «Memoized selectors are only helpful when you actually derive additional values
+          from the original data. If you are only looking up and returning an existing value,
+          you can keep the selector as a plain function.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-7-standard-patterns#memoized-selectors" target="_blank">Redux Fundamentals, Part 7</a>
+        </div>
+
+        <h3>Полный код фабрики из этого примера</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createSelector</span> } <span class="kw">from</span> <span class="str">'reselect'</span>
+
+<span class="kw">interface</span> <span class="type">Todo</span> { <span class="prop">id</span>: <span class="type">number</span>; <span class="prop">text</span>: <span class="type">string</span>; <span class="prop">completed</span>: <span class="type">boolean</span> }
+<span class="kw">interface</span> <span class="type">RootState</span> { <span class="prop">todos</span>: <span class="type">Todo</span>[] }
+
+<span class="cm">// Обычный селектор (не мемоизированный) — всем подходит</span>
+<span class="kw">const</span> <span class="fn">selectTodos</span> = (<span class="prop">state</span>: <span class="type">RootState</span>) => state.<span class="prop">todos</span>
+
+<span class="cm">// ❌ ОДИН на всех — кэш бьётся при смене id</span>
+<span class="kw">const</span> <span class="fn">selectTodoById</span> = <span class="fn">createSelector</span>(
+  <span class="fn">selectTodos</span>,
+  (_: <span class="type">RootState</span>, <span class="prop">id</span>: <span class="type">number</span>) => id,
+  (<span class="prop">todos</span>, <span class="prop">id</span>) => todos.<span class="fn">find</span>(t => t.<span class="prop">id</span> === id)
+)
+
+<span class="cm">// ✅ ФАБРИКА — каждый вызов = новый кэш</span>
+<span class="kw">const</span> <span class="fn">makeSelectTodoById</span> = () =>
+  <span class="fn">createSelector</span>(
+    <span class="fn">selectTodos</span>,
+    (_: <span class="type">RootState</span>, <span class="prop">id</span>: <span class="type">number</span>) => id,
+    (<span class="prop">todos</span>, <span class="prop">id</span>) => todos.<span class="fn">find</span>(t => t.<span class="prop">id</span> === id)
+  )
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

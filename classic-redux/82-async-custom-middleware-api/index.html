@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>82 — Custom API Middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">82 / 100</span>
+      Custom API Middleware
+    </div>
+    <nav class="site-header__nav">
+      <a href="../81-async-debounce-middleware/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">82</span>
+      <a href="../83-normalized-intro/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Custom API Middleware</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Middleware перехватывает действия с полем <code>meta.api</code> и автоматически
+            выполняет «запрос», диспатчит <code>success</code> или <code>failure</code>.
+            Обе кнопки используют одну и ту же middleware.
+          </p>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-users">
+              👥 Load users
+            </button>
+            <button class="btn btn--accent" id="btn-posts">
+              📝 Load posts
+            </button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Users</div>
+            <div id="users-display" style="min-height: 50px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Нажмите "Load users" ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Posts</div>
+            <div id="posts-display" style="min-height: 50px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Нажмите "Load posts" ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Custom API Middleware</div>
+      <div class="theory__body">
+        <h3>Паттерн API middleware</h3>
+        <p>
+          Вместо написания thunk для каждого API-запроса можно создать одну middleware,
+          которая <strong>перехватывает</strong> любой action с полем <code>meta.api</code>
+          и автоматически выполняет HTTP-запрос. Это централизует всю логику запросов
+          в одном месте.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Action с meta.api</span>
+<span class="kw">const</span> <span class="prop">action</span> = {
+  <span class="prop">type</span>: <span class="str">'users/fetch'</span>,
+  <span class="prop">meta</span>: {
+    <span class="prop">api</span>: {
+      <span class="prop">url</span>: <span class="str">'/api/users'</span>,
+      <span class="prop">method</span>: <span class="str">'GET'</span>
+    }
+  }
+}
+        </div>
+
+        <h3>Middleware делает HTTP-запрос</h3>
+        <p>
+          Когда middleware видит <code>action.meta.api</code>, она не пропускает action дальше.
+          Вместо этого она сама делает запрос по указанному URL и диспатчит результат.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">apiMiddleware</span> = (<span class="prop">store</span>: <span class="type">any</span>) =>
+  (<span class="prop">next</span>: <span class="type">any</span>) => <span class="kw">async</span> (<span class="prop">action</span>: <span class="type">any</span>) => {
+    <span class="kw">if</span> (!action.meta?.api) <span class="kw">return</span> <span class="fn">next</span>(action)
+
+    <span class="kw">const</span> { <span class="prop">url</span>, <span class="prop">method</span> } = action.meta.api
+
+    <span class="kw">try</span> {
+      <span class="kw">const</span> data = <span class="kw">await</span> <span class="fn">fetch</span>(url, { method })
+      store.<span class="fn">dispatch</span>({
+        <span class="prop">type</span>: <span class="str">`${action.type}/success`</span>,
+        <span class="prop">payload</span>: data
+      })
+    } <span class="kw">catch</span> (err) {
+      store.<span class="fn">dispatch</span>({
+        <span class="prop">type</span>: <span class="str">`${action.type}/failure`</span>,
+        <span class="prop">error</span>: err.message
+      })
+    }
+  }
+        </div>
+
+        <h3>Диспатч success / failure</h3>
+        <p>
+          Middleware автоматически формирует имена типов: к оригинальному <code>type</code>
+          добавляется <code>/success</code> или <code>/failure</code>. Reducer просто
+          обрабатывает эти типы — ему не нужно знать о HTTP.
+        </p>
+
+        <div class="quote">
+          «Middleware provides a third-party extension point between dispatching an action,
+          and the moment it reaches the reducer.»
+          <br>— <a href="https://redux.js.org/understanding/history-and-design/middleware" target="_blank">Redux Docs — Middleware</a>
+        </div>
+
+        <h3>Централизация API-логики</h3>
+        <p>
+          Без API middleware каждый thunk содержит одинаковый код: <code>try/catch</code>,
+          <code>fetch</code>, dispatch loading/success/failure. С API middleware этот
+          шаблонный код пишется <strong>один раз</strong>. Action creators становятся
+          простыми объектами с <code>meta.api</code>.
+        </p>
+
+        <h3>Уменьшение boilerplate</h3>
+        <p>
+          Сравните: для 10 API-эндпоинтов без middleware нужно 10 thunk с
+          повторяющимся кодом fetch/dispatch. С API middleware — 10 простых action объектов
+          и одна middleware. Логика запроса описана декларативно в action.
+        </p>
+
+        <div class="tip">
+          API middleware — это декларативный подход: action <em>описывает</em> запрос
+          (URL, метод), а middleware <em>выполняет</em> его. Это разделение делает
+          код чище и тестируемее.
+        </div>
+
+        <div class="warning">
+          В реальных проектах API middleware сложнее: авторизация, retry, кеширование,
+          нормализация. Здесь показан базовый паттерн для понимания концепции.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Action с <code>meta.api</code> описывает запрос декларативно</li>
+          <li>Middleware перехватывает, выполняет fetch, диспатчит результат</li>
+          <li><code>${type}/success</code> и <code>${type}/failure</code> — автоматические имена</li>
+          <li>Вся логика запросов — в одной middleware</li>
+          <li>Уменьшает boilerplate по сравнению с отдельными thunk</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

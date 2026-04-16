@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>76b — Thunk изнутри: как это работает</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .pipeline-visual {
+      display: flex; flex-direction: column; gap: 6px;
+      background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; margin-bottom: 16px;
+    }
+    .pipeline-step {
+      padding: 8px 12px; border-radius: var(--radius-sm);
+      font-family: var(--font-mono); font-size: 0.8rem;
+      border: 1px solid var(--border); transition: all 0.3s;
+    }
+    .pipeline-step.active { border-color: var(--accent); background: rgba(86,156,214,0.15); }
+    .pipeline-step.thunk-hit { border-color: var(--accent-purple); background: rgba(197,134,192,0.15); }
+    .pipeline-arrow { text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">76b / 100</span>
+      Thunk изнутри — как это работает
+    </div>
+    <nav class="site-header__nav">
+      <a href="../76a-why-thunks/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">76b</span>
+      <a href="../76c-redux-thunk-full-api/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Что происходит внутри thunk middleware</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 0.85rem;">
+              Наблюдайте за pipeline при dispatch обычного объекта vs функции:
+            </p>
+
+            <div class="pipeline-visual">
+              <div class="pipeline-step" id="ps-dispatch">→ store.dispatch(???)</div>
+              <div class="pipeline-arrow">↓</div>
+              <div class="pipeline-step" id="ps-thunk">🔍 Thunk middleware: typeof action === 'function'?</div>
+              <div class="pipeline-arrow" id="ps-fork">↓</div>
+              <div class="pipeline-step" id="ps-yes" style="margin-left: 30px; display:none;">
+                ↳ ДА: action(dispatch, getState) — вызываем функцию
+              </div>
+              <div class="pipeline-step" id="ps-no" style="margin-left: 30px; display:none;">
+                ↳ НЕТ: next(action) — передаём дальше
+              </div>
+              <div class="pipeline-arrow">↓</div>
+              <div class="pipeline-step" id="ps-reducer">⚙ Reducer → новый state</div>
+              <div class="pipeline-arrow">↓</div>
+              <div class="pipeline-step" id="ps-subscribers">📢 Subscribers оповещены</div>
+            </div>
+
+            <div class="btn-group">
+              <button class="btn" id="btn-plain">Dispatch объект { type: '...' }</button>
+              <button class="btn btn--accent" id="btn-thunk-sync">Dispatch sync thunk</button>
+              <button class="btn btn--accent" id="btn-thunk-async">Dispatch async thunk</button>
+              <button class="btn" id="btn-thunk-getstate">Thunk с getState()</button>
+              <button class="btn btn--danger" id="btn-thunk-conditional">Условный thunk</button>
+            </div>
+          </div>
+          <div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">Текущий State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.85rem;"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+    <div id="devtools-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Анатомия thunk middleware</div>
+      <div class="theory__body">
+        <h3>Исходный код thunk middleware (5 строк)</h3>
+        <p>
+          Вся магия thunk — это буквально 5 строк кода. Вот полная реализация:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">thunkMiddleware</span> = <span class="prop">storeAPI</span> => <span class="prop">next</span> => <span class="prop">action</span> => {
+  <span class="cm">// Если action — функция, вызываем её с dispatch и getState</span>
+  <span class="kw">if</span> (<span class="kw">typeof</span> action === <span class="str">'function'</span>) {
+    <span class="kw">return</span> <span class="fn">action</span>(storeAPI.<span class="prop">dispatch</span>, storeAPI.<span class="prop">getState</span>)
+  }
+  <span class="cm">// Иначе — обычный action, передаём следующему middleware</span>
+  <span class="kw">return</span> <span class="fn">next</span>(action)
+}
+        </div>
+
+        <h3>Пошаговый разбор</h3>
+        <p>Когда вы вызываете <code>store.dispatch(something)</code>:</p>
+
+        <ol>
+          <li>
+            <strong>dispatch перехватывается</strong> middleware pipeline.
+            Thunk middleware — первый (или один из первых) в цепочке.
+          </li>
+          <li>
+            <strong>typeof проверка:</strong> middleware смотрит — <code>something</code> это функция или объект?
+          </li>
+          <li>
+            <strong>Если функция (thunk):</strong>
+            <ul>
+              <li>Вызывает <code>action(dispatch, getState)</code></li>
+              <li><code>dispatch</code> здесь — это <code>storeAPI.dispatch</code>, то есть <em>полный pipeline сначала</em></li>
+              <li><code>getState</code> — для чтения текущего state</li>
+              <li>Возвращает результат вызова (может быть Promise!)</li>
+              <li>Action <strong>НЕ доходит до reducer</strong> — функцию reducer не поймёт</li>
+            </ul>
+          </li>
+          <li>
+            <strong>Если объект:</strong>
+            <ul>
+              <li>Вызывает <code>next(action)</code> — передаёт дальше по pipeline</li>
+              <li>Доходит до reducer как обычно</li>
+            </ul>
+          </li>
+        </ol>
+
+        <h3>Ключевой момент: storeAPI.dispatch vs next</h3>
+        <div class="warning">
+          Thunk middleware передаёт в функцию <code>storeAPI.dispatch</code>, а не <code>next</code>.
+          Это значит, что когда thunk-функция вызывает <code>dispatch(action)</code>,
+          action проходит <strong>весь pipeline заново</strong>, включая сам thunk middleware.
+          Это позволяет dispatch'ить другие thunks из thunk!
+        </div>
+
+        <div class="code-block">
+<span class="cm">// Thunk может dispatch'ить другие thunks!</span>
+<span class="kw">const</span> <span class="fn">outerThunk</span> = () => <span class="kw">async</span> (<span class="prop">dispatch</span>) => {
+  <span class="cm">// dispatch проходит ВЕСЬ pipeline заново</span>
+  <span class="kw">await</span> dispatch(<span class="fn">innerThunk</span>())  <span class="cm">// ← тоже thunk!</span>
+  dispatch({ <span class="prop">type</span>: <span class="str">'done'</span> })   <span class="cm">// ← обычный action</span>
+}
+
+<span class="kw">const</span> <span class="fn">innerThunk</span> = () => <span class="kw">async</span> (<span class="prop">dispatch</span>) => {
+  <span class="kw">const</span> data = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api'</span>)
+  dispatch({ <span class="prop">type</span>: <span class="str">'data/loaded'</span>, <span class="prop">payload</span>: data })
+}
+        </div>
+
+        <h3>Синхронные thunks</h3>
+        <p>
+          Thunk не обязан быть асинхронным! Можно использовать для доступа к getState:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Синхронный thunk — для условной логики</span>
+<span class="kw">const</span> <span class="fn">incrementIfOdd</span> = () => (<span class="prop">dispatch</span>, <span class="prop">getState</span>) => {
+  <span class="kw">const</span> { <span class="prop">value</span> } = <span class="fn">getState</span>()
+  <span class="kw">if</span> (value % <span class="num">2</span> !== <span class="num">0</span>) {
+    dispatch({ <span class="prop">type</span>: <span class="str">'counter/incremented'</span> })
+  }
+}
+        </div>
+
+        <div class="quote">
+          «Thunk functions can be used for both asynchronous and synchronous logic.
+          Thunks provide a way to write any reusable logic that needs access to
+          dispatch and getState.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-6-async-logic" target="_blank">Redux Fundamentals, Part 6</a>
+        </div>
+
+        <h3>Что возвращает dispatch(thunk)?</h3>
+        <div class="tip">
+          <code>store.dispatch(thunk())</code> возвращает то, что возвращает thunk-функция.
+          Если thunk — async функция, dispatch вернёт Promise. Это позволяет делать:
+          <br><code>await store.dispatch(fetchData())</code>
+          <br>и выполнять код после завершения async операции.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>77 — Обработка ошибок в thunks</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">77 / 100</span>
+      Обработка ошибок в thunks
+    </div>
+    <nav class="site-header__nav">
+      <a href="../76c-redux-thunk-full-api/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">77</span>
+      <a href="../78-async-conditional-dispatch/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Error handling в async thunks</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Загрузчик данных с переключателем «Force error». Thunk использует <code>try/catch</code>.
+            При ошибке dispatch <code>fetchFailed(error.message)</code>.
+          </p>
+
+          <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-fetch">🔄 Загрузить данные</button>
+            <label style="display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.85rem; cursor: pointer;">
+              <input type="checkbox" id="toggle-error" style="accent-color: var(--accent-red);">
+              Force error
+            </label>
+            <button class="btn" id="btn-retry" style="display:none;">🔁 Retry</button>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Статус</div>
+            <pre id="status-display" style="color: var(--text-secondary); font-size: 0.9rem;">idle</pre>
+          </div>
+
+          <div id="error-display" style="display:none; padding: 10px 16px; background: rgba(244,71,71,0.1); border: 1px solid var(--accent-red); color: var(--accent-red); border-radius: 6px; font-size: 0.85rem; margin-bottom: 16px;"></div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Данные</div>
+            <div id="data-display" style="min-height: 40px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Нажмите «Загрузить данные» ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Обработка ошибок в async thunks</div>
+      <div class="theory__body">
+        <h3>try/catch в async thunks</h3>
+        <p>
+          Асинхронные thunks должны оборачивать свою логику в <code>try/catch</code>,
+          чтобы перехватить ошибки сети, парсинга и другие исключения.
+        </p>
+
+        <div class="quote">
+          «Any time you write an async thunk, you should add error handling
+          with try/catch blocks. The catch block should dispatch a "rejected"
+          action containing the error message.»
+          <br>— <a href="https://redux.js.org/tutorials/essentials/part-5-async-logic" target="_blank">Redux Essentials, Part 5 — Async Logic and Data Fetching</a>
+        </div>
+
+        <h3>Паттерн: loading / succeeded / failed</h3>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">fetchData</span> = () => <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>): <span class="type">Promise</span>&lt;<span class="type">void</span>&gt; => {
+  <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'fetch/pending'</span> })
+
+  <span class="kw">try</span> {
+    <span class="kw">const</span> response = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/data'</span>)
+    <span class="kw">const</span> data = <span class="kw">await</span> response.<span class="fn">json</span>()
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'fetch/fulfilled'</span>, <span class="prop">payload</span>: data })
+  } <span class="kw">catch</span> (err: <span class="type">any</span>) {
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'fetch/rejected'</span>, <span class="prop">payload</span>: err.<span class="prop">message</span> })
+  }
+}
+        </div>
+
+        <h3>Хранение ошибки в state</h3>
+        <p>
+          Ошибка сохраняется в state, чтобы UI мог отобразить сообщение и предложить retry.
+        </p>
+
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">AppState</span> {
+  <span class="prop">status</span>: <span class="str">'idle'</span> | <span class="str">'loading'</span> | <span class="str">'succeeded'</span> | <span class="str">'failed'</span>
+  <span class="prop">data</span>: <span class="type">Item</span>[]
+  <span class="prop">error</span>: <span class="type">string</span> | <span class="type">null</span>
+}
+
+<span class="cm">// В reducer:</span>
+<span class="kw">case</span> <span class="str">'fetch/rejected'</span>:
+  <span class="kw">return</span> { ...<span class="prop">state</span>, <span class="prop">status</span>: <span class="str">'failed'</span>, <span class="prop">error</span>: action.<span class="prop">payload</span> }
+        </div>
+
+        <h3>Recovery-паттерны</h3>
+        <ul>
+          <li><strong>Retry</strong> — кнопка повторной попытки, которая заново вызывает thunk</li>
+          <li><strong>Reset</strong> — сброс state в <code>idle</code> и очистка ошибки</li>
+          <li><strong>Fallback</strong> — показ кэшированных данных при ошибке</li>
+        </ul>
+
+        <div class="code-block">
+<span class="cm">// Retry: просто dispatch thunk ещё раз</span>
+btnRetry.<span class="fn">addEventListener</span>(<span class="str">'click'</span>, () => {
+  store.<span class="fn">dispatch</span>(<span class="fn">fetchData</span>() <span class="kw">as</span> <span class="type">any</span>)
+})
+        </div>
+
+        <div class="tip">
+          Всегда сохраняйте <code>error.message</code> (строку), а не весь объект ошибки —
+          объекты <code>Error</code> не сериализуются и нарушают принцип сериализуемости Redux-state.
+        </div>
+
+        <div class="warning">
+          Без <code>try/catch</code> ошибка в async thunk приведёт к unhandled promise rejection.
+          Это не обрушит приложение, но state останется в состоянии <code>'loading'</code> навсегда.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Оборачивайте async thunk в <code>try/catch</code></li>
+          <li>В <code>catch</code> делайте <code>dispatch({ type: 'rejected', payload: err.message })</code></li>
+          <li>Храните <code>error: string | null</code> в state</li>
+          <li>Предоставляйте пользователю возможность retry</li>
+          <li>Паттерн: <code>{ status: 'failed', error: 'Network error' }</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

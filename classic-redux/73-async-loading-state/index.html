@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>73 — Loading state с enum: idle/loading/succeeded/failed</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">73 / 100</span>
+      Loading state с enum
+    </div>
+    <nav class="site-header__nav">
+      <a href="../72-thunk-with-params/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">73</span>
+      <a href="../74-async-loading-enum-vs-boolean/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Enum loading state</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Состояние загрузки представлено строковым enum:
+            <code>idle</code> → <code>loading</code> → <code>succeeded</code> или <code>failed</code>.
+            Индикатор показывает текущий статус с цветом.
+          </p>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="btn btn--accent" id="btn-load">🔄 Load Todos</button>
+            <button class="btn" id="btn-reset">↺ Reset</button>
+          </div>
+
+          <div id="status-indicator" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px;">
+            <span id="status-dot" style="width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted);"></span>
+            <span id="status-label" style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--text-secondary);">idle</span>
+          </div>
+
+          <div class="state-display" style="margin-bottom: 16px;">
+            <div class="state-display__label">Todos</div>
+            <div id="todos-display" style="min-height: 60px; padding: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Нажмите "Load Todos" ↑</span>
+            </div>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Полный State</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Enum для состояния загрузки</div>
+      <div class="theory__body">
+        <h3>Почему строковый enum?</h3>
+        <p>
+          Загрузка данных — не бинарный процесс. Есть минимум 4 состояния:
+          ещё не начата, в процессе, завершена успешно, завершена с ошибкой.
+          Строковый enum точно описывает каждое из них.
+        </p>
+
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">TodosState</span> {
+  <span class="prop">status</span>: <span class="str">'idle'</span> | <span class="str">'loading'</span> | <span class="str">'succeeded'</span> | <span class="str">'failed'</span>
+  <span class="prop">entities</span>: <span class="type">Todo</span>[]
+  <span class="prop">error</span>: <span class="type">string</span> | <span class="type">null</span>
+}
+        </div>
+
+        <h3>Dispatching loading/loaded actions</h3>
+        <p>
+          Thunk dispatch-ит экшены, которые переключают <code>status</code> в reducer.
+          Каждый экшен — чёткий переход между состояниями.
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">fetchTodos</span>() {
+  <span class="kw">return</span> <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">any</span>) => {
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/loading'</span> })
+    <span class="kw">try</span> {
+      <span class="kw">const</span> todos = <span class="kw">await</span> <span class="fn">fetchFromAPI</span>()
+      <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/succeeded'</span>, <span class="prop">payload</span>: todos })
+    } <span class="kw">catch</span> (err) {
+      <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/failed'</span>, <span class="prop">payload</span>: err.<span class="prop">message</span> })
+    }
+  }
+}
+        </div>
+
+        <h3>Организация state shape</h3>
+        <p>
+          Хорошая практика — хранить <code>status</code>, <code>entities</code> (данные)
+          и <code>error</code> рядом друг с другом. Это делает состояние
+          самодокументированным.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Начальное состояние</span>
+<span class="kw">const</span> <span class="prop">initialState</span>: <span class="type">TodosState</span> = {
+  <span class="prop">status</span>: <span class="str">'idle'</span>,     <span class="cm">// ещё не загружали</span>
+  <span class="prop">entities</span>: [],       <span class="cm">// пустой массив данных</span>
+  <span class="prop">error</span>: <span class="num">null</span>         <span class="cm">// ошибки нет</span>
+}
+        </div>
+
+        <div class="quote">
+          «We recommend using a 'status' enum field that will be one of
+          'idle' | 'loading' | 'succeeded' | 'failed', as a standard approach
+          for tracking loading state for async requests.»
+          <br>— <a href="https://redux.js.org/tutorials/essentials/part-5-async-logic#loading-state-for-requests" target="_blank">Redux Essentials, Part 5: Loading State for Requests</a>
+        </div>
+
+        <div class="tip">
+          Enum-подход масштабируется: легко добавить новые состояния, например
+          <code>'refreshing'</code> или <code>'retrying'</code>, без изменения структуры.
+        </div>
+
+        <div class="warning">
+          Не используйте <code>isLoading: boolean</code> для асинхронных операций —
+          это покрывает только 2 из 4 возможных состояний. Подробнее — в уроке 74.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>4 состояния: <code>idle</code>, <code>loading</code>, <code>succeeded</code>, <code>failed</code></li>
+          <li>Reducer переключает <code>status</code> по разным экшенам</li>
+          <li>State shape: <code>{ status, entities, error }</code></li>
+          <li>Каждый переход — отдельный dispatch</li>
+          <li>Строковый enum легко расширяется</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

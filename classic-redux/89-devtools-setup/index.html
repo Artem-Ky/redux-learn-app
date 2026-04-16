@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>89 — Подключение Redux DevTools</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">89 / 100</span>
+      Подключение Redux DevTools
+    </div>
+    <nav class="site-header__nav">
+      <a href="../88-normalized-complex/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">89</span>
+      <a href="../90-devtools-time-travel/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Два DevTools одновременно</div>
+      <div class="demo-section__body">
+        <div style="max-width: 600px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+            Счётчик подключён и к нашей встроенной DevTools-панели, и к расширению
+            Chrome Redux DevTools. Оба показывают одни и те же данные.
+          </p>
+
+          <div class="counter" style="margin-bottom: 20px;">
+            <button class="btn" id="btn-dec">−</button>
+            <span class="counter__value" id="counter-value">0</span>
+            <button class="btn" id="btn-inc">+</button>
+            <button class="btn btn--sm" id="btn-reset">Reset</button>
+          </div>
+
+          <div class="btn-group" style="margin-bottom: 16px;">
+            <button class="btn btn--sm" id="btn-add5">+5</button>
+            <button class="btn btn--sm" id="btn-add10">+10</button>
+            <button class="btn btn--sm" id="btn-random">Случайное</button>
+          </div>
+
+          <div class="state-display">
+            <div class="state-display__label">Текущее состояние</div>
+            <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.9rem;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OUR DEVTOOLS -->
+    <div id="devtools-container"></div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Подключение Redux DevTools</div>
+      <div class="theory__body">
+        <h3>Расширение для браузера</h3>
+        <p>
+          Redux DevTools — это расширение для Chrome и Firefox, которое позволяет
+          инспектировать каждый экшен, просматривать состояние, видеть diff между
+          состояниями и путешествовать во времени.
+        </p>
+        <ul>
+          <li><a href="https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd" target="_blank">Chrome Web Store — Redux DevTools</a></li>
+          <li><a href="https://addons.mozilla.org/en-US/firefox/addon/reduxdevtools/" target="_blank">Firefox Add-ons — Redux DevTools</a></li>
+        </ul>
+
+        <h3>Подключение через enhancer</h3>
+        <p>
+          После установки расширения в <code>window</code> появляется глобальный
+          объект <code>__REDUX_DEVTOOLS_EXTENSION__</code>. Вызывая его, мы получаем
+          store enhancer:
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">enhancer</span> = <span class="prop">window</span>.<span class="prop">__REDUX_DEVTOOLS_EXTENSION__</span>?.() || (<span class="prop">f</span> => <span class="prop">f</span>)
+
+<span class="kw">const</span> <span class="prop">store</span> = <span class="fn">createStore</span>(<span class="prop">reducer</span>, <span class="prop">enhancer</span>)
+        </div>
+
+        <h3>Пакет redux-devtools-extension</h3>
+        <p>
+          Для более удобного подключения (особенно вместе с middleware) существует
+          npm-пакет <code>redux-devtools-extension</code>:
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">composeWithDevTools</span> } <span class="kw">from</span> <span class="str">'redux-devtools-extension'</span>
+
+<span class="kw">const</span> <span class="prop">store</span> = <span class="fn">createStore</span>(
+  <span class="prop">reducer</span>,
+  <span class="fn">composeWithDevTools</span>(<span class="fn">applyMiddleware</span>(<span class="prop">thunk</span>))
+)
+        </div>
+
+        <div class="quote">
+          «Redux was specifically designed to make it easier to trace when, where,
+          why, and how your state has changed. Redux DevTools allow you to see the
+          history of dispatched actions, the contents of each action, the final state
+          after an action was dispatched, and the diff in the state after an action.»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-4-store#redux-devtools" target="_blank">Redux Fundamentals, Part 4: Store — Redux DevTools</a>
+        </div>
+
+        <h3>Что видно в DevTools</h3>
+        <p>
+          Расширение Redux DevTools показывает:
+        </p>
+        <ul>
+          <li><strong>Actions</strong> — список всех отправленных экшенов с типом и payload</li>
+          <li><strong>State</strong> — полное дерево состояния после каждого экшена</li>
+          <li><strong>Diff</strong> — что именно изменилось в состоянии</li>
+          <li><strong>Time Travel</strong> — возможность «перемотать» к любому состоянию</li>
+          <li><strong>Dispatch</strong> — отправка экшенов прямо из DevTools</li>
+        </ul>
+
+        <div class="tip">
+          Наша встроенная DevTools-панель работает по тому же принципу, что и расширение:
+          перехватывает <code>dispatch</code>, сохраняет снимки состояния «до» и «после»,
+          и показывает историю экшенов. Откройте расширение Chrome — вы увидите те же данные.
+        </div>
+
+        <div class="warning">
+          <code>window.__REDUX_DEVTOOLS_EXTENSION__</code> доступен только когда расширение
+          установлено. Всегда используйте optional chaining (<code>?.</code>) или fallback
+          <code>|| (f => f)</code>, чтобы приложение работало без расширения.
+        </div>
+
+        <h3>Ключевые моменты</h3>
+        <ul>
+          <li>Установите расширение Redux DevTools для Chrome или Firefox</li>
+          <li><code>window.__REDUX_DEVTOOLS_EXTENSION__?.()</code> — enhancer для store</li>
+          <li><code>composeWithDevTools</code> — удобное подключение вместе с middleware</li>
+          <li>DevTools показывают: actions, state, diff, time travel</li>
+          <li>Не забывайте fallback для продакшена или без расширения</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

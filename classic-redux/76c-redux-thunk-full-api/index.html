@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>76c — redux-thunk: полный API и паттерны</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">76c / 100</span>
+      redux-thunk — полный API и продвинутые паттерны
+    </div>
+    <nav class="site-header__nav">
+      <a href="../76b-thunk-internals/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">76c</span>
+      <a href="../77-async-error-handling/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Продвинутые паттерны redux-thunk</div>
+      <div class="demo-section__body">
+        <div class="two-col">
+          <div>
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Базовые паттерны</h3>
+            <div class="btn-group" style="flex-direction: column;">
+              <button class="btn btn--accent" id="btn-simple">Простой thunk (загрузка данных)</button>
+              <button class="btn btn--accent" id="btn-with-params">Thunk с параметрами</button>
+              <button class="btn" id="btn-sync-thunk">Синхронный thunk (incrementIfOdd)</button>
+            </div>
+
+            <h3 style="color: var(--text-bright); margin: 16px 0 12px;">Продвинутые паттерны</h3>
+            <div class="btn-group" style="flex-direction: column;">
+              <button class="btn btn--accent" id="btn-compose">Thunk вызывает thunk</button>
+              <button class="btn btn--accent" id="btn-extra-arg">withExtraArgument (API клиент)</button>
+              <button class="btn" id="btn-return-promise">Thunk возвращает Promise</button>
+              <button class="btn btn--danger" id="btn-error-handling">Обработка ошибок в thunk</button>
+            </div>
+          </div>
+          <div>
+            <div class="state-display" style="margin-bottom: 12px;">
+              <div class="state-display__label">State</div>
+              <pre id="state-display" style="color: var(--accent-cyan); font-size: 0.8rem;"></pre>
+            </div>
+            <button class="btn" id="btn-reset">Сбросить state</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+    <div id="devtools-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — redux-thunk: полный справочник</div>
+      <div class="theory__body">
+
+        <h3>Исходный код redux-thunk (~14 строк)</h3>
+        <p>
+          Вся библиотека redux-thunk — это буквально несколько строк.
+          Вот её <strong>полный</strong> исходный код:
+        </p>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">createThunkMiddleware</span>(<span class="prop">extraArgument</span>?) {
+  <span class="kw">return</span> (<span class="prop">{ dispatch, getState }</span>) => (<span class="prop">next</span>) => (<span class="prop">action</span>) => {
+    <span class="kw">if</span> (<span class="kw">typeof</span> action === <span class="str">'function'</span>) {
+      <span class="kw">return</span> <span class="fn">action</span>(dispatch, getState, extraArgument)
+    }
+    <span class="kw">return</span> <span class="fn">next</span>(action)
+  }
+}
+
+<span class="kw">const</span> thunk = <span class="fn">createThunkMiddleware</span>()
+thunk.<span class="prop">withExtraArgument</span> = <span class="fn">createThunkMiddleware</span>
+
+<span class="kw">export default</span> thunk
+        </div>
+
+        <div class="tip">
+          <strong>14 строк.</strong> Это одна из самых маленьких и при этом самых используемых
+          библиотек в экосистеме JavaScript. Миллионы загрузок в неделю — за 14 строк кода.
+        </div>
+
+        <h3>API: thunk function</h3>
+        <p>Thunk-функция получает три аргумента:</p>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">myThunk</span> = (<span class="prop">arg1</span>, <span class="prop">arg2</span>) => (<span class="prop">dispatch</span>, <span class="prop">getState</span>, <span class="prop">extraArgument</span>) => {
+  <span class="cm">// dispatch — отправить action (проходит ВЕСЬ pipeline)</span>
+  <span class="cm">// getState — прочитать текущий state</span>
+  <span class="cm">// extraArgument — дополнительный аргумент (API клиент и т.д.)</span>
+}
+        </div>
+
+        <h3>1. dispatch — отправка экшенов</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">fetchUsers</span> = () => <span class="kw">async</span> (<span class="prop">dispatch</span>) => {
+  <span class="cm">// Dispatch обычного action</span>
+  dispatch({ <span class="prop">type</span>: <span class="str">'users/loading'</span> })
+
+  <span class="kw">const</span> data = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/users'</span>)
+  dispatch({ <span class="prop">type</span>: <span class="str">'users/loaded'</span>, <span class="prop">payload</span>: data })
+
+  <span class="cm">// Dispatch другого thunk(!)</span>
+  dispatch(<span class="fn">showNotification</span>(<span class="str">'Пользователи загружены'</span>))
+}
+        </div>
+
+        <h3>2. getState — чтение state</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">conditionalFetch</span> = () => (<span class="prop">dispatch</span>, <span class="prop">getState</span>) => {
+  <span class="kw">const</span> state = <span class="fn">getState</span>()
+
+  <span class="cm">// Проверяем текущий state перед действием</span>
+  <span class="kw">if</span> (state.<span class="prop">users</span>.<span class="prop">status</span> === <span class="str">'loaded'</span>) {
+    console.<span class="fn">log</span>(<span class="str">'Данные уже загружены, пропускаем'</span>)
+    <span class="kw">return</span>
+  }
+
+  <span class="cm">// getState() можно вызывать ПОСЛЕ dispatch — увидим обновлённый state</span>
+  dispatch({ <span class="prop">type</span>: <span class="str">'users/loading'</span> })
+  console.<span class="fn">log</span>(<span class="fn">getState</span>().<span class="prop">users</span>.<span class="prop">status</span>) <span class="cm">// 'loading'</span>
+}
+        </div>
+
+        <h3>3. withExtraArgument — инъекция зависимостей</h3>
+        <p>
+          Это <strong>killer-фича</strong> для архитектуры. Позволяет передать
+          любой объект (API клиент, роутер, аналитику) в каждый thunk:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Настройка store</span>
+<span class="kw">import</span> { thunk } <span class="kw">from</span> <span class="str">'redux-thunk'</span>
+
+<span class="kw">const</span> api = {
+  <span class="fn">getUsers</span>: () => <span class="fn">fetch</span>(<span class="str">'/api/users'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
+  <span class="fn">saveUser</span>: (user) => <span class="fn">fetch</span>(<span class="str">'/api/users'</span>, { <span class="prop">method</span>: <span class="str">'POST'</span>, <span class="prop">body</span>: <span class="fn">JSON.stringify</span>(user) }),
+}
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(
+  reducer,
+  <span class="fn">applyMiddleware</span>(thunk.<span class="fn">withExtraArgument</span>(api))
+)
+
+<span class="cm">// В thunk'е — третий аргумент = наш api</span>
+<span class="kw">const</span> <span class="fn">fetchUsers</span> = () => <span class="kw">async</span> (<span class="prop">dispatch</span>, <span class="prop">getState</span>, <span class="prop">api</span>) => {
+  <span class="kw">const</span> users = <span class="kw">await</span> api.<span class="fn">getUsers</span>()  <span class="cm">// ← не нужен import!</span>
+  dispatch({ <span class="prop">type</span>: <span class="str">'users/loaded'</span>, <span class="prop">payload</span>: users })
+}
+        </div>
+
+        <div class="tip">
+          <strong>Зачем withExtraArgument?</strong>
+          <br>— В тестах передаём mock API → thunk не знает, что API ненастоящий
+          <br>— В SSR передаём серверный API клиент
+          <br>— Можно передать несколько зависимостей: <code>{ api, analytics, router }</code>
+          <br>— Thunk не зависит от импортов → чистая архитектура
+        </div>
+
+        <h3>4. Thunk вызывает thunk (композиция)</h3>
+        <div class="code-block">
+<span class="cm">// Маленькие переиспользуемые thunk'и</span>
+<span class="kw">const</span> <span class="fn">showNotification</span> = (<span class="prop">text</span>) => (<span class="prop">dispatch</span>) => {
+  dispatch({ <span class="prop">type</span>: <span class="str">'ui/notification'</span>, <span class="prop">payload</span>: text })
+  <span class="fn">setTimeout</span>(() => dispatch({ <span class="prop">type</span>: <span class="str">'ui/clearNotification'</span> }), <span class="num">3000</span>)
+}
+
+<span class="kw">const</span> <span class="fn">logAnalytics</span> = (<span class="prop">event</span>) => (<span class="prop">dispatch</span>) => {
+  dispatch({ <span class="prop">type</span>: <span class="str">'analytics/track'</span>, <span class="prop">payload</span>: event })
+}
+
+<span class="cm">// Большой thunk компонует маленькие</span>
+<span class="kw">const</span> <span class="fn">saveAndNotify</span> = (<span class="prop">data</span>) => <span class="kw">async</span> (<span class="prop">dispatch</span>) => {
+  <span class="kw">await</span> dispatch(<span class="fn">saveData</span>(data))         <span class="cm">// thunk!</span>
+  dispatch(<span class="fn">showNotification</span>(<span class="str">'Сохранено'</span>))  <span class="cm">// thunk!</span>
+  dispatch(<span class="fn">logAnalytics</span>(<span class="str">'data_saved'</span>))    <span class="cm">// thunk!</span>
+}
+        </div>
+
+        <h3>5. Обработка ошибок</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">fetchSafely</span> = () => <span class="kw">async</span> (<span class="prop">dispatch</span>) => {
+  <span class="kw">try</span> {
+    dispatch({ <span class="prop">type</span>: <span class="str">'data/loading'</span> })
+    <span class="kw">const</span> data = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/data'</span>)
+    dispatch({ <span class="prop">type</span>: <span class="str">'data/loaded'</span>, <span class="prop">payload</span>: data })
+  } <span class="kw">catch</span> (err) {
+    dispatch({ <span class="prop">type</span>: <span class="str">'data/error'</span>, <span class="prop">payload</span>: err.<span class="prop">message</span> })
+    <span class="cm">// Можно пробросить ошибку дальше для await в UI:</span>
+    <span class="kw">throw</span> err
+  }
+}
+
+<span class="cm">// В UI:</span>
+<span class="kw">try</span> {
+  <span class="kw">await</span> store.<span class="fn">dispatch</span>(<span class="fn">fetchSafely</span>())
+  <span class="fn">showSuccess</span>()
+} <span class="kw">catch</span> {
+  <span class="fn">showError</span>()
+}
+        </div>
+
+        <h3>6. Тестирование thunks</h3>
+        <div class="code-block">
+<span class="cm">// Thunk легко тестировать — передаём mock dispatch и getState</span>
+<span class="fn">test</span>(<span class="str">'fetchUsers dispatches correct actions'</span>, <span class="kw">async</span> () => {
+  <span class="kw">const</span> dispatch = jest.<span class="fn">fn</span>()
+  <span class="kw">const</span> getState = jest.<span class="fn">fn</span>(() => ({ <span class="prop">status</span>: <span class="str">'idle'</span> }))
+  <span class="kw">const</span> mockApi = { <span class="fn">getUsers</span>: () => <span class="fn">Promise</span>.<span class="fn">resolve</span>([{ <span class="prop">id</span>: <span class="num">1</span> }]) }
+
+  <span class="cm">// Вызываем thunk напрямую, без store!</span>
+  <span class="kw">await</span> <span class="fn">fetchUsers</span>()(dispatch, getState, mockApi)
+
+  <span class="fn">expect</span>(dispatch).<span class="fn">toHaveBeenCalledWith</span>({ <span class="prop">type</span>: <span class="str">'users/loading'</span> })
+  <span class="fn">expect</span>(dispatch).<span class="fn">toHaveBeenCalledWith</span>({
+    <span class="prop">type</span>: <span class="str">'users/loaded'</span>,
+    <span class="prop">payload</span>: [{ <span class="prop">id</span>: <span class="num">1</span> }]
+  })
+})
+        </div>
+
+        <h3>redux-thunk vs альтернативы</h3>
+        <p>Почему thunk, а не redux-saga / redux-observable?</p>
+        <ul>
+          <li><strong>Простота:</strong> 14 строк кода. Ноль нового API. Обычные функции и async/await.</li>
+          <li><strong>Порог входа:</strong> если вы знаете Promise/async/await — вы уже знаете thunks.</li>
+          <li><strong>Официальность:</strong> входит в Redux Toolkit по умолчанию.</li>
+          <li><strong>Достаточность:</strong> покрывает 95% use cases для async в Redux.</li>
+        </ul>
+
+        <div class="quote">
+          «The Redux "Thunk" middleware lets us pass functions to dispatch.
+          "Thunk" functions let us write async logic ahead of time, without
+          knowing what Redux store is being used. A Redux thunk function receives
+          dispatch and getState as arguments, and can dispatch actions like
+          "this data was received from an API response".»
+          <br>— <a href="https://redux.js.org/tutorials/fundamentals/part-6-async-logic#using-the-redux-thunk-middleware" target="_blank">Redux Fundamentals, Part 6</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
