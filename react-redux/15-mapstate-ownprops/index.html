@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>15 — mapStateToProps с ownProps</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .todo-item {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .todo-item.flash {
+      border-color: var(--accent-cyan);
+      background: rgba(78, 201, 176, 0.08);
+    }
+    .todo-item__text {
+      flex: 1;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+    .todo-item__text.done {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+    .todo-item__meta {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .todo-item__checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }
+    .ownprops-flow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px 0;
+      flex-wrap: wrap;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+    .ownprops-flow__box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">15 / 70</span>
+      mapStateToProps с ownProps
+    </div>
+    <nav class="site-header__nav">
+      <a href="../14-mapstate-basics/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">15</span>
+      <a href="../16-mapstate-return-and-rerender/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — mapStateToProps с ownProps (Todo-список)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 12px;">
+          Каждый <code>&lt;TodoItem&gt;</code> получает <code>id</code> от родителя (ownProps)
+          и читает свой todo из store через <code>mapStateToProps(state, ownProps)</code>.
+          Изменение одного todo ре-рендерит <strong>только его</strong>.
+        </p>
+
+        <div class="ownprops-flow">
+          <div class="ownprops-flow__box" style="border-color: var(--accent-purple);">
+            <div style="color: var(--accent-purple);">Parent</div>
+            <div style="color: var(--text-muted);">id={0}</div>
+          </div>
+          <span style="color: var(--text-muted);">→</span>
+          <div class="ownprops-flow__box" style="border-color: var(--accent-yellow);">
+            <div style="color: var(--accent-yellow);">mapStateToProps</div>
+            <div style="color: var(--text-muted);">(state, ownProps)</div>
+          </div>
+          <span style="color: var(--text-muted);">→</span>
+          <div class="ownprops-flow__box" style="border-color: var(--accent-cyan);">
+            <div style="color: var(--accent-cyan);">TodoItem</div>
+            <div style="color: var(--text-muted);">props.todo</div>
+          </div>
+        </div>
+
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Второй аргумент mapStateToProps: ownProps</div>
+      <div class="theory__body">
+        <h3>Что такое ownProps?</h3>
+        <p>
+          <code>ownProps</code> — это props, которые передаёт <em>родительский компонент</em>
+          (а не Redux). Если ваша <code>mapStateToProps</code> объявлена с двумя параметрами,
+          она получит <code>ownProps</code> как второй аргумент.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// mapStateToProps с ownProps:</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>, <span class="prop">ownProps</span>) => ({
+  <span class="prop">todo</span>: state.<span class="prop">todos</span>[ownProps.<span class="prop">id</span>]
+})
+
+<span class="cm">// Родитель передаёт id:</span>
+&lt;<span class="type">ConnectedTodoItem</span> <span class="prop">id</span>={<span class="num">0</span>} /&gt;
+&lt;<span class="type">ConnectedTodoItem</span> <span class="prop">id</span>={<span class="num">1</span>} /&gt;
+&lt;<span class="type">ConnectedTodoItem</span> <span class="prop">id</span>={<span class="num">2</span>} /&gt;
+        </div>
+
+        <h3>Когда mapStateToProps вызывается с ownProps</h3>
+
+        <div class="quote">
+          «If your mapStateToProps function is declared as taking two parameters,
+          it will be called whenever the store state changes or when the wrapper
+          component receives new props (based on shallow equality comparisons).»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapstate" target="_blank">react-redux.js.org — connect: Extracting Data with mapStateToProps</a>
+        </div>
+        <div class="quote">
+          «Если ваша функция mapStateToProps объявлена с двумя параметрами,
+          она будет вызываться при каждом изменении состояния store ИЛИ когда
+          компонент-обёртка получает новые props (на основе shallow equality сравнения).»
+          <br>— перевод
+        </div>
+
+        <p>
+          Это ключевое отличие от mapStateToProps с одним параметром:
+        </p>
+        <ul>
+          <li><strong>Один параметр</strong> <code>(state)</code> — вызывается только при изменении state</li>
+          <li><strong>Два параметра</strong> <code>(state, ownProps)</code> — вызывается при изменении state
+            <em>И</em> при получении новых props от родителя</li>
+        </ul>
+
+        <div class="warning">
+          <strong>Производительность:</strong> с ownProps, mapStateToProps запускается
+          <em>чаще</em> — при каждом изменении props родителя. Это может стать проблемой,
+          если родитель часто перерисовывается. Используйте ownProps только когда
+          действительно нужно сочетать данные из store с props от родителя.
+        </div>
+
+        <h3>Автоматическое слияние props</h3>
+
+        <div class="quote">
+          «You do not need to include values from ownProps in the object returned
+          from mapStateToProps. connect will automatically merge those different
+          prop sources into a final set of props.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapstate" target="_blank">react-redux.js.org — connect: Extracting Data with mapStateToProps</a>
+        </div>
+        <div class="quote">
+          «Вам не нужно включать значения из ownProps в объект, возвращаемый
+          mapStateToProps. connect автоматически объединит эти различные
+          источники props в итоговый набор props.»
+          <br>— перевод
+        </div>
+
+        <div class="code-block">
+<span class="cm">// Не нужно так:</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (state, ownProps) => ({
+  <span class="prop">id</span>: ownProps.<span class="prop">id</span>,         <span class="cm">// ❌ не нужно — connect и так передаст id</span>
+  <span class="prop">todo</span>: state.<span class="prop">todos</span>[ownProps.<span class="prop">id</span>]
+})
+
+<span class="cm">// Правильно — только данные из store:</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (state, ownProps) => ({
+  <span class="prop">todo</span>: state.<span class="prop">todos</span>[ownProps.<span class="prop">id</span>]   <span class="cm">// ✔ только то, что нужно из store</span>
+})
+<span class="cm">// Компонент получит: { id, todo, dispatch }</span>
+<span class="cm">//                     ↑ ownProps   ↑ из store  ↑ автоматически</span>
+        </div>
+
+        <h3>Как connect определяет количество аргументов</h3>
+        <p>
+          React-Redux проверяет <code>mapStateToProps.length</code> (количество объявленных
+          параметров). Если <code>length === 1</code> — ownProps не передаётся, функция
+          вызывается только при изменении state. Если <code>length >= 2</code> — ownProps
+          передаётся, и функция вызывается и при изменении props.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// length === 1 → ownProps НЕ передаётся:</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (state) => ({ count: state.<span class="prop">count</span> })
+<span class="prop">mapStateToProps</span>.<span class="prop">length</span>  <span class="cm">// 1</span>
+
+<span class="cm">// length === 2 → ownProps передаётся:</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (state, ownProps) => ({ todo: state.<span class="prop">todos</span>[ownProps.<span class="prop">id</span>] })
+<span class="prop">mapStateToProps</span>.<span class="prop">length</span>  <span class="cm">// 2</span>
+        </div>
+
+        <div class="tip">
+          <strong>Паттерн: список с индивидуальным подключением.</strong><br>
+          Список рендерит массив id, каждый элемент получает свой id через ownProps
+          и читает данные из store через mapStateToProps(state, ownProps).
+          При изменении одного элемента ре-рендерится только он — остальные не затрагиваются.
+          Это стандартный подход для оптимизации списков в Redux.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>20 — dispatch по умолчанию (без mapDispatchToProps)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .counter-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 24px;
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+    }
+    .counter-display__value {
+      font-family: var(--font-mono);
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 80px;
+      text-align: center;
+    }
+    .counter-display__label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: center;
+      margin-top: 4px;
+    }
+    .props-viewer {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      margin: 14px 0;
+    }
+    .props-viewer__key {
+      color: #9cdcfe;
+    }
+    .props-viewer__type {
+      color: var(--accent-cyan);
+      font-style: italic;
+    }
+    .props-viewer__val {
+      color: var(--accent-orange);
+    }
+    .equivalent-forms {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 14px 0;
+    }
+    @media (max-width: 800px) {
+      .equivalent-forms { grid-template-columns: 1fr; }
+    }
+    .equiv-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      text-align: center;
+    }
+    .equiv-card__code {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent-yellow);
+      margin-bottom: 6px;
+    }
+    .equiv-card__note {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .equiv-card__eq {
+      font-size: 1.2rem;
+      color: var(--success);
+      font-weight: 700;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">20 / 70</span>
+      dispatch по умолчанию (без mapDispatchToProps)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../19-mapstate-arity-behavior/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">20</span>
+      <a href="../21-mapdispatch-function/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — dispatch в props без mapDispatchToProps</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Компонент подключён через <code>connect(mapStateToProps)(Counter)</code> — без второго аргумента.
+          В этом случае <code>dispatch</code> автоматически передаётся в props. Кнопки вызывают
+          <code>props.dispatch()</code> напрямую.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — dispatch по умолчанию</div>
+      <div class="theory__body">
+
+        <h3>Когда dispatch передаётся в props?</h3>
+        <div class="quote">
+          "If you don't specify the second argument to connect(), your component will receive
+          dispatch by default."
+          — react-redux.js.org/using-react-redux/connect-mapdispatch
+        </div>
+        <div class="quote">
+          «Если вы не указываете второй аргумент connect(), ваш компонент получит dispatch
+          по умолчанию.»
+        </div>
+
+        <h3>Три эквивалентные формы</h3>
+        <p>
+          Все три варианта ниже дают одинаковый результат — компонент получает
+          <code>props.dispatch</code>:
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Форма 1: без аргументов</span>
+<span class="fn">connect</span>()(<span class="type">MyComponent</span>)
+
+<span class="cm">// Форма 2: null, null</span>
+<span class="fn">connect</span>(<span class="kw">null</span>, <span class="kw">null</span>)(<span class="type">MyComponent</span>)
+
+<span class="cm">// Форма 3: только mapStateToProps (без mapDispatchToProps)</span>
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>)(<span class="type">MyComponent</span>)
+
+<span class="cm">// Все три → props.dispatch доступен внутри компонента</span>
+        </div>
+
+        <h3>Использование props.dispatch</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">Counter</span>({ <span class="prop">count</span>, <span class="prop">dispatch</span> }) {
+  <span class="kw">return</span> (
+    &lt;div&gt;
+      &lt;span&gt;{count}&lt;/span&gt;
+      &lt;button <span class="prop">onClick</span>={() =&gt;
+        <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'INCREMENT'</span> })
+      }&gt;+&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = <span class="prop">state</span> =&gt; ({
+  <span class="prop">count</span>: state.<span class="prop">counter</span>
+})
+
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>)(<span class="type">Counter</span>)
+<span class="cm">// mapDispatchToProps не указан → dispatch в props</span>
+        </div>
+
+        <h3>Когда dispatch НЕ передаётся?</h3>
+        <p>
+          Если вы <strong>указали</strong> <code>mapDispatchToProps</code> (функцию или объект),
+          dispatch <strong>не передаётся</strong> в props автоматически. Вместо этого передаются
+          результаты mapDispatchToProps:
+        </p>
+        <div class="code-block">
+<span class="cm">// mapDispatchToProps указан → dispatch НЕ в props</span>
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = {
+  <span class="fn">increment</span>: () =&gt; ({ <span class="prop">type</span>: <span class="str">'INCREMENT'</span> })
+}
+
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">Counter</span>)
+<span class="cm">// props = { count, increment } — dispatch отсутствует!</span>
+        </div>
+
+        <div class="warning">
+          <strong>Важно:</strong> использование <code>props.dispatch</code> напрямую — самый простой,
+          но наименее «чистый» подход. Компонент знает о Redux напрямую. В следующих уроках
+          (21+) мы научимся использовать <code>mapDispatchToProps</code> для абстрагирования dispatch.
+        </div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Когда вы вызываете <code>props.dispatch(action)</code>, action попадает в store.
+          Store вызывает reducer, сохраняет новый state и уведомляет Subscription
+          (<a href="../03a-subscription-system/">подробнее в уроке 03a</a>).
+          Subscription проходит по linked list callback'ов и вызывает <code>checkForUpdates</code>
+          для каждого подключённого компонента. <code>checkForUpdates</code> запускает
+          <code>mapStateToProps</code> с новым state, сравнивает каждое поле через <code>===</code>,
+          и если есть изменения — вызывает <code>forceRender</code>.
+        </p>
+
+        <div class="tip">
+          <strong>Итог:</strong> без <code>mapDispatchToProps</code> вы получаете <code>dispatch</code>
+          в props «бесплатно». Это удобно для быстрого прототипирования, но для продакшн-кода
+          лучше использовать <code>mapDispatchToProps</code> (следующий урок).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

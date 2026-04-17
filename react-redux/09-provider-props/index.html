@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>09 — Provider: полный API props</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .props-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .prop-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .prop-card.active {
+      border-color: var(--accent);
+    }
+    .prop-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .prop-card__header:hover {
+      background: var(--bg-hover);
+    }
+    .prop-card__name {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--accent-yellow);
+    }
+    .prop-card__meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .prop-card__required {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .prop-card__required--yes {
+      background: rgba(244, 71, 71, 0.12);
+      color: var(--error);
+      border: 1px solid rgba(244, 71, 71, 0.3);
+    }
+    .prop-card__required--no {
+      background: rgba(86, 156, 214, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(86, 156, 214, 0.3);
+    }
+    .prop-card__toggle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      transition: transform 0.2s;
+    }
+    .prop-card.active .prop-card__toggle {
+      transform: rotate(180deg);
+    }
+    .prop-card__body {
+      display: none;
+      padding: 0 16px 16px;
+      border-top: 1px solid var(--border);
+    }
+    .prop-card.active .prop-card__body {
+      display: block;
+      padding-top: 14px;
+    }
+    .prop-card__type {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-cyan);
+      background: #0d0d0d;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+    .prop-card__desc {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+    .ts-interface {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.65;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+      margin-top: 16px;
+    }
+    .demo-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .demo-controls label {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .demo-controls select {
+      background: var(--bg-input);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      color: var(--text-bright);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      padding: 4px 8px;
+    }
+    .demo-value {
+      font-family: var(--font-mono);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      text-align: center;
+      padding: 12px 0;
+    }
+    .demo-info {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">09 / 70</span>
+      Provider: полный API props
+    </div>
+    <nav class="site-header__nav">
+      <a href="../08-provider-and-context/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">09</span>
+      <a href="../10-provider-ssr-hydration/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Все props компонента &lt;Provider&gt;</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Кликайте на каждый prop чтобы увидеть его тип, описание и пример.
+          Внизу — рабочий счётчик с применённым Provider.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Полный API props компонента &lt;Provider&gt;</div>
+      <div class="theory__body">
+        <h3>TypeScript интерфейс</h3>
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">ProviderProps</span>&lt;<span class="type">A</span> <span class="kw">extends</span> <span class="type">Action</span> = <span class="type">AnyAction</span>, <span class="type">S</span> = <span class="kw">any</span>&gt; {
+  <span class="prop">store</span>: <span class="type">Store</span>&lt;<span class="type">S</span>, <span class="type">A</span>&gt;                <span class="cm">// обязательный</span>
+  <span class="prop">context</span>?: <span class="type">React.Context</span>&lt;<span class="type">ReactReduxContextValue</span>&gt;  <span class="cm">// опциональный</span>
+  <span class="prop">serverState</span>?: <span class="type">S</span>                  <span class="cm">// опциональный (SSR)</span>
+  <span class="prop">stabilityCheck</span>?: <span class="str">'never'</span> | <span class="str">'once'</span> | <span class="str">'always'</span>  <span class="cm">// опциональный</span>
+  <span class="prop">children</span>: <span class="type">ReactNode</span>               <span class="cm">// обязательный</span>
+}
+        </div>
+
+        <h3>store (обязательный)</h3>
+        <p>
+          Единственный обязательный prop. Принимает Redux store, созданный через
+          <code>createStore()</code> или <code>configureStore()</code>.
+          Provider помещает этот store в React Context и создаёт корневую Subscription
+          (linked list коллбэков — <code>checkForUpdates</code>, сравнение через <code>===</code>,
+          <code>forceRender()</code> при изменении;
+          <a href="../03a-subscription-system/">подробнее в уроке 03a</a>).
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> store = <span class="fn">createStore</span>(rootReducer)
+
+&lt;<span class="type">Provider</span> <span class="prop">store</span>={store}&gt;
+  &lt;<span class="type">App</span> /&gt;
+&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <h3>context (опциональный)</h3>
+        <p>
+          Позволяет передать собственный React Context вместо встроенного <code>ReactReduxContext</code>.
+          Полезно, когда нужно подключить <strong>несколько Redux store</strong> к одному приложению —
+          каждый Provider с собственным context изолирует свой store.
+        </p>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createContext</span> } <span class="kw">from</span> <span class="str">'react'</span>
+
+<span class="kw">const</span> MyContext = <span class="fn">createContext</span>(<span class="kw">null</span>)
+
+&lt;<span class="type">Provider</span> <span class="prop">store</span>={storeA} <span class="prop">context</span>={MyContext}&gt;
+  &lt;<span class="type">App</span> /&gt;
+&lt;/<span class="type">Provider</span>&gt;
+
+<span class="cm">// Компонент внутри:</span>
+<span class="kw">const</span> value = <span class="fn">useSelector</span>(selector, { <span class="prop">context</span>: MyContext })
+        </div>
+
+        <h3>serverState (опциональный)</h3>
+        <p>
+          Используется при SSR-гидрации с <code>hydrateRoot</code>. Передаёт серверное состояние,
+          чтобы избежать hydration mismatch — ситуации, когда серверный HTML не совпадает
+          с клиентским рендером. Подробнее — в
+          <a href="../10-provider-ssr-hydration/">следующем уроке</a>.
+        </p>
+        <div class="code-block">
+<span class="fn">hydrateRoot</span>(
+  document.<span class="fn">getElementById</span>(<span class="str">'root'</span>),
+  &lt;<span class="type">Provider</span> <span class="prop">store</span>={store} <span class="prop">serverState</span>={window.__PRELOADED_STATE__}&gt;
+    &lt;<span class="type">App</span> /&gt;
+  &lt;/<span class="type">Provider</span>&gt;
+)
+        </div>
+
+        <h3>stabilityCheck (опциональный)</h3>
+        <p>
+          Контролирует проверку стабильности selector-функций в development-режиме.
+          React-Redux может дважды вызвать selector с одним и тем же state
+          и предупредить, если результаты отличаются (нестабильный selector).
+        </p>
+        <ul>
+          <li><code>'once'</code> — проверка при первом вызове (по умолчанию в dev)</li>
+          <li><code>'always'</code> — проверка при каждом вызове</li>
+          <li><code>'never'</code> — отключить проверку</li>
+        </ul>
+        <div class="code-block">
+<span class="cm">// Отключить проверку стабильности (не рекомендуется)</span>
+&lt;<span class="type">Provider</span> <span class="prop">store</span>={store} <span class="prop">stabilityCheck</span>=<span class="str">"never"</span>&gt;
+  &lt;<span class="type">App</span> /&gt;
+&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <div class="warning">
+          <strong>Предупреждение:</strong> Не отключайте stabilityCheck без веской причины.
+          Нестабильные селекторы — частая причина лишних ре-рендеров и багов.
+        </div>
+
+        <div class="tip">
+          <strong>Совет:</strong> В большинстве приложений вам потребуется только prop <code>store</code>.
+          Остальные props используются в специфических сценариях: множественные store,
+          SSR-гидрация или отладка производительности.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

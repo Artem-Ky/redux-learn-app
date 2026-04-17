@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>11 — Множественные Provider'ы и кастомный контекст</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .store-panel {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 12px;
+      transition: border-color 0.3s;
+    }
+    .store-panel--user { border-color: var(--accent); }
+    .store-panel--product { border-color: var(--accent-purple); }
+    .store-panel__title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .store-panel__title .tag-ctx {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+    }
+    .store-panel--user .store-panel__title { color: var(--accent); }
+    .store-panel--product .store-panel__title { color: var(--accent-purple); }
+    .store-panel__state {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+    .store-panel__components {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .nesting-diagram {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.8;
+      color: var(--text-secondary);
+      margin: 16px 0;
+      white-space: pre;
+    }
+    .nesting-diagram .ctx-user { color: var(--accent); }
+    .nesting-diagram .ctx-product { color: var(--accent-purple); }
+    .nesting-diagram .ctx-comp { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">11 / 70</span>
+      Множественные Provider'ы и кастомный контекст
+    </div>
+    <nav class="site-header__nav">
+      <a href="../10-provider-ssr-hydration/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">11</span>
+      <a href="../12-connect-intro/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Два store через кастомные контексты</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Два независимых Redux store, каждый в своём &lt;Provider&gt; с кастомным React Context.
+          Dispatch в один store <strong>не влияет</strong> на компоненты, подписанные на другой.
+        </p>
+
+        <div class="nesting-diagram"><span class="ctx-user">&lt;Provider store={userStore} context={UserContext}&gt;</span>
+  <span class="ctx-product">&lt;Provider store={productStore} context={ProductContext}&gt;</span>
+    <span class="ctx-comp">&lt;UserProfile /&gt;</span>      ← читает из userStore через UserContext
+    <span class="ctx-comp">&lt;ProductCatalog /&gt;</span>   ← читает из productStore через ProductContext
+  <span class="ctx-product">&lt;/Provider&gt;</span>
+<span class="ctx-user">&lt;/Provider&gt;</span></div>
+
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Множественные store и кастомные контексты</div>
+      <div class="theory__body">
+        <h3>Зачем нужны множественные store?</h3>
+        <p>
+          Redux был спроектирован для работы с <strong>одним store</strong>.
+          Но иногда (микрофронтенды, интеграция legacy-систем, независимые модули)
+          возникает необходимость использовать несколько store одновременно.
+        </p>
+
+        <div class="quote">
+          «Redux was designed to use a single store. However, if you are in an unavoidable
+          position of needing to use multiple stores, as of v6 you may do so by providing
+          (multiple) custom contexts.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/accessing-store" target="_blank">react-redux.js.org — Accessing the Store</a>
+        </div>
+        <div class="quote">
+          «Redux был спроектирован для использования одного store. Однако, если вы
+          оказались в ситуации, когда необходимо использовать несколько store,
+          начиная с v6 вы можете это сделать, предоставив (несколько) кастомных контекстов.»
+          <br>— перевод
+        </div>
+
+        <div class="quote">
+          «Instead of using the default context instance from React Redux, you may supply your
+          own custom context instance.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/accessing-store" target="_blank">react-redux.js.org — Accessing the Store</a>
+        </div>
+        <div class="quote">
+          «Вместо использования экземпляра контекста по умолчанию из React Redux,
+          вы можете предоставить свой собственный кастомный экземпляр контекста.»
+          <br>— перевод
+        </div>
+
+        <h3>Как это работает</h3>
+        <p>
+          Каждый &lt;Provider&gt; принимает проп <code>context</code>. Если передан кастомный
+          контекст — store кладётся именно в него. Хуки <code>useSelector</code> и
+          <code>useDispatch</code> тоже принимают <code>context</code> как аргумент,
+          чтобы указать, из какого store читать.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> React <span class="kw">from</span> <span class="str">'react'</span>
+<span class="kw">import</span> { Provider, useSelector, useDispatch, createDispatchHook, createSelectorHook } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="cm">// Создаём кастомные контексты</span>
+<span class="kw">const</span> <span class="prop">UserContext</span> = React.<span class="fn">createContext</span>(<span class="kw">null</span>)
+<span class="kw">const</span> <span class="prop">ProductContext</span> = React.<span class="fn">createContext</span>(<span class="kw">null</span>)
+
+<span class="cm">// Опционально: создаём типизированные хуки для каждого store</span>
+<span class="kw">const</span> <span class="fn">useUserSelector</span> = <span class="fn">createSelectorHook</span>(UserContext)
+<span class="kw">const</span> <span class="fn">useUserDispatch</span> = <span class="fn">createDispatchHook</span>(UserContext)
+<span class="kw">const</span> <span class="fn">useProductSelector</span> = <span class="fn">createSelectorHook</span>(ProductContext)
+<span class="kw">const</span> <span class="fn">useProductDispatch</span> = <span class="fn">createDispatchHook</span>(ProductContext)
+
+<span class="cm">// Вложенные Provider'ы</span>
+<span class="kw">function</span> <span class="fn">App</span>() {
+  <span class="kw">return</span> (
+    &lt;<span class="type">Provider</span> <span class="prop">store</span>={userStore} <span class="prop">context</span>={UserContext}&gt;
+      &lt;<span class="type">Provider</span> <span class="prop">store</span>={productStore} <span class="prop">context</span>={ProductContext}&gt;
+        &lt;<span class="type">UserProfile</span> /&gt;
+        &lt;<span class="type">ProductCatalog</span> /&gt;
+      &lt;/<span class="type">Provider</span>&gt;
+    &lt;/<span class="type">Provider</span>&gt;
+  )
+}
+        </div>
+
+        <h3>Каждый store — своя Subscription</h3>
+        <p>
+          Каждый &lt;Provider&gt; создаёт свою собственную
+          <a href="../03a-subscription-system/" style="color: var(--accent-blue-bright);">Subscription</a>
+          (linked list слушателей). При dispatch в один store — Subscription этого Provider
+          проходит по своему списку, для каждого слушателя запускает его selector, сравнивает
+          результат с предыдущим (<code>===</code>). Если отличается — вызывает
+          <code>forceRender()</code> только для этого компонента. Компоненты, подписанные
+          на другой store через другой контекст, <strong>не затрагиваются</strong>.
+        </p>
+
+        <h3>Когда это действительно нужно</h3>
+        <p>
+          Множественные store — это <strong>не рекомендуемый паттерн</strong> для обычных приложений.
+          Используйте его только в специфических сценариях:
+        </p>
+        <ul>
+          <li><strong>Микрофронтенды</strong> — каждый микрофронтенд имеет свой store,
+          они не должны знать друг о друге</li>
+          <li><strong>Интеграция legacy-модулей</strong> — старый модуль со своим store
+          встраивается в новое приложение</li>
+          <li><strong>Изоляция данных</strong> — например, админ-панель внутри пользовательского приложения</li>
+        </ul>
+
+        <div class="warning">
+          <strong>Не используйте множественные store вместо slice'ов!</strong><br>
+          Если вы хотите разделить state на части — используйте <code>combineReducers</code>
+          или Redux Toolkit slice'ы. Множественные store усложняют отладку (DevTools работают
+          только с одним store), делают невозможным cross-store dispatch и ломают middleware-цепочки.
+        </div>
+
+        <div class="tip">
+          <strong>Альтернатива createSelectorHook / createDispatchHook:</strong><br>
+          Вместо создания специальных хуков через <code>createSelectorHook(context)</code>,
+          можно передавать контекст напрямую:
+          <code>useSelector(selector, { context: UserContext })</code>.
+          Но кастомные хуки удобнее — не нужно каждый раз указывать контекст.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

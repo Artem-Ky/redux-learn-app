@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>14 — mapStateToProps — основы</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .mapstate-flow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: center;
+      padding: 16px 0;
+      flex-wrap: wrap;
+    }
+    .mapstate-box {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      text-align: center;
+      min-width: 130px;
+    }
+    .mapstate-box__label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .mapstate-box__value {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .mapstate-arrow {
+      color: var(--text-muted);
+      font-size: 1.3rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">14 / 70</span>
+      mapStateToProps — основы
+    </div>
+    <nav class="site-header__nav">
+      <a href="../13-connect-no-args/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">14</span>
+      <a href="../15-mapstate-ownprops/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — mapStateToProps извлекает данные из store</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 12px;">
+          <code>mapStateToProps</code> — первый аргумент <code>connect()</code>.
+          Функция принимает весь <strong>state</strong> и возвращает объект с нужными данными.
+          Этот объект передаётся как props в компонент.
+        </p>
+
+        <div class="mapstate-flow">
+          <div class="mapstate-box" style="border-color: var(--accent-purple);">
+            <div class="mapstate-box__label">Redux state</div>
+            <div class="mapstate-box__value" style="color: var(--accent-purple);">{ counter: { value: N } }</div>
+          </div>
+          <div class="mapstate-arrow">→</div>
+          <div class="mapstate-box" style="border-color: var(--accent-yellow);">
+            <div class="mapstate-box__label">mapStateToProps</div>
+            <div class="mapstate-box__value" style="color: var(--accent-yellow);">(state) => ({ count: state.counter.value })</div>
+          </div>
+          <div class="mapstate-arrow">→</div>
+          <div class="mapstate-box" style="border-color: var(--accent-cyan);">
+            <div class="mapstate-box__label">Component props</div>
+            <div class="mapstate-box__value" style="color: var(--accent-cyan);">{ count: N }</div>
+          </div>
+        </div>
+
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — mapStateToProps: первый аргумент connect()</div>
+      <div class="theory__body">
+        <h3>Что такое mapStateToProps?</h3>
+        <p>
+          <code>mapStateToProps</code> — это функция, которая определяет, <strong>какие данные</strong>
+          из Redux store нужны вашему компоненту. Она «маппит» (отображает) state store
+          в props компонента.
+        </p>
+
+        <div class="quote">
+          «As the first argument passed in to connect, mapStateToProps is used for
+          selecting the part of the data from the store that the connected component needs.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapstate" target="_blank">react-redux.js.org — connect: Extracting Data with mapStateToProps</a>
+        </div>
+        <div class="quote">
+          «Как первый аргумент, переданный в connect, mapStateToProps используется для
+          выбора той части данных из store, которая нужна подключённому компоненту.»
+          <br>— перевод
+        </div>
+
+        <h3>Когда вызывается mapStateToProps?</h3>
+
+        <div class="quote">
+          «It is called every time the store state changes. It receives the entire
+          store state, and should return an object of data this component needs.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapstate" target="_blank">react-redux.js.org — connect: Extracting Data with mapStateToProps</a>
+        </div>
+        <div class="quote">
+          «Она вызывается каждый раз при изменении состояния store. Она получает
+          весь state store и должна возвращать объект с данными, которые нужны компоненту.»
+          <br>— перевод
+        </div>
+
+        <p>
+          Точнее, механизм работает так: при dispatch
+          <a href="../03a-subscription-system/" style="color: var(--accent-blue-bright);">Subscription</a>
+          (linked list слушателей) уведомляет connect-обёртку. Обёртка вызывает
+          <code>mapStateToProps(newState)</code>, сравнивает результат с предыдущим
+          (shallow equality), и если хотя бы одно поле отличается — вызывает ре-рендер
+          оригинального компонента.
+        </p>
+
+        <h3>Сигнатура функции</h3>
+
+        <div class="quote">
+          «mapStateToProps should be defined as a function:
+          function mapStateToProps(state, ownProps?)»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapstate" target="_blank">react-redux.js.org — connect: Extracting Data with mapStateToProps</a>
+        </div>
+        <div class="quote">
+          «mapStateToProps должна быть определена как функция:
+          function mapStateToProps(state, ownProps?)»
+          <br>— перевод
+        </div>
+
+        <div class="code-block">
+<span class="cm">// Базовая форма — один аргумент (state):</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>) => ({
+  <span class="prop">count</span>: state.<span class="prop">counter</span>.<span class="prop">value</span>,
+  <span class="prop">userName</span>: state.<span class="prop">user</span>.<span class="prop">name</span>,
+})
+
+<span class="cm">// connect() передаст { count, userName } как props в компонент:</span>
+<span class="kw">const</span> <span class="type">ConnectedCounter</span> = <span class="fn">connect</span>(mapStateToProps)(Counter)
+
+<span class="cm">// Counter получит:</span>
+<span class="cm">//   props.count    — из state.counter.value</span>
+<span class="cm">//   props.userName — из state.user.name</span>
+<span class="cm">//   props.dispatch — добавлен автоматически</span>
+        </div>
+
+        <h3>Правила mapStateToProps</h3>
+        <ul>
+          <li>Должна быть <strong>чистой функцией</strong> — никаких side effects</li>
+          <li>Возвращает <strong>простой объект</strong>, каждое поле которого станет prop'ом</li>
+          <li>Должна быть <strong>быстрой</strong> — вызывается при каждом dispatch</li>
+          <li>Не вызывайте <code>dispatch</code> внутри mapStateToProps</li>
+          <li>Результат сравнивается через <strong>shallow equality</strong> (не === как в useSelector)</li>
+        </ul>
+
+        <div class="warning">
+          <strong>Не создавайте новые объекты внутри mapStateToProps!</strong><br>
+          <code>return { items: state.items.filter(...) }</code> — создаёт новый массив
+          при каждом вызове. Shallow equality увидит «новый» массив → ненужный ре-рендер.
+          Используйте <code>reselect</code> для мемоизации таких вычислений.
+        </div>
+
+        <div class="tip">
+          <strong>mapStateToProps vs useSelector:</strong><br>
+          <code>mapStateToProps</code> возвращает объект с несколькими полями
+          (shallow equal сравнение). <code>useSelector</code> возвращает одно значение
+          (=== сравнение). Для нескольких полей с useSelector нужно вызывать его несколько раз
+          или использовать <code>createSelector</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

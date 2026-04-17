@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>18 — Использование селекторов в mapStateToProps</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+      transition: background 0.2s;
+    }
+    .todo-item:hover { background: var(--bg-hover); }
+    .todo-item.done .todo-text {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+    .todo-text {
+      flex: 1;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+    .todo-check {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--accent-cyan);
+    }
+    .selector-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      border: 1px solid var(--border);
+    }
+    .selector-badge.recomputed {
+      color: var(--accent-yellow);
+      background: rgba(220,220,170,0.08);
+    }
+    .selector-badge.cached {
+      color: var(--success);
+      background: rgba(76,175,80,0.08);
+    }
+    .filter-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .filter-btn {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-family: var(--font-sans);
+      transition: all 0.15s;
+    }
+    .filter-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+    .filter-btn.active {
+      background: #264f78;
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      padding: 12px 16px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-top: 12px;
+    }
+    .stats-bar__item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .stats-bar__num {
+      font-family: var(--font-mono);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .stats-bar__label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .selector-stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .selector-stat-card {
+      padding: 10px 14px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      flex: 1;
+      min-width: 160px;
+    }
+    .selector-stat-card__name {
+      color: var(--accent-yellow);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .selector-stat-card__val {
+      color: var(--accent-cyan);
+      font-size: 1rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">18 / 70</span>
+      Использование селекторов в mapStateToProps
+    </div>
+    <nav class="site-header__nav">
+      <a href="../17-mapstate-best-practices/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">18</span>
+      <a href="../19-mapstate-arity-behavior/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Селекторы и мемоизация в connect()</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Todo-приложение с тремя селекторами: <code>selectAllTodos</code>,
+          <code>selectFilteredTodos</code> (мемоизированный), <code>selectTodoCount</code>.
+          Консоль показывает, сколько раз каждый селектор пересчитывался.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Селекторы в mapStateToProps</div>
+      <div class="theory__body">
+
+        <h3>Зачем нужны селекторы?</h3>
+        <div class="quote">
+          "We highly encourage the use of 'selector' functions to help encapsulate the process of
+          extracting values from specific locations in the state tree. Memoized selector functions
+          also play a key role in improving application performance."
+          — react-redux.js.org/using-react-redux/connect-mapstate
+        </div>
+        <div class="quote">
+          «Мы настоятельно рекомендуем использовать функции-"селекторы", чтобы инкапсулировать
+          процесс извлечения значений из конкретных мест дерева state. Мемоизированные функции-селекторы
+          также играют ключевую роль в улучшении производительности приложения.»
+        </div>
+
+        <h3>Простые селекторы</h3>
+        <p>
+          Простой селектор — обычная функция, которая принимает <code>state</code> и возвращает
+          нужный фрагмент. Они живут рядом с reducer'ами:
+        </p>
+        <div class="code-block">
+<span class="cm">// selectors.ts (рядом с todosReducer)</span>
+
+<span class="kw">export const</span> <span class="fn">selectAllTodos</span> = (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt;
+  state.todos.<span class="prop">items</span>
+
+<span class="kw">export const</span> <span class="fn">selectFilter</span> = (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt;
+  state.todos.<span class="prop">filter</span>
+
+<span class="kw">export const</span> <span class="fn">selectTodoCount</span> = (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt;
+  state.todos.items.<span class="prop">length</span>
+        </div>
+
+        <h3>Мемоизированные селекторы (createSelector)</h3>
+        <p>
+          Когда нужно <strong>вычислять</strong> производное значение (фильтрация, сортировка,
+          агрегация), используйте <code>createSelector</code> из библиотеки reselect:
+        </p>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createSelector</span> } <span class="kw">from</span> <span class="str">'reselect'</span>
+
+<span class="kw">export const</span> <span class="fn">selectFilteredTodos</span> = <span class="fn">createSelector</span>(
+  [<span class="fn">selectAllTodos</span>, <span class="fn">selectFilter</span>],
+  (<span class="prop">todos</span>, <span class="prop">filter</span>) =&gt; {
+    <span class="kw">if</span> (filter === <span class="str">'done'</span>) <span class="kw">return</span> todos.<span class="fn">filter</span>(t =&gt; t.done)
+    <span class="kw">if</span> (filter === <span class="str">'active'</span>) <span class="kw">return</span> todos.<span class="fn">filter</span>(t =&gt; !t.done)
+    <span class="kw">return</span> todos
+  }
+)
+        </div>
+        <p>
+          <code>createSelector</code> запоминает результат. Функция-вычислитель вызывается <strong>только</strong>
+          если хотя бы один входной селектор вернул новое значение. Если входы те же — возвращается кэш.
+        </p>
+
+        <h3>Использование в mapStateToProps</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; ({
+  <span class="prop">todos</span>: <span class="fn">selectFilteredTodos</span>(state),
+  <span class="prop">count</span>: <span class="fn">selectTodoCount</span>(state),
+})
+
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>)(<span class="type">TodoList</span>)
+        </div>
+
+        <h3>Паттерн: селекторы живут рядом с reducer'ами</h3>
+        <div class="code-block">
+<span class="cm">// Структура файлов:</span>
+<span class="cm">//</span>
+<span class="cm">// features/</span>
+<span class="cm">//   todos/</span>
+<span class="cm">//     todosReducer.ts    ← reducer</span>
+<span class="cm">//     todosSelectors.ts  ← селекторы</span>
+<span class="cm">//     TodoList.tsx       ← компонент</span>
+<span class="cm">//</span>
+<span class="cm">// Селекторы знают структуру state → живут рядом с reducer'ом,</span>
+<span class="cm">// который эту структуру определяет.</span>
+        </div>
+
+        <div class="tip">
+          <strong>Ключевое преимущество:</strong> если структура state изменится, вы правите
+          только селекторы — компоненты не затрагиваются. Это <em>инкапсуляция</em>.
+        </div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          При каждом dispatch система Subscription
+          (<a href="../03a-subscription-system/">подробнее в уроке 03a</a>)
+          проходит по linked list callback'ов и вызывает <code>checkForUpdates</code>.
+          Для компонентов, подключённых через <code>connect()</code>, <code>checkForUpdates</code>
+          запускает <code>mapStateToProps</code>, а внутри неё — ваши селекторы. Мемоизированный
+          селектор возвращает тот же объект если входы не изменились → shallow equality check
+          проходит через <code>===</code> → компонент не перерисовывается.
+        </p>
+
+        <div class="warning">
+          <strong>Без мемоизации:</strong> если селектор возвращает новый массив/объект каждый раз
+          (через <code>.filter()</code>, <code>.map()</code>, spread), shallow check видит новую
+          ссылку и компонент перерисовывается при каждом dispatch.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

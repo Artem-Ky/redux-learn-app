@@ -20,6 +20,8 @@ function rootReducer(
   switch (action.type) {
     case 'counter/increment':
       return { ...state, counter: state.counter + 1 }
+    case 'counter/reset':
+      return { ...state, counter: 0 }
     case 'theme/toggle':
       return { ...state, theme: state.theme === 'dark' ? 'light' : 'dark' }
     default:
@@ -180,7 +182,7 @@ document.getElementById('btn-sub-reset')!.addEventListener('click', () => {
   document.getElementById('sl-theme-new')!.textContent = '?'
 
   // Reset store
-  while (store.getState().counter > 0) store.dispatch({ type: 'counter/decrement' } as { type: string })
+  store.dispatch({ type: 'counter/reset' } as { type: string })
   if (store.getState().theme !== 'dark') store.dispatch({ type: 'theme/toggle' } as { type: string })
 
   con.clear()

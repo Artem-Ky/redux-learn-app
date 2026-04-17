@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>12 — connect() — введение в HOC-паттерн</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .hoc-flow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: center;
+      padding: 20px 0;
+      flex-wrap: wrap;
+    }
+    .hoc-box {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      text-align: center;
+      min-width: 160px;
+      transition: border-color 0.3s, background 0.3s, transform 0.3s;
+    }
+    .hoc-box.active {
+      transform: scale(1.05);
+    }
+    .hoc-box--original { border-color: var(--accent-orange); }
+    .hoc-box--original.active { background: rgba(206, 145, 120, 0.1); }
+    .hoc-box--connect { border-color: var(--accent-purple); }
+    .hoc-box--connect.active { background: rgba(197, 134, 192, 0.1); }
+    .hoc-box--connected { border-color: var(--accent-cyan); }
+    .hoc-box--connected.active { background: rgba(78, 201, 176, 0.1); }
+    .hoc-box__label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .hoc-box__name {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+    .hoc-arrow {
+      color: var(--text-muted);
+      font-size: 1.5rem;
+    }
+    .wrapper-view {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 16px;
+    }
+    .wrapper-view__outer {
+      border: 2px dashed var(--accent-cyan);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+    .wrapper-view__outer-label {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent-cyan);
+      margin-bottom: 8px;
+    }
+    .wrapper-view__inner {
+      border: 2px solid var(--accent-orange);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      background: var(--bg-tertiary);
+    }
+    .wrapper-view__inner-label {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent-orange);
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">12 / 70</span>
+      connect() — введение в HOC-паттерн
+    </div>
+    <nav class="site-header__nav">
+      <a href="../11-provider-multiple-stores/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">12</span>
+      <a href="../13-connect-no-args/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — HOC-обёртка connect()</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 12px;">
+          <code>connect()</code> берёт ваш компонент и возвращает <strong>новый</strong>
+          компонент-обёртку, который подключён к Redux store. Оригинальный компонент
+          <em>не модифицируется</em>.
+        </p>
+
+        <div class="hoc-flow" id="hoc-flow">
+          <div class="hoc-box hoc-box--original" id="hoc-original">
+            <div class="hoc-box__label">Оригинальный</div>
+            <div class="hoc-box__name" style="color: var(--accent-orange);">Counter</div>
+          </div>
+          <div class="hoc-arrow">→</div>
+          <div class="hoc-box hoc-box--connect" id="hoc-connect">
+            <div class="hoc-box__label">HOC-фабрика</div>
+            <div class="hoc-box__name" style="color: var(--accent-purple);">connect()</div>
+          </div>
+          <div class="hoc-arrow">→</div>
+          <div class="hoc-box hoc-box--connected" id="hoc-connected">
+            <div class="hoc-box__label">Подключённый</div>
+            <div class="hoc-box__name" style="color: var(--accent-cyan);">ConnectedCounter</div>
+          </div>
+        </div>
+
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — connect() и HOC-паттерн</div>
+      <div class="theory__body">
+        <h3>Что такое connect()?</h3>
+        <p>
+          <code>connect()</code> — это <strong>Higher-Order Component (HOC)</strong>,
+          который подключает React-компонент к Redux store. Это исторически первый
+          и основной API React-Redux (до появления хуков в v7.1).
+        </p>
+
+        <div class="quote">
+          «The connect() function connects a React component to a Redux store.
+          It provides its connected component with the pieces of the data it needs
+          from the store, and the functions it can use to dispatch actions to the store.»
+          <br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org — Connect</a>
+        </div>
+        <div class="quote">
+          «Функция connect() подключает React-компонент к Redux store.
+          Она предоставляет подключённому компоненту те данные из store, которые ему нужны,
+          и функции, которые он может использовать для dispatch'а actions в store.»
+          <br>— перевод
+        </div>
+
+        <div class="quote">
+          «It does not modify the component class passed to it; instead, it returns
+          a new, connected component class that wraps the component you passed in.»
+          <br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org — Connect</a>
+        </div>
+        <div class="quote">
+          «Она не модифицирует переданный ей класс компонента; вместо этого она
+          возвращает новый, подключённый класс компонента, который оборачивает
+          переданный вами компонент.»
+          <br>— перевод
+        </div>
+
+        <h3>Сигнатура connect()</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">connect</span>(
+  <span class="prop">mapStateToProps</span>?,     <span class="cm">// (state, ownProps?) => stateProps</span>
+  <span class="prop">mapDispatchToProps</span>?,   <span class="cm">// object | (dispatch, ownProps?) => dispatchProps</span>
+  <span class="prop">mergeProps</span>?,            <span class="cm">// (stateProps, dispatchProps, ownProps) => mergedProps</span>
+  <span class="prop">options</span>?               <span class="cm">// { context?, areStatesEqual?, ... }</span>
+)
+        </div>
+        <p>
+          <code>connect()</code> возвращает <strong>функцию-обёртку</strong> (wrapper function).
+          Эту функцию вы вызываете с вашим компонентом:
+        </p>
+        <div class="code-block">
+<span class="cm">// Двойной вызов — это currying:</span>
+<span class="kw">const</span> <span class="prop">enhance</span> = <span class="fn">connect</span>(mapStateToProps, mapDispatchToProps)  <span class="cm">// → wrapper function</span>
+<span class="kw">const</span> <span class="type">ConnectedCounter</span> = <span class="fn">enhance</span>(Counter)                      <span class="cm">// → connected component</span>
+
+<span class="cm">// Или в одну строку:</span>
+<span class="kw">const</span> <span class="type">ConnectedCounter</span> = <span class="fn">connect</span>(mapStateToProps, mapDispatchToProps)(Counter)
+        </div>
+
+        <h3>HOC-паттерн</h3>
+        <p>
+          <strong>Higher-Order Component</strong> — это функция, которая принимает компонент
+          и возвращает <em>новый улучшенный компонент</em>:
+        </p>
+        <div class="code-block">
+<span class="cm">// HOC-паттерн в общем виде:</span>
+<span class="kw">const</span> <span class="fn">withSomething</span> = (WrappedComponent) => {
+  <span class="kw">return function</span> <span class="fn">EnhancedComponent</span>(props) {
+    <span class="kw">const</span> extraData = <span class="fn">useExtraData</span>()
+    <span class="kw">return</span> &lt;WrappedComponent {...props} {...extraData} /&gt;
+  }
+}
+
+<span class="cm">// connect() — частный случай HOC:</span>
+<span class="cm">// он добавляет данные из Redux store в props компонента</span>
+        </div>
+
+        <p>
+          Обёртка (<code>ConnectedCounter</code>) делает следующее:
+        </p>
+        <ol>
+          <li>Читает store из React Context (через &lt;Provider&gt;)</li>
+          <li>Подписывается на изменения store через
+            <a href="../03a-subscription-system/" style="color: var(--accent-blue-bright);">Subscription</a>
+            (linked list слушателей; при dispatch — selector проверяет изменения через <code>===</code>,
+            и если значение отличается — вызывает <code>forceRender()</code>)</li>
+          <li>Вызывает <code>mapStateToProps(state)</code> при каждом изменении store</li>
+          <li>Передаёт результат как props в оригинальный компонент</li>
+        </ol>
+
+        <div class="tip">
+          <strong>connect() vs хуки:</strong> Сегодня для новых проектов рекомендуются хуки
+          (<code>useSelector</code> + <code>useDispatch</code>). Но <code>connect()</code>
+          всё ещё полностью поддерживается, широко используется в legacy-коде, и имеет
+          некоторые преимущества (nested Subscription для защиты от zombie children,
+          автоматический memoization через <code>areStatesEqual</code>).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

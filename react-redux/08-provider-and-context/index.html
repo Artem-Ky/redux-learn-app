@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>08 — Provider и React Context — как это работает</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 800px) {
+      .compare-grid { grid-template-columns: 1fr; }
+    }
+    .compare-panel {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .compare-panel--naive { border-color: var(--warning); }
+    .compare-panel--real { border-color: var(--success); }
+    .compare-panel__header {
+      padding: 10px 16px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .compare-panel--naive .compare-panel__header {
+      background: rgba(255, 152, 0, 0.1);
+      color: var(--warning);
+    }
+    .compare-panel--real .compare-panel__header {
+      background: rgba(76, 175, 80, 0.1);
+      color: var(--success);
+    }
+    .compare-panel__body { padding: 20px; }
+    .compare-counter {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+    .compare-counter__value {
+      font-family: var(--font-mono);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 50px;
+      text-align: center;
+    }
+    .render-tracker {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      margin-top: 10px;
+    }
+    .render-tracker__row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      font-size: 0.82rem;
+    }
+    .render-tracker__label { color: var(--text-secondary); }
+    .render-tracker__count {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      min-width: 30px;
+      text-align: right;
+    }
+    .render-tracker__count--bad { color: var(--error); }
+    .render-tracker__count--good { color: var(--success); }
+    .render-flash {
+      transition: background 0.3s;
+    }
+    .render-flash.flash {
+      background: rgba(244, 71, 71, 0.15) !important;
+    }
+    .render-flash.flash-good {
+      background: rgba(76, 175, 80, 0.1) !important;
+    }
+    .unrelated-box {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      margin-top: 10px;
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">08 / 70</span>
+      Provider и React Context
+    </div>
+    <nav class="site-header__nav">
+      <a href="../07-provider-basics/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">08</span>
+      <a href="../09-provider-props/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Наивный Context vs React-Redux Provider</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Нажимайте <strong>+</strong> и наблюдайте за счётчиками рендеров. Слева — наивный подход
+          через <code>React.createContext</code> (все компоненты перерисовываются). Справа —
+          настоящий React-Redux Provider (перерисовывается только подписанный компонент).
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Provider и React Context: как это работает внутри</div>
+      <div class="theory__body">
+        <h3>React-Redux использует Context, но не как вы думаете</h3>
+
+        <div class="quote">
+          "Internally, React Redux uses React's context feature to make the Redux store
+          accessible to deeply nested connected components."
+          <br><br>
+          <em>Внутри React Redux использует механизм context React для предоставления
+          Redux store глубоко вложенным подключённым компонентам.</em>
+          <br><br>— react-redux.js.org, Accessing the Store
+        </div>
+
+        <p>
+          Ключевое отличие React-Redux от наивного использования Context:
+          &lt;Provider&gt; помещает в Context <strong>стабильный объект</strong>
+          <code>{'{store, subscription}'}</code>, который <strong>никогда не меняется</strong>.
+          Context value остаётся <code>===</code> равным самому себе при каждом рендере.
+        </p>
+
+        <h3>Почему наивный Context — это проблема</h3>
+        <p>
+          При использовании <code>React.createContext</code> напрямую для хранения state,
+          <strong>каждое изменение</strong> значения context вызывает re-render <strong>всех</strong>
+          потребителей (<code>useContext</code>), даже если конкретному компоненту
+          это значение не нужно.
+        </p>
+        <div class="code-block">
+<span class="cm">// Наивный подход — ПЛОХО для производительности</span>
+<span class="kw">const</span> StoreContext = React.<span class="fn">createContext</span>(<span class="kw">null</span>)
+
+<span class="kw">function</span> <span class="fn">NaiveProvider</span>({ children }) {
+  <span class="kw">const</span> [state, setState] = <span class="fn">useState</span>(initialState)
+  <span class="cm">// Каждый setState создаёт НОВЫЙ объект value</span>
+  <span class="cm">// → React пересчитывает ВСЕХ потребителей!</span>
+  <span class="kw">return</span> (
+    &lt;<span class="type">StoreContext.Provider</span> <span class="prop">value</span>={{ state, setState }}&gt;
+      {children}
+    &lt;/<span class="type">StoreContext.Provider</span>&gt;
+  )
+}
+        </div>
+
+        <h3>Как работает React-Redux Provider</h3>
+
+        <div class="quote">
+          "React Redux's &lt;Provider&gt; component uses &lt;ReactReduxContext.Provider&gt; to put the Redux store
+          and internal subscription wrappers into context. useSelector, useDispatch, and connect call
+          useContext(ReactReduxContext) to read those values and handle updates."
+          <br><br>
+          <em>&lt;Provider&gt; компонент React Redux использует &lt;ReactReduxContext.Provider&gt; для помещения
+          Redux store и внутренних обёрток подписки в context. useSelector, useDispatch и connect
+          вызывают useContext(ReactReduxContext) для чтения этих значений и обработки обновлений.</em>
+          <br><br>— react-redux.js.org, Accessing the Store
+        </div>
+
+        <div class="code-block">
+<span class="cm">// Реальный React-Redux Provider (упрощённо)</span>
+<span class="kw">function</span> <span class="fn">Provider</span>({ store, children }) {
+  <span class="cm">// contextValue создаётся ОДИН раз и НИКОГДА не меняется</span>
+  <span class="kw">const</span> contextValue = <span class="fn">useMemo</span>(() => ({
+    store,
+    subscription: <span class="kw">new</span> <span class="fn">Subscription</span>(store)
+  }), [store])
+
+  <span class="cm">// Context.Provider получает стабильную ссылку</span>
+  <span class="cm">// → React НЕ перерисовывает потребителей при dispatch!</span>
+  <span class="kw">return</span> (
+    &lt;<span class="type">ReactReduxContext.Provider</span> <span class="prop">value</span>={contextValue}&gt;
+      {children}
+    &lt;/<span class="type">ReactReduxContext.Provider</span>&gt;
+  )
+}
+        </div>
+
+        <h3>Механизм уведомлений: Subscription вместо Context</h3>
+        <p>
+          Уведомления о dispatch проходят <strong>не через Context</strong>, а через
+          Subscription — систему linked list коллбэков. При каждом dispatch:
+        </p>
+        <ol>
+          <li>Store вызывает callback из <code>store.subscribe()</code></li>
+          <li>Это Root Subscription (созданная &lt;Provider&gt;), которая проходит по своему linked list</li>
+          <li>Для каждого слушателя (каждый <code>useSelector</code>) вызывает <code>checkForUpdates()</code></li>
+          <li><code>checkForUpdates</code> запускает selector, сравнивает результат через <code>===</code></li>
+          <li>Если значение изменилось — вызывает <code>forceRender()</code> только для этого компонента</li>
+        </ol>
+        <p>
+          Подробности работы Subscription —
+          в <a href="../03a-subscription-system/">уроке 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Итог:</strong> Context используется только для <em>передачи ссылки на store</em>.
+          Перерисовка компонентов управляется через Subscription, а не через Context.
+          Поэтому React-Redux не страдает от проблемы «все потребители перерисовываются».
+        </div>
+
+        <h3>Сравнение подходов</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 16px 0;">
+          <tr style="border-bottom: 1px solid var(--border);">
+            <th style="text-align: left; padding: 8px; color: var(--text-muted);"></th>
+            <th style="text-align: left; padding: 8px; color: var(--warning);">Наивный Context</th>
+            <th style="text-align: left; padding: 8px; color: var(--success);">React-Redux Provider</th>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Context value</td>
+            <td style="padding: 8px;">Меняется при каждом dispatch</td>
+            <td style="padding: 8px;">Стабильный {store, subscription}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Re-render</td>
+            <td style="padding: 8px;">ВСЕ потребители</td>
+            <td style="padding: 8px;">Только подписанные с изменением</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Уведомления</td>
+            <td style="padding: 8px;">Через React Context</td>
+            <td style="padding: 8px;">Через Subscription (linked list)</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;">Производительность</td>
+            <td style="padding: 8px;">O(N) re-renders при каждом dispatch</td>
+            <td style="padding: 8px;">Только изменённые компоненты</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

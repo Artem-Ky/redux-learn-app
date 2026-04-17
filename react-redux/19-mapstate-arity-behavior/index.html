@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>19 — Arity: как количество аргументов меняет поведение</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .variant-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 14px 0;
+    }
+    @media (max-width: 900px) {
+      .variant-grid { grid-template-columns: 1fr; }
+    }
+    .variant-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+    .variant-card.flash { border-color: var(--accent-cyan); }
+    .variant-card__header {
+      padding: 8px 14px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .variant-card__header.v1 {
+      background: rgba(86,156,214,0.1);
+      color: var(--accent);
+    }
+    .variant-card__header.v2 {
+      background: rgba(78,201,176,0.1);
+      color: var(--accent-cyan);
+    }
+    .variant-card__header.v3 {
+      background: rgba(255,152,0,0.1);
+      color: var(--warning);
+    }
+    .variant-card__body {
+      padding: 14px;
+    }
+    .variant-card__code {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      background: #0d0d0d;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    .arg-display {
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      margin-top: 8px;
+    }
+    .arg-display__label {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .arg-display__value {
+      color: var(--accent-cyan);
+    }
+    .arg-display__value.none {
+      color: var(--error);
+      font-style: italic;
+    }
+    .arity-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+    .arity-badge.len1 {
+      background: rgba(86,156,214,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(86,156,214,0.3);
+    }
+    .arity-badge.len2 {
+      background: rgba(78,201,176,0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(78,201,176,0.3);
+    }
+    .render-count {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent-yellow);
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">19 / 70</span>
+      Arity: как количество аргументов меняет поведение
+    </div>
+    <nav class="site-header__nav">
+      <a href="../18-mapstate-selectors/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">19</span>
+      <a href="../20-dispatch-default/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Три варианта mapStateToProps: arity и ownProps</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Три компонента с разными сигнатурами mapStateToProps. Обратите внимание:
+          вариант 3 использует значение по умолчанию <code>(state, ownProps = {})</code>,
+          но <code>function.length === 1</code>, поэтому ownProps <strong>не передаётся</strong>.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Arity (количество аргументов) mapStateToProps</div>
+      <div class="theory__body">
+
+        <h3>Что такое arity?</h3>
+        <p>
+          <strong>Arity</strong> — количество аргументов функции. В JavaScript это
+          свойство <code>function.length</code>, которое считает количество <em>обязательных</em>
+          параметров (до первого с значением по умолчанию или rest-параметра).
+        </p>
+
+        <h3>Как React Redux использует arity</h3>
+        <div class="quote">
+          "With just (state), the function runs whenever the root store state object is different.
+          With (state, ownProps), it runs any time the store state is different and ALSO whenever
+          the wrapper props have changed."
+          — react-redux.js.org/using-react-redux/connect-mapstate
+        </div>
+        <div class="quote">
+          «С параметром только (state) функция запускается каждый раз, когда корневой объект
+          state store отличается. С (state, ownProps) она запускается каждый раз, когда
+          state store отличается, И ТАКЖЕ когда props обёртки изменились.»
+        </div>
+
+        <h3>Не добавляйте ownProps без необходимости</h3>
+        <div class="quote">
+          "You should not add the ownProps argument unless you actually need to use it, or your
+          mapStateToProps function will run more often than it needs to."
+          — react-redux.js.org/using-react-redux/connect-mapstate
+        </div>
+        <div class="quote">
+          «Вы не должны добавлять аргумент ownProps, если вы реально его не используете,
+          иначе ваша функция mapStateToProps будет запускаться чаще, чем нужно.»
+        </div>
+
+        <h3>Ловушка: значение по умолчанию</h3>
+        <div class="quote">
+          "Note: ownProps is not passed to mapStateToProps and mapDispatchToProps if the formal
+          definition of the function contains one mandatory parameter (function has length 1)."
+          — react-redux.js.org/api/connect
+        </div>
+        <div class="quote">
+          «Примечание: ownProps не передаётся в mapStateToProps и mapDispatchToProps, если
+          формальное определение функции содержит один обязательный параметр (function.length === 1).»
+        </div>
+
+        <div class="code-block">
+<span class="cm">// Вариант 1: length === 1 → ownProps НЕ передаётся</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>) =&gt; ({...})
+<span class="cm">// Вызывается ТОЛЬКО при изменении store state</span>
+
+<span class="cm">// Вариант 2: length === 2 → ownProps ПЕРЕДАЁТСЯ</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>, <span class="prop">ownProps</span>) =&gt; ({...})
+<span class="cm">// Вызывается при изменении store state ИЛИ ownProps</span>
+
+<span class="cm">// Вариант 3: length === 1 (!) → ownProps НЕ передаётся</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>, <span class="prop">ownProps</span> = {}) =&gt; ({...})
+<span class="cm">// Значение по умолчанию → length === 1 → ownProps не будет передан!</span>
+        </div>
+
+        <h3>Таблица: arity и поведение</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 16px 0;">
+          <tr style="border-bottom: 1px solid var(--border);">
+            <th style="text-align: left; padding: 8px; color: var(--text-muted);">Сигнатура</th>
+            <th style="text-align: center; padding: 8px; color: var(--text-muted);">fn.length</th>
+            <th style="text-align: center; padding: 8px; color: var(--text-muted);">ownProps передаётся?</th>
+            <th style="text-align: left; padding: 8px; color: var(--text-muted);">Когда вызывается</th>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>(state) =&gt; ...</code></td>
+            <td style="padding: 8px; text-align: center;">1</td>
+            <td style="padding: 8px; text-align: center; color: var(--error);">Нет</td>
+            <td style="padding: 8px;">При изменении store state</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>(state, ownProps) =&gt; ...</code></td>
+            <td style="padding: 8px; text-align: center;">2</td>
+            <td style="padding: 8px; text-align: center; color: var(--success);">Да</td>
+            <td style="padding: 8px;">При изменении state ИЛИ ownProps</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>(state, ownProps = {}) =&gt; ...</code></td>
+            <td style="padding: 8px; text-align: center;">1</td>
+            <td style="padding: 8px; text-align: center; color: var(--error);">Нет</td>
+            <td style="padding: 8px;">При изменении store state (ownProps игнорируется!)</td>
+          </tr>
+        </table>
+
+        <div class="warning">
+          <strong>Ловушка:</strong> <code>(state, ownProps = {})</code> выглядит так, будто принимает
+          ownProps, но <code>function.length === 1</code>, поэтому React Redux <strong>не передаёт</strong>
+          ownProps. Второй аргумент всегда будет <code>undefined</code> (и сработает значение по умолчанию <code>{'{}'}</code>).
+        </div>
+
+        <div class="tip">
+          <strong>Правило:</strong> если вам нужен ownProps — явно объявите два параметра
+          <strong>без значений по умолчанию</strong>: <code>(state, ownProps)</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>13 — connect() без аргументов — получаем dispatch</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .combo-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin: 16px 0;
+    }
+    .combo-table th,
+    .combo-table td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+    .combo-table th {
+      background: var(--bg-tertiary);
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+    .combo-table td {
+      background: var(--bg-panel);
+      color: var(--text-secondary);
+    }
+    .combo-table code {
+      font-size: 0.78rem;
+    }
+    .combo-table .tag-yes {
+      color: var(--success);
+      font-weight: 600;
+    }
+    .combo-table .tag-no {
+      color: var(--error);
+      font-weight: 600;
+    }
+    .combo-highlight {
+      background: rgba(86, 156, 214, 0.08) !important;
+      border-left: 3px solid var(--accent) !important;
+    }
+    .props-display {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-top: 12px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">13 / 70</span>
+      connect() без аргументов — получаем dispatch
+    </div>
+    <nav class="site-header__nav">
+      <a href="../12-connect-intro/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">13</span>
+      <a href="../14-mapstate-basics/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — connect() без аргументов</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 12px;">
+          <code>connect()(MyComponent)</code> — самый простой вызов. Компонент получает
+          <code>props.dispatch</code>, но <strong>не подписывается</strong> на store
+          (не ре-рендерится при изменении state).
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Четыре комбинации вызова connect()</div>
+      <div class="theory__body">
+        <h3>connect() без аргументов</h3>
+        <p>
+          Когда вы вызываете <code>connect()</code> без аргументов, результат — компонент,
+          который получает только <code>dispatch</code> в props. Он <strong>не подписан</strong>
+          на изменения store, поэтому изменения state не вызывают его ре-рендер.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// connect() без аргументов:</span>
+<span class="kw">const</span> <span class="type">ConnectedComponent</span> = <span class="fn">connect</span>()(MyComponent)
+
+<span class="cm">// MyComponent получит:</span>
+<span class="cm">//   props.dispatch — функция для dispatch'а actions</span>
+<span class="cm">//   Больше ничего из store!</span>
+<span class="cm">//   Компонент НЕ подписан на store — не перерисовывается при dispatch.</span>
+        </div>
+
+        <h3>Четыре комбинации вызова connect()</h3>
+        <p>
+          В зависимости от переданных аргументов, connect() ведёт себя по-разному:
+        </p>
+
+        <table class="combo-table">
+          <thead>
+            <tr>
+              <th>Вызов</th>
+              <th>Подписка на store</th>
+              <th>dispatch в props</th>
+              <th>Что получает компонент</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="combo-highlight">
+              <td><code>connect()(Comp)</code></td>
+              <td><span class="tag-no">нет</span></td>
+              <td><span class="tag-yes">да</span></td>
+              <td>только <code>props.dispatch</code></td>
+            </tr>
+            <tr>
+              <td><code>connect(mapStateToProps)(Comp)</code></td>
+              <td><span class="tag-yes">да</span></td>
+              <td><span class="tag-yes">да</span></td>
+              <td>данные из store + <code>dispatch</code></td>
+            </tr>
+            <tr>
+              <td><code>connect(null, mapDispatchToProps)(Comp)</code></td>
+              <td><span class="tag-no">нет</span></td>
+              <td><span class="tag-no">нет</span><sup>*</sup></td>
+              <td>только action creators</td>
+            </tr>
+            <tr>
+              <td><code>connect(mapStateToProps, mapDispatchToProps)(Comp)</code></td>
+              <td><span class="tag-yes">да</span></td>
+              <td><span class="tag-no">нет</span><sup>*</sup></td>
+              <td>данные из store + action creators</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="font-size: 0.78rem; color: var(--text-muted);">
+          * Когда передан <code>mapDispatchToProps</code>, <code>dispatch</code> не
+          добавляется в props автоматически (предполагается, что вы биндите action creators).
+        </p>
+
+        <div class="quote">
+          «If you don't supply your own mapDispatchToProps function or object full of
+          action creators, the default mapDispatchToProps implementation just injects
+          dispatch into your component's props.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org — connect: Dispatching Actions</a>
+        </div>
+        <div class="quote">
+          «Если вы не предоставите свою собственную функцию mapDispatchToProps или объект
+          с action creators, реализация mapDispatchToProps по умолчанию просто инжектит
+          dispatch в props вашего компонента.»
+          <br>— перевод
+        </div>
+
+        <h3>Подписка на store и Subscription</h3>
+        <p>
+          Подписка на store контролируется первым аргументом (<code>mapStateToProps</code>):
+        </p>
+        <ul>
+          <li>Если <code>mapStateToProps</code> передан — connect создаёт
+            <a href="../03a-subscription-system/" style="color: var(--accent-blue-bright);">Subscription</a>
+            (listener в linked list). При dispatch — selector вызывается с новым state,
+            результат сравнивается с предыдущим (<code>===</code>). Если отличается —
+            <code>forceRender()</code>.</li>
+          <li>Если <code>mapStateToProps</code> не передан (null или undefined) —
+            подписки нет. Компонент не знает об изменениях state.</li>
+        </ul>
+
+        <div class="tip">
+          <strong>Когда connect() без аргументов полезен?</strong><br>
+          Когда компоненту нужно только <em>отправлять</em> actions, но не <em>читать</em>
+          данные из store. Например, кнопка «Выйти из аккаунта», которая dispatch'ит action,
+          но не отображает данные пользователя.
+        </div>
+
+        <div class="warning">
+          <strong>Современная альтернатива:</strong> <code>useDispatch()</code> делает то же самое
+          без обёртки. В новом коде предпочитайте хуки.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

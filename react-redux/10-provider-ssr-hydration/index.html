@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>10 — Provider и SSR: serverState</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ssr-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .ssr-step {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 14px 16px;
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 2px;
+      transition: all 0.4s;
+    }
+    .ssr-step.active {
+      border-color: var(--accent);
+      background: rgba(86, 156, 214, 0.1);
+    }
+    .ssr-step.done {
+      border-color: var(--success);
+      background: rgba(76, 175, 80, 0.06);
+    }
+    .ssr-step__num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      border: 2px solid var(--border-light);
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+      transition: all 0.3s;
+    }
+    .ssr-step.active .ssr-step__num {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(86, 156, 214, 0.2);
+    }
+    .ssr-step.done .ssr-step__num {
+      border-color: var(--success);
+      color: var(--success);
+      background: rgba(76, 175, 80, 0.15);
+    }
+    .ssr-step__info { flex: 1; }
+    .ssr-step__title {
+      color: var(--text-bright);
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+    .ssr-step__desc {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    .ssr-connector {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 1rem;
+      padding: 2px 0;
+      margin-left: 28px;
+    }
+    .ssr-preview {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    @media (max-width: 800px) {
+      .ssr-preview { grid-template-columns: 1fr; }
+    }
+    .ssr-box {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .ssr-box__header {
+      padding: 8px 14px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ssr-box--server .ssr-box__header {
+      background: rgba(86, 156, 214, 0.1);
+      color: var(--accent);
+    }
+    .ssr-box--client .ssr-box__header {
+      background: rgba(76, 175, 80, 0.1);
+      color: var(--success);
+    }
+    .ssr-box__body {
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+    .ssr-html {
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      font-size: 0.78rem;
+    }
+    .ssr-state-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin: 8px 4px;
+    }
+    .ssr-state-badge--server {
+      background: rgba(86, 156, 214, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(86, 156, 214, 0.3);
+    }
+    .ssr-state-badge--client {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .hydration-counter {
+      text-align: center;
+      padding: 16px;
+    }
+    .hydration-counter__value {
+      font-family: var(--font-mono);
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .hydration-counter__label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .mismatch-alert {
+      background: rgba(244, 71, 71, 0.08);
+      border: 1px solid rgba(244, 71, 71, 0.3);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 0.82rem;
+      color: var(--error);
+      margin-top: 10px;
+      display: none;
+    }
+    .mismatch-alert.visible { display: block; }
+    .match-alert {
+      background: rgba(76, 175, 80, 0.08);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 0.82rem;
+      color: var(--success);
+      margin-top: 10px;
+      display: none;
+    }
+    .match-alert.visible { display: block; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">10 / 70</span>
+      Provider и SSR: serverState
+    </div>
+    <nav class="site-header__nav">
+      <a href="../09-provider-props/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">10</span>
+      <a href="../11-provider-multiple-stores/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Симуляция SSR и гидрации</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Нажмите «Запустить SSR-симуляцию» чтобы увидеть процесс:
+          серверный рендер → передача HTML → гидрация на клиенте.
+          Сравните сценарии с <code>serverState</code> и без него.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Provider и SSR: serverState</div>
+      <div class="theory__body">
+        <h3>Проблема: Hydration Mismatch</h3>
+        <p>
+          При Server-Side Rendering (SSR) сервер рендерит React-компоненты в HTML-строку
+          и отправляет клиенту. Клиент затем «гидрирует» этот HTML — подключает обработчики событий
+          и делает его интерактивным, используя <code>hydrateRoot()</code> вместо <code>createRoot()</code>.
+        </p>
+        <p>
+          Проблема возникает, когда <strong>серверный state</strong> и <strong>клиентский state</strong>
+          расходятся. Между моментом серверного рендера и клиентской гидрации может произойти
+          dispatch — например, другой компонент в store инициализируется позже. В результате
+          HTML с сервера не совпадает с тем, что React пытается отрендерить на клиенте.
+        </p>
+
+        <div class="warning">
+          <strong>Hydration mismatch</strong> — одна из самых частых ошибок при SSR.
+          React 18 выдаёт предупреждение: <code>"Text content does not match server-rendered HTML"</code>.
+          Это может привести к визуальным артефактам и потере интерактивности.
+        </div>
+
+        <h3>Решение: prop serverState</h3>
+
+        <div class="quote">
+          "&lt;Provider&gt; now accepts a serverState prop for use in SSR hydration scenarios.
+          This is necessary if you are calling hydrateRoot in order to avoid hydration mismatches."
+          <br><br>
+          <em>&lt;Provider&gt; теперь принимает prop serverState для сценариев SSR-гидрации.
+          Это необходимо при использовании hydrateRoot, чтобы избежать hydration mismatch.</em>
+          <br><br>— react-redux.js.org, Provider
+        </div>
+
+        <p>
+          Prop <code>serverState</code> говорит React-Redux: «Вот state, который сервер использовал
+          для рендера этого HTML. Используй его для первого рендера на клиенте, чтобы HTML совпал».
+          После первого рендера React-Redux переключается на актуальный <code>store.getState()</code>.
+        </p>
+
+        <h3>Как это работает внутри</h3>
+        <ol>
+          <li><strong>Сервер</strong> создаёт store с preloadedState, рендерит HTML через <code>renderToString()</code></li>
+          <li>Сервер отправляет HTML + сериализованный state клиенту</li>
+          <li><strong>Клиент</strong> создаёт свой store с тем же preloadedState</li>
+          <li>Клиент вызывает <code>hydrateRoot()</code> с <code>serverState={window.__PRELOADED_STATE__}</code></li>
+          <li>При гидрации <code>useSelector</code> использует <code>serverState</code> (не <code>store.getState()</code>)</li>
+          <li>React видит, что HTML совпадает → гидрация проходит без ошибок</li>
+          <li>После гидрации переключается на <code>store.getState()</code> для последующих обновлений</li>
+        </ol>
+
+        <h3>Полный пример SSR-гидрации</h3>
+        <div class="code-block">
+<span class="cm">// === Серверный код (Node.js) ===</span>
+<span class="kw">import</span> { <span class="fn">renderToString</span> } <span class="kw">from</span> <span class="str">'react-dom/server'</span>
+<span class="kw">import</span> { <span class="type">Provider</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(rootReducer, preloadedState)
+<span class="kw">const</span> html = <span class="fn">renderToString</span>(
+  &lt;<span class="type">Provider</span> <span class="prop">store</span>={store}&gt;
+    &lt;<span class="type">App</span> /&gt;
+  &lt;/<span class="type">Provider</span>&gt;
+)
+
+<span class="cm">// Вставляем state в HTML для передачи клиенту</span>
+<span class="kw">const</span> fullHtml = <span class="str">`
+  &lt;div id="root"&gt;${html}&lt;/div&gt;
+  &lt;script&gt;
+    window.__PRELOADED_STATE__ = ${<span class="fn">JSON.stringify</span>(store.<span class="fn">getState</span>())}
+  &lt;/script&gt;
+`</span>
+        </div>
+
+        <div class="code-block">
+<span class="cm">// === Клиентский код ===</span>
+<span class="kw">import</span> { <span class="fn">hydrateRoot</span> } <span class="kw">from</span> <span class="str">'react-dom/client'</span>
+<span class="kw">import</span> { <span class="type">Provider</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">const</span> preloadedState = window.__PRELOADED_STATE__
+<span class="kw">delete</span> window.__PRELOADED_STATE__
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(rootReducer, preloadedState)
+
+<span class="fn">hydrateRoot</span>(
+  document.<span class="fn">getElementById</span>(<span class="str">'root'</span>),
+  &lt;<span class="type">Provider</span>
+    <span class="prop">store</span>={store}
+    <span class="prop">serverState</span>={preloadedState}
+  &gt;
+    &lt;<span class="type">App</span> /&gt;
+  &lt;/<span class="type">Provider</span>&gt;
+)
+        </div>
+
+        <h3>preloadedState vs serverState</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 16px 0;">
+          <tr style="border-bottom: 1px solid var(--border);">
+            <th style="text-align: left; padding: 8px; color: var(--text-muted);"></th>
+            <th style="text-align: left; padding: 8px; color: var(--accent-orange);">preloadedState</th>
+            <th style="text-align: left; padding: 8px; color: var(--accent-cyan);">serverState</th>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Где</td>
+            <td style="padding: 8px;">Аргумент createStore(reducer, <strong>preloadedState</strong>)</td>
+            <td style="padding: 8px;">Prop &lt;Provider <strong>serverState</strong>={...}&gt;</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Зачем</td>
+            <td style="padding: 8px;">Инициализация store с данными</td>
+            <td style="padding: 8px;">Фиксация state для первого рендера (hydration)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Когда</td>
+            <td style="padding: 8px;">При создании store</td>
+            <td style="padding: 8px;">При гидрации (hydrateRoot)</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;">Что если без него</td>
+            <td style="padding: 8px;">Store начнёт с reducer default state</td>
+            <td style="padding: 8px;">Возможен hydration mismatch</td>
+          </tr>
+        </table>
+
+        <div class="tip">
+          <strong>Совет:</strong> Если вы не используете SSR — вам <code>serverState</code> не нужен.
+          Он решает конкретную проблему расхождения HTML при гидрации.
+          Для обычных SPA достаточно <code>preloadedState</code> в <code>createStore()</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

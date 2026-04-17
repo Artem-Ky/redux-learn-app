@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>17 — mapStateToProps — лучшие практики</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .pattern-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 0;
+    }
+    .pattern-tab {
+      padding: 10px 20px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: background 0.15s, color 0.15s;
+      font-family: var(--font-sans);
+    }
+    .pattern-tab:hover {
+      background: var(--bg-hover);
+      color: var(--text-bright);
+    }
+    .pattern-tab.active {
+      background: var(--bg-secondary);
+      color: var(--accent-cyan);
+      border-bottom: 2px solid var(--bg-secondary);
+      margin-bottom: -2px;
+    }
+    .pattern-panel {
+      display: none;
+      padding: 20px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+    .pattern-panel.active { display: block; }
+    .side-by-side {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 12px 0;
+    }
+    @media (max-width: 700px) {
+      .side-by-side { grid-template-columns: 1fr; }
+    }
+    .code-card {
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .code-card__header {
+      padding: 6px 14px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .code-card__header.bad {
+      background: rgba(244,71,71,0.12);
+      color: var(--error);
+      border-bottom: 1px solid rgba(244,71,71,0.3);
+    }
+    .code-card__header.good {
+      background: rgba(76,175,80,0.12);
+      color: var(--success);
+      border-bottom: 1px solid rgba(76,175,80,0.3);
+    }
+    .code-card__body {
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      background: #0d0d0d;
+      white-space: pre-wrap;
+    }
+    .render-counter-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent-yellow);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">17 / 70</span>
+      mapStateToProps — лучшие практики
+    </div>
+    <nav class="site-header__nav">
+      <a href="../16-mapstate-return-and-rerender/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">17</span>
+      <a href="../18-mapstate-selectors/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Анти-паттерны и исправления</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Четыре распространённых ошибки при написании <code>mapStateToProps</code>.
+          Каждая вкладка показывает плохой и хороший варианты с подсчётом рендеров.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Лучшие практики mapStateToProps</div>
+      <div class="theory__body">
+
+        <h3>1. mapStateToProps должна «перекраивать» данные</h3>
+        <div class="quote">
+          "mapStateToProps functions can, and should, do a lot more than just return state.someSlice.
+          They have the responsibility of 're-shaping' store data as needed for that component."
+          — react-redux.js.org/using-react-redux/connect-mapstate
+        </div>
+        <div class="quote">
+          «Функции mapStateToProps могут и должны делать гораздо больше, чем просто
+          возвращать state.someSlice. Они отвечают за "перекраивание" данных из store
+          в ту форму, которая нужна конкретному компоненту.»
+        </div>
+
+        <h3>2. mapStateToProps должна быть быстрой</h3>
+        <div class="quote">
+          "mapStateToProps Functions Should Be Fast"
+          — react-redux.js.org/using-react-redux/connect-mapstate (заголовок раздела)
+        </div>
+        <div class="quote">
+          «Функции mapStateToProps должны быть быстрыми.»
+        </div>
+        <p>
+          Эта функция вызывается при <strong>каждом</strong> изменении store. Если внутри
+          выполняются тяжёлые вычисления — вся система Subscription замедляется.
+          Subscription проходит по linked list callback'ов, вызывает <code>checkForUpdates</code>
+          для каждого подключённого компонента, а <code>checkForUpdates</code> запускает
+          <code>mapStateToProps</code> и сравнивает результат через <code>===</code>.
+          Если <code>mapStateToProps</code> медленная — всё тормозит
+          (<a href="../03a-subscription-system/">подробнее в уроке 03a</a>).
+        </p>
+
+        <h3>3. mapStateToProps должна быть чистой и синхронной</h3>
+        <div class="quote">
+          "mapStateToProps Functions Should Be Pure and Synchronous"
+          — react-redux.js.org/using-react-redux/connect-mapstate (заголовок раздела)
+        </div>
+        <div class="quote">
+          «Функции mapStateToProps должны быть чистыми и синхронными.»
+        </div>
+        <p>
+          Никаких <code>fetch()</code>, <code>setTimeout()</code>, побочных эффектов или мутаций.
+          <code>mapStateToProps</code> — чистая функция: получает state, возвращает объект. Точка.
+        </p>
+
+        <h3>4. Используйте селекторы</h3>
+        <div class="quote">
+          "We highly encourage the use of 'selector' functions to help encapsulate the process of
+          extracting values from specific locations in the state tree."
+          — react-redux.js.org/using-react-redux/connect-mapstate
+        </div>
+        <div class="quote">
+          «Мы настоятельно рекомендуем использовать функции-"селекторы", чтобы инкапсулировать
+          процесс извлечения значений из конкретных мест дерева state.»
+        </div>
+
+        <h3>Таблица анти-паттернов</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 16px 0;">
+          <tr style="border-bottom: 1px solid var(--border);">
+            <th style="text-align: left; padding: 8px; color: var(--error);">Плохо</th>
+            <th style="text-align: left; padding: 8px; color: var(--success);">Хорошо</th>
+            <th style="text-align: left; padding: 8px; color: var(--text-muted);">Почему</th>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>state =&gt; state</code></td>
+            <td style="padding: 8px;"><code>state =&gt; ({ count: state.counter })</code></td>
+            <td style="padding: 8px;">Вернуть весь state = ре-рендер при любом изменении</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>state.todos.map(...)</code></td>
+            <td style="padding: 8px;">Мемоизированный селектор</td>
+            <td style="padding: 8px;">map() создаёт новый массив → новая ссылка → всегда !==</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>async</code> / <code>fetch()</code></td>
+            <td style="padding: 8px;">Чистая синхронная функция</td>
+            <td style="padding: 8px;">mapStateToProps должна быть чистой</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;">Тяжёлые вычисления</td>
+            <td style="padding: 8px;">createSelector (reselect)</td>
+            <td style="padding: 8px;">Мемоизация пересчитывает только при изменении входных данных</td>
+          </tr>
+        </table>
+
+        <div class="warning">
+          <strong>Внимание:</strong> <code>state =&gt; state</code> — самый частый анти-паттерн.
+          Компонент будет перерисовываться при <strong>каждом</strong> dispatch, даже если нужные
+          ему данные не менялись. Всегда извлекайте конкретные поля.
+        </div>
+
+        <div class="tip">
+          <strong>Совет:</strong> В следующем уроке (18) мы подробно разберём селекторы
+          и <code>createSelector</code> — основной инструмент для мемоизации в mapStateToProps.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

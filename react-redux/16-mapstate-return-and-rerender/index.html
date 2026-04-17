@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>16 — Возвращаемые значения mapStateToProps и ре-рендеры</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .field-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .field-card.flash-green {
+      border-color: var(--success);
+      background: rgba(76,175,80,0.08);
+    }
+    .field-card.flash-skip {
+      border-color: var(--text-muted);
+      background: rgba(102,102,102,0.06);
+    }
+    .field-card__label {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      min-width: 120px;
+    }
+    .field-card__value {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .render-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--accent-yellow);
+      margin-top: 12px;
+    }
+    .shallow-eq-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin: 14px 0;
+    }
+    .shallow-eq-table th {
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .shallow-eq-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+    }
+    .shallow-eq-table .result-yes {
+      color: var(--success);
+      font-weight: 700;
+    }
+    .shallow-eq-table .result-no {
+      color: var(--error);
+      font-weight: 700;
+    }
+    .eq-visual {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      margin: 16px 0;
+      flex-wrap: wrap;
+    }
+    .eq-box {
+      padding: 10px 18px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-panel);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      text-align: center;
+      min-width: 140px;
+      transition: border-color 0.3s;
+    }
+    .eq-box__label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .eq-arrow {
+      font-size: 1.4rem;
+      color: var(--text-muted);
+    }
+    .eq-result {
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+    }
+    .eq-result.same {
+      color: var(--success);
+      background: rgba(76,175,80,0.12);
+      border: 1px solid rgba(76,175,80,0.3);
+    }
+    .eq-result.diff {
+      color: var(--error);
+      background: rgba(244,71,71,0.12);
+      border: 1px solid rgba(244,71,71,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">16 / 70</span>
+      Возвращаемые значения mapStateToProps и ре-рендеры
+    </div>
+    <nav class="site-header__nav">
+      <a href="../15-mapstate-ownprops/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">16</span>
+      <a href="../17-mapstate-best-practices/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — shallow equality и ре-рендеры connect()</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Компонент подключён через <code>connect()</code>. <code>mapStateToProps</code> возвращает
+          только <code>{ name }</code>. Нажмите кнопки и наблюдайте: изменение <code>age</code>
+          <strong>не вызывает</strong> ре-рендер, потому что <code>name</code> не изменился.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Shallow Equality и ре-рендеры mapStateToProps</div>
+      <div class="theory__body">
+        <h3>Как connect() решает, перерисовывать ли компонент?</h3>
+        <p>
+          Когда state в store изменяется, React Redux вызывает вашу функцию <code>mapStateToProps</code>
+          и получает новый объект. Затем он сравнивает <strong>каждое поле</strong> нового объекта
+          с соответствующим полем предыдущего результата через <code>===</code>. Это называется
+          <em>shallow equality check</em> (поверхностная проверка равенства).
+        </p>
+
+        <div class="quote">
+          "React Redux internally implements the shouldComponentUpdate method such that the wrapper
+          component re-renders precisely when the data your component needs has changed. By default,
+          React Redux decides whether the contents of the object returned from mapStateToProps are
+          different using === comparison (a 'shallow equality' check) on each field of the returned object."
+          — react-redux.js.org/using-react-redux/connect-mapstate
+        </div>
+        <div class="quote">
+          «React Redux внутренне реализует метод shouldComponentUpdate так, что компонент-обёртка
+          перерисовывается именно тогда, когда данные, нужные вашему компоненту, изменились.
+          По умолчанию React Redux определяет, изменилось ли содержимое объекта, возвращённого из
+          mapStateToProps, используя сравнение === (поверхностную проверку равенства) для каждого
+          поля возвращённого объекта.»
+        </div>
+
+        <h3>Визуально: как работает shallow equality</h3>
+        <div class="code-block">
+<span class="cm">// Предположим mapStateToProps возвращает:</span>
+<span class="kw">const</span> prev = { <span class="prop">name</span>: <span class="str">"Alice"</span> }
+<span class="kw">const</span> next = { <span class="prop">name</span>: <span class="str">"Alice"</span> }
+
+<span class="cm">// Shallow equality check:</span>
+prev.<span class="prop">name</span> === next.<span class="prop">name</span>  <span class="cm">// "Alice" === "Alice" → true</span>
+<span class="cm">// Все поля одинаковы → НЕ перерисовывать</span>
+
+<span class="cm">// Теперь если name изменилось:</span>
+<span class="kw">const</span> prev2 = { <span class="prop">name</span>: <span class="str">"Alice"</span> }
+<span class="kw">const</span> next2 = { <span class="prop">name</span>: <span class="str">"Bob"</span> }
+
+prev2.<span class="prop">name</span> === next2.<span class="prop">name</span>  <span class="cm">// "Alice" === "Bob" → false</span>
+<span class="cm">// Есть отличие → ПЕРЕРИСОВАТЬ</span>
+        </div>
+
+        <h3>Ловушка: мутация объекта</h3>
+        <div class="quote">
+          "Note that returning a mutated object of the same reference is a common mistake that can
+          result in your component not re-rendering when expected."
+          — react-redux.js.org/using-react-redux/connect-mapstate
+        </div>
+        <div class="quote">
+          «Обратите внимание: возврат мутированного объекта с той же ссылкой — распространённая
+          ошибка, которая может привести к тому, что ваш компонент не перерисуется, когда вы
+          этого ожидаете.»
+        </div>
+
+        <div class="code-block">
+<span class="cm">// ПЛОХО: мутация объекта</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>) => {
+  state.user.<span class="prop">name</span> = <span class="str">"changed"</span>  <span class="cm">// мутация!</span>
+  <span class="kw">return</span> state.user  <span class="cm">// та же ссылка → shallow check видит ===</span>
+}
+<span class="cm">// Результат: компонент НЕ перерисуется, хотя данные изменились</span>
+
+<span class="cm">// ХОРОШО: новый объект</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>) => ({
+  <span class="prop">name</span>: state.user.<span class="prop">name</span>
+})
+        </div>
+
+        <h3>Когда запускается mapStateToProps?</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 16px 0;">
+          <tr style="border-bottom: 1px solid var(--border);">
+            <th style="text-align: left; padding: 8px; color: var(--text-muted);">Сигнатура</th>
+            <th style="text-align: left; padding: 8px; color: var(--accent-cyan);">Когда вызывается</th>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>mapStateToProps(state)</code></td>
+            <td style="padding: 8px;">Когда state в store изменяется</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>mapStateToProps(state, ownProps)</code></td>
+            <td style="padding: 8px;">Когда state в store изменяется <strong>ИЛИ</strong> когда ownProps изменяются</td>
+          </tr>
+        </table>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Когда store обновляется, React Redux использует систему Subscription
+          (<a href="../03a-subscription-system/">подробнее в уроке 03a</a>):
+          Subscription хранит linked list callback'ов. При каждом dispatch вызывается
+          <code>checkForUpdates</code>, который запускает <code>mapStateToProps</code> с новым state,
+          сравнивает каждое поле результата с предыдущим через <code>===</code>, и если хотя бы одно
+          поле отличается — вызывает <code>forceRender</code> для компонента.
+        </p>
+
+        <div class="tip">
+          <strong>Ключевой вывод:</strong> возвращайте из <code>mapStateToProps</code> только те поля,
+          которые реально нужны компоненту. Чем меньше полей — тем реже компонент перерисовывается.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

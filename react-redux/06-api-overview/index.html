@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>06 — Обзор всего API React-Redux</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .api-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0;
+    }
+    .api-tab {
+      padding: 10px 20px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+      margin-bottom: -2px;
+    }
+    .api-tab:hover { color: var(--text-bright); }
+    .api-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .api-section { display: none; }
+    .api-section.active { display: block; }
+    .api-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .api-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    }
+    .api-card:hover {
+      border-color: var(--accent);
+      background: rgba(86, 156, 214, 0.06);
+      transform: translateY(-2px);
+    }
+    .api-card.selected {
+      border-color: var(--accent-cyan);
+      background: rgba(78, 201, 176, 0.08);
+    }
+    .api-card__name {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent-yellow);
+      margin-bottom: 6px;
+    }
+    .api-card__desc {
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    .api-card__tag {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-top: 8px;
+    }
+    .api-card__tag--recommended {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .api-card__tag--legacy {
+      background: rgba(255, 152, 0, 0.12);
+      color: var(--warning);
+      border: 1px solid rgba(255, 152, 0, 0.3);
+    }
+    .api-card__tag--core {
+      background: rgba(86, 156, 214, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(86, 156, 214, 0.3);
+    }
+    .code-preview {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-top: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.65;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+      min-height: 80px;
+    }
+    .code-preview__title {
+      color: var(--accent-cyan);
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .api-summary {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .api-summary__item {
+      text-align: center;
+      padding: 10px 16px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      min-width: 100px;
+    }
+    .api-summary__num {
+      font-family: var(--font-mono);
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .api-summary__label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">06 / 70</span>
+      Обзор всего API React-Redux
+    </div>
+    <nav class="site-header__nav">
+      <a href="../05-data-flow-full-cycle/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">06</span>
+      <a href="../07-provider-basics/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Карта API React-Redux</div>
+      <div class="demo-section__body">
+        <div class="api-summary">
+          <div class="api-summary__item">
+            <div class="api-summary__num">1</div>
+            <div class="api-summary__label">Provider</div>
+          </div>
+          <div class="api-summary__item">
+            <div class="api-summary__num">3</div>
+            <div class="api-summary__label">Hooks</div>
+          </div>
+          <div class="api-summary__item">
+            <div class="api-summary__num">1</div>
+            <div class="api-summary__label">Connect</div>
+          </div>
+        </div>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Полный обзор API React-Redux</div>
+      <div class="theory__body">
+        <h3>Три группы API</h3>
+        <p>
+          Весь публичный API React-Redux можно разделить на три группы:
+          <strong>Provider</strong> (компонент для подключения store),
+          <strong>Hooks API</strong> (современный подход) и
+          <strong>Connect API</strong> (классический HOC-подход).
+        </p>
+
+        <div class="quote">
+          "useSelector reads a value from the store state and subscribes to updates,
+          while useDispatch returns the store's dispatch method to let you dispatch actions."
+          <br><br>
+          <em>useSelector читает значение из state store и подписывается на обновления,
+          а useDispatch возвращает метод dispatch store для отправки actions.</em>
+          <br><br>— react-redux.js.org, Getting Started
+        </div>
+
+        <h3>1. &lt;Provider&gt;</h3>
+        <p>
+          Компонент <code>&lt;Provider store={store}&gt;</code> оборачивает всё приложение
+          и делает Redux store доступным для всех вложенных компонентов через React Context.
+          Без него ни один хук или connect не сможет получить доступ к store.
+        </p>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="type">Provider</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import</span> store <span class="kw">from</span> <span class="str">'./store'</span>
+
+<span class="fn">createRoot</span>(document.<span class="fn">getElementById</span>(<span class="str">'root'</span>)).<span class="fn">render</span>(
+  &lt;<span class="type">Provider</span> <span class="prop">store</span>={store}&gt;
+    &lt;<span class="type">App</span> /&gt;
+  &lt;/<span class="type">Provider</span>&gt;
+)
+        </div>
+
+        <h3>2. Hooks API (рекомендуется)</h3>
+
+        <div class="quote">
+          "We recommend using the React-Redux hooks API as the default approach
+          in your React components."
+          <br><br>
+          <em>Мы рекомендуем использовать React-Redux hooks API как подход
+          по умолчанию в ваших React-компонентах.</em>
+          <br><br>— react-redux.js.org, Hooks
+        </div>
+
+        <ul>
+          <li><code>useSelector(selector, equalityFn?)</code> — читает данные из store state, подписывается на обновления.
+            При каждом dispatch вызывает selector, сравнивает результат с предыдущим через <code>===</code> и
+            при изменении вызывает <code>forceRender()</code>
+            (<a href="../03a-subscription-system/">подробнее в 03a</a>).</li>
+          <li><code>useDispatch()</code> — возвращает функцию <code>store.dispatch</code> для отправки actions.</li>
+          <li><code>useStore()</code> — возвращает ссылку на сам store-объект. Используется редко —
+            только когда нужен прямой доступ к <code>store.getState()</code> или <code>store.replaceReducer()</code>.</li>
+        </ul>
+
+        <h3>3. Connect API (классический)</h3>
+
+        <div class="quote">
+          "The existing connect API still works and will continue to be supported,
+          but the hooks API is simpler and works better with TypeScript."
+          <br><br>
+          <em>Существующий connect API по-прежнему работает и будет поддерживаться,
+          но hooks API проще и лучше работает с TypeScript.</em>
+          <br><br>— react-redux.js.org, Hooks
+        </div>
+
+        <div class="code-block">
+<span class="fn">connect</span>(<span class="prop">mapStateToProps</span>?, <span class="prop">mapDispatchToProps</span>?, <span class="prop">mergeProps</span>?, <span class="prop">options</span>?)
+        </div>
+
+        <p>
+          <code>connect</code> — это Higher-Order Component (HOC), который оборачивает ваш компонент
+          и передаёт ему props из Redux store. Принимает до четырёх аргументов:
+        </p>
+        <ul>
+          <li><code>mapStateToProps</code> — функция, которая извлекает данные из state и передаёт их как props</li>
+          <li><code>mapDispatchToProps</code> — функция или объект, определяющий dispatch-функции как props</li>
+          <li><code>mergeProps</code> — функция для объединения stateProps, dispatchProps и ownProps</li>
+          <li><code>options</code> — объект с дополнительными настройками (context, areStatesEqual и др.)</li>
+        </ul>
+
+        <div class="tip">
+          <strong>Рекомендация:</strong> Для нового кода используйте Hooks API (useSelector + useDispatch).
+          Connect API изучайте для поддержки legacy-кода — его вы встретите в старых проектах повсюду.
+        </div>
+
+        <h3>Что мы изучим дальше</h3>
+        <p>
+          В следующих уроках мы подробно разберём каждую часть API:
+        </p>
+        <ol>
+          <li><strong>Уроки 07–10:</strong> &lt;Provider&gt; — основы, context, props, SSR</li>
+          <li><strong>Уроки 12–19:</strong> connect() — mapStateToProps, mapDispatchToProps, mergeProps</li>
+          <li><strong>Уроки 20+:</strong> Hooks API — useSelector, useDispatch, useStore</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

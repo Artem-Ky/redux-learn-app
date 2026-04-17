@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>07 — Компонент &lt;Provider&gt; — основы</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 800px) {
+      .scenario-grid { grid-template-columns: 1fr; }
+    }
+    .scenario {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .scenario--error { border-color: var(--error); }
+    .scenario--success { border-color: var(--success); }
+    .scenario__header {
+      padding: 10px 16px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .scenario--error .scenario__header {
+      background: rgba(244, 71, 71, 0.1);
+      color: var(--error);
+    }
+    .scenario--success .scenario__header {
+      background: rgba(76, 175, 80, 0.1);
+      color: var(--success);
+    }
+    .scenario__body {
+      padding: 20px;
+      min-height: 120px;
+    }
+    .error-display {
+      background: rgba(244, 71, 71, 0.08);
+      border: 1px solid rgba(244, 71, 71, 0.3);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--error);
+      line-height: 1.6;
+    }
+    .error-display__title {
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+    .working-counter {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      justify-content: center;
+      padding: 10px 0;
+    }
+    .working-counter__value {
+      font-family: var(--font-mono);
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 60px;
+      text-align: center;
+    }
+    .render-badge {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">07 / 70</span>
+      Компонент &lt;Provider&gt; — основы
+    </div>
+    <nav class="site-header__nav">
+      <a href="../06-api-overview/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">07</span>
+      <a href="../08-provider-and-context/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Без &lt;Provider&gt; vs с &lt;Provider&gt;</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Слева — компонент <strong>без</strong> &lt;Provider&gt; (ошибка перехватывается ErrorBoundary).
+          Справа — <strong>с</strong> &lt;Provider&gt; (рабочий счётчик).
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Компонент &lt;Provider&gt;</div>
+      <div class="theory__body">
+        <h3>Зачем нужен &lt;Provider&gt;?</h3>
+
+        <div class="quote">
+          "The &lt;Provider&gt; component makes the Redux store available to any nested components
+          that need to access the Redux store."
+          <br><br>
+          <em>Компонент &lt;Provider&gt; делает Redux store доступным для любых вложенных компонентов,
+          которым нужен доступ к Redux store.</em>
+          <br><br>— react-redux.js.org, Provider
+        </div>
+
+        <p>
+          &lt;Provider&gt; — это React-компонент, который принимает prop <code>store</code>
+          и помещает его в React Context. После этого любой компонент внутри дерева может
+          получить доступ к store через хуки (<code>useSelector</code>, <code>useDispatch</code>)
+          или через <code>connect()</code>.
+        </p>
+
+        <h3>Почему на верхнем уровне?</h3>
+
+        <div class="quote">
+          "Since any React component in a React Redux app can be connected to the store,
+          most applications will render a &lt;Provider&gt; at the top level, with the entire
+          app's component tree inside of it."
+          <br><br>
+          <em>Поскольку любой React-компонент в React Redux приложении может быть подключён к store,
+          большинство приложений рендерят &lt;Provider&gt; на верхнем уровне, с деревом компонентов
+          всего приложения внутри.</em>
+          <br><br>— react-redux.js.org, Provider
+        </div>
+
+        <div class="code-block">
+<span class="cm">// Типичная точка входа React-Redux приложения</span>
+<span class="kw">import</span> { <span class="type">Provider</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import</span> { <span class="fn">createRoot</span> } <span class="kw">from</span> <span class="str">'react-dom/client'</span>
+<span class="kw">import</span> store <span class="kw">from</span> <span class="str">'./store'</span>
+<span class="kw">import</span> <span class="type">App</span> <span class="kw">from</span> <span class="str">'./App'</span>
+
+<span class="fn">createRoot</span>(document.<span class="fn">getElementById</span>(<span class="str">'root'</span>)).<span class="fn">render</span>(
+  &lt;<span class="type">Provider</span> <span class="prop">store</span>={store}&gt;
+    &lt;<span class="type">App</span> /&gt;
+  &lt;/<span class="type">Provider</span>&gt;
+)
+        </div>
+
+        <h3>Как это связано с Context?</h3>
+
+        <div class="quote">
+          "The Hooks and connect APIs can then access the provided store instance
+          via React's Context mechanism."
+          <br><br>
+          <em>API хуков и connect затем получают доступ к предоставленному экземпляру store
+          через механизм React Context.</em>
+          <br><br>— react-redux.js.org, Accessing the Store
+        </div>
+
+        <p>
+          Внутри &lt;Provider&gt; создаёт объект <code>{'{store, subscription}'}</code> и помещает его
+          в <code>ReactReduxContext</code>. Когда вы вызываете <code>useSelector()</code>,
+          хук читает store из этого контекста и подписывается на обновления
+          через Subscription (linked list коллбэков, где каждый вызывает <code>checkForUpdates()</code>,
+          сравнивает результат selector через <code>===</code> и при изменении
+          вызывает <code>forceRender()</code> —
+          <a href="../03a-subscription-system/">подробнее в уроке 03a</a>).
+        </p>
+
+        <h3>Что если забыть &lt;Provider&gt;?</h3>
+        <p>
+          Если вызвать <code>useSelector</code> или <code>useDispatch</code> без &lt;Provider&gt;
+          в дереве, React-Redux выбросит ошибку:
+        </p>
+        <div class="code-block" style="color: var(--error);">
+Error: Could not find "store" in the context of
+"Connect(MyComponent)". Either wrap the root component
+in a &lt;Provider&gt;, or pass a custom React context provider
+to &lt;Provider&gt; and the corresponding React context consumer
+to Connect(MyComponent) in connect options.
+        </div>
+
+        <div class="warning">
+          <strong>Важно:</strong> &lt;Provider&gt; должен быть выше в дереве, чем любой компонент,
+          использующий useSelector, useDispatch или connect. Обычно его ставят в самом корне — в файле index.tsx.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

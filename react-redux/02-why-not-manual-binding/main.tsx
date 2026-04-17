@@ -108,6 +108,15 @@ function ManualCounter() {
 
 let reduxSelectorCalls = 0
 
+// Отдельный компонент для отображения счётчика вызовов селектора.
+// Подписан на state.other.timestamp — обновляется при КАЖДОМ dispatch
+// (включая other/update), поэтому всегда показывает актуальное значение.
+// Это не влияет на renderCount родительского компонента.
+function SelectorCallBadge() {
+  useSelector((state: AppState) => state.other.timestamp)
+  return <span>{reduxSelectorCalls}</span>
+}
+
 function ReactReduxCounter() {
   const count = useSelector((state: AppState) => {
     reduxSelectorCalls++
@@ -134,7 +143,7 @@ function ReactReduxCounter() {
         Рендеров: <span>{renderCount.current}</span>
       </div>
       <div className="render-counter" style={{ marginTop: '4px' }}>
-        selector вызовов: <span>{reduxSelectorCalls}</span>
+        selector вызовов: <SelectorCallBadge />
       </div>
       <p style={{ color: 'var(--success)', fontSize: '0.78rem', marginTop: '8px' }}>
         ✔ useSelector сравнивает результат ===. Если counter.value не изменился → нет рендера
