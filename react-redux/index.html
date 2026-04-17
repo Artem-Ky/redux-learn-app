@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>React-Redux — Обучение</title>
+  <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">React-Redux — Полный курс</div>
+  </div>
+
+  <div class="page">
+    <div class="section-title">A. Введение и архитектура</div>
+    <div class="index-grid">
+      <a href="./01-what-is-react-redux/" class="index-card">
+        <div class="index-card__num">01</div>
+        <div class="index-card__title">Что такое React-Redux?</div>
+        <div class="index-card__desc">Зачем отдельная библиотека, три проблемы которые она решает</div>
+      </a>
+      <a href="./02-why-not-manual-binding/" class="index-card">
+        <div class="index-card__num">02</div>
+        <div class="index-card__title">Почему нельзя вручную?</div>
+        <div class="index-card__desc">Props drilling, лишние рендеры, утечки памяти, отсутствие batching</div>
+      </a>
+      <a href="./03-installation-setup/" class="index-card">
+        <div class="index-card__num">03</div>
+        <div class="index-card__title">Установка и настройка</div>
+        <div class="index-card__desc">npm install, структура проекта, минимальный пример</div>
+      </a>
+      <a href="./03a-subscription-system/" class="index-card">
+        <div class="index-card__num">03a</div>
+        <div class="index-card__title">Система подписок (Subscription)</div>
+        <div class="index-card__desc">Как React-Redux уведомляет компоненты: linked list, nested vs flat, исходный код</div>
+      </a>
+      <a href="./04-architecture-overview/" class="index-card">
+        <div class="index-card__num">04</div>
+        <div class="index-card__title">Архитектура React-Redux</div>
+        <div class="index-card__desc">Store → Provider → Context → useSelector → Component</div>
+      </a>
+      <a href="./05-data-flow-full-cycle/" class="index-card">
+        <div class="index-card__num">05</div>
+        <div class="index-card__title">Полный цикл данных</div>
+        <div class="index-card__desc">От клика до обновления UI — пошаговая визуализация</div>
+      </a>
+      <a href="./06-api-overview/" class="index-card">
+        <div class="index-card__num">06</div>
+        <div class="index-card__title">Обзор API</div>
+        <div class="index-card__desc">Provider, Hooks, Connect — карта всего API</div>
+      </a>
+    </div>
+
+    <div class="section-title">B. Provider — Поставщик стора</div>
+    <div class="index-grid">
+      <a href="./07-provider-basics/" class="index-card">
+        <div class="index-card__num">07</div>
+        <div class="index-card__title">Компонент Provider</div>
+        <div class="index-card__desc">Оборачиваем приложение, store как prop</div>
+      </a>
+      <a href="./08-provider-and-context/" class="index-card">
+        <div class="index-card__num">08</div>
+        <div class="index-card__title">Provider и React Context</div>
+        <div class="index-card__desc">Что Provider делает под капотом, ReactReduxContext</div>
+      </a>
+      <a href="./09-provider-props/" class="index-card">
+        <div class="index-card__num">09</div>
+        <div class="index-card__title">Provider: все props</div>
+        <div class="index-card__desc">store, context, serverState, stabilityCheck</div>
+      </a>
+      <a href="./10-provider-ssr-hydration/" class="index-card">
+        <div class="index-card__num">10</div>
+        <div class="index-card__title">Provider и SSR</div>
+        <div class="index-card__desc">serverState, React 18 hydration</div>
+      </a>
+      <a href="./11-provider-multiple-stores/" class="index-card">
+        <div class="index-card__num">11</div>
+        <div class="index-card__title">Множественные Provider'ы</div>
+        <div class="index-card__desc">Несколько store'ов, custom context, изоляция</div>
+      </a>
+    </div>
+
+    <div class="section-title">C. Connect API — mapStateToProps</div>
+    <div class="index-grid">
+      <a href="./12-connect-intro/" class="index-card">
+        <div class="index-card__num">12</div>
+        <div class="index-card__title">connect() — введение</div>
+        <div class="index-card__desc">HOC-паттерн, обёрточный компонент</div>
+      </a>
+      <a href="./13-connect-no-args/" class="index-card">
+        <div class="index-card__num">13</div>
+        <div class="index-card__title">connect() без аргументов</div>
+        <div class="index-card__desc">Получаем только dispatch</div>
+      </a>
+      <a href="./14-mapstate-basics/" class="index-card">
+        <div class="index-card__num">14</div>
+        <div class="index-card__title">mapStateToProps — основы</div>
+        <div class="index-card__desc">Функция (state) => object, подписка на store</div>
+      </a>
+      <a href="./15-mapstate-ownprops/" class="index-card">
+        <div class="index-card__num">15</div>
+        <div class="index-card__title">mapStateToProps и ownProps</div>
+        <div class="index-card__desc">Второй аргумент, зависимость от props</div>
+      </a>
+      <a href="./16-mapstate-return-and-rerender/" class="index-card">
+        <div class="index-card__num">16</div>
+        <div class="index-card__title">Возвращаемые значения и ре-рендер</div>
+        <div class="index-card__desc">Shallow equality, когда перерисовывается</div>
+      </a>
+      <a href="./17-mapstate-best-practices/" class="index-card">
+        <div class="index-card__num">17</div>
+        <div class="index-card__title">mapStateToProps — практики</div>
+        <div class="index-card__desc">Быстрые и чистые функции, селекторы</div>
+      </a>
+      <a href="./18-mapstate-selectors/" class="index-card">
+        <div class="index-card__num">18</div>
+        <div class="index-card__title">Селекторы в mapStateToProps</div>
+        <div class="index-card__desc">Reselect + connect, мемоизация</div>
+      </a>
+      <a href="./19-mapstate-arity-behavior/" class="index-card">
+        <div class="index-card__num">19</div>
+        <div class="index-card__title">Arity mapStateToProps</div>
+        <div class="index-card__desc">Количество аргументов меняет поведение</div>
+      </a>
+    </div>
+
+    <div class="section-title">D. Connect API — mapDispatchToProps</div>
+    <div class="index-grid">
+      <a href="./20-dispatch-default/" class="index-card">
+        <div class="index-card__num">20</div>
+        <div class="index-card__title">dispatch по умолчанию</div>
+        <div class="index-card__desc">Без mapDispatchToProps — props.dispatch</div>
+      </a>
+      <a href="./21-mapdispatch-function/" class="index-card">
+        <div class="index-card__num">21</div>
+        <div class="index-card__title">mapDispatchToProps как функция</div>
+        <div class="index-card__desc">(dispatch) => object, обёртка action creators</div>
+      </a>
+      <a href="./22-mapdispatch-ownprops/" class="index-card">
+        <div class="index-card__num">22</div>
+        <div class="index-card__title">mapDispatchToProps и ownProps</div>
+        <div class="index-card__desc">(dispatch, ownProps), биндинг при смене props</div>
+      </a>
+      <a href="./23-mapdispatch-bindactioncreators/" class="index-card">
+        <div class="index-card__num">23</div>
+        <div class="index-card__title">bindActionCreators</div>
+        <div class="index-card__desc">Автоматическая обёртка action creators</div>
+      </a>
+      <a href="./24-mapdispatch-object-shorthand/" class="index-card">
+        <div class="index-card__num">24</div>
+        <div class="index-card__title">Object shorthand форма</div>
+        <div class="index-card__desc">Рекомендуемая краткая запись { addTodo }</div>
+      </a>
+      <a href="./25-dispatch-lost-gotcha/" class="index-card">
+        <div class="index-card__num">25</div>
+        <div class="index-card__title">Почему пропадает dispatch</div>
+        <div class="index-card__desc">Частая ошибка при mapDispatchToProps</div>
+      </a>
+      <a href="./26-connect-four-combinations/" class="index-card">
+        <div class="index-card__num">26</div>
+        <div class="index-card__title">4 комбинации connect</div>
+        <div class="index-card__desc">Таблица 2×2: subscribe × inject</div>
+      </a>
+      <a href="./27-connect-practical-todo/" class="index-card">
+        <div class="index-card__num">27</div>
+        <div class="index-card__title">Todo-лист через connect</div>
+        <div class="index-card__desc">Полный практический пример</div>
+      </a>
+    </div>
+
+    <div class="section-title">E. Connect API — mergeProps, options, продвинутое</div>
+    <div class="index-grid">
+      <a href="./28-mergeprops/" class="index-card">
+        <div class="index-card__num">28</div>
+        <div class="index-card__title">mergeProps</div>
+        <div class="index-card__desc">Третий аргумент connect, кастомное слияние</div>
+      </a>
+      <a href="./29-connect-options-context/" class="index-card">
+        <div class="index-card__num">29</div>
+        <div class="index-card__title">options.context</div>
+        <div class="index-card__desc">Кастомный контекст для connect</div>
+      </a>
+      <a href="./30-connect-options-equality/" class="index-card">
+        <div class="index-card__num">30</div>
+        <div class="index-card__title">options — equality функции</div>
+        <div class="index-card__desc">areStatesEqual, areOwnPropsEqual и др.</div>
+      </a>
+      <a href="./31-connect-options-forwardref/" class="index-card">
+        <div class="index-card__num">31</div>
+        <div class="index-card__title">options.forwardRef</div>
+        <div class="index-card__desc">Проброс ref через connect</div>
+      </a>
+      <a href="./32-connect-factory-functions/" class="index-card">
+        <div class="index-card__num">32</div>
+        <div class="index-card__title">Factory Functions</div>
+        <div class="index-card__desc">Per-instance мемоизация</div>
+      </a>
+      <a href="./33-connect-returns/" class="index-card">
+        <div class="index-card__num">33</div>
+        <div class="index-card__title">connect() Returns</div>
+        <div class="index-card__desc">Двухэтапный вызов, переиспользование HOC</div>
+      </a>
+      <a href="./34-connectedprops-typescript/" class="index-card">
+        <div class="index-card__num">34</div>
+        <div class="index-card__title">ConnectedProps + TypeScript</div>
+        <div class="index-card__desc">Автовывод типов для connect</div>
+      </a>
+    </div>
+
+    <div class="section-title">F. Hooks API — useSelector</div>
+    <div class="index-grid">
+      <a href="./35-hooks-intro/" class="index-card">
+        <div class="index-card__num">35</div>
+        <div class="index-card__title">Hooks API — введение</div>
+        <div class="index-card__desc">Почему хуки — рекомендуемый подход</div>
+      </a>
+      <a href="./36-useselector-basics/" class="index-card">
+        <div class="index-card__num">36</div>
+        <div class="index-card__title">useSelector — основы</div>
+        <div class="index-card__desc">Извлечение данных из store</div>
+      </a>
+      <a href="./37-useselector-equality/" class="index-card">
+        <div class="index-card__num">37</div>
+        <div class="index-card__title">useSelector — equality</div>
+        <div class="index-card__desc">Строгое === и ре-рендеры</div>
+      </a>
+      <a href="./38-useselector-shallowequal/" class="index-card">
+        <div class="index-card__num">38</div>
+        <div class="index-card__title">shallowEqual</div>
+        <div class="index-card__desc">Импорт shallowEqual, equalityFn</div>
+      </a>
+      <a href="./39-useselector-multiple-calls/" class="index-card">
+        <div class="index-card__num">39</div>
+        <div class="index-card__title">Множественные useSelector</div>
+        <div class="index-card__desc">Несколько вызовов, один рендер</div>
+      </a>
+      <a href="./40-useselector-memoized/" class="index-card">
+        <div class="index-card__num">40</div>
+        <div class="index-card__title">useSelector + createSelector</div>
+        <div class="index-card__desc">Мемоизированные селекторы</div>
+      </a>
+      <a href="./41-useselector-per-instance/" class="index-card">
+        <div class="index-card__num">41</div>
+        <div class="index-card__title">Per-instance мемоизация</div>
+        <div class="index-card__desc">useMemo + createSelector</div>
+      </a>
+      <a href="./42-useselector-dev-checks/" class="index-card">
+        <div class="index-card__num">42</div>
+        <div class="index-card__title">Dev mode checks</div>
+        <div class="index-card__desc">stabilityCheck, identityFunctionCheck</div>
+      </a>
+      <a href="./43-useselector-vs-mapstate/" class="index-card">
+        <div class="index-card__num">43</div>
+        <div class="index-card__title">useSelector vs mapState</div>
+        <div class="index-card__desc">Глубокое сравнение двух подходов</div>
+      </a>
+    </div>
+
+    <div class="section-title">G. Hooks API — useDispatch, useStore, custom hooks</div>
+    <div class="index-grid">
+      <a href="./44-usedispatch-basics/" class="index-card">
+        <div class="index-card__num">44</div>
+        <div class="index-card__title">useDispatch — основы</div>
+        <div class="index-card__desc">Получение dispatch, стабильная ссылка</div>
+      </a>
+      <a href="./45-usedispatch-callback-memo/" class="index-card">
+        <div class="index-card__num">45</div>
+        <div class="index-card__title">useDispatch + useCallback</div>
+        <div class="index-card__desc">Мемоизация callback'ов, React.memo</div>
+      </a>
+      <a href="./46-usestore-hook/" class="index-card">
+        <div class="index-card__num">46</div>
+        <div class="index-card__title">useStore</div>
+        <div class="index-card__desc">Прямой доступ к store instance</div>
+      </a>
+      <a href="./47-custom-context-hooks/" class="index-card">
+        <div class="index-card__num">47</div>
+        <div class="index-card__title">Кастомные хуки контекста</div>
+        <div class="index-card__desc">createStoreHook, createDispatchHook, createSelectorHook</div>
+      </a>
+      <a href="./48-hooks-recipes/" class="index-card">
+        <div class="index-card__num">48</div>
+        <div class="index-card__title">Hooks Recipes</div>
+        <div class="index-card__desc">useActions(), useShallowEqualSelector()</div>
+      </a>
+      <a href="./49-hooks-practical-todo/" class="index-card">
+        <div class="index-card__num">49</div>
+        <div class="index-card__title">Todo-лист через Hooks</div>
+        <div class="index-card__desc">Полный практический пример</div>
+      </a>
+    </div>
+
+    <div class="section-title">H. Connect vs Hooks — детальное сравнение</div>
+    <div class="index-grid">
+      <a href="./50-side-by-side-reading/" class="index-card">
+        <div class="index-card__num">50</div>
+        <div class="index-card__title">Сравнение: чтение данных</div>
+        <div class="index-card__desc">mapStateToProps vs useSelector бок о бок</div>
+      </a>
+      <a href="./51-side-by-side-dispatch/" class="index-card">
+        <div class="index-card__num">51</div>
+        <div class="index-card__title">Сравнение: dispatch</div>
+        <div class="index-card__desc">mapDispatchToProps vs useDispatch бок о бок</div>
+      </a>
+      <a href="./52-performance-comparison/" class="index-card">
+        <div class="index-card__num">52</div>
+        <div class="index-card__title">Производительность</div>
+        <div class="index-card__desc">connect vs hooks: рендеры, React.memo</div>
+      </a>
+      <a href="./53-stale-props-zombie-children/" class="index-card">
+        <div class="index-card__num">53</div>
+        <div class="index-card__title">Stale Props и Zombie Children</div>
+        <div class="index-card__desc">Edge cases хуков vs connect</div>
+      </a>
+      <a href="./54-migration-connect-to-hooks/" class="index-card">
+        <div class="index-card__num">54</div>
+        <div class="index-card__title">Миграция connect → hooks</div>
+        <div class="index-card__desc">Пошаговый рефакторинг</div>
+      </a>
+    </div>
+
+    <div class="section-title">I. TypeScript + React-Redux</div>
+    <div class="index-grid">
+      <a href="./55-typed-hooks-withTypes/" class="index-card">
+        <div class="index-card__num">55</div>
+        <div class="index-card__title">Типизированные хуки</div>
+        <div class="index-card__desc">.withTypes(), useAppSelector, useAppDispatch</div>
+      </a>
+      <a href="./56-typed-useselector/" class="index-card">
+        <div class="index-card__num">56</div>
+        <div class="index-card__title">Типизация useSelector</div>
+        <div class="index-card__desc">RootState, вывод типов, pre-typed hooks</div>
+      </a>
+      <a href="./57-typed-usedispatch/" class="index-card">
+        <div class="index-card__num">57</div>
+        <div class="index-card__title">Типизация useDispatch</div>
+        <div class="index-card__desc">AppDispatch, thunk-совместимость</div>
+      </a>
+      <a href="./58-typed-connect/" class="index-card">
+        <div class="index-card__num">58</div>
+        <div class="index-card__title">Типизация connect</div>
+        <div class="index-card__desc">ConnectedProps, ручная vs авто типизация</div>
+      </a>
+    </div>
+
+    <div class="section-title">J. Производительность и оптимизация</div>
+    <div class="index-grid">
+      <a href="./59-render-optimization-model/" class="index-card">
+        <div class="index-card__num">59</div>
+        <div class="index-card__title">Модель оптимизации рендеров</div>
+        <div class="index-card__desc">Subscription model, batching</div>
+      </a>
+      <a href="./60-react-memo-with-hooks/" class="index-card">
+        <div class="index-card__num">60</div>
+        <div class="index-card__title">React.memo + useSelector</div>
+        <div class="index-card__desc">Правильная оптимизация компонентов</div>
+      </a>
+      <a href="./61-batch-api/" class="index-card">
+        <div class="index-card__num">61</div>
+        <div class="index-card__title">batch() API</div>
+        <div class="index-card__desc">Батчинг dispatch, React 18 автобатчинг</div>
+      </a>
+      <a href="./62-memoized-selectors-performance/" class="index-card">
+        <div class="index-card__num">62</div>
+        <div class="index-card__title">Мемоизация и производительность</div>
+        <div class="index-card__desc">createSelector как ключ к оптимизации</div>
+      </a>
+      <a href="./63-antipatterns/" class="index-card">
+        <div class="index-card__num">63</div>
+        <div class="index-card__title">Антипаттерны</div>
+        <div class="index-card__desc">Типичные ошибки производительности</div>
+      </a>
+    </div>
+
+    <div class="section-title">K. Продвинутые темы</div>
+    <div class="index-grid">
+      <a href="./64-accessing-store-directly/" class="index-card">
+        <div class="index-card__num">64</div>
+        <div class="index-card__title">ReactReduxContext</div>
+        <div class="index-card__desc">Прямой доступ к store через context</div>
+      </a>
+      <a href="./65-multiple-stores-deep/" class="index-card">
+        <div class="index-card__num">65</div>
+        <div class="index-card__title">Множественные store'ы</div>
+        <div class="index-card__desc">Microfrontends, compose(connect, connect)</div>
+      </a>
+      <a href="./66-subscription-model-internals/" class="index-card">
+        <div class="index-card__num">66</div>
+        <div class="index-card__title">Subscription model</div>
+        <div class="index-card__desc">Как работает подписка внутри react-redux</div>
+      </a>
+      <a href="./67-react-redux-internals/" class="index-card">
+        <div class="index-card__num">67</div>
+        <div class="index-card__title">Исходный код React-Redux</div>
+        <div class="index-card__desc">Своя реализация useSelector (~30 строк)</div>
+      </a>
+    </div>
+
+    <div class="section-title">L. Финальные проекты и итоги</div>
+    <div class="index-grid">
+      <a href="./68-todo-app-connect-full/" class="index-card">
+        <div class="index-card__num">68</div>
+        <div class="index-card__title">Todo Manager (Connect)</div>
+        <div class="index-card__desc">Полноценное приложение через connect API</div>
+      </a>
+      <a href="./69-todo-app-hooks-full/" class="index-card">
+        <div class="index-card__num">69</div>
+        <div class="index-card__title">Todo Manager (Hooks)</div>
+        <div class="index-card__desc">Полноценное приложение через Hooks API</div>
+      </a>
+      <a href="./70-course-summary/" class="index-card">
+        <div class="index-card__num">70</div>
+        <div class="index-card__title">Итоги и шпаргалка</div>
+        <div class="index-card__desc">Карта знаний, чеклист, путь к RTK</div>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

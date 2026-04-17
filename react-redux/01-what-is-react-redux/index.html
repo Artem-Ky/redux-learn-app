@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01 — Что такое React-Redux?</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .problem-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 12px;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .problem-card.active {
+      border-color: var(--accent);
+      background: rgba(86, 156, 214, 0.08);
+    }
+    .problem-card.solved {
+      border-color: var(--success);
+      background: rgba(76, 175, 80, 0.06);
+    }
+    .problem-card__num {
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-size: 0.75rem;
+      margin-bottom: 4px;
+    }
+    .problem-card__title {
+      color: var(--text-bright);
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+    }
+    .problem-card__desc {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+    .problem-card__solution {
+      color: var(--success);
+      font-size: 0.85rem;
+      margin-top: 8px;
+      display: none;
+    }
+    .problem-card.solved .problem-card__solution {
+      display: block;
+    }
+    .benefit-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .benefit-item {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      text-align: center;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .benefit-item:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-cyan);
+    }
+    .benefit-item__icon {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+    }
+    .benefit-item__label {
+      color: var(--text-bright);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .benefit-item__desc {
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">01 / 70</span>
+      Что такое React-Redux?
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <span class="current">01</span>
+      <a href="../02-why-not-manual-binding/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Поток данных React-Redux</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Нажмите «Пройти цикл», чтобы увидеть как данные проходят через React-Redux пошагово.
+          Каждый шаг подсветится и появится объяснение в консоли.
+        </p>
+
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 8px;">
+          Пример: приложение-счётчик. Store хранит <code>{ value: 0 }</code>,
+          компонент Counter отображает значение и кнопки +/−.
+        </p>
+
+        <div class="flow-diagram" id="flow">
+          <div class="flow-step" id="step-store">
+            <div class="flow-step__label">Redux Store</div>
+            <div class="flow-step__value" id="step-store-val">{ value: 0 }</div>
+          </div>
+          <div class="flow-arrow" id="arrow-1">→</div>
+          <div class="flow-step" id="step-provider">
+            <div class="flow-step__label">&lt;Provider&gt;</div>
+            <div class="flow-step__value">передаёт store в Context</div>
+          </div>
+          <div class="flow-arrow" id="arrow-2">→</div>
+          <div class="flow-step" id="step-selector">
+            <div class="flow-step__label">useSelector</div>
+            <div class="flow-step__value" id="step-selector-val">state =&gt; state.value</div>
+          </div>
+          <div class="flow-arrow" id="arrow-3">→</div>
+          <div class="flow-step" id="step-component">
+            <div class="flow-step__label">&lt;Counter /&gt;</div>
+            <div class="flow-step__value" id="step-component-val">отображает: 0</div>
+          </div>
+          <div class="flow-arrow" id="arrow-4">→</div>
+          <div class="flow-step" id="step-dispatch">
+            <div class="flow-step__label">dispatch</div>
+            <div class="flow-step__value" id="step-dispatch-val">{ type: 'increment' }</div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+          <button class="btn" style="border-color: var(--accent-cyan); color: var(--accent-cyan);" id="btn-startup">① Запуск приложения</button>
+          <button class="btn btn--accent" id="btn-cycle">② Клик на кнопку +</button>
+          <button class="btn" id="btn-reset">Сбросить</button>
+        </div>
+
+        <h3 style="color: var(--text-bright); margin: 24px 0 12px; font-size: 1rem;">
+          Три проблемы, которые решает React-Redux
+        </h3>
+        <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 0.85rem;">
+          Нажмите «Показать решения», чтобы увидеть как React-Redux справляется с каждой проблемой:
+        </p>
+
+        <div id="problems-list">
+          <div class="problem-card" id="problem-1">
+            <div class="problem-card__num">Проблема #1</div>
+            <div class="problem-card__title">Props Drilling</div>
+            <div class="problem-card__desc">
+              Без React-Redux store нужно передавать через props на каждом уровне вложенности.
+              Если store нужен компоненту на глубине 5 уровней — придётся «просверлить» props через 4 промежуточных компонента.
+            </div>
+            <div class="problem-card__solution">
+              ✔ <strong>Provider</strong> оборачивает всё приложение и делает store доступным
+              через React Context для <em>любого</em> вложенного компонента без props drilling.
+            </div>
+          </div>
+          <div class="problem-card" id="problem-2">
+            <div class="problem-card__num">Проблема #2</div>
+            <div class="problem-card__title">Лишние ре-рендеры</div>
+            <div class="problem-card__desc">
+              Наивное использование Context перерисовывает ВСЕ компоненты-потребители при любом изменении state,
+              даже если конкретному компоненту нужна только часть данных, которая не изменилась.
+            </div>
+            <div class="problem-card__solution">
+              ✔ React-Redux использует собственную <strong>Subscription</strong> систему:
+              каждый компонент подписывается на store и ре-рендерится только если его конкретные данные изменились.
+            </div>
+          </div>
+          <div class="problem-card" id="problem-3">
+            <div class="problem-card__num">Проблема #3</div>
+            <div class="problem-card__title">Ручная подписка и утечки памяти</div>
+            <div class="problem-card__desc">
+              При ручном подключении нужно вызывать store.subscribe() в useEffect,
+              не забыть вернуть unsubscribe при размонтировании, обработать edge cases.
+            </div>
+            <div class="problem-card__solution">
+              ✔ React-Redux <strong>автоматически</strong> управляет подпиской и отпиской.
+              useSelector/connect сами подписываются и очищаются при размонтировании компонента.
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 16px;">
+          <button class="btn btn--success" id="btn-solve">Показать решения</button>
+        </div>
+
+        <h3 style="color: var(--text-bright); margin: 28px 0 8px; font-size: 1rem;">
+          Ключевые преимущества React-Redux
+        </h3>
+        <div class="benefit-grid">
+          <div class="benefit-item">
+            <div class="benefit-item__icon">🏛️</div>
+            <div class="benefit-item__label">Official</div>
+            <div class="benefit-item__desc">Поддерживается командой Redux</div>
+          </div>
+          <div class="benefit-item">
+            <div class="benefit-item__icon">🎯</div>
+            <div class="benefit-item__label">Predictable</div>
+            <div class="benefit-item__desc">Компонент обновляется только при изменении его данных</div>
+          </div>
+          <div class="benefit-item">
+            <div class="benefit-item__icon">📦</div>
+            <div class="benefit-item__label">Encapsulated</div>
+            <div class="benefit-item__desc">API инкапсулирует взаимодействие со store</div>
+          </div>
+          <div class="benefit-item">
+            <div class="benefit-item__icon">⚡</div>
+            <div class="benefit-item__label">Optimized</div>
+            <div class="benefit-item__desc">Автоматические оптимизации производительности</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что такое React-Redux?</div>
+      <div class="theory__body">
+        <h3>Определение</h3>
+        <p>
+          <strong>React-Redux</strong> — это официальная библиотека UI-привязок (UI bindings) для Redux,
+          созданная специально для React. Она предоставляет API, позволяющий React-компонентам
+          читать данные из Redux store и отправлять actions для обновления состояния.
+        </p>
+
+        <div class="quote">
+          «React Redux is the official React UI bindings layer for Redux. It lets your React
+          components read data from a Redux store, and dispatch actions to the store to update state.»
+          <br>— <a href="https://react-redux.js.org/introduction/getting-started" target="_blank">react-redux.js.org — Getting Started</a>
+        </div>
+        <div class="quote">
+          «React Redux — это официальный слой UI-привязок React для Redux. Он позволяет
+          вашим React-компонентам читать данные из Redux store и отправлять actions в store
+          для обновления состояния.»
+          <br>— перевод
+        </div>
+
+        <h3>Зачем нужна отдельная библиотека?</h3>
+        <p>
+          Redux сам по себе — это <strong>библиотека управления состоянием</strong>, не привязанная
+          к конкретному UI-фреймворку. Он работает с Vanilla JS, Angular, Vue, React и чем угодно.
+          Но чтобы <em>эффективно</em> интегрировать Redux с React, нужен «мост» между ними.
+        </p>
+        <p>
+          Можно ли подключить Redux к React вручную? Технически — да (мы покажем это в уроке 02).
+          Но у такого подхода много проблем: props drilling, лишние ре-рендеры, утечки памяти,
+          отсутствие батчинга обновлений. React-Redux решает все эти проблемы.
+        </p>
+
+        <div class="quote">
+          «Designed to work with React's component model. You define how to extract the values
+          your component needs from Redux, and your component updates automatically as needed.»
+          <br>— <a href="https://react-redux.js.org/" target="_blank">react-redux.js.org</a>
+        </div>
+        <div class="quote">
+          «Спроектирован для работы с компонентной моделью React. Вы определяете, как извлечь
+          значения, нужные вашему компоненту, из Redux, и компонент обновляется автоматически
+          при необходимости.»
+          <br>— перевод
+        </div>
+
+        <h3>Два API: Connect и Hooks</h3>
+        <p>
+          React-Redux предоставляет два способа подключения компонентов к Redux store:
+        </p>
+        <ul>
+          <li>
+            <strong>Hooks API</strong> (рекомендуемый, с v7.1.0) — хуки <code>useSelector</code>,
+            <code>useDispatch</code>, <code>useStore</code>. Проще, лучше работает с TypeScript.
+          </li>
+          <li>
+            <strong>Connect API</strong> (HOC-подход) — функция
+            <code>connect(mapStateToProps?, mapDispatchToProps?, mergeProps?, options?)</code>,
+            оборачивающая компонент. Принимает до 4 аргументов (все опциональные).
+            Работает с классовыми и функциональными компонентами.
+            По-прежнему поддерживается, но не рекомендуется для нового кода.
+          </li>
+        </ul>
+
+        <div class="tip">
+          <strong>Почему мы изучаем ОБА подхода?</strong><br>
+          В реальных проектах вы встретите и connect, и hooks. Легаси-код часто использует connect.
+          Понимание обоих подходов — ключ к эффективной работе с React-Redux.
+          В этом курсе мы подробно разберём каждый API и научимся мигрировать между ними.
+        </div>
+
+        <h3>Что даёт React-Redux (официально)</h3>
+
+        <div class="quote">
+          «Provides APIs that enable your components to interact with the Redux store,
+          so you don't have to write that logic yourself.»
+          <br>— <a href="https://react-redux.js.org/" target="_blank">react-redux.js.org</a>
+        </div>
+        <div class="quote">
+          «Предоставляет API, позволяющий вашим компонентам взаимодействовать с Redux store,
+          чтобы вам не приходилось писать эту логику самостоятельно.»
+          <br>— перевод
+        </div>
+
+        <div class="quote">
+          «Automatically implements complex performance optimizations, so that your own component
+          only re-renders when the data it needs has actually changed.»
+          <br>— <a href="https://react-redux.js.org/" target="_blank">react-redux.js.org</a>
+        </div>
+        <div class="quote">
+          «Автоматически реализует сложные оптимизации производительности, так что ваш компонент
+          перерисовывается только тогда, когда данные, которые ему нужны, действительно изменились.»
+          <br>— перевод
+        </div>
+
+        <h3>Предпосылки</h3>
+        <p>
+          Этот курс предполагает, что вы прошли главу <strong>Classic Redux</strong> и понимаете:
+          actions, reducers, store (createStore, getState, dispatch, subscribe),
+          middleware, thunks, selectors, combineReducers. Если нет — вернитесь к
+          <a href="../../classic-redux/">Classic Redux</a>.
+        </p>
+
+        <h3>Код примера: минимальное React-Redux приложение</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createStore</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+<span class="kw">import</span> { <span class="type">Provider</span>, <span class="fn">useSelector</span>, <span class="fn">useDispatch</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="cm">// 1. Reducer (уже знакомый из Classic Redux)</span>
+<span class="kw">function</span> <span class="fn">counterReducer</span>(state = { <span class="prop">value</span>: <span class="num">0</span> }, action) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'increment'</span>: <span class="kw">return</span> { <span class="prop">value</span>: state.<span class="prop">value</span> + <span class="num">1</span> }
+    <span class="kw">case</span> <span class="str">'decrement'</span>: <span class="kw">return</span> { <span class="prop">value</span>: state.<span class="prop">value</span> - <span class="num">1</span> }
+    <span class="kw">default</span>: <span class="kw">return</span> state
+  }
+}
+
+<span class="cm">// 2. Store (уже знакомый)</span>
+<span class="kw">const</span> store = <span class="fn">createStore</span>(counterReducer)
+
+<span class="cm">// 3. React-компонент с хуками React-Redux</span>
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> count = <span class="fn">useSelector</span>(state => state.<span class="prop">value</span>)  <span class="cm">// читаем из store</span>
+  <span class="kw">const</span> dispatch = <span class="fn">useDispatch</span>()                     <span class="cm">// получаем dispatch</span>
+  <span class="kw">return</span> (
+    &lt;div&gt;
+      &lt;button onClick={() => dispatch({ <span class="prop">type</span>: <span class="str">'decrement'</span> })}&gt;−&lt;/button&gt;
+      &lt;span&gt;{count}&lt;/span&gt;
+      &lt;button onClick={() => dispatch({ <span class="prop">type</span>: <span class="str">'increment'</span> })}&gt;+&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+
+<span class="cm">// 4. Provider оборачивает приложение</span>
+&lt;<span class="type">Provider</span> store={store}&gt;
+  &lt;<span class="fn">Counter</span> /&gt;
+&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <div class="warning">
+          <strong>Важно:</strong> В курсе Classic Redux мы работали без React — чистый JS + HTML + Redux.
+          Теперь мы добавляем React в стек. Каждый урок будет содержать React-компоненты,
+          которые рендерятся в <code>&lt;div id="root"&gt;</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

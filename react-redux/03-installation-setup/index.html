@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03 — Установка и настройка</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .setup-step {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      transition: border-color 0.3s;
+    }
+    .setup-step:hover { border-color: var(--accent); }
+    .setup-step__num {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-light);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .setup-step__content { flex: 1; }
+    .setup-step__title {
+      color: var(--text-bright);
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+    }
+    .setup-step__cmd {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-cyan);
+      margin-top: 8px;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+    .setup-step__cmd:hover { border-color: var(--accent); }
+    .setup-step__cmd::after {
+      content: 'клик = копировать';
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+    }
+    .mini-app {
+      background: var(--bg-panel);
+      border: 1px solid var(--success);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+    }
+    .mini-app__label {
+      color: var(--success);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">03 / 70</span>
+      Установка и настройка
+    </div>
+    <nav class="site-header__nav">
+      <a href="../02-why-not-manual-binding/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">03</span>
+      <a href="../03a-subscription-system/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Минимальное React-Redux приложение</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Этот счётчик — <strong>полноценное React-Redux приложение</strong>, состоящее из
+          трёх частей: Redux store, Provider и React-компонент с хуками. Весь код — ниже.
+        </p>
+
+        <div class="mini-app">
+          <div class="mini-app__label">✔ Живое React-Redux приложение</div>
+          <div id="root"></div>
+        </div>
+
+        <h3 style="color: var(--text-bright); margin: 24px 0 12px; font-size: 1rem;">
+          Шаги установки React-Redux проекта
+        </h3>
+
+        <div class="setup-step">
+          <div class="setup-step__num">1</div>
+          <div class="setup-step__content">
+            <div class="setup-step__title">Установить React-Redux</div>
+            <p style="color: var(--text-secondary); font-size: 0.85rem;">
+              React-Redux — отдельный пакет от redux. Нужны оба.
+            </p>
+            <div class="setup-step__cmd" data-copy="npm install react-redux redux">
+              npm install react-redux redux
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="setup-step__num">2</div>
+          <div class="setup-step__content">
+            <div class="setup-step__title">Создать Redux store</div>
+            <p style="color: var(--text-secondary); font-size: 0.85rem;">
+              Это уже знакомо из Classic Redux: reducer + createStore.
+            </p>
+            <div class="setup-step__cmd" data-copy="const store = createStore(rootReducer)">
+              const store = createStore(rootReducer)
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="setup-step__num">3</div>
+          <div class="setup-step__content">
+            <div class="setup-step__title">Обернуть приложение в Provider</div>
+            <p style="color: var(--text-secondary); font-size: 0.85rem;">
+              Provider делает store доступным для всех вложенных компонентов.
+            </p>
+            <div class="setup-step__cmd" data-copy="<Provider store={store}><App /></Provider>">
+              &lt;Provider store={store}&gt;&lt;App /&gt;&lt;/Provider&gt;
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="setup-step__num">4</div>
+          <div class="setup-step__content">
+            <div class="setup-step__title">Использовать хуки в компонентах</div>
+            <p style="color: var(--text-secondary); font-size: 0.85rem;">
+              useSelector для чтения данных, useDispatch для отправки действий.
+            </p>
+            <div class="setup-step__cmd" data-copy="const value = useSelector(state => state.value)">
+              const value = useSelector(state =&gt; state.value)
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Установка React-Redux</div>
+      <div class="theory__body">
+        <h3>Установка</h3>
+
+        <div class="quote">
+          «React Redux 8.x requires React 16.8.3 or later / React Native 0.59 or later,
+          in order to make use of React Hooks.»
+          <br>— <a href="https://react-redux.js.org/introduction/getting-started" target="_blank">react-redux.js.org — Getting Started</a>
+        </div>
+        <div class="quote">
+          «React Redux 8.x требует React 16.8.3 или новее / React Native 0.59 или новее
+          для использования React Hooks.»
+          <br>— перевод
+        </div>
+
+        <p>
+          React-Redux — это <strong>отдельный пакет</strong> от redux. Вам нужны оба:
+        </p>
+        <div class="code-block">
+<span class="cm"># npm</span>
+npm install react-redux redux
+
+<span class="cm"># yarn</span>
+yarn add react-redux redux
+        </div>
+
+        <div class="quote">
+          «React-Redux v8 is written in TypeScript, so all types are automatically included.»
+          <br>— <a href="https://react-redux.js.org/introduction/getting-started" target="_blank">react-redux.js.org — Getting Started</a>
+        </div>
+        <div class="quote">
+          «React-Redux v8 написан на TypeScript, все типы включены автоматически.»
+          <br>— перевод
+        </div>
+
+        <p>
+          Не нужно отдельно устанавливать <code>@types/react-redux</code> — типы уже встроены
+          в пакет начиная с v8.
+        </p>
+
+        <h3>Минимальный код: три шага</h3>
+
+        <p><strong>Шаг 1: Создать Redux store</strong> (уже знакомо из Classic Redux)</p>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createStore</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="kw">interface</span> <span class="type">CounterState</span> { <span class="prop">value</span>: <span class="type">number</span> }
+
+<span class="kw">const</span> <span class="prop">initialState</span>: <span class="type">CounterState</span> = { <span class="prop">value</span>: <span class="num">0</span> }
+
+<span class="kw">function</span> <span class="fn">counterReducer</span>(state = initialState, action: { <span class="prop">type</span>: <span class="type">string</span> }) {
+  <span class="kw">switch</span> (action.<span class="prop">type</span>) {
+    <span class="kw">case</span> <span class="str">'increment'</span>: <span class="kw">return</span> { <span class="prop">value</span>: state.<span class="prop">value</span> + <span class="num">1</span> }
+    <span class="kw">case</span> <span class="str">'decrement'</span>: <span class="kw">return</span> { <span class="prop">value</span>: state.<span class="prop">value</span> - <span class="num">1</span> }
+    <span class="kw">default</span>: <span class="kw">return</span> state
+  }
+}
+
+<span class="kw">const</span> store = <span class="fn">createStore</span>(counterReducer)
+        </div>
+
+        <p><strong>Шаг 2: Обернуть приложение в Provider</strong></p>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="type">Provider</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import</span> { <span class="fn">createRoot</span> } <span class="kw">from</span> <span class="str">'react-dom/client'</span>
+
+<span class="kw">const</span> root = <span class="fn">createRoot</span>(document.<span class="fn">getElementById</span>(<span class="str">'root'</span>)!)
+root.<span class="fn">render</span>(
+  &lt;<span class="type">Provider</span> store={store}&gt;
+    &lt;<span class="fn">App</span> /&gt;
+  &lt;/<span class="type">Provider</span>&gt;
+)
+        </div>
+
+        <div class="quote">
+          «The &lt;Provider&gt; component makes the Redux store available to any nested
+          components that need to access the Redux store.»
+          <br>— <a href="https://react-redux.js.org/api/provider" target="_blank">react-redux.js.org — Provider</a>
+        </div>
+        <div class="quote">
+          «Компонент &lt;Provider&gt; делает Redux store доступным для любых вложенных
+          компонентов, которым нужен доступ к Redux store.»
+          <br>— перевод
+        </div>
+
+        <p><strong>Шаг 3: Использовать хуки в компонентах</strong></p>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">useSelector</span>, <span class="fn">useDispatch</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> count = <span class="fn">useSelector</span>(state => state.<span class="prop">value</span>)
+  <span class="kw">const</span> dispatch = <span class="fn">useDispatch</span>()
+
+  <span class="kw">return</span> (
+    &lt;div&gt;
+      &lt;button onClick={() => dispatch({ <span class="prop">type</span>: <span class="str">'decrement'</span> })}&gt;−&lt;/button&gt;
+      &lt;span&gt;{count}&lt;/span&gt;
+      &lt;button onClick={() => dispatch({ <span class="prop">type</span>: <span class="str">'increment'</span> })}&gt;+&lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+        </div>
+
+        <div class="quote">
+          «`useSelector` reads a value from the store state and subscribes to updates,
+          while `useDispatch` returns the store's `dispatch` method to let you dispatch actions.»
+          <br>— <a href="https://react-redux.js.org/introduction/getting-started" target="_blank">react-redux.js.org — Getting Started</a>
+        </div>
+        <div class="quote">
+          «`useSelector` читает значение из state store и подписывается на обновления,
+          а `useDispatch` возвращает метод `dispatch` store для отправки actions.»
+          <br>— перевод
+        </div>
+
+        <div class="tip">
+          <strong>Всего три шага:</strong><br>
+          1. <code>createStore(reducer)</code> — создать store (Classic Redux)<br>
+          2. <code>&lt;Provider store={store}&gt;</code> — обернуть приложение (React-Redux)<br>
+          3. <code>useSelector</code> / <code>useDispatch</code> — использовать в компонентах (React-Redux)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04 — Архитектура React-Redux</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .arch-diagram {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding: 20px;
+      position: relative;
+    }
+    .arch-layer {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      margin-bottom: 4px;
+      transition: border-color 0.4s, background 0.4s, transform 0.3s;
+      position: relative;
+    }
+    .arch-layer.active {
+      border-color: var(--accent);
+      background: rgba(86, 156, 214, 0.1);
+      transform: scale(1.02);
+    }
+    .arch-layer.highlight-read {
+      border-color: var(--accent-cyan);
+      background: rgba(78, 201, 176, 0.1);
+    }
+    .arch-layer.highlight-write {
+      border-color: var(--accent-purple);
+      background: rgba(197, 134, 192, 0.1);
+    }
+    .arch-layer__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .arch-layer__name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text-bright);
+    }
+    .arch-layer__tag {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--bg-tertiary);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .arch-layer__desc {
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+    .arch-arrow {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      padding: 2px 0;
+      transition: color 0.3s;
+    }
+    .arch-arrow.active { color: var(--accent); }
+    .arch-controls {
+      display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap;
+    }
+    .comp-tree {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      margin-top: 16px;
+    }
+    .comp-node {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-tertiary);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .comp-node.rerendered {
+      border-color: var(--accent-cyan);
+      background: rgba(78, 201, 176, 0.12);
+      color: var(--accent-cyan);
+    }
+    .comp-node.connected {
+      border-left: 3px solid var(--accent);
+    }
+    .comp-tree__arrow {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .comp-tree__row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">04 / 70</span>
+      Архитектура React-Redux
+    </div>
+    <nav class="site-header__nav">
+      <a href="../03a-subscription-system/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">04</span>
+      <a href="../05-data-flow-full-cycle/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Многослойная архитектура React-Redux</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 12px;">
+          React-Redux состоит из нескольких слоёв. Нажмите «Анимировать чтение» или «Анимировать запись»,
+          чтобы увидеть путь данных через каждый слой. Внизу — дерево компонентов с подсветкой рендеров.
+        </p>
+
+        <div class="arch-diagram" id="arch-diagram">
+          <div class="arch-layer" id="layer-store">
+            <div class="arch-layer__header">
+              <span class="arch-layer__name">Redux Store</span>
+              <span class="arch-layer__tag">createStore(reducer)</span>
+            </div>
+            <div class="arch-layer__desc">
+              Единый источник истины. Хранит всё состояние приложения.
+              Предоставляет getState(), dispatch(), subscribe().
+            </div>
+          </div>
+
+          <div class="arch-arrow" id="arrow-1">↕</div>
+
+          <div class="arch-layer" id="layer-provider">
+            <div class="arch-layer__header">
+              <span class="arch-layer__name">&lt;Provider store={store}&gt;</span>
+              <span class="arch-layer__tag">react-redux</span>
+            </div>
+            <div class="arch-layer__desc">
+              React-компонент-обёртка. Кладёт store в React Context и создаёт
+              корневую Subscription для оптимизированного уведомления потомков.
+            </div>
+          </div>
+
+          <div class="arch-arrow" id="arrow-2">↕</div>
+
+          <div class="arch-layer" id="layer-context">
+            <div class="arch-layer__header">
+              <span class="arch-layer__name">ReactReduxContext</span>
+              <span class="arch-layer__tag">React.createContext</span>
+            </div>
+            <div class="arch-layer__desc">
+              Внутренний React Context. Содержит ссылку на store и Subscription.
+              Компоненты НЕ подписываются через Context напрямую — это ключ к оптимизации.
+            </div>
+          </div>
+
+          <div class="arch-arrow" id="arrow-3">↕</div>
+
+          <div class="arch-layer" id="layer-subscription">
+            <div class="arch-layer__header">
+              <span class="arch-layer__name">Subscription System</span>
+              <span class="arch-layer__tag">linked list слушателей</span>
+            </div>
+            <div class="arch-layer__desc">
+              Linked list callback'ов (подробно в <a href="../03a-subscription-system/" style="color: var(--accent-blue-bright);">уроке 03a</a>).
+              При dispatch: Subscription проходит по списку, для каждого слушателя запускает его selector,
+              сравнивает результат с предыдущим (===). Если отличается — вызывает forceRender()
+              только для этого компонента. Если нет — пропускает.
+            </div>
+          </div>
+
+          <div class="arch-arrow" id="arrow-4">↕</div>
+
+          <div class="arch-layer" id="layer-hooks">
+            <div class="arch-layer__header">
+              <span class="arch-layer__name">useSelector / useDispatch / connect</span>
+              <span class="arch-layer__tag">API для компонентов</span>
+            </div>
+            <div class="arch-layer__desc">
+              Публичный API. useSelector извлекает данные и подписывается на изменения.
+              useDispatch возвращает dispatch. connect() оборачивает компонент в HOC.
+            </div>
+          </div>
+
+          <div class="arch-arrow" id="arrow-5">↕</div>
+
+          <div class="arch-layer" id="layer-components">
+            <div class="arch-layer__header">
+              <span class="arch-layer__name">React Components</span>
+              <span class="arch-layer__tag">ваш код</span>
+            </div>
+            <div class="arch-layer__desc">
+              Ваши компоненты. Используют хуки или connect для взаимодействия со store.
+              Ре-рендерятся ТОЛЬКО когда их данные из store изменились.
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-controls">
+          <button class="btn btn--accent" id="btn-read">Анимировать чтение данных ↓</button>
+          <button class="btn" style="border-color: var(--accent-purple); color: var(--accent-purple);" id="btn-write">Анимировать dispatch ↑</button>
+          <button class="btn" id="btn-arch-reset">Сбросить</button>
+        </div>
+
+        <h3 style="color: var(--text-bright); margin: 28px 0 12px; font-size: 1rem;">
+          Дерево компонентов — кто ре-рендерится?
+        </h3>
+        <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 0.82rem;">
+          Dispatch изменяет <code>state.counter</code>. Компоненты с <span style="border-left: 3px solid var(--accent); padding-left: 4px;">синей полосой</span> подключены к store.
+          Только подключённые компоненты с изменёнными данными подсветятся.
+        </p>
+
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Внутренняя архитектура React-Redux</div>
+      <div class="theory__body">
+        <h3>Слои архитектуры</h3>
+        <p>
+          React-Redux — это <strong>многослойная система</strong>, в которой каждый слой выполняет
+          свою роль. Понимание этих слоёв — ключ к эффективному использованию библиотеки.
+        </p>
+
+        <h3>1. Redux Store</h3>
+        <p>
+          Знакомый нам из Classic Redux store: <code>createStore(reducer)</code>. Ничего нового.
+          React-Redux не создаёт свой store — он использует тот, что вы передаёте в Provider.
+        </p>
+
+        <h3>2. Provider + React Context</h3>
+
+        <div class="quote">
+          «Internally, React Redux uses React's "context" feature to make the Redux store
+          accessible to deeply nested connected components. As of React Redux version 6,
+          this is normally handled by a single default context object instance generated
+          by `React.createContext()`, called `ReactReduxContext`.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/accessing-store" target="_blank">react-redux.js.org — Accessing the Store</a>
+        </div>
+        <div class="quote">
+          «Внутри React Redux использует фичу "context" React, чтобы сделать Redux store доступным
+          для глубоко вложенных подключённых компонентов. Начиная с версии 6, это обрабатывается
+          одним объектом контекста по умолчанию, созданным через `React.createContext()`, 
+          называемым `ReactReduxContext`.»
+          <br>— перевод
+        </div>
+
+        <p>
+          <strong>Важный нюанс:</strong> Provider НЕ просто кладёт store в Context. Он делает три вещи:
+        </p>
+        <ol>
+          <li>Кладёт в Context <strong>стабильный объект</strong> <code>{ store, subscription }</code> —
+          этот объект НИКОГДА не меняется, поэтому useContext() НИКОГДА не вызывает ре-рендер.</li>
+          <li>Создаёт <strong>root Subscription</strong> — linked list callback'ов.
+          Один раз вызывает <code>store.subscribe()</code> и при каждом dispatch проходит
+          по списку слушателей.</li>
+          <li>Для каждого слушателя (компонент с useSelector): запускает его selector,
+          сравнивает результат с предыдущим (<code>===</code>), и если значение изменилось —
+          вызывает <code>forceRender()</code> только для этого компонента.</li>
+        </ol>
+        <p>
+          Подробный разбор Subscription с исходным кодом — в
+          <a href="../03a-subscription-system/" style="color: var(--accent-blue-bright);">уроке 03a</a>.
+        </p>
+
+        <h3>3. Subscription System — как React-Redux решает проблему лишних рендеров</h3>
+
+        <p>
+          Это самый важный и наименее документированный механизм React-Redux. Он не описан
+          как отдельная страница в docs, но упоминается в нескольких местах. Разберём по порядку.
+        </p>
+
+        <p><strong>Проблема:</strong> React Context работает так: когда значение Context.Provider
+        меняется, ВСЕ компоненты, вызывающие <code>useContext()</code>, перерисовываются.
+        Если бы React-Redux просто клал state в Context — при каждом dispatch перерисовывалось бы
+        ВСЁ дерево. Это катастрофа для производительности.</p>
+
+        <p><strong>Решение:</strong> React-Redux НЕ кладёт state в Context. Он кладёт
+        <em>ссылку на store</em> (которая никогда не меняется) и объект <code>Subscription</code>.
+        Уведомления об изменениях идут через Subscription, минуя React Context.</p>
+
+        <p><strong>Как это работает пошагово:</strong></p>
+        <ol>
+          <li><code>&lt;Provider&gt;</code> вызывает <code>store.subscribe()</code> один раз и создаёт
+          корневой Subscription-объект. Этот объект хранит список «слушателей» (listeners).</li>
+          <li>Когда компонент вызывает <code>useSelector(selector)</code>, React-Redux регистрирует
+          этот компонент как слушателя в Subscription. При этом React Context НЕ меняется.</li>
+          <li>При <code>dispatch(action)</code> Redux store обновляется. Store вызывает callback
+          из шага 1. Subscription получает уведомление.</li>
+          <li>Subscription проходит по списку слушателей. Для каждого запускает его selector
+          с новым state. Сравнивает результат с предыдущим (<code>===</code>).
+          Если отличается — вызывает <code>forceRender()</code> только для этого компонента.</li>
+        </ol>
+
+        <div class="code-block">
+<span class="cm">// Упрощённая схема Subscription:</span>
+
+<span class="kw">class</span> <span class="type">Subscription</span> {
+  <span class="prop">listeners</span> = []  <span class="cm">// список подписанных компонентов</span>
+
+  <span class="fn">addListener</span>(listener) {
+    <span class="kw">this</span>.<span class="prop">listeners</span>.<span class="fn">push</span>(listener)
+  }
+
+  <span class="fn">notifyAll</span>() {
+    <span class="cm">// Вызывается при каждом store.dispatch()</span>
+    <span class="kw">this</span>.<span class="prop">listeners</span>.<span class="fn">forEach</span>(listener => {
+      <span class="kw">const</span> newValue = listener.<span class="fn">selector</span>(store.<span class="fn">getState</span>())
+      <span class="kw">if</span> (newValue !== listener.<span class="prop">prevValue</span>) {
+        listener.<span class="prop">prevValue</span> = newValue
+        listener.<span class="fn">forceRender</span>()  <span class="cm">// Ре-рендер ТОЛЬКО этого компонента!</span>
+      }
+    })
+  }
+}
+        </div>
+
+        <p><strong>Разница между connect и useSelector:</strong></p>
+        <ul>
+          <li><code>connect()</code> создаёт <strong>вложенную (nested) Subscription</strong>:
+          каждый connect-компонент становится «мини-Provider» для своих потомков.
+          Это формирует иерархию подписок (parent → child), что решает проблему «zombie children»
+          (когда дочерний компонент ещё подписан на удалённые данные).</li>
+          <li><code>useSelector</code> создаёт <strong>плоскую (flat) подписку</strong>:
+          регистрируется напрямую в Subscription объекте Provider. Проще, но может иметь
+          edge cases со stale props (подробнее в уроке 53).</li>
+        </ul>
+
+        <div class="quote">
+          «Starting with version 5, React Redux has attempted to guarantee that consistency
+          with `ownProps`. In version 7, that is implemented using a custom `Subscription`
+          class internally in `connect()`, which forms a nested hierarchy. This ensures that
+          connected components lower in the tree will only receive store update notifications
+          once the nearest connected ancestor has been updated.»
+          <br>— <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">react-redux.js.org — Stale Props and Zombie Children</a>
+        </div>
+        <div class="quote">
+          «Начиная с версии 5, React Redux пытается гарантировать согласованность с ownProps.
+          В версии 7 это реализовано с помощью кастомного класса Subscription внутри connect(),
+          который формирует вложенную иерархию. Это гарантирует, что подключённые компоненты
+          ниже по дереву получат уведомления об обновлении store только после того, как ближайший
+          подключённый предок обновится.»
+          <br>— перевод
+        </div>
+
+        <div class="quote">
+          «With hooks, there is no way to render a context provider, which means there's also
+          no nested hierarchy of subscriptions. Because of this, the "stale props" and "zombie
+          child" issues may potentially re-occur in an app that relies on using hooks instead
+          of `connect()`.»
+          <br>— <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">react-redux.js.org — Stale Props and Zombie Children</a>
+        </div>
+        <div class="quote">
+          «С хуками нет возможности рендерить context provider, а значит нет и вложенной
+          иерархии подписок. Из-за этого проблемы "stale props" и "zombie children"
+          потенциально могут возникнуть в приложении, использующем хуки вместо connect().»
+          <br>— перевод
+        </div>
+
+        <div class="tip">
+          <strong>Где почитать про Subscription:</strong><br>
+          Subscription — внутренний механизм React-Redux, у него нет отдельной страницы в docs.
+          Но он упоминается в нескольких местах:<br>
+          • <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">Hooks — Stale Props and Zombie Children</a> — здесь описана разница подписок connect vs hooks<br>
+          • <a href="https://react-redux.js.org/using-react-redux/accessing-store#understanding-context-usage" target="_blank">Accessing the Store — Understanding Context Usage</a> — как Provider использует Context<br>
+          • <a href="https://github.com/reduxjs/react-redux/blob/master/src/utils/Subscription.ts" target="_blank">GitHub: Subscription.ts</a> — исходный код класса Subscription<br>
+          • <a href="https://blog.isquaredsoftware.com/2018/11/react-redux-history-implementation/" target="_blank">Mark Erikson: React-Redux History and Implementation</a> — подробная статья от мейнтейнера Redux
+        </div>
+
+        <div class="quote">
+          «React Redux provides APIs that allow your components to dispatch actions and subscribe
+          to data updates from the store. As part of that, React Redux abstracts away the details
+          of which store you are using, and the exact details of how that store interaction
+          is handled.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/accessing-store" target="_blank">react-redux.js.org — Accessing the Store</a>
+        </div>
+        <div class="quote">
+          «React Redux предоставляет API, позволяющий компонентам dispatch'ить actions и
+          подписываться на обновления данных из store. При этом React Redux абстрагирует
+          детали того, какой store используется и как именно происходит взаимодействие со store.»
+          <br>— перевод
+        </div>
+
+        <h3>4. Публичный API (useSelector / useDispatch / connect)</h3>
+        <p>
+          Это то, что вы используете в своих компонентах. API скрывает всю сложность
+          подписки, сравнения значений и оптимизации рендеров. Вы просто говорите
+          «мне нужно state.counter.value» — и React-Redux делает всё остальное.
+        </p>
+
+        <h3>Как данные текут при ЧТЕНИИ</h3>
+        <div class="code-block">
+Store  →  Provider (React Context)  →  Subscription  →  useSelector  →  Component
+          <span class="cm">             ↑                            ↑                ↑             ↑</span>
+          <span class="cm">        кладёт store          создаёт подписку    извлекает     рендерится</span>
+          <span class="cm">        в Context             на store            данные        с данными</span>
+        </div>
+
+        <h3>Как данные текут при ЗАПИСИ (dispatch)</h3>
+        <div class="code-block">
+Component  →  useDispatch  →  store.dispatch(action)  →  reducer  →  новый state
+                                      ↓
+                              store уведомляет Subscription
+                                      ↓
+                         Subscription проверяет: данные изменились?
+                              ↓                          ↓
+                             Да → ре-рендер           Нет → ничего
+        </div>
+
+        <div class="tip">
+          <strong>Ключевой инсайт:</strong> React-Redux использует React Context только для
+          <em>передачи ссылки</em> на store, а НЕ для уведомления об изменениях.
+          Уведомления идут через собственную систему Subscription, что обеспечивает
+          точечные ре-рендеры только тех компонентов, чьи данные действительно изменились.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

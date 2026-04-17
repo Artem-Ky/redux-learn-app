@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03a — Система подписок React-Redux</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .sub-layer {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      transition: all 0.4s;
+      position: relative;
+    }
+    .sub-layer.active {
+      border-color: var(--accent);
+      background: rgba(86, 156, 214, 0.1);
+    }
+    .sub-layer.fire {
+      border-color: var(--accent-orange);
+      background: rgba(206, 145, 120, 0.1);
+    }
+    .sub-layer.skip {
+      border-color: var(--success);
+      background: rgba(76, 175, 80, 0.06);
+    }
+    .sub-layer__title {
+      font-weight: 700;
+      color: var(--text-bright);
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+    .sub-layer__desc {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    .sub-layer__badge {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      display: none;
+    }
+    .sub-layer.fire .sub-layer__badge {
+      display: inline-block;
+      background: rgba(206, 145, 120, 0.2);
+      color: var(--accent-orange);
+      border: 1px solid var(--accent-orange);
+    }
+    .sub-layer.skip .sub-layer__badge {
+      display: inline-block;
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+    .sub-connector {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      padding: 2px 0;
+      font-family: var(--font-mono);
+    }
+    .sub-diagram {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .nested-block {
+      border-left: 3px solid var(--accent-purple);
+      margin-left: 20px;
+      padding-left: 16px;
+    }
+    .src-link {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent-blue-bright);
+      text-decoration: none;
+      padding: 2px 6px;
+      background: rgba(121, 184, 255, 0.08);
+      border-radius: 3px;
+    }
+    .src-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">03a / 70</span>
+      Система подписок React-Redux (Subscription)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../03-installation-setup/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">03a</span>
+      <a href="../04-architecture-overview/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Как работает Subscription внутри React-Redux</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Ниже — модель того, что происходит внутри React-Redux при dispatch.
+          Нажмите кнопки, чтобы увидеть как Subscription уведомляет компоненты и как
+          каждый из них решает: рендериться или нет.
+        </p>
+
+        <div class="sub-diagram">
+          <div class="sub-layer" id="sl-store">
+            <div class="sub-layer__title">Redux Store</div>
+            <div class="sub-layer__desc">state = { counter: <span id="sv-counter">0</span>, theme: "<span id="sv-theme">dark</span>" }</div>
+          </div>
+          <div class="sub-connector">│ store.subscribe(subscription.handleChangeWrapper)</div>
+
+          <div class="sub-layer" id="sl-root-sub">
+            <div class="sub-layer__title">Root Subscription (создан Provider'ом)</div>
+            <div class="sub-layer__desc">
+              Подписан на store.subscribe(). При любом dispatch — получает уведомление первым.
+              Проходит по своему списку listeners и вызывает каждый.
+            </div>
+            <div class="sub-layer__badge" id="badge-root">уведомлён</div>
+          </div>
+          <div class="sub-connector">│ subscription.notifyNestedSubs()</div>
+          <div class="sub-connector">├──────────────────────┤</div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <div class="sub-layer" id="sl-counter">
+                <div class="sub-layer__title">&lt;Counter /&gt;</div>
+                <div class="sub-layer__desc">
+                  useSelector(s =&gt; s.counter)<br>
+                  prev: <span id="sl-counter-prev">0</span> → new: <span id="sl-counter-new">?</span>
+                </div>
+                <div class="sub-layer__badge" id="badge-counter">?</div>
+              </div>
+            </div>
+            <div>
+              <div class="sub-layer" id="sl-theme">
+                <div class="sub-layer__title">&lt;ThemeDisplay /&gt;</div>
+                <div class="sub-layer__desc">
+                  useSelector(s =&gt; s.theme)<br>
+                  prev: "<span id="sl-theme-prev">dark</span>" → new: "<span id="sl-theme-new">?</span>"
+                </div>
+                <div class="sub-layer__badge" id="badge-theme">?</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+          <button class="btn btn--accent" id="btn-inc">dispatch counter/increment</button>
+          <button class="btn" style="border-color: var(--accent-purple); color: var(--accent-purple);" id="btn-theme">dispatch theme/toggle</button>
+          <button class="btn" id="btn-sub-reset">Сбросить</button>
+        </div>
+
+        <h3 style="color: var(--text-bright); margin: 28px 0 12px; font-size: 1rem;">
+          Живой пример — те же компоненты на React-Redux
+        </h3>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Subscription: внутренний механизм React-Redux</div>
+      <div class="theory__body">
+        <h3>Зачем вообще нужна Subscription?</h3>
+        <p>
+          Чтобы понять Subscription, сначала нужно понять <strong>проблему, которую она решает</strong>.
+        </p>
+        <p>
+          React Context работает так: когда значение <code>Context.Provider</code> меняется,
+          <strong>ВСЕ</strong> компоненты, которые вызывают <code>useContext()</code>, перерисовываются.
+          Без исключений. Это дизайн React.
+        </p>
+        <p>
+          Если бы React-Redux просто клал <code>state</code> в Context:
+        </p>
+        <div class="code-block">
+<span class="cm">// ❌ ПЛОХОЙ подход (React-Redux так НЕ делает):</span>
+<span class="kw">const</span> StoreContext = React.<span class="fn">createContext</span>(<span class="kw">null</span>)
+
+<span class="kw">function</span> <span class="fn">NaiveProvider</span>({ store, children }) {
+  <span class="kw">const</span> [state, setState] = <span class="fn">useState</span>(store.<span class="fn">getState</span>())
+
+  <span class="fn">useEffect</span>(() => {
+    <span class="kw">return</span> store.<span class="fn">subscribe</span>(() => {
+      <span class="fn">setState</span>(store.<span class="fn">getState</span>())  <span class="cm">// state меняется → Context value меняется</span>
+    })                            <span class="cm">// → ВСЕ useContext() ре-рендерятся!</span>
+  }, [store])
+
+  <span class="kw">return</span> (
+    &lt;StoreContext.Provider value={state}&gt;  <span class="cm">// каждый dispatch = новый value</span>
+      {children}
+    &lt;/StoreContext.Provider&gt;
+  )
+}
+        </div>
+        <p>
+          При каждом dispatch все 100 компонентов, использующих <code>useContext(StoreContext)</code>,
+          перерисовались бы — даже если 99 из них не нуждаются в обновлении.
+          <strong>Это катастрофа для производительности.</strong>
+        </p>
+
+        <h3>Что делает React-Redux вместо этого</h3>
+        <p>
+          React-Redux кладёт в Context <strong>НЕ state</strong>, а <strong>ссылку на store</strong>
+          (которая НИКОГДА не меняется) и объект <strong>Subscription</strong>:
+        </p>
+        <div class="code-block">
+<span class="cm">// ✔ Как React-Redux на самом деле работает (упрощённо):</span>
+
+<span class="cm">// Context value — СТАБИЛЬНЫЙ объект, НЕ меняется при dispatch</span>
+<span class="kw">const</span> contextValue = <span class="fn">useMemo</span>(() => ({
+  <span class="prop">store</span>,                    <span class="cm">// ссылка на store (стабильна)</span>
+  <span class="prop">subscription</span>: <span class="fn">createSubscription</span>(store)  <span class="cm">// объект подписок</span>
+}), [store])
+
+&lt;ReactReduxContext.Provider value={contextValue}&gt;
+  {children}
+&lt;/ReactReduxContext.Provider&gt;
+
+<span class="cm">// contextValue НИКОГДА не меняется → useContext() НИКОГДА</span>
+<span class="cm">// не вызывает ре-рендер! Уведомления идут через Subscription.</span>
+        </div>
+
+        <h3>Как Subscription уведомляет компоненты</h3>
+        <p>
+          Subscription — это связный список (linked list) слушателей. Каждый компонент,
+          использующий <code>useSelector</code> или <code>connect</code>, добавляет себя
+          в этот список. Когда dispatch меняет state, Subscription проходит по списку и
+          для каждого слушателя:
+        </p>
+        <ol>
+          <li>Запускает его selector с новым state</li>
+          <li>Сравнивает результат с предыдущим значением (<code>===</code> для useSelector, shallow equal для connect)</li>
+          <li>Если значение изменилось — вызывает <code>forceRender()</code> только для этого компонента</li>
+          <li>Если НЕ изменилось — ничего не делает, компонент спит</li>
+        </ol>
+
+        <h3>Исходный код Subscription (из react-redux)</h3>
+        <p>
+          Вот реальный код из
+          <a class="src-link" href="https://github.com/reduxjs/react-redux/blob/master/src/utils/Subscription.ts" target="_blank">
+            src/utils/Subscription.ts
+          </a>
+          (упрощённый для наглядности):
+        </p>
+        <div class="code-block">
+<span class="cm">// Коллекция слушателей — двусвязный список (linked list)</span>
+<span class="cm">// Реальный код: github.com/reduxjs/react-redux/blob/master/src/utils/Subscription.ts</span>
+
+<span class="kw">function</span> <span class="fn">createListenerCollection</span>() {
+  <span class="kw">let</span> first: Listener | <span class="kw">null</span> = <span class="kw">null</span>
+  <span class="kw">let</span> last: Listener | <span class="kw">null</span> = <span class="kw">null</span>
+
+  <span class="kw">return</span> {
+    <span class="cm">// Оповестить всех слушателей</span>
+    <span class="fn">notify</span>() {
+      <span class="fn">batch</span>(() => {                <span class="cm">// батчим обновления React</span>
+        <span class="kw">let</span> listener = first
+        <span class="kw">while</span> (listener) {
+          listener.<span class="fn">callback</span>()      <span class="cm">// вызываем callback каждого слушателя</span>
+          listener = listener.<span class="prop">next</span>  <span class="cm">// идём к следующему по linked list</span>
+        }
+      })
+    },
+
+    <span class="cm">// Подписать нового слушателя</span>
+    <span class="fn">subscribe</span>(callback) {
+      <span class="kw">const</span> listener = { callback, next: <span class="kw">null</span>, prev: last }
+      <span class="kw">if</span> (last) last.<span class="prop">next</span> = listener
+      <span class="kw">else</span> first = listener
+      last = listener
+
+      <span class="kw">return</span> <span class="kw">function</span> <span class="fn">unsubscribe</span>() {
+        <span class="cm">// удаляем из linked list при отписке</span>
+      }
+    }
+  }
+}
+        </div>
+
+        <div class="code-block">
+<span class="cm">// Сама Subscription — связывает store и слушателей</span>
+
+<span class="kw">function</span> <span class="fn">createSubscription</span>(store, parentSub?) {
+  <span class="kw">let</span> listeners = <span class="fn">createListenerCollection</span>()
+
+  <span class="kw">function</span> <span class="fn">trySubscribe</span>() {
+    <span class="kw">if</span> (parentSub) {
+      <span class="cm">// Если есть родительская Subscription (connect-иерархия)</span>
+      <span class="cm">// → подписываемся на родителя, а НЕ напрямую на store</span>
+      parentSub.<span class="fn">addNestedSub</span>(handleChange)
+    } <span class="kw">else</span> {
+      <span class="cm">// Если нет родителя (корневая, от Provider)</span>
+      <span class="cm">// → подписываемся напрямую на store.subscribe()</span>
+      store.<span class="fn">subscribe</span>(handleChange)
+    }
+  }
+
+  <span class="kw">function</span> <span class="fn">handleChange</span>() {
+    <span class="cm">// При изменении state — вызвать onStateChange</span>
+    <span class="cm">// (это callback который проверяет selector и решает рендерить или нет)</span>
+    subscription.<span class="prop">onStateChange</span>?.()
+  }
+
+  <span class="kw">function</span> <span class="fn">addNestedSub</span>(listener) {
+    <span class="fn">trySubscribe</span>()
+    <span class="kw">return</span> listeners.<span class="fn">subscribe</span>(listener)  <span class="cm">// добавляем в linked list</span>
+  }
+
+  <span class="kw">function</span> <span class="fn">notifyNestedSubs</span>() {
+    listeners.<span class="fn">notify</span>()  <span class="cm">// оповещаем всех вложенных слушателей</span>
+  }
+}
+        </div>
+
+        <h3>Два типа подписки: nested (connect) vs flat (useSelector)</h3>
+
+        <p><strong>connect()</strong> — вложенная (nested) подписка:</p>
+        <div class="code-block">
+<span class="cm">// connect() создаёт СВОЮ Subscription, которая подписана на РОДИТЕЛЬСКУЮ</span>
+
+Provider (Root Subscription)
+  └─ ConnectedComponentA (Subscription A, подписана на Root)
+       └─ ConnectedComponentB (Subscription B, подписана на A)
+            └─ ConnectedComponentC (Subscription C, подписана на B)
+
+<span class="cm">// При dispatch: Root → A → B → C</span>
+<span class="cm">// Каждый уровень ЖДЁТ пока родитель обновится, потом обновляет себя.</span>
+<span class="cm">// Это гарантирует: родитель рендерится РАНЬШЕ ребёнка.</span>
+<span class="cm">// Если родитель решил не рендерить ребёнка (unmount) → ребёнок не получит</span>
+<span class="cm">// уведомление → нет "zombie children".</span>
+        </div>
+
+        <p><strong>useSelector</strong> — плоская (flat) подписка:</p>
+        <div class="code-block">
+<span class="cm">// useSelector регистрируется напрямую в Root Subscription</span>
+
+Provider (Root Subscription)
+  ├─ ComponentA (useSelector — listener в Root)
+  ├─ ComponentB (useSelector — listener в Root)
+  └─ ComponentC (useSelector — listener в Root)
+
+<span class="cm">// При dispatch: Root уведомляет A, B, C одновременно (в порядке подписки)</span>
+<span class="cm">// Проще, но нет гарантии порядка parent → child.</span>
+<span class="cm">// Потенциальная проблема: "zombie children" (редко на практике).</span>
+        </div>
+
+        <div class="quote">
+          «Starting with version 5, React Redux has attempted to guarantee that consistency
+          with ownProps. In version 7, that is implemented using a custom Subscription class
+          internally in connect(), which forms a nested hierarchy. This ensures that connected
+          components lower in the tree will only receive store update notifications once the
+          nearest connected ancestor has been updated.»
+          <br>— <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">react-redux.js.org — Stale Props and Zombie Children</a>
+        </div>
+        <div class="quote">
+          «Начиная с версии 5, React Redux пытается гарантировать согласованность с ownProps.
+          В версии 7 это реализовано с помощью кастомного класса Subscription внутри connect(),
+          который формирует вложенную иерархию. Это гарантирует, что подключённые компоненты
+          ниже по дереву получат уведомления только после обновления ближайшего подключённого
+          предка.»
+          <br>— перевод
+        </div>
+
+        <div class="quote">
+          «With hooks, there is no way to render a context provider, which means there's also
+          no nested hierarchy of subscriptions. Because of this, the "stale props" and "zombie
+          child" issues may potentially re-occur in an app that relies on using hooks instead of
+          connect().»
+          <br>— <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">react-redux.js.org — Stale Props and Zombie Children</a>
+        </div>
+        <div class="quote">
+          «С хуками нет возможности рендерить context provider, а значит нет и вложенной
+          иерархии подписок. Из-за этого проблемы "stale props" и "zombie children"
+          потенциально могут возникнуть при использовании хуков вместо connect().»
+          <br>— перевод
+        </div>
+
+        <h3>Что именно делает useSelector при получении уведомления</h3>
+        <p>
+          Когда Subscription вызывает callback компонента с useSelector, происходит следующее
+          (реальная логика из
+          <a class="src-link" href="https://github.com/reduxjs/react-redux/blob/master/src/hooks/useSelector.ts" target="_blank">
+            src/hooks/useSelector.ts
+          </a>):
+        </p>
+        <div class="code-block">
+<span class="cm">// Упрощённая логика useSelector при уведомлении от Subscription:</span>
+
+<span class="kw">function</span> <span class="fn">checkForUpdates</span>() {
+  <span class="kw">const</span> newStoreState = store.<span class="fn">getState</span>()
+  <span class="kw">const</span> newSelectedValue = selector(newStoreState)
+
+  <span class="cm">// Сравниваем с предыдущим значением</span>
+  <span class="kw">if</span> (<span class="fn">equalityFn</span>(newSelectedValue, lastSelectedValue)) {
+    <span class="cm">// Значение НЕ изменилось → ничего не делаем</span>
+    <span class="kw">return</span>
+  }
+
+  <span class="cm">// Значение изменилось → запоминаем новое и принудительно ре-рендерим</span>
+  lastSelectedValue = newSelectedValue
+  <span class="fn">forceRender</span>()  <span class="cm">// useReducer(c => c + 1, 0) — трюк для принудительного рендера</span>
+}
+        </div>
+
+        <h3>Полная цепочка: dispatch → ре-рендер</h3>
+        <div class="code-block">
+1. store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> })
+   ↓
+2. Redux store вызывает reducer → новый state = { counter: <span class="num">1</span>, theme: <span class="str">'dark'</span> }
+   ↓
+3. store вызывает callback'и из store.subscribe()
+   ↓
+4. Root Subscription (от Provider) получает уведомление
+   → вызывает subscription.<span class="prop">onStateChange</span>()
+   → это вызывает <span class="fn">notifyNestedSubs</span>() → listeners.<span class="fn">notify</span>()
+   ↓
+5. Для каждого слушателя (компонент с useSelector):
+   → вызывается <span class="fn">checkForUpdates</span>()
+   → запускает selector(newState)
+   → сравнивает с prevValue
+   ↓
+6a. Counter: selector(state) → state.counter → <span class="num">1</span>
+    prev = <span class="num">0</span>, new = <span class="num">1</span> → <span class="num">0</span> !== <span class="num">1</span> → <span class="kw">true</span> → <span class="fn">forceRender</span>() → <span class="str">РЕ-РЕНДЕР!</span>
+
+6b. ThemeDisplay: selector(state) → state.theme → <span class="str">'dark'</span>
+    prev = <span class="str">'dark'</span>, new = <span class="str">'dark'</span> → <span class="str">'dark'</span> === <span class="str">'dark'</span> → <span class="kw">false</span> → <span class="str">ПРОПУСТИТЬ</span>
+        </div>
+
+        <h3>Ссылки на исходный код и документацию</h3>
+        <ul>
+          <li><a class="src-link" href="https://github.com/reduxjs/react-redux/blob/master/src/utils/Subscription.ts" target="_blank">Subscription.ts</a> — класс Subscription (linked list слушателей)</li>
+          <li><a class="src-link" href="https://github.com/reduxjs/react-redux/blob/master/src/hooks/useSelector.ts" target="_blank">useSelector.ts</a> — хук useSelector (checkForUpdates, equalityFn)</li>
+          <li><a class="src-link" href="https://github.com/reduxjs/react-redux/blob/master/src/components/Provider.tsx" target="_blank">Provider.tsx</a> — компонент Provider (создание root Subscription)</li>
+          <li><a class="src-link" href="https://github.com/reduxjs/react-redux/blob/master/src/components/connect.tsx" target="_blank">connect.tsx</a> — HOC connect (создание nested Subscription)</li>
+          <li><a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">Документация: Stale Props and Zombie Children</a> — описание разницы подписок</li>
+          <li><a href="https://react-redux.js.org/using-react-redux/accessing-store#understanding-context-usage" target="_blank">Документация: Understanding Context Usage</a> — как Provider использует Context</li>
+          <li><a href="https://blog.isquaredsoftware.com/2018/11/react-redux-history-implementation/" target="_blank">Mark Erikson: React-Redux History and Implementation</a> — статья от мейнтейнера Redux с полной историей</li>
+        </ul>
+
+        <div class="tip">
+          <strong>Итого:</strong> Subscription — это НЕ магия. Это linked list callback'ов.
+          При dispatch: store → Subscription.notify() → для каждого listener: запустить selector,
+          сравнить результат, если отличается → forceRender(). Вот и всё.
+          React Context используется только для передачи ссылки на store (она стабильна и никогда не меняется),
+          а не для уведомления о изменениях.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

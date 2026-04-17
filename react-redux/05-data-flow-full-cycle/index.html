@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>05 — Полный цикл данных</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .cycle-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .cycle-step {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 14px 16px;
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 2px;
+      transition: all 0.4s;
+      position: relative;
+    }
+    .cycle-step.active {
+      border-color: var(--accent);
+      background: rgba(86, 156, 214, 0.1);
+      transform: scale(1.02);
+    }
+    .cycle-step.done {
+      border-color: var(--success);
+      background: rgba(76, 175, 80, 0.06);
+    }
+    .cycle-step__num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      border: 2px solid var(--border-light);
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+      transition: all 0.3s;
+    }
+    .cycle-step.active .cycle-step__num {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(86, 156, 214, 0.2);
+    }
+    .cycle-step.done .cycle-step__num {
+      border-color: var(--success);
+      color: var(--success);
+      background: rgba(76, 175, 80, 0.15);
+    }
+    .cycle-step__info { flex: 1; }
+    .cycle-step__title {
+      color: var(--text-bright);
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+    .cycle-step__desc {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    .cycle-step__code {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent-orange);
+      background: #0d0d0d;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      margin-top: 6px;
+      display: none;
+    }
+    .cycle-step.active .cycle-step__code,
+    .cycle-step.done .cycle-step__code {
+      display: block;
+    }
+    .cycle-connector {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 1rem;
+      padding: 2px 0;
+      margin-left: 28px;
+    }
+    .live-counter {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-top: 20px;
+      transition: border-color 0.3s;
+    }
+    .live-counter.flash {
+      border-color: var(--accent-cyan);
+    }
+    .live-counter__value {
+      font-family: var(--font-mono);
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 80px;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    .live-counter__value.bump {
+      transform: scale(1.2);
+    }
+    .live-counter__label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: center;
+      margin-top: 8px;
+    }
+    .step-mode-toggle {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin: 16px 0;
+      align-items: center;
+    }
+    .step-mode-toggle label {
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">05 / 70</span>
+      Полный цикл данных
+    </div>
+    <nav class="site-header__nav">
+      <a href="../04-architecture-overview/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">05</span>
+      <a href="../06-api-overview/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Полный цикл данных от клика до обновления UI</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 12px;">
+          Нажмите <strong>+</strong> или <strong>−</strong> и наблюдайте как каждый шаг цикла
+          подсвечивается в реальном времени. В пошаговом режиме можно проходить шаги по одному.
+        </p>
+
+        <div class="step-mode-toggle">
+          <label>
+            <input type="checkbox" id="step-mode"> Пошаговый режим (вручную по шагам)
+          </label>
+          <button class="btn btn--sm" id="btn-next-step" style="display: none;">
+            Следующий шаг →
+          </button>
+        </div>
+
+        <div id="root"></div>
+
+        <div class="cycle-steps" id="cycle-steps">
+          <div class="cycle-step" id="cs-1">
+            <div class="cycle-step__num">1</div>
+            <div class="cycle-step__info">
+              <div class="cycle-step__title">Пользователь кликает кнопку</div>
+              <div class="cycle-step__desc">React вызывает onClick handler компонента.</div>
+              <div class="cycle-step__code">onClick={() => dispatch(increment())}</div>
+            </div>
+          </div>
+          <div class="cycle-connector">↓</div>
+
+          <div class="cycle-step" id="cs-2">
+            <div class="cycle-step__num">2</div>
+            <div class="cycle-step__info">
+              <div class="cycle-step__title">useDispatch() → dispatch(action)</div>
+              <div class="cycle-step__desc">Handler вызывает dispatch с объектом action. Action отправляется в Redux store.</div>
+              <div class="cycle-step__code">dispatch({ type: 'counter/increment' })</div>
+            </div>
+          </div>
+          <div class="cycle-connector">↓</div>
+
+          <div class="cycle-step" id="cs-3">
+            <div class="cycle-step__num">3</div>
+            <div class="cycle-step__info">
+              <div class="cycle-step__title">Store вызывает reducer</div>
+              <div class="cycle-step__desc">Redux store передаёт текущий state и action в reducer. Reducer возвращает новый state.</div>
+              <div class="cycle-step__code">reducer({ value: N }, { type: 'counter/increment' }) → { value: N+1 }</div>
+            </div>
+          </div>
+          <div class="cycle-connector">↓</div>
+
+          <div class="cycle-step" id="cs-4">
+            <div class="cycle-step__num">4</div>
+            <div class="cycle-step__info">
+              <div class="cycle-step__title">Store сохраняет новый state → Subscription оповещает слушателей</div>
+              <div class="cycle-step__desc">
+                Store заменяет текущий state на новый. Затем вызывает callback из store.subscribe() —
+                это Root Subscription (созданная Provider'ом). Subscription проходит по своему
+                linked list слушателей и вызывает checkForUpdates() каждого
+                (<a href="../03a-subscription-system/" style="color: var(--accent-blue-bright);">подробнее в 03a</a>).
+              </div>
+              <div class="cycle-step__code">store → Root Subscription.notify() → listener.callback() для каждого</div>
+            </div>
+          </div>
+          <div class="cycle-connector">↓</div>
+
+          <div class="cycle-step" id="cs-5">
+            <div class="cycle-step__num">5</div>
+            <div class="cycle-step__info">
+              <div class="cycle-step__title">checkForUpdates(): selector(newState) !== prevResult?</div>
+              <div class="cycle-step__desc">
+                Для каждого компонента с useSelector: берёт новый state из store.getState(),
+                запускает его selector-функцию, сравнивает результат с предыдущим через ===.
+                Если значение отличается — вызывает forceRender() (через useReducer внутри).
+                Если совпадает — ничего не делает, компонент спит.
+              </div>
+              <div class="cycle-step__code">selector({ value: N+1 }) → N+1. prev(N) !== N+1 → true → forceRender()</div>
+            </div>
+          </div>
+          <div class="cycle-connector">↓</div>
+
+          <div class="cycle-step" id="cs-6">
+            <div class="cycle-step__num">6</div>
+            <div class="cycle-step__info">
+              <div class="cycle-step__title">Компонент ре-рендерится с новым значением</div>
+              <div class="cycle-step__desc">React перерисовывает компонент. UI обновлён. Цикл завершён.</div>
+              <div class="cycle-step__code">Counter() → &lt;span&gt;{N+1}&lt;/span&gt;</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 16px;">
+          <button class="btn" id="btn-cycle-reset">Сбросить анимацию</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Полный цикл данных React-Redux</div>
+      <div class="theory__body">
+        <h3>Цикл данных: 6 шагов</h3>
+        <p>
+          Каждое взаимодействие пользователя с React-Redux приложением проходит через
+          6 последовательных шагов. Понимание этого цикла — фундамент для всего дальнейшего обучения.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Полный цикл одного клика:</span>
+
+<span class="cm">// Шаг 1: Пользователь кликает</span>
+&lt;button onClick={() => dispatch(increment())}&gt;
+
+<span class="cm">// Шаг 2: dispatch отправляет action в store</span>
+store.<span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> })
+
+<span class="cm">// Шаг 3: Store вызывает reducer</span>
+<span class="fn">counterReducer</span>({ <span class="prop">value</span>: <span class="num">0</span> }, { <span class="prop">type</span>: <span class="str">'counter/increment'</span> })
+<span class="cm">// → возвращает { value: 1 }</span>
+
+<span class="cm">// Шаг 4: Store сохраняет новый state и уведомляет Subscription</span>
+<span class="cm">// (внутренний механизм React-Redux)</span>
+
+<span class="cm">// Шаг 5: useSelector запускает selector с новым state</span>
+<span class="kw">const</span> newValue = <span class="fn">selector</span>(newState) <span class="cm">// → 1</span>
+<span class="kw">const</span> changed = prevValue !== newValue <span class="cm">// 0 !== 1 → true → RERENDER</span>
+
+<span class="cm">// Шаг 6: React перерисовывает компонент</span>
+<span class="cm">// Counter() вызывается заново, useSelector возвращает 1</span>
+        </div>
+
+        <h3>Ключевой шаг: checkForUpdates (шаги 4–5)</h3>
+        <p>
+          Шаги 4–5 — самые важные для производительности. Вот что происходит внутри
+          (подробнее — в <a href="../03a-subscription-system/">уроке 03a</a>):
+        </p>
+        <ol>
+          <li>Store вызывает callback из <code>store.subscribe()</code></li>
+          <li>Этот callback — метод Root Subscription (созданной Provider'ом)</li>
+          <li>Subscription проходит по linked list слушателей</li>
+          <li>Для каждого слушателя (каждый useSelector в приложении) вызывает <code>checkForUpdates()</code></li>
+          <li><code>checkForUpdates</code> берёт <code>store.getState()</code>, запускает selector-функцию,
+          и сравнивает результат с предыдущим через <code>===</code></li>
+          <li>Если <code>prevResult !== newResult</code> → вызывает <code>forceRender()</code>
+          (внутри это <code>useReducer(c => c + 1, 0)</code> — трюк для принудительного рендера)</li>
+          <li>Если <code>prevResult === newResult</code> → ничего не делает, компонент спит</li>
+        </ol>
+        <p>
+          Сравнение по умолчанию: <code>===</code> (строгое равенство ссылок).
+          Это означает, что если selector возвращает <strong>новый объект</strong> каждый раз
+          (например <code>state => ({ a: state.a, b: state.b })</code>) — компонент
+          будет ре-рендериться при каждом dispatch, даже если данные не изменились.
+          Это одна из главных «ловушек», которую мы подробно разберём в уроках про useSelector.
+        </p>
+
+        <h3>Что если данные НЕ изменились?</h3>
+        <div class="code-block">
+<span class="cm">// Пример: dispatch изменяет state.other, но НЕ state.counter</span>
+
+<span class="cm">// Компонент подписан на state.counter:</span>
+<span class="kw">const</span> count = <span class="fn">useSelector</span>(state => state.<span class="prop">counter</span>)
+
+<span class="cm">// При dispatch({ type: 'other/update' }):</span>
+<span class="cm">// Шаг 5: selector(newState) → state.counter → 0 (не изменился)</span>
+<span class="cm">// prevValue === newValue → 0 === 0 → true → SKIP RERENDER</span>
+<span class="cm">// Компонент НЕ перерисовывается!</span>
+        </div>
+
+        <div class="tip">
+          <strong>Вывод:</strong> React-Redux перерисовывает компонент только если
+          <code>selector(newState) !== selector(prevState)</code>. Это работает автоматически —
+          вам нужно лишь правильно писать селекторы. Мы научим этому в разделе F.
+        </div>
+
+        <h3>Аналогия с Classic Redux</h3>
+        <p>
+          В Classic Redux мы вручную делали <code>store.subscribe(() => { ... })</code>
+          и сами решали, когда обновлять UI. React-Redux автоматизирует этот процесс:
+        </p>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 16px 0;">
+          <tr style="border-bottom: 1px solid var(--border);">
+            <th style="text-align: left; padding: 8px; color: var(--text-muted);">Шаг</th>
+            <th style="text-align: left; padding: 8px; color: var(--accent-orange);">Classic Redux</th>
+            <th style="text-align: left; padding: 8px; color: var(--accent-cyan);">React-Redux</th>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Подписка</td>
+            <td style="padding: 8px;">store.subscribe() вручную</td>
+            <td style="padding: 8px;">Автоматически через useSelector</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Чтение</td>
+            <td style="padding: 8px;">store.getState() вручную</td>
+            <td style="padding: 8px;">useSelector(selector) автоматически</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Проверка</td>
+            <td style="padding: 8px;">Вручную (если вообще есть)</td>
+            <td style="padding: 8px;">=== сравнение автоматически</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Обновление UI</td>
+            <td style="padding: 8px;">DOM-манипуляции вручную</td>
+            <td style="padding: 8px;">React re-render автоматически</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;">Отписка</td>
+            <td style="padding: 8px;">unsubscribe() вручную</td>
+            <td style="padding: 8px;">Автоматически при unmount</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

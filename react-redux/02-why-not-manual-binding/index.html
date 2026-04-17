@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>02 — Почему нельзя подключить Redux вручную?</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 800px) {
+      .comparison { grid-template-columns: 1fr; }
+    }
+    .comparison__side {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .comparison__side--bad {
+      border-color: var(--error);
+      border-style: dashed;
+    }
+    .comparison__side--good {
+      border-color: var(--success);
+    }
+    .comparison__label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .comparison__label--bad { color: var(--error); }
+    .comparison__label--good { color: var(--success); }
+    .render-counter {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+    }
+    .render-counter span {
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+    .counter-widget {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 12px 0;
+    }
+    .counter-widget__value {
+      font-family: var(--font-mono);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 50px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">02 / 70</span>
+      Почему нельзя подключить Redux вручную?
+    </div>
+    <nav class="site-header__nav">
+      <a href="../01-what-is-react-redux/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">02</span>
+      <a href="../03-installation-setup/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO -->
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — Ручное подключение vs React-Redux</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Оба счётчика подключены к <strong>одному и тому же Redux store</strong>.
+          Левый — через ручной store.subscribe(), правый — через React-Redux.
+          Обратите внимание на <strong>счётчик рендеров</strong> — он показывает эффективность.
+        </p>
+
+        <div id="root"></div>
+
+        <div style="text-align: center; margin-top: 16px;">
+          <button class="btn" id="btn-dispatch-unrelated">
+            Dispatch несвязанного действия (изменить другой срез state)
+          </button>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 8px; text-align: center;">
+          Нажмите эту кнопку — она изменяет <code>state.other</code>, но НЕ <code>state.counter</code>.
+          Следите за счётчиком рендеров!
+        </p>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Почему ручное подключение Redux к React — плохая идея</div>
+      <div class="theory__body">
+        <h3>Четыре проблемы ручного подключения</h3>
+        <p>
+          Технически можно подключить Redux к React вручную — через <code>store.subscribe()</code>
+          в <code>useEffect</code> и <code>store.getState()</code> для чтения. Но у такого подхода
+          есть серьёзные проблемы:
+        </p>
+
+        <h3>Проблема 1: Props Drilling</h3>
+        <p>
+          Без React-Redux store нужно передавать как prop от корневого компонента к каждому,
+          кому он нужен. Если компонент на 5-м уровне вложенности нуждается в store — придётся
+          «просверлить» prop через 4 промежуточных компонента, которым store вообще не нужен.
+        </p>
+        <div class="code-block">
+<span class="cm">// Ручной подход — props drilling кошмар:</span>
+&lt;<span class="type">App</span> store={store}&gt;
+  &lt;<span class="type">Layout</span> store={store}&gt;         <span class="cm">// Layout'у store не нужен!</span>
+    &lt;<span class="type">Sidebar</span> store={store}&gt;      <span class="cm">// Sidebar'у store не нужен!</span>
+      &lt;<span class="type">UserPanel</span> store={store}&gt;  <span class="cm">// Вот ему нужен...</span>
+        &lt;<span class="type">Avatar</span> store={store} /&gt; <span class="cm">// И ему тоже</span>
+      &lt;/<span class="type">UserPanel</span>&gt;
+    &lt;/<span class="type">Sidebar</span>&gt;
+  &lt;/<span class="type">Layout</span>&gt;
+&lt;/<span class="type">App</span>&gt;
+        </div>
+
+        <h3>Проблема 2: Лишние ре-рендеры</h3>
+        <p>
+          При ручном <code>store.subscribe()</code> callback вызывается при <strong>каждом</strong>
+          dispatch — даже если данные этого компонента не изменились. В демо выше видно:
+          при dispatch несвязанного действия ручной счётчик ре-рендерится, а React-Redux — нет.
+        </p>
+        <div class="code-block">
+<span class="cm">// Ручной подход — ре-рендер при КАЖДОМ dispatch:</span>
+<span class="fn">useEffect</span>(() => {
+  <span class="kw">const</span> unsubscribe = store.<span class="fn">subscribe</span>(() => {
+    <span class="cm">// Вызывается при КАЖДОМ dispatch, даже если наши данные не изменились!</span>
+    <span class="fn">setLocalState</span>(store.<span class="fn">getState</span>().<span class="prop">counter</span>)
+  })
+  <span class="kw">return</span> unsubscribe
+}, [])
+        </div>
+
+        <h3>Проблема 3: Утечки памяти</h3>
+        <p>
+          Если забыть вернуть <code>unsubscribe</code> из <code>useEffect</code>, компонент
+          останется подписан на store даже после размонтирования. Это утечка памяти.
+          React-Redux управляет подпиской автоматически.
+        </p>
+
+        <h3>Проблема 4: Нет батчинга обновлений</h3>
+        <p>
+          При двух быстрых dispatch подряд ручной подход вызовет два отдельных setState,
+          что может привести к двум ре-рендерам (в React &lt; 18). React-Redux использует
+          внутренний батчинг для объединения обновлений.
+        </p>
+
+        <h3>Как делает React-Redux</h3>
+        <div class="code-block">
+<span class="cm">// React-Redux подход — просто, оптимизировано, безопасно:</span>
+<span class="kw">import</span> { <span class="fn">useSelector</span>, <span class="fn">useDispatch</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="cm">// Автоподписка + ре-рендер ТОЛЬКО если state.counter.value изменился</span>
+  <span class="kw">const</span> count = <span class="fn">useSelector</span>(state => state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">const</span> dispatch = <span class="fn">useDispatch</span>()
+
+  <span class="kw">return</span> &lt;button onClick={() => dispatch({ <span class="prop">type</span>: <span class="str">'increment'</span> })}&gt;{count}&lt;/button&gt;
+}
+        </div>
+
+        <div class="tip">
+          <strong>Вывод:</strong> React-Redux берёт на себя всю сложность интеграции:
+          подписку, отписку, проверку изменений, оптимизацию рендеров, батчинг.
+          Вы просто указываете <em>какие данные нужны</em> — всё остальное делается автоматически.
+        </div>
+
+        <h3>Итоговая таблица сравнения</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 16px 0;">
+          <tr style="border-bottom: 1px solid var(--border);">
+            <th style="text-align: left; padding: 8px; color: var(--text-muted);">Аспект</th>
+            <th style="text-align: left; padding: 8px; color: var(--error);">Ручное подключение</th>
+            <th style="text-align: left; padding: 8px; color: var(--success);">React-Redux</th>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Передача store</td>
+            <td style="padding: 8px; color: var(--error);">Props drilling</td>
+            <td style="padding: 8px; color: var(--success);">Provider + Context</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Подписка/отписка</td>
+            <td style="padding: 8px; color: var(--error);">Вручную в useEffect</td>
+            <td style="padding: 8px; color: var(--success);">Автоматически</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Ре-рендеры</td>
+            <td style="padding: 8px; color: var(--error);">При каждом dispatch</td>
+            <td style="padding: 8px; color: var(--success);">Только при изменении данных</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Утечки памяти</td>
+            <td style="padding: 8px; color: var(--error);">Возможны</td>
+            <td style="padding: 8px; color: var(--success);">Исключены</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;">Батчинг</td>
+            <td style="padding: 8px; color: var(--error);">Нет (до React 18)</td>
+            <td style="padding: 8px; color: var(--success);">Встроен</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>
