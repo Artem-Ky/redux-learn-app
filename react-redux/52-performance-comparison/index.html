@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>52 — Производительность: connect vs hooks</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .perf-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1100px) {
+      .perf-grid { grid-template-columns: 1fr; }
+    }
+    .perf-col {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .perf-col--connect { border-color: var(--accent); }
+    .perf-col--hook    { border-color: var(--accent-purple); }
+    .perf-col--memo    { border-color: var(--success); }
+    .perf-col__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .perf-col--connect .perf-col__title { color: var(--accent); }
+    .perf-col--hook    .perf-col__title { color: var(--accent-purple); }
+    .perf-col--memo    .perf-col__title { color: var(--success); }
+    .perf-col__stat {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      display: flex;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      align-items: center;
+    }
+    .perf-col__stat-label { color: var(--text-muted); }
+    .perf-col__stat-val   { color: var(--accent-cyan); font-weight: 700; }
+    .perf-heatmap {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 2px;
+      padding: 6px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+    }
+    .perf-cell {
+      aspect-ratio: 1 / 1;
+      background: #2a2a2a;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      color: #888;
+      transition: background-color 0.25s ease-out;
+      position: relative;
+    }
+    .perf-cell--done { color: var(--success); }
+    .perf-cell--highlight {
+      outline: 2px solid var(--accent-yellow);
+      outline-offset: 1px;
+      z-index: 1;
+    }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .parent-panel {
+      background: var(--bg-panel);
+      border: 1px dashed var(--border-light);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    .parent-panel__val { color: var(--accent-yellow); font-weight: 700; }
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin: 10px 0;
+    }
+    .diff-table th, .diff-table td {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+      text-align: left;
+    }
+    .diff-table th {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 0.78rem;
+    }
+    .diff-table td code { color: var(--accent-yellow); font-size: 0.76rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">52 / 70</span>
+      Производительность: connect vs hooks
+    </div>
+    <nav class="site-header__nav">
+      <a href="../51-side-by-side-dispatch/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">52</span>
+      <a href="../53-stale-props-zombie-children/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — 100 элементов × 3 реализации</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          В каждой колонке 100 компонентов <code>TodoItem</code>. Клетка подсвечивается красным
+          каждый раз, когда её React-компонент ре-рендерится. Сравнивайте, сколько клеток
+          вспыхивает при каждом действии, и как растут счётчики «total renders».
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — performance: connect vs hooks</div>
+      <div class="theory__body">
+
+        <h3>Как работает оптимизация в connect</h3>
+        <div class="quote">
+          "React Redux internally implements the shouldComponentUpdate method such that the wrapper component re-renders precisely when the data your component needs has changed."<br>
+          — <a href="https://react-redux.js.org/using-react-redux/connect-mapstate#why-use-shouldcomponentupdate" target="_blank">react-redux.js.org/using-react-redux/connect-mapstate</a>
+        </div>
+        <div class="quote">
+          «React Redux внутри реализует метод shouldComponentUpdate так, что компонент-обёртка ре-рендерится ровно тогда, когда изменились данные, нужные вашему компоненту.»<br>
+          — перевод
+        </div>
+
+        <p>
+          Когда вы пишете <code>connect(mapStateToProps)(Component)</code>, React-Redux создаёт
+          класс-обёртку вокруг вашего компонента. Эта обёртка на каждом уведомлении от store
+          вычисляет новый результат <code>mapStateToProps</code> и сравнивает его с предыдущим через
+          <code>shallowEqual</code>. Если shallow-equal — <code>shouldComponentUpdate</code> возвращает
+          <code>false</code>, и дочерний рендер <em>не</em> запускается.
+        </p>
+        <p>
+          Та же логика срабатывает и при ре-рендере родителя: обёртка сравнивает <em>ownProps</em>
+          через shallow, и если они не изменились — снова пропускает рендер. Именно поэтому в
+          connect-списке из 100 элементов при изменении одного элемента ре-рендерится ровно один
+          компонент.
+        </p>
+
+        <h3>Почему у хуков поведение другое</h3>
+        <div class="quote">
+          "unlike connect(), useSelector() does not prevent the component from re-rendering due to its parent re-rendering, even if the component's props did not change."<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «В отличие от connect(), useSelector() не предотвращает ре-рендер компонента из-за ре-рендера его родителя, даже если props компонента не изменились.»<br>
+          — перевод
+        </div>
+
+        <p>
+          <code>useSelector</code> живёт <em>внутри</em> функционального компонента и срабатывает
+          только на подписку к store. Он никак не участвует в решении «рендерить ли детей при
+          ре-рендере родителя». Если родитель ре-рендерится — дети ре-рендерятся просто потому, что
+          это их родитель их вызвал. <code>useSelector</code> при этом снова считает свою
+          функцию-селектор — но рендер уже <em>произошёл</em>.
+        </p>
+
+        <h3>Решение: React.memo</h3>
+        <div class="quote">
+          "If further performance optimizations are necessary, you may consider wrapping your function component in React.memo()"<br>
+          — <a href="https://react-redux.js.org/api/hooks#performance" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Если необходимы дополнительные оптимизации производительности, вы можете обернуть свой функциональный компонент в React.memo().»<br>
+          — перевод
+        </div>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">TodoItem</span> = <span class="fn">memo</span>(<span class="kw">function</span> <span class="fn">TodoItem</span>({ <span class="prop">id</span> }: <span class="type">Props</span>) {
+  <span class="kw">const</span> <span class="prop">todo</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>.<span class="prop">byId</span>[id])
+  <span class="kw">return</span> &lt;div&gt;{todo.text}&lt;/div&gt;
+})
+        </div>
+
+        <p>
+          <code>React.memo</code> — аналог <code>shouldComponentUpdate</code> для функциональных
+          компонентов. По умолчанию он сравнивает props через <code>Object.is</code> для каждого
+          ключа. Если props не изменились — компонент не ре-рендерится при ре-рендере родителя.
+          Внутренние <code>useSelector</code>-подписки продолжают работать независимо: когда
+          меняется <em>их</em> slice — компонент ре-рендерится, несмотря на <code>memo</code>.
+        </p>
+
+        <h3>Сравнительная таблица — по сценариям</h3>
+        <table class="diff-table">
+          <thead>
+            <tr>
+              <th>Действие</th>
+              <th>connect</th>
+              <th>hooks (без memo)</th>
+              <th>hooks + memo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Toggle item 42</strong><br><span style="color:var(--text-muted)">меняется один элемент</span></td>
+              <td>ровно 1 ре-рендер</td>
+              <td>ровно 1 ре-рендер <em>(пока предок над списком не делает лишний setState / forceUpdate / useSelector на другой ветке state)</em></td>
+              <td>ровно 1 ре-рендер</td>
+            </tr>
+            <tr>
+              <td><strong>Force parent rerender</strong><br><span style="color:var(--text-muted)">родитель перерисовывается, state не меняется</span></td>
+              <td>0 ре-рендеров — HOC блокирует</td>
+              <td><strong>100 ре-рендеров</strong> — все дети перерисовываются за родителем</td>
+              <td>0 ре-рендеров — <code>memo</code> сравнил props и пропустил</td>
+            </tr>
+            <tr>
+              <td><strong>Dispatch unrelated</strong><br><span style="color:var(--text-muted)">другой slice (noise)</span></td>
+              <td>0 ре-рендеров — shallow по selector'у</td>
+              <td>0 ре-рендеров — <code>===</code> по selector'у</td>
+              <td>0 ре-рендеров — то же</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">
+          В демо выше счётчики «total renders» обновляются через <code>useSyncExternalStore</code>, чтобы
+          не вызывать <code>setState</code> в общем родителе над тремя списками после dispatch.
+          <code>noise.tick</code> читается в отдельном <code>NoiseTickReadout</code>, а не в корневом
+          <code>App</code>, иначе при <code>NOISE_TICK</code> ре-рендерился бы весь экран и средняя
+          колонка дала бы +100 (каскад от родителя), хотя селектор по <code>todos</code> не меняется.
+        </p>
+
+        <h3>Где проявляется цена хуков</h3>
+        <p>
+          В трёх ситуациях hooks без <code>memo</code> дают больше лишних рендеров, чем
+          <code>connect</code>:
+        </p>
+        <ul style="padding-left: 20px; line-height: 1.8;">
+          <li>
+            <strong>Родительский компонент часто ре-рендерится</strong> (например, печать в инпуте
+            родителя, таймер, анимация). Каждый его рендер проходит через <em>всех</em> детей.
+          </li>
+          <li>
+            <strong>Длинные списки</strong> — 100, 1000 элементов, у каждого <code>useSelector</code>.
+            При каждом рендере родителя вызывается <code>useSelector</code> × N, а ещё и сами
+            функциональные компоненты отрабатывают.
+          </li>
+          <li>
+            <strong>Тяжёлое тело компонента</strong> — сложная логика, вычисления, JSX с множеством
+            условий. Даже если React потом сравнит vDOM и ничего не изменит в DOM, сам прогон функции
+            стоит CPU.
+          </li>
+        </ul>
+
+        <h3>Практическая стратегия</h3>
+        <ul style="padding-left: 20px; line-height: 1.8;">
+          <li>
+            <strong>Не оптимизируйте заранее.</strong> Для большинства компонентов React достаточно
+            быстр, и <code>memo</code> добавит больше когнитивной сложности, чем выигрыша.
+          </li>
+          <li>
+            <strong>Меряйте React DevTools Profiler.</strong> Если «flamegraph» показывает, что
+            длинный список перерисовывается целиком по пустяку — тогда <code>memo</code>.
+          </li>
+          <li>
+            <strong>Стабильные props для memo.</strong> <code>memo</code> работает только если props
+            сохраняют ссылочное равенство. Поэтому inline-объекты и свежесозданные коллбэки
+            (<code>onClick={() =&gt; ...}</code>) ломают memo. Используйте <code>useCallback</code> и
+            <code>useMemo</code>.
+          </li>
+          <li>
+            <strong>Для очень больших списков</strong> — <em>виртуализация</em>
+            (<code>react-window</code>, <code>react-virtuoso</code>). <code>memo</code> решает
+            «не перерисовывать невидимое», виртуализация вообще не рендерит невидимое.
+          </li>
+        </ul>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Во всех трёх вариантах подписки идут через один и тот же механизм: linked list callback'ов
+          → <code>Subscription.notify()</code> → <code>checkForUpdates</code> → selector → <code>===</code>
+          → <code>forceRender</code>. Разница — в том, <em>блокирует</em> ли HOC рендер от родителя:
+          у <code>connect</code> да, у <code>useSelector</code> нет. <code>React.memo</code>
+          воссоздаёт поведение <code>connect</code> на уровне React, а не на уровне Redux.
+          Подробнее про подписку — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Главный вывод:</strong> <code>connect</code> — это «hooks + memo», приклеенный
+          одной строкой <code>connect()(Component)</code>. Hooks дают гибкость, но требуют
+          осознанно ставить <code>memo</code>, когда это действительно нужно. В большинстве
+          экранов разница не заметна.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

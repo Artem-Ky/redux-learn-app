@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>51 — Сравнение: отправка actions — mapDispatchToProps vs useDispatch</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .sbs-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1100px) {
+      .sbs-grid { grid-template-columns: 1fr; }
+    }
+    .sbs-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .sbs-card--fn       { border-color: var(--accent); }
+    .sbs-card--obj      { border-color: var(--accent-cyan); }
+    .sbs-card--hook     { border-color: var(--accent-purple); }
+    .sbs-card__header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .sbs-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .sbs-card--fn   .sbs-card__title { color: var(--accent); }
+    .sbs-card--obj  .sbs-card__title { color: var(--accent-cyan); }
+    .sbs-card--hook .sbs-card__title { color: var(--accent-purple); }
+    .sbs-card__renders {
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      margin-left: auto;
+    }
+    .sbs-card__count {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+    .sbs-card__count-val {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .sbs-card__buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+    .sbs-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      color: var(--text-bright);
+    }
+    .ref-panel {
+      background: var(--bg-panel);
+      border: 1px dashed var(--border-light);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+    }
+    .ref-panel__item {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .ref-panel__label { color: var(--text-muted); }
+    .ref-panel__val   { color: var(--accent-yellow); font-weight: 700; }
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin: 10px 0;
+    }
+    .diff-table th, .diff-table td {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+      text-align: left;
+    }
+    .diff-table th {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 0.78rem;
+    }
+    .diff-table td { color: var(--text-secondary); }
+    .diff-table td code { color: var(--accent-yellow); font-size: 0.76rem; }
+    .diff-table .col-fn   { color: var(--accent); }
+    .diff-table .col-obj  { color: var(--accent-cyan); }
+    .diff-table .col-hook { color: var(--accent-purple); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">51 / 70</span>
+      Сравнение: отправка actions — mapDispatchToProps vs useDispatch
+    </div>
+    <nav class="site-header__nav">
+      <a href="../50-side-by-side-reading/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">51</span>
+      <a href="../52-performance-comparison/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — три реализации одного счётчика</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Слева — <code>mapDispatchToProps</code> как функция, посередине — <code>mapDispatchToProps</code>
+          как объект (shorthand), справа — хук <code>useDispatch</code>. Визуально и функционально все
+          три ведут себя одинаково. Смотрите на панель «Стабильность ссылок коллбэков»: пересоздаются
+          ли функции <code>increment</code> / <code>decrement</code> от рендера к рендеру.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — mapDispatchToProps vs useDispatch</div>
+      <div class="theory__body">
+
+        <h3>Форма 1. mapDispatchToProps как функция</h3>
+        <p>
+          Первый и самый «ручной» вариант — передать функцию, которая принимает <code>dispatch</code>
+          и возвращает объект с коллбэками. Каждый коллбэк явно вызывает <code>dispatch</code>
+          с нужным action-объектом.
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = (<span class="prop">dispatch</span>: <span class="type">Dispatch</span>) =&gt; ({
+  <span class="prop">increment</span>: () =&gt; <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> }),
+  <span class="prop">decrement</span>: () =&gt; <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/decrement'</span> }),
+  <span class="prop">reset</span>:     () =&gt; <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/reset'</span> }),
+})
+
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="fn">Counter</span>)
+        </div>
+        <p>
+          <code>connect</code> вызывает эту функцию один раз при монтировании (или при каждой смене
+          owner props, если <code>mapDispatchToProps</code> двухарный) и кэширует результат. В props
+          компонента приходят уже обёрнутые функции, идентичные между рендерами.
+        </p>
+
+        <h3>Форма 2. mapDispatchToProps как объект (shorthand)</h3>
+        <p>
+          Более короткий и идиоматичный вариант — передать <em>объект</em> из action creators.
+          React-Redux сам обернёт каждую функцию через <code>bindActionCreators</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">increment</span> = () =&gt; ({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> })
+<span class="kw">const</span> <span class="fn">decrement</span> = () =&gt; ({ <span class="prop">type</span>: <span class="str">'counter/decrement'</span> })
+<span class="kw">const</span> <span class="fn">reset</span>     = () =&gt; ({ <span class="prop">type</span>: <span class="str">'counter/reset'</span> })
+
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, { <span class="prop">increment</span>, <span class="prop">decrement</span>, <span class="prop">reset</span> })(<span class="fn">Counter</span>)
+        </div>
+
+        <div class="quote">
+          "We recommend always using the 'object shorthand' form of mapDispatchToProps, unless you have a specific reason to customize the dispatching behavior."<br>
+          — <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch#defining-mapdispatchtoprops-as-an-object" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Мы рекомендуем всегда использовать форму "object shorthand" для mapDispatchToProps, если только у вас нет особой причины настраивать поведение dispatch.»<br>
+          — перевод
+        </div>
+
+        <p>
+          Что это даёт: (1) меньше бойлерплейта — не надо писать <code>(dispatch) =&gt; ({ ... })</code>
+          вручную; (2) все обёртки создаются один раз и не пересоздаются между рендерами; (3) action
+          creators остаются чистыми и переиспользуемыми вне компонента (в тестах, thunk-ах, саге).
+        </p>
+
+        <h3>Форма 3. useDispatch</h3>
+        <p>
+          В hooks-подходе нет «маппера» как такового. Хук <code>useDispatch</code> возвращает ссылку
+          на сам <code>dispatch</code>, а вы уже сами решаете, как его вызывать. Обычно это выглядит
+          так:
+        </p>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+  <span class="kw">const</span> <span class="prop">increment</span> = <span class="fn">useCallback</span>(
+    () =&gt; <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> }),
+    [<span class="prop">dispatch</span>]
+  )
+  <span class="cm">// ...</span>
+}
+        </div>
+
+        <div class="quote">
+          "You should probably prefer to call the useDispatch hook in your components to retrieve a reference to dispatch, and manually call dispatch(someActionCreator()) in callbacks and effects as needed."<br>
+          — <a href="https://react-redux.js.org/api/hooks#usedispatch" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Скорее всего, вам лучше вызывать хук useDispatch в компонентах, чтобы получить ссылку на dispatch, и вручную вызывать dispatch(someActionCreator()) в коллбэках и эффектах по мере необходимости.»<br>
+          — перевод
+        </div>
+
+        <h3>Стабильность ссылки на dispatch</h3>
+        <p>
+          <code>dispatch</code>, возвращаемый <code>useDispatch</code>, — это та же самая функция
+          между рендерами, пока не меняется <code>&lt;Provider&gt;</code> (а он практически никогда
+          не меняется). Поэтому безопасно ставить его в зависимости <code>useCallback</code>,
+          <code>useEffect</code>, <code>useMemo</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">increment</span> = <span class="fn">useCallback</span>(
+  () =&gt; <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> }),
+  [<span class="prop">dispatch</span>]  <span class="cm">// стабильно — коллбэк создастся один раз</span>
+)
+        </div>
+        <p>
+          Сам <code>dispatch</code> можно считать «живущим» на уровне store — именно поэтому он
+          стабилен. В уроке 44 (useDispatch basics) это разобрано подробно.
+        </p>
+
+        <h3>Таблица различий</h3>
+        <table class="diff-table">
+          <thead>
+            <tr>
+              <th>Аспект</th>
+              <th class="col-fn">mapDispatchToProps (функция)</th>
+              <th class="col-obj">mapDispatchToProps (объект)</th>
+              <th class="col-hook">useDispatch</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Объём кода</strong></td>
+              <td>самый многословный: явно пишем <code>() =&gt; dispatch({...})</code></td>
+              <td>короче всего: просто объект action creators</td>
+              <td>средний: <code>useCallback</code> + вызов <code>dispatch</code></td>
+            </tr>
+            <tr>
+              <td><strong>Что приходит в props</strong></td>
+              <td>готовые коллбэки, уже связанные с <code>dispatch</code></td>
+              <td>готовые коллбэки (обёрнутые через <code>bindActionCreators</code>)</td>
+              <td>ничего: коллбэки собираются руками внутри компонента</td>
+            </tr>
+            <tr>
+              <td><strong>Стабильность ссылок</strong></td>
+              <td>стабильные (кэширует <code>connect</code>)</td>
+              <td>стабильные (кэширует <code>connect</code>)</td>
+              <td>стабильные только внутри <code>useCallback</code> с <code>[dispatch]</code></td>
+            </tr>
+            <tr>
+              <td><strong>Типизация</strong></td>
+              <td>
+                <code>DispatchProps</code> + <code>ConnectedProps</code> через <code>connect</code>
+              </td>
+              <td>
+                <code>DispatchProps = typeof mapDispatchToProps</code> или <code>ConnectedProps</code>
+              </td>
+              <td>
+                типы коллбэков выводятся сами; <code>useDispatch</code> возвращает <code>Dispatch</code>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Доступ к ownProps</strong></td>
+              <td>второй аргумент <code>mapDispatchToProps(dispatch, ownProps)</code></td>
+              <td>нет — action creators не знают про ownProps</td>
+              <td>через closure функционального компонента</td>
+            </tr>
+            <tr>
+              <td><strong>Тестируемость action creator'ов</strong></td>
+              <td>хуже: функция определена в маппере, вне компонента её нет</td>
+              <td>отлично: action creators — чистые функции, тестируются отдельно</td>
+              <td>отлично: action creators — чистые функции, тестируются отдельно</td>
+            </tr>
+            <tr>
+              <td><strong>Интеграция с middleware (thunk и т.д.)</strong></td>
+              <td>нужно типизировать <code>Dispatch</code> с <code>ThunkDispatch</code></td>
+              <td>thunk-creator передаётся в объект как есть</td>
+              <td>нужен типизированный <code>useAppDispatch</code> (урок 55)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Когда какой вариант брать</h3>
+        <ul style="padding-left: 20px; line-height: 1.8;">
+          <li>
+            <strong>Новый код</strong> — <code>useDispatch</code>. Это официальный рекомендованный
+            подход.
+          </li>
+          <li>
+            <strong>Остаёмся на connect</strong> — object shorthand. Минимум бойлерплейта, и это
+            прямая рекомендация документации.
+          </li>
+          <li>
+            <strong>Нужен доступ к ownProps внутри коллбэка и при этом connect</strong> —
+            функциональная форма <code>mapDispatchToProps(dispatch, ownProps)</code>. Редкий случай.
+          </li>
+          <li>
+            <strong>Нестандартное поведение при dispatch</strong> (батчинг, логирование,
+            условный dispatch, оборачивание thunk-ов) — функциональная форма, там у вас полный
+            контроль над тем, что попадёт в props.
+          </li>
+        </ul>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          В отличие от <code>useSelector</code> / <code>mapStateToProps</code>, <code>dispatch</code>
+          сам по себе <em>не подписывается</em> на store — он только <em>отправляет</em> action.
+          Подписки живут на стороне <em>читателей</em>: <code>connect</code> и <code>useSelector</code>.
+          После <code>dispatch</code> запускается уже знакомая цепочка: linked list callback'ов →
+          <code>Subscription.notify()</code> → <code>checkForUpdates</code> → selector → <code>===</code>
+          → <code>forceRender</code>. Подробности — в <a href="../03a-subscription-system/">уроке 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Практический вывод:</strong> все три формы отправки actions функционально
+          идентичны — они все в конце вызывают <code>store.dispatch(action)</code>. Разница —
+          в эргономике кода, количестве бойлерплейта, стабильности ссылок и в том, как легко
+          протестировать action creator отдельно от UI.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

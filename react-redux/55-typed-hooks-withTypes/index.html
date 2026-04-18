@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>55 — Типизированные хуки с .withTypes()</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .approach-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1000px) {
+      .approach-grid { grid-template-columns: 1fr; }
+    }
+    .approach-col {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .approach-col--old { border-color: var(--text-muted); }
+    .approach-col--new { border-color: var(--success); }
+    .approach-col__tag {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .approach-col--old .approach-col__tag { background: #333; color: var(--text-muted); }
+    .approach-col--new .approach-col__tag { background: rgba(76,175,80,0.15); color: var(--success); }
+    .approach-col__title {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent-yellow);
+    }
+    .approach-col__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .approach-col__preview {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .counter-box {
+      background: #0d0d0d;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 12px 18px;
+      font-family: var(--font-mono);
+      text-align: center;
+      min-width: 160px;
+    }
+    .counter-box__title {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .counter-box__val {
+      font-size: 1.8rem;
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+    .counter-box__buttons {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin: 10px 0;
+    }
+    .diff-table th, .diff-table td {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+      text-align: left;
+    }
+    .diff-table th {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 0.78rem;
+    }
+    .diff-table td code { color: var(--accent-yellow); font-size: 0.76rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">55 / 70</span>
+      Типизированные хуки с .withTypes()
+    </div>
+    <nav class="site-header__nav">
+      <a href="../54-migration-connect-to-hooks/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">55</span>
+      <a href="../56-typed-useselector/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — два подхода к типизации хуков</div>
+      <div class="demo-section">
+        <div class="demo-section__body">
+          <p style="color: var(--text-secondary); margin-bottom: 14px;">
+            Слева — «старый» способ через <code>TypedUseSelectorHook</code>, справа — «новый»
+            через <code>.withTypes()</code> из React-Redux v9.1.0+. Оба компонента читают один и тот
+            же <code>count</code> из общего store и диспатчат один и тот же thunk через типизированный
+            <code>useAppDispatch</code>. На уровне runtime они идентичны; разница только в том,
+            <em>как</em> записывается тип.
+          </p>
+          <div id="root"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — типизированные хуки</div>
+      <div class="theory__body">
+
+        <h3>Почему нужны типизированные хуки</h3>
+        <div class="quote">
+          "While it's possible to import the RootState and AppDispatch types into each component, it's better to create pre-typed versions of the useDispatch and useSelector hooks for usage in your application."<br>
+          — <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#define-typed-hooks" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a>
+        </div>
+        <div class="quote">
+          «Хотя можно импортировать типы RootState и AppDispatch в каждый компонент, лучше создать заранее типизированные версии хуков useDispatch и useSelector для использования во всём приложении.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "For useSelector, it saves you the need to type (state: RootState) every time"<br>
+          — <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#define-typed-hooks" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a>
+        </div>
+        <div class="quote">
+          «Для useSelector это избавляет вас от необходимости каждый раз писать (state: RootState).»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "For useDispatch, the default Dispatch type does not know about thunks or other middleware. In order to correctly dispatch thunks, you need to use the specific customized AppDispatch type from the store that includes the thunk middleware types."<br>
+          — <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#define-typed-hooks" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a>
+        </div>
+        <div class="quote">
+          «Для useDispatch дефолтный тип Dispatch ничего не знает о thunk-ах или другом middleware. Чтобы корректно диспатчить thunks, нужно использовать специфический кастомизированный тип AppDispatch из store, включающий типы thunk-middleware.»<br>
+          — перевод
+        </div>
+
+        <h3>Типы из store</h3>
+        <div class="quote">
+          "Using configureStore should not need any additional typings. You will, however, want to extract the RootState type and the Dispatch type so that they can be referenced as needed. Inferring these types from the store itself means that they correctly update as you add more state slices or modify middleware settings."<br>
+          — <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#define-root-state-and-dispatch-types" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a>
+        </div>
+        <div class="quote">
+          «Использование configureStore не должно требовать дополнительной типизации. Однако вы захотите извлечь типы RootState и Dispatch, чтобы на них можно было ссылаться по мере необходимости. Выведение этих типов из самого store означает, что они корректно обновляются по мере добавления новых state-slices или изменения настроек middleware.»<br>
+          — перевод
+        </div>
+
+        <div class="code-block">
+<span class="cm">// app/store.ts — типы выводятся из самого store</span>
+<span class="kw">export type</span> <span class="type">RootState</span> = <span class="type">ReturnType</span>&lt;<span class="kw">typeof</span> store.<span class="prop">getState</span>&gt;
+<span class="kw">export type</span> <span class="type">AppDispatch</span> = <span class="kw">typeof</span> store.<span class="prop">dispatch</span>
+<span class="kw">export type</span> <span class="type">AppStore</span> = <span class="kw">typeof</span> store
+        </div>
+        <p>
+          Принцип: типы не <em>объявляем</em>, а <em>выводим</em> от самого store. Когда добавляем
+          новый reducer или новое middleware — типы подтягиваются сами, без ручного правки.
+        </p>
+
+        <h3>Подход 1 — «старый» через TypedUseSelectorHook</h3>
+        <div class="code-block">
+<span class="cm">// app/hooks.ts</span>
+<span class="kw">import type</span> { <span class="type">TypedUseSelectorHook</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import</span> { <span class="prop">useDispatch</span>, <span class="prop">useSelector</span>, <span class="prop">useStore</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import type</span> { <span class="type">AppDispatch</span>, <span class="type">AppStore</span>, <span class="type">RootState</span> } <span class="kw">from</span> <span class="str">'./store'</span>
+
+<span class="kw">export const</span> <span class="prop">useAppDispatch</span>: () =&gt; <span class="type">AppDispatch</span> = <span class="prop">useDispatch</span>
+<span class="kw">export const</span> <span class="prop">useAppSelector</span>: <span class="type">TypedUseSelectorHook</span>&lt;<span class="type">RootState</span>&gt; = <span class="prop">useSelector</span>
+<span class="kw">export const</span> <span class="prop">useAppStore</span>: () =&gt; <span class="type">AppStore</span> = <span class="prop">useStore</span>
+        </div>
+        <p>
+          Работает на всех версиях React-Redux и привычен любому, кто писал TypeScript с
+          React-Redux до версии 9.1. Небольшой минус — три импортируемых имени
+          (<code>useDispatch</code>, <code>useSelector</code>, <code>useStore</code>) и отдельный
+          тип <code>TypedUseSelectorHook</code>.
+        </p>
+
+        <h3>Подход 2 — новый .withTypes() (v9.1.0+)</h3>
+        <div class="quote">
+          "React Redux v9.1.0 adds a new .withTypes method to each of these hooks, analogous to the .withTypes method found on Redux Toolkit's createAsyncThunk."<br>
+          — <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#define-typed-hooks" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a>
+        </div>
+        <div class="quote">
+          «React Redux v9.1.0 добавляет новый метод .withTypes к каждому из этих хуков, аналогичный методу .withTypes у createAsyncThunk из Redux Toolkit.»<br>
+          — перевод
+        </div>
+
+        <div class="code-block">
+<span class="cm">// app/hooks.ts</span>
+<span class="kw">import</span> { <span class="prop">useDispatch</span>, <span class="prop">useSelector</span>, <span class="prop">useStore</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import type</span> { <span class="type">AppDispatch</span>, <span class="type">AppStore</span>, <span class="type">RootState</span> } <span class="kw">from</span> <span class="str">'./store'</span>
+
+<span class="kw">export const</span> <span class="prop">useAppDispatch</span> = <span class="prop">useDispatch</span>.<span class="fn">withTypes</span>&lt;<span class="type">AppDispatch</span>&gt;()
+<span class="kw">export const</span> <span class="prop">useAppSelector</span> = <span class="prop">useSelector</span>.<span class="fn">withTypes</span>&lt;<span class="type">RootState</span>&gt;()
+<span class="kw">export const</span> <span class="prop">useAppStore</span>   = <span class="prop">useStore</span>.<span class="fn">withTypes</span>&lt;<span class="type">AppStore</span>&gt;()
+        </div>
+        <p>
+          <code>.withTypes&lt;T&gt;()</code> возвращает <em>ту же самую функцию</em> на уровне
+          runtime — это чистая TypeScript-обёртка, которая «прибивает» генерик к хуку. Выигрыш —
+          меньше бойлерплейта и один единообразный синтаксис.
+        </p>
+
+        <h3>Использование в компоненте</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="prop">useAppDispatch</span>, <span class="prop">useAppSelector</span> } <span class="kw">from</span> <span class="str">'./hooks'</span>
+
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useAppSelector</span>(<span class="prop">state</span> =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)  <span class="cm">// state: RootState</span>
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useAppDispatch</span>()  <span class="cm">// dispatch: AppDispatch (умеет про thunks)</span>
+
+  <span class="kw">return</span> (
+    &lt;div&gt;
+      &lt;p&gt;{count}&lt;/p&gt;
+      &lt;button onClick={() =&gt; <span class="fn">dispatch</span>(<span class="fn">incrementAsync</span>())}&gt;
+        async +1
+      &lt;/button&gt;
+    &lt;/div&gt;
+  )
+}
+        </div>
+
+        <p>
+          Ни в селекторе, ни в <code>dispatch</code> больше <em>нигде</em> не нужно писать
+          <code>state: RootState</code> или <code>AppDispatch</code>. Типы придут сами.
+          <code>dispatch(incrementAsync())</code>, где <code>incrementAsync</code> возвращает
+          thunk — проходит проверку типов благодаря <code>AppDispatch</code>,
+          унаследованному от store с thunk-middleware.
+        </p>
+
+        <h3>Сравнение двух подходов</h3>
+        <table class="diff-table">
+          <thead>
+            <tr>
+              <th>Аспект</th>
+              <th>TypedUseSelectorHook</th>
+              <th>.withTypes()</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Версия React-Redux</strong></td>
+              <td>любая с TS-типами</td>
+              <td>v9.1.0+</td>
+            </tr>
+            <tr>
+              <td><strong>Импорты из react-redux</strong></td>
+              <td><code>useSelector, useDispatch, useStore</code> + тип <code>TypedUseSelectorHook</code></td>
+              <td><code>useSelector, useDispatch, useStore</code> — и всё</td>
+            </tr>
+            <tr>
+              <td><strong>Синтаксис</strong></td>
+              <td>Три разных формы: generic-тип, явная сигнатура, явная сигнатура</td>
+              <td>Один способ: <code>hook.withTypes&lt;T&gt;()</code></td>
+            </tr>
+            <tr>
+              <td><strong>Runtime</strong></td>
+              <td>сами хуки</td>
+              <td>сами хуки (<code>.withTypes()</code> — это no-op)</td>
+            </tr>
+            <tr>
+              <td><strong>Параллель с другим API</strong></td>
+              <td>—</td>
+              <td>Redux Toolkit: <code>createAsyncThunk.withTypes()</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Как это положить в проект</h3>
+        <ol style="padding-left: 20px; line-height: 1.8;">
+          <li>Создать <code>app/store.ts</code>, туда — <code>store</code> и экспорт типов
+            <code>RootState</code>, <code>AppDispatch</code>, <code>AppStore</code>.</li>
+          <li>Создать <code>app/hooks.ts</code>, туда — типизированные
+            <code>useAppSelector</code>, <code>useAppDispatch</code>, <code>useAppStore</code>.</li>
+          <li>В компонентах импортировать хуки из <code>app/hooks</code>, а не из
+            <code>react-redux</code>. ESLint-правило <code>no-restricted-imports</code> помогает
+            запретить импорт обычных хуков напрямую.</li>
+          <li>При добавлении middleware / slice типы обновятся автоматически: <code>RootState</code>
+            и <code>AppDispatch</code> выводятся из <code>store</code>.</li>
+        </ol>
+
+        <h3>Ошибки, которые ловят типы</h3>
+        <ul style="padding-left: 20px; line-height: 1.8;">
+          <li>Опечатка в имени slice (<code>state.couter.value</code>) — ошибка компиляции.</li>
+          <li>Читаем несуществующее поле — ошибка компиляции.</li>
+          <li>Dispatch'им не-action-объект или не-thunk — ошибка компиляции.</li>
+          <li>Меняем форму state в reducer'е — все места использования засветятся как broken.</li>
+        </ul>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Типизация чисто TS-уровня и никак не влияет на поведение подписки. Runtime тот же:
+          linked list callback'ов → <code>Subscription.notify()</code> → <code>checkForUpdates</code>
+          → selector → <code>===</code> → <code>forceRender</code>. Подробности —
+          <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Рекомендация:</strong> на новой версии React-Redux (v9.1.0+) берите
+          <code>.withTypes()</code> — это короче, единообразно и явно проще читается. Старый
+          <code>TypedUseSelectorHook</code> остаётся рабочим; переписывать существующий файл
+          <code>hooks.ts</code> «ради красоты» необязательно.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

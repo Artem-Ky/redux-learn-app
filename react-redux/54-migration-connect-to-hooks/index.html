@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>54 — Миграция с connect на hooks</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .stepper {
+      display: flex;
+      gap: 2px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      overflow-x: auto;
+      margin-bottom: 12px;
+    }
+    .stepper__btn {
+      flex: 1;
+      padding: 10px 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .stepper__btn:hover { color: var(--text-bright); background: rgba(255,255,255,0.04); }
+    .stepper__btn--active {
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+    }
+    .stepper__btn-num {
+      display: inline-block;
+      background: rgba(0,0,0,0.2);
+      color: inherit;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-right: 6px;
+      font-size: 0.72rem;
+    }
+    .stepper__btn--active .stepper__btn-num {
+      background: rgba(0,0,0,0.3);
+    }
+    .step-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 1000px) {
+      .step-panel { grid-template-columns: 1fr; }
+    }
+    .step-panel__col {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .step-panel__col-title {
+      color: var(--accent-yellow);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .step-panel__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .step-panel__preview {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+    .counter-box {
+      background: #0d0d0d;
+      border: 2px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      padding: 14px 20px;
+      font-family: var(--font-mono);
+      text-align: center;
+      min-width: 160px;
+    }
+    .counter-box__title {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .counter-box__val {
+      font-size: 1.8rem;
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+    .counter-box__buttons {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .step-notes {
+      background: rgba(86, 156, 214, 0.08);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .step-notes__title {
+      color: var(--accent);
+      font-weight: 700;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+    .step-nav {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .checklist {
+      list-style: none;
+      padding: 0;
+    }
+    .checklist li {
+      padding: 6px 0 6px 28px;
+      position: relative;
+      line-height: 1.6;
+    }
+    .checklist li::before {
+      content: '✓';
+      position: absolute;
+      left: 4px;
+      top: 6px;
+      color: var(--success);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">54 / 70</span>
+      Пошаговая миграция с connect на hooks
+    </div>
+    <nav class="site-header__nav">
+      <a href="../53-stale-props-zombie-children/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">54</span>
+      <a href="../55-typed-hooks-withTypes/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — stepper: одна и та же фича, 6 шагов</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Один и тот же компонент <code>Counter</code> в шести состояниях миграции — от
+          класс-компонента с <code>connect</code> до функционального компонента в
+          <code>React.memo</code>. На каждом шаге слева код, справа живой рабочий превью. Все шаги
+          работают с общим store — нажимая кнопки на любом шаге, вы двигаете тот же <code>count</code>.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — миграция connect → hooks</div>
+      <div class="theory__body">
+
+        <h3>Почему мигрируем</h3>
+        <div class="quote">
+          "We recommend using the React-Redux hooks API as the default approach in your React components."<br>
+          — <a href="https://react-redux.js.org/api/hooks#recipes" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Мы рекомендуем использовать hooks-API React-Redux как подход по умолчанию в ваших React-компонентах.»<br>
+          — перевод
+        </div>
+
+        <p>
+          Hooks-подход идёт в документации как подход по умолчанию и даёт: (1) плоское дерево в
+          React DevTools (нет обёрток <code>&lt;Connect(Counter)&gt;</code>); (2) простую
+          TypeScript-инференцию — не нужны <code>StateProps</code> / <code>DispatchProps</code> /
+          <code>ConnectedProps</code>; (3) гибкость — несколько <code>useSelector</code>-ов в одном
+          компоненте, возврат любого значения; (4) натуральную интеграцию с другими хуками
+          (<code>useCallback</code>, <code>useMemo</code>, <code>useEffect</code>).
+        </p>
+
+        <h3>Чеклист миграции одного компонента</h3>
+        <ul class="checklist">
+          <li>Класс-компонент → функциональный компонент (если ещё не). Состояние класса
+            (<code>this.state</code>) — через <code>useState</code>; lifecycle — через
+            <code>useEffect</code>.</li>
+          <li>Убрать <code>mapStateToProps</code>. Для каждого поля — свой <code>useSelector</code>
+            внутри компонента.</li>
+          <li>Убрать <code>mapDispatchToProps</code>. Взять <code>useDispatch()</code>, коллбэки
+            собирать на месте, заворачивать в <code>useCallback</code> при передаче вниз.</li>
+          <li>Убрать <code>connect(...)(Counter)</code> и сам <code>export default connect(...)</code>.
+            Экспортировать сам компонент.</li>
+          <li>Удалить типы <code>StateProps</code>, <code>DispatchProps</code>,
+            <code>ConnectedProps</code>. Остаются только собственные <code>Props</code> компонента.</li>
+          <li>Опционально — обернуть в <code>React.memo</code>, если parent часто перерисовывается
+            и это заметно в профилировщике (урок 52).</li>
+          <li>Проверить <em>stale props</em> / <em>zombie children</em> для компонентов, читающих
+            записи по <code>id</code>: добавить <code>if (!data) return null</code> (урок 53).</li>
+          <li>Если в приложении используются thunk / saga и типизация — создать типизированные
+            <code>useAppSelector</code> / <code>useAppDispatch</code> (урок 55).</li>
+        </ul>
+
+        <h3>Что получается в финале</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="prop">memo</span>, <span class="prop">useCallback</span> } <span class="kw">from</span> <span class="str">'react'</span>
+<span class="kw">import</span> { <span class="prop">useSelector</span>, <span class="prop">useDispatch</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">interface</span> <span class="type">Props</span> { <span class="prop">title</span>: <span class="type">string</span> }
+
+<span class="kw">export const</span> <span class="fn">Counter</span> = <span class="fn">memo</span>(({ <span class="prop">title</span> }: <span class="type">Props</span>) =&gt; {
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">const</span> <span class="prop">user</span>  = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">user</span>)
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+
+  <span class="kw">const</span> <span class="prop">incrementCounter</span> = <span class="fn">useCallback</span>(
+    () =&gt; <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> }),
+    [<span class="prop">dispatch</span>]
+  )
+
+  <span class="kw">return</span> (
+    &lt;div&gt;
+      &lt;h3&gt;{title}&lt;/h3&gt;
+      &lt;p&gt;user: {user.<span class="prop">name</span>}&lt;/p&gt;
+      &lt;p&gt;count: {count}&lt;/p&gt;
+      &lt;button onClick={incrementCounter}&gt;+1&lt;/button&gt;
+    &lt;/div&gt;
+  )
+})
+        </div>
+
+        <h3>Можно смешивать</h3>
+        <p>
+          Полная миграция приложения сразу — редкость и рисково. Нормальная стратегия:
+          <em>новые</em> компоненты пишем на хуках, <em>старые</em> трогаем при необходимости
+          (фича, баг, рефакторинг). Connect и хуки отлично уживаются в одном дереве — они
+          работают поверх одного и того же <code>&lt;Provider&gt;</code>, одного store, одной
+          Subscription-системы.
+        </p>
+
+        <h3>Что не нужно мигрировать</h3>
+        <ul style="padding-left: 20px; line-height: 1.8;">
+          <li>
+            Класс-компоненты, которые по другим причинам <strong>остаются</strong> классами
+            (lifecycle-критичный код, внешние библиотеки, HOC-обёртки). Хуки работают только в
+            функциональных компонентах — нет смысла переписывать целый класс просто ради
+            <code>useSelector</code>.
+          </li>
+          <li>
+            Уже работающие компоненты, которые никто не планирует трогать — принцип «не чини, что не
+            сломано». Аккуратная миграция — это время и риск регресса.
+          </li>
+          <li>
+            Компоненты с очень хитрым <code>mergeProps</code> / <code>options.areStatesEqual</code>.
+            Там ещё нужно оценить, получится ли повторить логику на хуках (обычно — да, через
+            <code>useSelector</code> с <code>equalityFn</code> и <code>useMemo</code>, но осторожно).
+          </li>
+        </ul>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Миграция меняет только <em>способ подключения</em> на уровне компонента. Под капотом
+          работает одна и та же цепочка: linked list callback'ов → <code>Subscription.notify()</code>
+          → <code>checkForUpdates</code> → selector → <code>===</code> → <code>forceRender</code>.
+          Отличие — <code>connect</code> делает свою <code>shallowEqual</code>-проверку агрегата,
+          а <code>useSelector</code> сверяет один результат через <code>===</code>. Подписка и
+          уведомления — общие. Подробнее — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Практика:</strong> начните с одного простого компонента и проделайте все шесть
+          шагов. Когда прошагаете пару штук — уже поймаете ритм: «<code>connect</code> снять,
+          <code>useSelector</code> поставить, <code>useDispatch</code> + <code>useCallback</code>,
+          типы убрать». Остальные компоненты пойдут быстрее.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

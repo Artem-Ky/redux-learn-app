@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>56 — Типизация useSelector вручную и через pre-typed hooks</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ts-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .ts-layout { grid-template-columns: 1fr; }
+    }
+    .ts-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ts-card--manual { border-color: var(--accent-orange); }
+    .ts-card--pre    { border-color: var(--success); }
+    .ts-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ts-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .ts-card--manual .ts-card__title { color: var(--accent-orange); }
+    .ts-card--pre    .ts-card__title { color: var(--success); }
+    .ts-card__badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .ts-card--manual .ts-card__badge {
+      background: rgba(206, 145, 120, 0.15);
+      color: var(--accent-orange);
+      border: 1px solid rgba(206, 145, 120, 0.3);
+    }
+    .ts-card--pre .ts-card__badge {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .ts-card__demo {
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-tertiary);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: var(--text-bright);
+      text-align: center;
+    }
+    .ts-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .ts-card__metric {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: right;
+    }
+    .infer-box {
+      background: var(--bg-tertiary);
+      border: 1px dashed var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin: 8px 0 14px;
+    }
+    .infer-box b { color: var(--accent-cyan); }
+    .ts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      margin: 12px 0;
+    }
+    .ts-table th, .ts-table td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .ts-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+    }
+    .ts-table td { background: var(--bg-tertiary); }
+    .ts-table code { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">56 / 70</span>
+      Типизация useSelector вручную и через pre-typed hooks
+    </div>
+    <nav class="site-header__nav">
+      <a href="../55-typed-hooks-withTypes/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">56</span>
+      <a href="../57-typed-usedispatch/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — два способа напечатать useSelector</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Оба компонента читают одни и те же поля — <code>counter.value</code> и <code>user.name</code>.
+          Слева тип <code>RootState</code> указывается в каждом вызове <code>useSelector</code>:
+          получается шумно и легко забыть. Справа используется pre-typed хук
+          <code>useAppSelector</code>, созданный через <code>useSelector.withTypes&lt;RootState&gt;()</code>:
+          тип <code>state</code> выводится автоматически в каждом селекторе.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — типизация useSelector</div>
+      <div class="theory__body">
+
+        <h3>Две стратегии печати</h3>
+        <p>
+          Хук <code>useSelector</code> сам по себе дженерик: он принимает функцию-селектор и
+          возвращает её результат. Всё, что нужно TypeScript, — чтобы параметр
+          <code>state</code> селектора имел конкретный тип. Как только TS увидит
+          <code>(state: RootState) =&gt; ...</code>, он автоматически выведет тип возврата, и
+          именно этот тип станет типом <code>useSelector(...)</code>.
+        </p>
+        <p>
+          Отсюда ровно два рабочих подхода:
+        </p>
+        <ol>
+          <li><strong>Ручная типизация</strong> — в каждом вызове пишем
+              <code>(state: RootState) =&gt; ...</code>.</li>
+          <li><strong>Pre-typed hook</strong> — один раз создаём
+              <code>useAppSelector = useSelector.withTypes&lt;RootState&gt;()</code> и дальше
+              используем его без аннотаций.</li>
+        </ol>
+
+        <div class="quote">«When writing selector functions for use with useSelector, you should explicitly define the type of the state parameter. TS should be able to then infer the return type of the selector, which will be reused as the return type of the useSelector hook.»<br>— <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#typing-the-useselector-hook" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a></div>
+        <div class="quote">«Когда вы пишете функции-селекторы для использования с useSelector, вам следует явно определять тип параметра state. Тогда TS сможет вывести тип возврата селектора, который и будет использоваться как тип возврата хука useSelector.»<br>— перевод</div>
+
+        <h3>Вариант 1. Ручная типизация state в каждом вызове</h3>
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">RootState</span> {
+  <span class="prop">counter</span>: { <span class="prop">value</span>: <span class="type">number</span> }
+  <span class="prop">user</span>:    { <span class="prop">name</span>: <span class="type">string</span>; <span class="prop">email</span>: <span class="type">string</span> }
+}
+
+<span class="kw">function</span> <span class="fn">CounterManual</span>() {
+  <span class="kw">const</span> <span class="prop">count</span>    = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">const</span> <span class="prop">userName</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">user</span>.<span class="prop">name</span>)
+  <span class="kw">return</span> &lt;<span class="type">div</span>&gt;{userName}: {count}&lt;/<span class="type">div</span>&gt;
+}
+        </div>
+        <p>
+          Плюсы: работает из коробки, никаких дополнительных файлов.
+          Минусы: каждый вызов — это лишние 18 символов шума, легко забыть указать тип и
+          получить скрытый <code>any</code> в <code>state</code>.
+        </p>
+
+        <h3>Вариант 2. Отдельные selector-функции с типом</h3>
+        <p>
+          Типизация <code>state</code> в отдельной функции ещё выгоднее — вывод типа
+          распространяется и на возврат, и на все места вызова.
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">selectIsOn</span> = (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">isOn</span>
+<span class="cm">// TS infers: (state: RootState) =&gt; boolean</span>
+
+<span class="kw">const</span> <span class="prop">isOn</span> = <span class="fn">useSelector</span>(<span class="fn">selectIsOn</span>)
+<span class="cm">// TS infers: isOn — boolean</span>
+        </div>
+
+        <h3>Вариант 3. Pre-typed hook — useAppSelector</h3>
+        <p>
+          Самый компактный способ. Один файл <code>app/hooks.ts</code> — и дальше никто не
+          пишет <code>: RootState</code> вручную.
+        </p>
+        <div class="code-block">
+<span class="cm">// app/hooks.ts</span>
+<span class="kw">import</span> { <span class="fn">useSelector</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import type</span> { <span class="type">RootState</span> } <span class="kw">from</span> <span class="str">'./store'</span>
+
+<span class="kw">export const</span> <span class="fn">useAppSelector</span> = <span class="fn">useSelector</span>.<span class="fn">withTypes</span>&lt;<span class="type">RootState</span>&gt;()
+
+<span class="cm">// Counter.tsx</span>
+<span class="kw">function</span> <span class="fn">CounterTyped</span>() {
+  <span class="kw">const</span> <span class="prop">count</span>    = <span class="fn">useAppSelector</span>(<span class="prop">state</span> =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">const</span> <span class="prop">userName</span> = <span class="fn">useAppSelector</span>(<span class="prop">state</span> =&gt; state.<span class="prop">user</span>.<span class="prop">name</span>)
+  <span class="kw">return</span> &lt;<span class="type">div</span>&gt;{userName}: {count}&lt;/<span class="type">div</span>&gt;
+}
+        </div>
+
+        <h3>Что выводится автоматически</h3>
+        <table class="ts-table">
+          <thead>
+            <tr>
+              <th>Выражение</th>
+              <th>Тип, который выведет TS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>useAppSelector(state =&gt; state.counter.value)</code></td>
+              <td><code>number</code></td>
+            </tr>
+            <tr>
+              <td><code>useAppSelector(state =&gt; state.user)</code></td>
+              <td><code>{ name: string; email: string }</code></td>
+            </tr>
+            <tr>
+              <td><code>useAppSelector(state =&gt; state.user.email)</code></td>
+              <td><code>string</code></td>
+            </tr>
+            <tr>
+              <td><code>useAppSelector(state =&gt; state.missing)</code></td>
+              <td>ошибка компиляции — поля нет</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Рантайм один и тот же</h3>
+        <p>
+          Типизация — это <em>только</em> TypeScript. В рантайме оба подхода компилируются в
+          одинаковый JavaScript, и внутри работает одна и та же механика подписок: при
+          <code>dispatch</code> Subscription проходит по linked list callback'ов →
+          <code>Subscription.notify()</code> → для каждого слушателя <code>checkForUpdates</code>
+          → запускается <code>selector</code> → сравнение с <code>prevValue</code> через
+          <code>===</code> → <code>forceRender</code> если значения разные.
+          <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Рекомендация:</strong> создайте файл <code>app/hooks.ts</code> один раз в
+          начале проекта. Дальше все компоненты импортируют <code>useAppSelector</code> вместо
+          <code>useSelector</code>, и вы никогда больше не напишете <code>: RootState</code>
+          внутри селектора. Это буквально та же пара строк, о которой речь шла в уроке 55.
+        </div>
+
+        <div class="warning">
+          <strong>Опасность:</strong> если вы забыли указать тип <code>state</code> в ручном
+          варианте — <code>useSelector(state =&gt; state.counter.value)</code> — TS не даст
+          ошибку (<code>state</code> станет <code>any</code>), и любая опечатка
+          (<code>state.contre.value</code>) пройдёт молча. Pre-typed хук <code>useAppSelector</code>
+          эту дырку закрывает: забыть тип уже невозможно.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

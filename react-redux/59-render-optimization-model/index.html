@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>59 — Модель оптимизации рендеров в React-Redux</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ro-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1100px) {
+      .ro-grid { grid-template-columns: 1fr; }
+    }
+    .ro-col {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ro-col--naive  { border-color: var(--accent-red); }
+    .ro-col--connect{ border-color: var(--accent-yellow); }
+    .ro-col--hooks  { border-color: var(--success); }
+    .ro-col__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ro-col__title {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .ro-col--naive   .ro-col__title { color: var(--accent-red); }
+    .ro-col--connect .ro-col__title { color: var(--accent-yellow); }
+    .ro-col--hooks   .ro-col__title { color: var(--success); }
+    .ro-col__total {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .ro-col__total b { color: var(--text-bright); }
+    .ro-tree {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ro-node {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.05s linear, border-color 0.05s linear;
+    }
+    .ro-node__label b { color: var(--accent-cyan); }
+    .ro-node__count {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .ro-node.flash {
+      background: rgba(244, 71, 71, 0.3);
+      border-color: var(--accent-red);
+      animation: flashFade 0.6s ease-out;
+    }
+    @keyframes flashFade {
+      0%   { background: rgba(244, 71, 71, 0.5); }
+      100% { background: var(--bg-tertiary); }
+    }
+    .ro-controls {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 12px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+    }
+    .ro-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      flex-wrap: wrap;
+    }
+    .ro-legend__dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .ts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      margin: 12px 0;
+    }
+    .ts-table th, .ts-table td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .ts-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+    }
+    .ts-table td { background: var(--bg-tertiary); }
+    .ts-table code { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">59 / 70</span>
+      Модель оптимизации рендеров в React-Redux
+    </div>
+    <nav class="site-header__nav">
+      <a href="../58-typed-connect/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">59</span>
+      <a href="../60-batch-api/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — три способа раздать одно состояние</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 12px;">
+          Три колонки — одно и то же дерево из нескольких компонентов. В каждой колонке
+          только <b>C2</b> зависит от <code>counter.value</code>. Остальные читают данные,
+          которые не меняются. Следите за тем, какие узлы загораются красным при каждой
+          кнопке.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — почему так выходит</div>
+      <div class="theory__body">
+
+        <h3>Нативный React Context</h3>
+        <p>
+          Когда вы кладёте все данные в <code>Context.Provider</code> как
+          <code>value</code> и вызываете <code>useContext</code> в потребителях — это
+          «фича», а не «баг»: <strong>любое изменение value перерисовывает всех
+          потребителей</strong>, даже если изменилось поле, которое им не нужно. Причина —
+          React сравнивает <code>value</code> через <code>Object.is</code> и, если ссылка
+          другая, уведомляет всех.
+        </p>
+
+        <div class="quote">«Internally, React Redux uses React's "context" feature to make the Redux store accessible to deeply nested connected components.»<br>— <a href="https://react-redux.js.org/using-react-redux/accessing-store#understanding-context-usage" target="_blank">react-redux.js.org/using-react-redux/accessing-store</a></div>
+        <div class="quote">«Внутри React Redux использует механизм "context" из React, чтобы сделать стор Redux доступным для глубоко вложенных connected-компонентов.»<br>— перевод</div>
+
+        <div class="quote">«React Redux's &lt;Provider&gt; component uses &lt;Provider&gt; to put the Redux store and internal subscription wrappers into context. useSelector, useDispatch, and connect call useContext(ReactReduxContext) to read those values and handle updates.»<br>— <a href="https://react-redux.js.org/using-react-redux/accessing-store#understanding-context-usage" target="_blank">react-redux.js.org/using-react-redux/accessing-store</a></div>
+        <div class="quote">«Компонент &lt;Provider&gt; из React Redux использует &lt;Provider&gt; для того, чтобы положить Redux-стор и внутренние обёртки подписок в context. useSelector, useDispatch и connect вызывают useContext(ReactReduxContext), чтобы прочитать эти значения и обрабатывать обновления.»<br>— перевод</div>
+
+        <h3>Секрет React-Redux</h3>
+        <p>
+          Библиотека обходит проблему «всех потребителей» простым трюком. В
+          <code>Context</code> кладётся <em>стабильный</em> объект
+          <code>{ store, subscription }</code> — он ссылочно не меняется всё время жизни
+          приложения. Само значение state туда не идёт <em>никогда</em>. Уведомления об
+          изменениях доставляются мимо Context — через собственную систему Subscription.
+        </p>
+        <p>
+          Что это даёт:
+        </p>
+        <ul>
+          <li><code>Context.value</code> не меняется — React не рассылает принудительных
+              перерисовок.</li>
+          <li>При <code>dispatch</code> Subscription проходит по linked list callback'ов →
+              <code>Subscription.notify()</code> → для каждого слушателя
+              <code>checkForUpdates</code> → запускает <code>selector</code> → сравнивает
+              результат с prev через <code>===</code> → вызывает <code>forceRender</code>
+              только если значение действительно изменилось.</li>
+          <li><a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.</li>
+        </ul>
+
+        <h3>connect — nested Subscription</h3>
+        <p>
+          Каждый <code>connect</code>-обёрнутый компонент создаёт собственную
+          <code>Subscription</code>, встраиваясь в иерархию. У <code>connect</code> есть два
+          мощных эффекта:
+        </p>
+        <ul>
+          <li>Подписка на изменения store (через Subscription). После
+              <code>mapStateToProps</code> сравнивает результат с предыдущим через
+              <code>===</code> (shallow по объекту верхнего уровня) — перерисовка только
+              при реальной разнице.</li>
+          <li>Внешне <code>connect</code> работает как «чистый компонент»: если
+              <code>ownProps</code> не изменились, он не перерисует обёрнутый
+              компонент при обычном React-рендере родителя.</li>
+        </ul>
+
+        <h3>Hooks — плоская Subscription + React.memo</h3>
+        <p>
+          <code>useSelector</code> регистрирует слушателя у корневого
+          <code>Subscription</code>. При <code>dispatch</code> каждому слушателю запускается
+          <code>checkForUpdates</code> и, если его селектор вернул новое значение (по
+          <code>===</code>), — компонент перерисовывается. Но в отличие от <code>connect</code>,
+          хуки <strong>не блокируют</strong> перерисовки, вызванные родителем. Чтобы
+          получить то же поведение — оборачивают компонент в <code>React.memo</code>. Об
+          этом подробно — урок 60.
+        </p>
+
+        <h3>Сводная таблица</h3>
+        <table class="ts-table">
+          <thead>
+            <tr>
+              <th>Механизм</th>
+              <th>dispatch → лишний рендер?</th>
+              <th>parent rerender → лишний рендер?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Нативный Context</td>
+              <td>да, все потребители</td>
+              <td>да, обычный React</td>
+            </tr>
+            <tr>
+              <td>connect (nested Subscription)</td>
+              <td>только подписанные на изменившуюся часть</td>
+              <td>нет — ownProps сверяются по shallow</td>
+            </tr>
+            <tr>
+              <td>hooks (useSelector) без memo</td>
+              <td>только подписанные</td>
+              <td>да, parent тащит всех детей</td>
+            </tr>
+            <tr>
+              <td>hooks + React.memo</td>
+              <td>только подписанные</td>
+              <td>нет — memo блокирует при неизменных props</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="tip">
+          <strong>Мораль:</strong> в hooks-API оптимизация против «parent rerender» — ваша
+          забота (через <code>React.memo</code>). Зато вы получаете плоскую Subscription,
+          никаких nested-wrapperов и лишних Component-узлов в дереве. В большинстве
+          приложений разницы в производительности между правильно настроенными
+          <code>connect</code> и <code>hooks+memo</code> не видно.
+        </div>
+
+        <div class="warning">
+          <strong>Не путайте:</strong> даже связка <code>hooks + React.memo</code> не
+          защищает от сценария «селектор каждый раз возвращает новый объект». Если
+          <code>useSelector</code> возвращает новый массив/объект при каждом вызове,
+          <code>===</code> всегда ложен и <code>forceRender</code> запускается каждый раз.
+          Лечится мемоизированным селектором (<code>createSelector</code>) — урок 40 и 62.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -114,10 +114,10 @@
 
   <div class="page">
     <div class="demo-section">
-      <div class="demo-section__header">Интерактив — Наивный Context vs React-Redux Provider</div>
+      <div class="demo-section__header">Интерактив — Нативный Context vs React-Redux Provider</div>
       <div class="demo-section__body">
         <p style="color: var(--text-secondary); margin-bottom: 16px;">
-          Нажимайте <strong>+</strong> и наблюдайте за счётчиками рендеров. Слева — наивный подход
+          Нажимайте <strong>+</strong> и наблюдайте за счётчиками рендеров. Слева — нативный подход
           через <code>React.createContext</code> (все компоненты перерисовываются). Справа —
           настоящий React-Redux Provider (перерисовывается только подписанный компонент).
         </p>
@@ -142,13 +142,13 @@
         </div>
 
         <p>
-          Ключевое отличие React-Redux от наивного использования Context:
+          Ключевое отличие React-Redux от нативного использования Context:
           &lt;Provider&gt; помещает в Context <strong>стабильный объект</strong>
           <code>{'{store, subscription}'}</code>, который <strong>никогда не меняется</strong>.
           Context value остаётся <code>===</code> равным самому себе при каждом рендере.
         </p>
 
-        <h3>Почему наивный Context — это проблема</h3>
+        <h3>Почему нативный Context — это проблема</h3>
         <p>
           При использовании <code>React.createContext</code> напрямую для хранения state,
           <strong>каждое изменение</strong> значения context вызывает re-render <strong>всех</strong>
@@ -156,7 +156,7 @@
           это значение не нужно.
         </p>
         <div class="code-block">
-<span class="cm">// Наивный подход — ПЛОХО для производительности</span>
+<span class="cm">// Нативный подход — ПЛОХО для производительности</span>
 <span class="kw">const</span> StoreContext = React.<span class="fn">createContext</span>(<span class="kw">null</span>)
 
 <span class="kw">function</span> <span class="fn">NaiveProvider</span>({ children }) {
@@ -230,7 +230,7 @@
         <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 16px 0;">
           <tr style="border-bottom: 1px solid var(--border);">
             <th style="text-align: left; padding: 8px; color: var(--text-muted);"></th>
-            <th style="text-align: left; padding: 8px; color: var(--warning);">Наивный Context</th>
+            <th style="text-align: left; padding: 8px; color: var(--warning);">Нативный Context</th>
             <th style="text-align: left; padding: 8px; color: var(--success);">React-Redux Provider</th>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">

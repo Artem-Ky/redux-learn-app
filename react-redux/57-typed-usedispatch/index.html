@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>57 — Типизация useDispatch для thunk-совместимости</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ts-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .ts-layout { grid-template-columns: 1fr; }
+    }
+    .ts-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ts-card--bad  { border-color: var(--accent-red); }
+    .ts-card--good { border-color: var(--success); }
+    .ts-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ts-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .ts-card--bad  .ts-card__title { color: var(--accent-red); }
+    .ts-card--good .ts-card__title { color: var(--success); }
+    .ts-card__badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .ts-card--bad .ts-card__badge {
+      background: rgba(244, 71, 71, 0.15);
+      color: var(--accent-red);
+      border: 1px solid rgba(244, 71, 71, 0.3);
+    }
+    .ts-card--good .ts-card__badge {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .ts-card__demo {
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-tertiary);
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--text-bright);
+      text-align: center;
+    }
+    .ts-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .ts-error {
+      color: var(--accent-red);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      background: rgba(244, 71, 71, 0.08);
+      border-left: 3px solid var(--accent-red);
+      padding: 8px 10px;
+      margin-top: 6px;
+      white-space: pre-wrap;
+    }
+    .ts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      margin: 12px 0;
+    }
+    .ts-table th, .ts-table td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .ts-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+    }
+    .ts-table td { background: var(--bg-tertiary); }
+    .ts-table code { color: var(--accent-cyan); }
+    .status-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+    .status-pill--idle    { background: rgba(153,153,153,0.15); color: var(--text-muted); }
+    .status-pill--loading { background: rgba(255,152,0,0.15);   color: var(--warning); }
+    .status-pill--loaded  { background: rgba(76,175,80,0.15);   color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">57 / 70</span>
+      Типизация useDispatch для thunk-совместимости
+    </div>
+    <nav class="site-header__nav">
+      <a href="../56-typed-useselector/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">57</span>
+      <a href="../58-typed-connect/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — обычный useDispatch vs useAppDispatch</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          В стор подключён <code>redux-thunk</code>. Слева — попытка вызвать thunk через обычный
+          <code>useDispatch()</code>: на уровне TypeScript это компилятор ошибочно отклоняет,
+          потому что стандартный тип <code>Dispatch</code> знает только про plain-экшены.
+          Справа — тот же thunk, но через <code>useAppDispatch</code>, сконфигурированный
+          под тип стор-а: компилятор счастлив, запрос работает, в уведомлениях виден переход
+          <code>loading</code> → <code>loaded</code>.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — AppDispatch и thunks</div>
+      <div class="theory__body">
+
+        <h3>Почему стандартный useDispatch не знает про thunks</h3>
+        <p>
+          У ядра Redux тип <code>Dispatch</code> максимально простой:
+          <code>(action: A) =&gt; A</code>, где <code>A extends Action</code>. То есть он
+          принимает <em>объект-экшен</em> и возвращает его же. А thunk — это
+          <em>функция</em> <code>(dispatch, getState) =&gt; any</code>. По стандартному типу
+          такая функция не проходит как <code>Action</code>, поэтому TypeScript отказывается
+          её принять.
+        </p>
+        <p>
+          Middleware <code>redux-thunk</code> в рантайме расширяет <code>dispatch</code>:
+          «если пришла функция — вызвать её, иначе передать дальше». Типов это само по себе
+          не меняет: чтобы компилятор узнал про новую возможность, <strong>тип dispatch
+          тоже должен быть расширен</strong>. Именно это делает <code>store.dispatch</code>
+          после <code>applyMiddleware(thunk)</code>.
+        </p>
+
+        <div class="quote">«For useDispatch, the default Dispatch type does not know about thunks or other middleware. In order to correctly dispatch thunks, you need to use the specific customized AppDispatch type from the store that includes the thunk middleware types, and use that with useDispatch.»<br>— <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#define-typed-hooks" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a></div>
+        <div class="quote">«Для useDispatch стандартный тип Dispatch не знает о thunks или других middleware. Чтобы корректно диспатчить thunks, нужно взять кастомный тип AppDispatch из стор-а, который уже включает типы middleware thunk, и использовать его с useDispatch.»<br>— перевод</div>
+
+        <div class="quote">«By default, the return value of useDispatch is the standard Dispatch type defined by the Redux core types, so no declarations are needed.»<br>— <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#typing-the-usedispatch-hook" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a></div>
+        <div class="quote">«По умолчанию возвращаемое значение useDispatch имеет стандартный тип Dispatch, определённый в ядре Redux, поэтому никаких дополнительных деклараций не нужно.»<br>— перевод</div>
+
+        <div class="quote">«If you have a customized version of the Dispatch type, you may use that type explicitly: const dispatch: AppDispatch = useDispatch().»<br>— <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#typing-the-usedispatch-hook" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a></div>
+        <div class="quote">«Если у вас есть кастомизированная версия типа Dispatch, вы можете использовать её явно: const dispatch: AppDispatch = useDispatch().»<br>— перевод</div>
+
+        <h3>Шаги настройки</h3>
+        <ol>
+          <li>Подключить thunk в стор: <code>applyMiddleware(thunk)</code>.</li>
+          <li>Извлечь точный тип <code>dispatch</code>:
+              <code>export type AppDispatch = typeof store.dispatch</code>.
+              Этот тип уже знает про thunks — потому что <code>typeof</code>
+              считывает результат с применённым middleware.</li>
+          <li>Создать pre-typed хук:
+              <code>export const useAppDispatch = useDispatch.withTypes&lt;AppDispatch&gt;()</code>.</li>
+          <li>В компонентах писать <code>const dispatch = useAppDispatch()</code> и диспатчить
+              как объекты-экшены, так и thunks — всё типизируется корректно.</li>
+        </ol>
+
+        <h3>Пример thunk action creator</h3>
+        <div class="code-block">
+<span class="cm">// store.ts</span>
+<span class="kw">import</span> { <span class="fn">thunk</span> } <span class="kw">from</span> <span class="str">'redux-thunk'</span>
+<span class="kw">const</span> <span class="fn">store</span> = <span class="fn">createStore</span>(<span class="fn">rootReducer</span>, <span class="fn">applyMiddleware</span>(<span class="fn">thunk</span>))
+<span class="kw">export type</span> <span class="type">AppDispatch</span> = <span class="kw">typeof</span> <span class="prop">store</span>.<span class="prop">dispatch</span>
+<span class="cm">// знает про thunk!</span>
+
+<span class="cm">// fetchUser.ts</span>
+<span class="kw">const</span> <span class="fn">fetchUser</span> = (<span class="prop">id</span>: <span class="type">number</span>) =&gt;
+  <span class="kw">async</span> (<span class="prop">dispatch</span>: <span class="type">AppDispatch</span>) =&gt; {
+    <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'user/loading'</span> })
+    <span class="kw">await new</span> <span class="type">Promise</span>(<span class="prop">r</span> =&gt; <span class="fn">setTimeout</span>(<span class="prop">r</span>, <span class="num">500</span>))
+    <span class="prop">dispatch</span>({
+      <span class="prop">type</span>: <span class="str">'user/loaded'</span>,
+      <span class="prop">payload</span>: { <span class="prop">id</span>, <span class="prop">name</span>: <span class="str">'Alice'</span> },
+    })
+  }
+        </div>
+
+        <h3>Стандартный useDispatch — не компилируется</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">Component</span>() {
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+  <span class="cm">// Dispatch&lt;AnyAction&gt; — не знает о thunks</span>
+
+  <span class="prop">dispatch</span>(<span class="fn">fetchUser</span>(<span class="num">1</span>))
+  <span class="cm">// TS2345: Argument of type</span>
+  <span class="cm">// '(dispatch: AppDispatch) =&gt; Promise&lt;void&gt;'</span>
+  <span class="cm">// is not assignable to parameter of type 'AnyAction'.</span>
+}
+        </div>
+
+        <h3>Типизированный useAppDispatch — компилируется</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">useAppDispatch</span> = <span class="fn">useDispatch</span>.<span class="fn">withTypes</span>&lt;<span class="type">AppDispatch</span>&gt;()
+
+<span class="kw">function</span> <span class="fn">Component</span>() {
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useAppDispatch</span>()
+  <span class="cm">// тип: AppDispatch (с middleware)</span>
+
+  <span class="prop">dispatch</span>(<span class="fn">fetchUser</span>(<span class="num">1</span>))   <span class="cm">// OK — thunk</span>
+  <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'ping'</span> }) <span class="cm">// OK — plain action</span>
+}
+        </div>
+
+        <h3>Что именно делает .withTypes и что делает typeof store.dispatch</h3>
+        <table class="ts-table">
+          <thead>
+            <tr>
+              <th>Конструкция</th>
+              <th>Что возвращает</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>typeof store.dispatch</code></td>
+              <td>точный тип dispatch с учётом всех middleware
+                  (thunks, RTK Query, и т. д.)</td>
+            </tr>
+            <tr>
+              <td><code>useDispatch.withTypes&lt;AppDispatch&gt;()</code></td>
+              <td>фиксирует возврат <code>useDispatch()</code> как <code>AppDispatch</code></td>
+            </tr>
+            <tr>
+              <td><code>useDispatch()</code> (без типизации)</td>
+              <td><code>Dispatch&lt;UnknownAction&gt;</code> — минимальный набор</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Типы не меняют то, как работает подписка. Thunk вызывает <code>dispatch</code>
+          несколько раз: <code>user/loading</code> → <code>user/loaded</code>. Каждый такой
+          <code>dispatch</code> запускает reducer, обновляет <code>state</code> и запускает
+          подписку — Subscription проходит по linked list callback'ов →
+          <code>Subscription.notify()</code> → для каждого слушателя
+          <code>checkForUpdates</code> → запустить <code>selector</code> → сравнить через
+          <code>===</code> → <code>forceRender</code> если результат изменился.
+          <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Паттерн для проектов:</strong> держите <code>AppDispatch</code> и
+          <code>useAppDispatch</code> в файлах <code>app/store.ts</code> и
+          <code>app/hooks.ts</code>. В самих компонентах никогда не импортируйте голый
+          <code>useDispatch</code> — только <code>useAppDispatch</code>. Это делает весь код
+          совместимым с thunks сразу, без экспериментов с <code>as</code>-кастами.
+        </div>
+
+        <div class="warning">
+          <strong>Не пытайтесь обойти типы через <code>as any</code>.</strong> Кастинг скроет
+          проблему, но при этом потеряется и полезная информация: возврат thunk-а
+          (<code>Promise&lt;T&gt;</code>), который часто нужен вызывающей стороне.
+          С правильным <code>AppDispatch</code> вы получите
+          <code>const user = await dispatch(fetchUser(1))</code> с корректным типом.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

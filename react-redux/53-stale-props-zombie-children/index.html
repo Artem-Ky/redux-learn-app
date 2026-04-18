@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>53 — Stale Props и Zombie Children</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .demo-grid { grid-template-columns: 1fr; }
+    }
+    .demo-col {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .demo-col--unsafe { border-color: var(--danger); }
+    .demo-col--safe   { border-color: var(--success); }
+    .demo-col__title {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    .demo-col--unsafe .demo-col__title { color: var(--danger); }
+    .demo-col--safe   .demo-col__title { color: var(--success); }
+    .todo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      min-height: 180px;
+    }
+    .todo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      background: #0d0d0d;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+    .todo-row__id {
+      color: var(--text-muted);
+      width: 36px;
+    }
+    .todo-row__text { flex: 1; color: var(--text-bright); }
+    .todo-row__done { color: var(--success); }
+    .error-banner {
+      background: rgba(244, 71, 71, 0.12);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+    .ok-banner {
+      background: rgba(76, 175, 80, 0.1);
+      border: 1px solid var(--success);
+      color: var(--success);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .scenario-steps {
+      counter-reset: step;
+      padding: 0;
+      list-style: none;
+      margin: 10px 0;
+    }
+    .scenario-steps li {
+      counter-increment: step;
+      position: relative;
+      padding: 6px 6px 6px 34px;
+      line-height: 1.6;
+    }
+    .scenario-steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 4px;
+      top: 7px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">53 / 70</span>
+      Stale Props и Zombie Children — edge cases хуков
+    </div>
+    <nav class="site-header__nav">
+      <a href="../52-performance-comparison/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">53</span>
+      <a href="../54-migration-connect-to-hooks/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — воспроизведение zombie child</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Список из пяти todo. Для воспроизведения <em>zombie child</em> обе колонки держат
+          <strong>снимок <code>ids</code> при монтировании</strong> (список строк не сужается сразу
+          при <code>DELETE</code>), а в store запись в <code>byId</code> уже исчезает — дочерний
+          компонент с <code>id=5</code> ещё смонтирован и читает <code>undefined</code>.
+          Нажмите «Delete id=5»: в <em>левой</em> колонке нет проверки — TypeError, ловит
+          <code>ErrorBoundary</code>. В <em>правой</em> — <code>if (!todo) return null</code>.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Stale Props &amp; Zombie Children</div>
+      <div class="theory__body">
+
+        <h3>Откуда берётся проблема</h3>
+        <div class="quote">
+          "With hooks, there is no way to render a context provider, which means there's also no nested hierarchy of subscriptions. Because of this, the 'stale props' and 'zombie child' issues may potentially re-occur in an app that relies on using hooks instead of connect()."<br>
+          — <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «С хуками нет способа отрендерить провайдер контекста, а значит, нет и вложенной иерархии подписок. Из-за этого проблемы "stale props" и "zombie child" могут потенциально возникать в приложении, которое полагается на хуки вместо connect().»<br>
+          — перевод
+        </div>
+
+        <p>
+          В <code>connect</code> каждая HOC-обёртка создаёт <em>свой</em> <code>Subscription</code>,
+          вкладывающийся в subscription родителя. Уведомления идут сверху вниз: родительский
+          <code>Subscription</code> дёргает детей только <em>после</em> того, как сам отработал.
+          Это гарантирует, что к моменту, когда дочерний селектор видит новый state, родитель
+          уже обновил свои props.
+        </p>
+        <p>
+          В хуках такой иерархии нет: все <code>useSelector</code> подписываются на один и тот же
+          корневой <code>Subscription</code> (тот, что в <code>&lt;Provider&gt;</code>). Порядок
+          уведомлений — в порядке монтирования, и селектор ребёнка может сработать <em>до</em> того,
+          как селектор родителя «починил» свой output. Отсюда две беды: <em>stale props</em> и
+          <em>zombie child</em>.
+        </p>
+
+        <h3>Stale props</h3>
+        <div class="quote">
+          "Specifically, 'stale props' means any case where: a selector function relies on this component's props to extract data, a parent component would re-render and pass down new props as a result of an action, but this component's selector function executes before this component has had a chance to re-render with those new props"<br>
+          — <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Конкретно, "stale props" означает любой случай, когда: selector-функция опирается на props этого компонента для извлечения данных; родительский компонент должен перерисоваться и передать новые props в результате action; но selector этого компонента выполняется <em>до</em> того, как он успел перерисоваться с этими новыми props.»<br>
+          — перевод
+        </div>
+        <p>
+          Пример: родитель передаёт ребёнку <code>id</code>, а ребёнок делает
+          <code>useSelector(s =&gt; s.byId[props.id])</code>. Action меняет оба: и
+          <code>state.byId</code>, и <code>props.id</code> (потому что родительский селектор теперь
+          возвращает другой <code>id</code>). Но если селектор ребёнка запустился по старому
+          <code>props.id</code> — он получит «устаревшие» данные.
+        </p>
+
+        <h3>Zombie child</h3>
+        <div class="quote">
+          "'Zombie child' refers specifically to the case where: Multiple nested connected components are mounted in a first pass, causing a child component to subscribe to the store before its parent. An action is dispatched that deletes data from the store, such as a todo item. The parent component would stop rendering that child as a result. However, because the child subscribed first, its subscription runs before the parent stops rendering it."<br>
+          — <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «"Zombie child" — это конкретный случай: несколько вложенных connected-компонентов монтируются в первом проходе, из-за чего ребёнок подписывается на store раньше родителя. Диспатчится action, удаляющий данные из store — например, элемент todo. Родитель из-за этого перестаёт рендерить этого ребёнка. Но поскольку ребёнок подписался первым, его подписка срабатывает раньше, чем родитель успевает перестать его рендерить.»<br>
+          — перевод
+        </div>
+
+        <p>Что происходит по шагам:</p>
+        <ol class="scenario-steps">
+          <li>Todo <code>id=5</code> есть в <code>state.todos.byId</code>.</li>
+          <li>Родитель <code>TodoList</code> рендерит <code>&lt;TodoItem id={5} /&gt;</code>.</li>
+          <li>Внутри <code>TodoItem</code>: <code>useSelector(s =&gt; s.todos.byId[5])</code>.</li>
+          <li>Dispatch удаляет <code>id=5</code> из store.</li>
+          <li>Subscription уведомляет всех подписчиков. <em>Ребёнок</em> получает уведомление раньше родителя.</li>
+          <li>Селектор ребёнка возвращает <code>undefined</code>.</li>
+          <li>Если ребёнок пишет <code>todo.text</code> без защиты — <code>TypeError</code>.</li>
+          <li>Чуть позже родительский селектор сработает, увидит, что <code>id=5</code> больше нет, и перестанет рендерить ребёнка — но ошибка уже произошла.</li>
+        </ol>
+
+        <h3>Встроенная защита в useSelector</h3>
+        <div class="quote">
+          "useSelector() tries to deal with this by catching all errors that are thrown when the selector is executed due to a store update"<br>
+          — <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «useSelector() пытается бороться с этим, перехватывая все ошибки, брошенные при выполнении селектора из-за обновления store.»<br>
+          — перевод
+        </div>
+
+        <p>
+          Если селектор выбросил исключение <em>в ответ на update store</em>, <code>useSelector</code>
+          проглатывает ошибку и отдаёт предыдущий результат; расчёт, что родитель вот-вот
+          перерендерится и уберёт «мёртвого ребёнка». Но это работает только если ошибка
+          случилась <strong>внутри самого селектора</strong>. Если вы падаете уже в <em>теле
+          компонента</em> (<code>todo.text</code> когда <code>todo === undefined</code>) — React
+          поднимает ошибку наверх, до ближайшего <code>ErrorBoundary</code>.
+        </p>
+
+        <h3>Как защититься</h3>
+        <p>Два простых правила:</p>
+
+        <div class="code-block">
+<span class="cm">// 1. Селектор возвращает undefined? Защитный return null.</span>
+<span class="kw">function</span> <span class="fn">TodoItem</span>({ <span class="prop">id</span> }: <span class="type">Props</span>) {
+  <span class="kw">const</span> <span class="prop">todo</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>.<span class="prop">byId</span>[id])
+  <span class="kw">if</span> (!todo) <span class="kw">return null</span>  <span class="cm">// защита от zombie child</span>
+  <span class="kw">return</span> &lt;div&gt;{todo.text}&lt;/div&gt;
+}
+        </div>
+
+        <div class="code-block">
+<span class="cm">// 2. Или default-значение прямо в селекторе.</span>
+<span class="kw">const</span> <span class="prop">todo</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt;
+  state.<span class="prop">todos</span>.<span class="prop">byId</span>[id] ?? { <span class="prop">id</span>, <span class="prop">text</span>: <span class="str">''</span>, <span class="prop">done</span>: <span class="kw">false</span> }
+)
+        </div>
+
+        <p>
+          Второй вариант опасен тем, что возвращает <em>новую</em> ссылку на каждый рендер — это
+          ломает <code>===</code> и вызывает лишние ре-рендеры. Держите fallback-объект
+          <em>стабильным</em>:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">EMPTY_TODO</span>: <span class="type">Todo</span> = { <span class="prop">id</span>: <span class="num">-1</span>, <span class="prop">text</span>: <span class="str">''</span>, <span class="prop">done</span>: <span class="kw">false</span> }
+
+<span class="kw">const</span> <span class="prop">todo</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt;
+  state.<span class="prop">todos</span>.<span class="prop">byId</span>[id] ?? <span class="prop">EMPTY_TODO</span>
+)
+        </div>
+
+        <h3>На практике это редкость</h3>
+        <div class="quote">
+          "In practice, these are a rare concern - we've received far more comments about these being in the docs than actual reports of these being a real problem in an app."<br>
+          — <a href="https://react-redux.js.org/api/hooks#stale-props-and-zombie-children" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «На практике это редкая проблема — мы получили намного больше комментариев о том, что она присутствует в документации, чем реальных сообщений о том, что она кому-то навредила в приложении.»<br>
+          — перевод
+        </div>
+
+        <p>
+          Большинство приложений никогда не ловят zombie child — именно потому что защитная проверка
+          «нет данных — ничего не рисую» и так считается хорошим тоном. Тем не менее знать, почему
+          на пустой момент возвращается <code>undefined</code>, полезно для отладки странных
+          ошибок вида «cannot read property text of undefined» сразу после delete.
+        </p>
+
+        <h3>Как это устроено по внутренностям</h3>
+        <p>
+          В обоих моделях (<code>connect</code> и hooks) работает одна и та же цепочка: linked list
+          callback'ов → <code>Subscription.notify()</code> → <code>checkForUpdates</code> → selector
+          → <code>===</code> → <code>forceRender</code>. Отличие — в том, сколько у вас
+          <code>Subscription</code>-уровней и в каком порядке они нотифицируют своих listener'ов:
+          у <code>connect</code> — дерево, у хуков — плоский список на уровне <code>&lt;Provider&gt;</code>.
+          Все подробности — в <a href="../03a-subscription-system/">уроке 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Практический чеклист:</strong>
+          <ul style="padding-left: 18px; margin-top: 6px;">
+            <li>Любой селектор, читающий «запись по id» (<code>byId[id]</code>), должен уметь
+              пережить <code>undefined</code>.</li>
+            <li>В компоненте — <code>if (!data) return null</code> сразу после хука.</li>
+            <li>Не падайте в <code>data.field</code> без проверки.</li>
+            <li>Если нужен fallback-объект — сделайте его <em>модульной константой</em>, чтобы не
+              менять ссылку между рендерами.</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

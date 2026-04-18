@@ -206,7 +206,7 @@ function App() {
     <div className="compare-grid">
       <div className="compare-panel compare-panel--naive">
         <div className="compare-panel__header">
-          Наивный Context (useContext)
+          Нативный Context (useContext)
         </div>
         <div className="compare-panel__body">
           <NaiveProvider>
@@ -238,7 +238,7 @@ root.render(<App />)
 
 con.info('Provider и Context — сравнение подходов.')
 con.log('')
-con.log('Слева: наивный React.createContext — ВСЕ потребители перерисовываются')
+con.log('Слева: нативный React.createContext — ВСЕ потребители перерисовываются')
 con.log('Справа: React-Redux Provider — только подписанные компоненты')
 con.log('')
 con.log('Нажимайте + и следите за счётчиками рендеров!')

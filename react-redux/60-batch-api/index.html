@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>60 — batch() API: батчинг нескольких dispatch</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    /* ── layout ── */
+    .app {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+    }
+
+    /* ── column card ── */
+    .col {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .col--raw   { border-color: var(--accent-red); }
+    .col--batch { border-color: var(--success); }
+
+    .col__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .col__title {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .col--raw   .col__title { color: var(--accent-red); }
+    .col--batch .col__title { color: var(--success); }
+
+    .col__cnt {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+    .col__cnt--ok  { background: rgba(76,175,80,.18); color: var(--success); border: 1px solid rgba(76,175,80,.35); }
+    .col__cnt--bad { background: rgba(244,71,71,.18);  color: var(--accent-red); border: 1px solid rgba(244,71,71,.35); }
+
+    .col__code {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      line-height: 1.55;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      margin: 0;
+      white-space: pre;
+      overflow-x: auto;
+      color: var(--text-secondary);
+    }
+
+    .col__widget-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    /* ── profile card (the subscribed component) ── */
+    .pc {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      transition: background .05s linear, border-color .05s linear;
+    }
+    .pc.flash {
+      animation: pcFlash .55s ease-out;
+    }
+    @keyframes pcFlash {
+      0%   { background: rgba(244,71,71,.5); border-color: var(--accent-red); }
+      100% { background: var(--bg-tertiary); }
+    }
+    .pc__spinner { color: var(--accent-yellow); }
+    .pc__empty   { color: var(--text-muted); }
+    .pc__ready   { display: flex; align-items: center; gap: 10px; }
+    .pc__name    { color: var(--accent-cyan); font-weight: 600; }
+    .pc__role    { color: var(--text-muted); font-size: 0.78rem; }
+
+    /* ── render log ── */
+    .rlog {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .rlog--empty {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--border);
+    }
+    .rlog__row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      border: 1px solid transparent;
+    }
+    .rlog__row--glitch {
+      background: rgba(244,71,71,.1);
+      border-color: rgba(244,71,71,.3);
+      color: var(--text-secondary);
+    }
+    .rlog__row--ok {
+      background: rgba(76,175,80,.1);
+      border-color: rgba(76,175,80,.3);
+      color: var(--text-secondary);
+    }
+    .rlog__n {
+      color: var(--text-muted);
+      min-width: 22px;
+      font-size: 0.7rem;
+    }
+    .rlog__vals { flex: 1; }
+    .rlog__vals b { color: var(--accent-cyan); }
+    .rlog__row--glitch .rlog__tag { color: var(--accent-red); font-weight: 600; }
+    .rlog__row--ok     .rlog__tag { color: var(--success);    font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">60 / 60</span>
+      batch() API: батчинг нескольких dispatch
+    </div>
+    <nav class="site-header__nav">
+      <a href="../59-render-optimization-model/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">60</span>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — три dispatch, два исхода</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px; font-size: 0.88rem;">
+          Два изолированных store. Одна и та же операция «загрузить пользователя» — три dispatch:
+          <code>SET_LOADING(true)</code> → <code>SET_USER</code> → <code>SET_LOADING(false)</code>.
+          Нажми кнопку в каждой колонке и сравни сколько раз перерисовался компонент и
+          были ли промежуточные («глитчевые») состояния.
+        </p>
+        <div class="tip" style="margin-bottom: 14px;">
+          <strong>Почему flushSync слева?</strong>
+          React 18 automatic batching по умолчанию объединяет все dispatch в один рендер даже без
+          <code>batch()</code>. Чтобы честно показать проблему, левая колонка
+          оборачивает каждый dispatch в <code>flushSync()</code> — это принудительно сбрасывает
+          очередь рендеров после каждого вызова, как это происходило в React 17 с
+          <code>setTimeout</code> / <code>Promise.then</code>.
+        </div>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — что такое batch() и зачем он нужен</div>
+      <div class="theory__body">
+
+        <h3>Проблема трёх dispatch подряд</h3>
+        <p>
+          Классическая ситуация: thunk получил данные с сервера и хочет уведомить store тремя
+          действиями. Каждый <code>dispatch</code> вызывает <code>store.subscribe</code>-листенеры —
+          то есть обходит Subscription, вызывает <code>checkForUpdates</code> → selector → compare →
+          <code>forceRender</code>. Три dispatch подряд = три отдельных рендер-прохода.
+        </p>
+        <div class="code-block">
+<span class="cm">// ❌ три рендера в React 17 (setTimeout, Promise.then, нативные события)</span>
+dispatch({ <span class="prop">type</span>: <span class="str">'SET_LOADING'</span>, <span class="prop">value</span>: <span class="kw">true</span> })   <span class="cm">// рендер #1 — spinner без данных</span>
+dispatch({ <span class="prop">type</span>: <span class="str">'SET_USER'</span>, ...user })             <span class="cm">// рендер #2 — spinner + данные (нелогично!)</span>
+dispatch({ <span class="prop">type</span>: <span class="str">'SET_LOADING'</span>, <span class="prop">value</span>: <span class="kw">false</span> })  <span class="cm">// рендер #3 — итоговое состояние</span>
+        </div>
+
+        <h3>batch() — оборачивает в unstable_batchedUpdates</h3>
+        <p>
+          <code>batch()</code> из <code>react-redux</code> — реэкспорт
+          <code>unstable_batchedUpdates()</code> из <code>react-dom</code>.
+          Внутри обёртки React складывает все <code>setState</code>/<code>forceRender</code>
+          в очередь и делает один коммит в конце.
+        </p>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="prop">batch</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="cm">// ✅ всегда один рендер — независимо от версии React</span>
+<span class="fn">batch</span>(() =&gt; {
+  dispatch({ <span class="prop">type</span>: <span class="str">'SET_LOADING'</span>, <span class="prop">value</span>: <span class="kw">true</span> })
+  dispatch({ <span class="prop">type</span>: <span class="str">'SET_USER'</span>, ...user })
+  dispatch({ <span class="prop">type</span>: <span class="str">'SET_LOADING'</span>, <span class="prop">value</span>: <span class="kw">false</span> })
+})
+        </div>
+
+        <h3>React 18 — автоматический батчинг</h3>
+        <p>
+          С React 18 (<code>createRoot</code>) automatic batching работает <em>везде</em> —
+          в обработчиках событий, <code>Promise.then</code>, <code>setTimeout</code> и нативных
+          callback'ах. Три dispatch подряд дают один рендер без всякого <code>batch()</code>.
+        </p>
+
+        <div class="quote">«If you're using React 18, you do not need to use the batch API. React 18 automatically batches all state updates, no matter where they're queued.»<br>— <a href="https://react-redux.js.org/api/batch" target="_blank">react-redux.js.org/api/batch</a></div>
+
+        <h3>Когда batch() всё ещё нужен</h3>
+        <ul>
+          <li>Проект на React&nbsp;&lt;&nbsp;18.</li>
+          <li>Legacy-точка входа <code>ReactDOM.render</code> — даже в React 18 она не включает automatic batching.</li>
+          <li>Явное документирование намерения: «эти dispatch — одна логическая операция».</li>
+          <li>React Native со старыми версиями.</li>
+        </ul>
+
+        <div class="warning">
+          <strong>Важно:</strong> <code>batch()</code> объединяет только синхронные dispatch внутри
+          callback'а. Если внутри стоит <code>await</code> или <code>setTimeout</code>, dispatch после
+          паузы уже в другом тике и не батчатся вместе с первыми.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

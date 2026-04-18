@@ -198,14 +198,14 @@ function Parent() {
       </div>
 
       <div className="sbs-grid">
-        <UserCounterConnect title={`Слева — connect (parentTick ${parentTick})`} />
+        <UserCounterConnect title="Слева — connect" />
         <UserCounterHook    title={`Справа — useSelector (parentTick ${parentTick})`} />
       </div>
 
       <div style={{ margin: '8px 0 6px', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>
         Тот же hook-компонент, но завёрнутый в <code>React.memo</code>:
       </div>
-      <UserCounterHookMemo title={`useSelector + memo (parentTick ${parentTick})`} />
+      <UserCounterHookMemo title="useSelector + memo" />
     </div>
   )
 }
@@ -267,6 +267,6 @@ con.log('  1. counter + 1       → оба ре-рендерятся (подпи
 con.log('  2. SET_USER          → оба ре-рендерятся (подписаны)')
 con.log('  3. SET_EMAIL         → оба НЕ ре-рендерятся (unrelated)')
 con.log('  4. TICK              → оба НЕ ре-рендерятся (unrelated)')
-con.log('  5. Ре-рендер Parent  → connect НЕ ре-рендерится, useSelector РЕ-рендерится,')
-con.log('                         useSelector+memo НЕ ре-рендерится (props title меняется,')
-con.log('                         поэтому memo всё-таки обновит — это видно в title)')
+con.log('  5. Ре-рендер Parent  → connect НЕ ре-рендерится (title статичен — ownProps не меняются),')
+con.log('                         useSelector РЕ-рендерится (title в h3 обновится с parentTick),')
+con.log('                         useSelector+memo НЕ ре-рендерится (title статичен, memo блокирует)')
