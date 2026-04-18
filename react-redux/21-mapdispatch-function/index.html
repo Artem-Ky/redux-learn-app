@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>21 — mapDispatchToProps как функция</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .counter-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 24px;
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+    }
+    .counter-display__value {
+      font-family: var(--font-mono);
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 80px;
+      text-align: center;
+    }
+    .counter-display__label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: center;
+      margin-top: 4px;
+    }
+    .side-by-side {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    @media (max-width: 800px) {
+      .side-by-side { grid-template-columns: 1fr; }
+    }
+    .approach-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .approach-card__header {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .approach-card__header--old {
+      color: var(--text-muted);
+    }
+    .approach-card__header--new {
+      color: var(--accent-green);
+    }
+    .approach-card__snippet {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .props-viewer {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      margin: 12px 0;
+    }
+    .props-viewer__key { color: #9cdcfe; }
+    .props-viewer__type { color: var(--accent-cyan); font-style: italic; }
+    .props-viewer__val { color: var(--accent-orange); }
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+    .flow-node {
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+    }
+    .flow-node--hl {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+    .flow-arrow { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">21 / 70</span>
+      mapDispatchToProps как функция
+    </div>
+    <nav class="site-header__nav">
+      <a href="../20-dispatch-default/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">21</span>
+      <a href="../22-mapdispatch-ownprops/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — mapDispatchToProps в функциональной форме</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Слева — подход из урока 20 (<code>props.dispatch({type:'...'})</code> прямо в обработчике).
+          Справа — тот же счётчик, но через <code>mapDispatchToProps</code>-функцию: компонент получает
+          в props готовые <code>increment</code>, <code>decrement</code>, <code>reset</code> и вызывает
+          их напрямую. Нажмите кнопки и сравните записи в консоли.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — mapDispatchToProps (функциональная форма)</div>
+      <div class="theory__body">
+
+        <h3>Зачем вообще нужен mapDispatchToProps?</h3>
+        <p>
+          В уроке 20 мы видели: если не передать второй аргумент в <code>connect</code>, компонент
+          получает <code>props.dispatch</code> «бесплатно». Это работает, но заставляет компонент знать
+          о Redux: <code>onClick={() =&gt; props.dispatch({ type: 'counter/increment' })}</code>.
+          <code>mapDispatchToProps</code> решает эту проблему — превращает «сырой» dispatch в
+          удобные именованные функции, которые компонент воспринимает как обычные колбэки.
+        </p>
+
+        <div class="quote">
+          «Providing a mapDispatchToProps allows you to specify which actions your component might need
+          to dispatch. It lets you provide action dispatching functions as props. Therefore, instead of
+          calling props.dispatch(() =&gt; increment()), you may call props.increment() directly.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Передача mapDispatchToProps позволяет указать, какие именно экшены будет диспатчить компонент.
+          Она превращает функции диспатча в props. Поэтому вместо вызова props.dispatch(() =&gt; increment())
+          вы можете вызвать props.increment() напрямую.»
+          <br>— перевод
+        </div>
+
+        <h3>Синтаксис функциональной формы</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">connect</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="cm">// (1) Функция принимает dispatch и возвращает объект</span>
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = (<span class="prop">dispatch</span>) =&gt; ({
+  <span class="fn">increment</span>: () =&gt; <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> }),
+  <span class="fn">decrement</span>: () =&gt; <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/decrement'</span> }),
+  <span class="fn">reset</span>:     () =&gt; <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/reset'</span> }),
+})
+
+<span class="cm">// (2) Передаём вторым аргументом в connect</span>
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">Counter</span>)
+
+<span class="cm">// (3) Внутри компонента — вместо props.dispatch(...)</span>
+<span class="kw">function</span> <span class="fn">Counter</span>({ <span class="prop">count</span>, <span class="prop">increment</span>, <span class="prop">decrement</span>, <span class="prop">reset</span> }) {
+  <span class="kw">return</span> &lt;button <span class="prop">onClick</span>={<span class="prop">increment</span>}&gt;+&lt;/button&gt;
+}
+        </div>
+
+        <h3>Причина №1 — декларативность</h3>
+        <div class="quote">
+          «First, encapsulating the dispatch logic into function makes the implementation more
+          declarative. Dispatching an action and letting the Redux store handle the data flow is how
+          to implement the behavior, rather than what it does.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Во-первых, упаковка логики диспатча внутрь функции делает реализацию более декларативной.
+          Диспатч экшена и обработка потока данных внутри store — это как реализовать поведение,
+          а не что именно оно делает.»
+          <br>— перевод
+        </div>
+
+        <p>Сравните два обработчика кнопки:</p>
+        <div class="code-block">
+<span class="cm">// Императивно — компонент знает о dispatch и типе экшена:</span>
+&lt;button <span class="prop">onClick</span>={() =&gt; <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'SOMETHING'</span> })}&gt;
+
+<span class="cm">// Декларативно — компонент знает только про "doSomething":</span>
+&lt;button <span class="prop">onClick</span>={<span class="fn">doSomething</span>}&gt;
+        </div>
+
+        <h3>Причина №2 — передача колбэков дочерним компонентам</h3>
+        <div class="quote">
+          «In addition, you also gain the ability to pass down the action dispatching functions to
+          child (likely unconnected) components. This allows more components to dispatch actions,
+          while keeping them "unaware" of Redux.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Кроме того, вы получаете возможность передавать функции-диспатчеры в дочерние (как правило
+          не подключённые к store) компоненты. Это позволяет большему числу компонентов диспатчить
+          экшены, при этом оставаясь "не осведомлёнными" о Redux.»
+          <br>— перевод
+        </div>
+
+        <p>
+          Дочерний компонент (например, кнопка) получает <code>onClick</code> как обычный колбэк
+          и даже не догадывается, что он связан с Redux. Это упрощает переиспользование UI и тесты:
+          дочерку можно рендерить в Storybook без Provider.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Родитель — connected</span>
+<span class="kw">function</span> <span class="fn">TodoListRaw</span>({ <span class="prop">todos</span>, <span class="prop">toggleTodo</span> }) {
+  <span class="kw">return</span> todos.<span class="fn">map</span>(<span class="prop">t</span> =&gt;
+    &lt;<span class="type">Todo</span> <span class="prop">todo</span>={t} <span class="prop">onClick</span>={<span class="prop">toggleTodo</span>} /&gt;
+  )
+}
+
+<span class="cm">// Дочерний Todo — unconnected, ничего не знает про Redux</span>
+<span class="kw">function</span> <span class="fn">Todo</span>({ <span class="prop">todo</span>, <span class="prop">onClick</span> }) {
+  <span class="kw">return</span> &lt;li <span class="prop">onClick</span>={() =&gt; <span class="fn">onClick</span>(todo.id)}&gt;{todo.text}&lt;/li&gt;
+}
+        </div>
+
+        <h3>Параметры функции mapDispatchToProps</h3>
+        <p>Функция может быть арности 1 или 2:</p>
+        <ul>
+          <li><code>(dispatch)</code> — получает только <code>dispatch</code>, вызывается один раз при монтировании connected-компонента;</li>
+          <li><code>(dispatch, ownProps)</code> — получает дополнительно <code>ownProps</code>
+            (пропсы, переданные родителем). Переинициализируется при смене этих пропсов.
+            Подробнее — в <a href="../22-mapdispatch-ownprops/">уроке 22</a>.</li>
+        </ul>
+
+        <h3>Что возвращать</h3>
+        <p>
+          Функция должна возвращать <strong>plain object</strong>: ключи станут именами пропсов,
+          значения — функциями, которые внутри себя вызывают <code>dispatch</code>.
+        </p>
+
+        <div class="warning">
+          <strong>Внимание:</strong> если вы указали <code>mapDispatchToProps</code> (любой формы),
+          <code>props.dispatch</code> <em>больше не передаётся</em> компоненту автоматически.
+          Это отдельная частая ошибка — ей посвящён <a href="../25-dispatch-lost-gotcha/">урок 25</a>.
+        </div>
+
+        <h3>Связь с Subscription-системой</h3>
+        <p>
+          Когда компонент вызывает <code>props.increment()</code>, внутри функция делает
+          <code>dispatch({ type: 'counter/increment' })</code>. Store прогоняет reducer, получает
+          новый state и вызывает <code>Subscription.notify()</code>
+          (<a href="../03a-subscription-system/">детали в уроке 03a</a>). Subscription — это linked
+          list callback'ов: для каждого подключённого компонента <code>checkForUpdates</code>
+          запускает <code>mapStateToProps</code> с новым state, сравнивает каждое поле через
+          <code>===</code> с предыдущим значением, и если хотя бы одно изменилось — вызывает
+          <code>forceRender()</code>. Сами функции из <code>mapDispatchToProps</code> при этом
+          не пересоздаются — connect кэширует их.
+        </p>
+
+        <div class="tip">
+          <strong>Итог урока:</strong> <code>mapDispatchToProps</code> в функциональной форме превращает
+          сырой <code>dispatch</code> в набор именованных колбэков. Компонент становится декларативным
+          и может передавать эти колбэки дочерним компонентам. В следующих уроках посмотрим на
+          <code>ownProps</code>, <code>bindActionCreators</code> и короткую объектную форму.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

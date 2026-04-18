@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>48 — Hooks Recipes — рецепты из документации</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .recipe-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .recipe-grid { grid-template-columns: 1fr; }
+    }
+    .recipe-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .recipe-card__header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .recipe-card__title {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--accent-yellow);
+    }
+    .recipe-card__renders {
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      margin-left: auto;
+    }
+    .recipe-card__value {
+      font-family: var(--font-mono);
+      font-size: 1.3rem;
+      color: var(--accent-cyan);
+      font-weight: 700;
+      text-align: center;
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+    }
+    .recipe-card__buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .recipe-card__stat {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+    .recipe-card__stat strong { color: var(--accent-cyan); }
+    .panel-note {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .signature {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-cyan);
+      margin: 10px 0;
+    }
+    .history-feedback {
+      background: var(--bg-tertiary);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      max-height: 80px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">48 / 70</span>
+      Hooks Recipes — рецепты из документации
+    </div>
+    <nav class="site-header__nav">
+      <a href="../47-custom-context-hooks/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">48</span>
+      <a href="../49-hooks-practical-todo/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — два готовых рецепта хуков</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Слева — кастомный <code>useActions</code>, возвращающий набор заранее bindактированных
+          action creator'ов. Справа — <code>useShallowEqualSelector</code>, обёртка над
+          <code>useSelector</code> с готовой shallowEqual-проверкой. Оба — прямо из раздела
+          <em>Hooks Recipes</em> официальной документации.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Hooks Recipes</div>
+      <div class="theory__body">
+
+        <h3>Откуда эти рецепты</h3>
+        <div class="quote">
+          "We've pared down our hooks API from the original alpha release, focusing on a more minimal set of API primitives. However, you may still wish to use some of the approaches we tried in your own apps. These examples should be ready to copy and paste into your own codebase."<br>
+          — <a href="https://react-redux.js.org/api/hooks#recipes" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Мы сократили наш hooks API по сравнению с изначальным альфа-релизом, сфокусировавшись на более минимальном наборе API-примитивов. Тем не менее, вы, возможно, захотите использовать некоторые из подходов, которые мы пробовали, в своих приложениях. Эти примеры готовы к копированию и вставке в ваш код.»<br>
+          — перевод
+        </div>
+
+        <h3>Рецепт 1: useActions(actions, deps?)</h3>
+        <p>
+          Был частью alpha-версии, но был удалён. Причина — не столько технические ограничения,
+          сколько идеология:
+        </p>
+        <div class="quote">
+          "This hook was in our original alpha release, but removed in v7.1.0-alpha.4, based on Dan Abramov's suggestion. That suggestion was based on 'binding action creators' not being as useful in a hooks-based use case, and causing too much conceptual overhead and syntactic complexity."<br>
+          — <a href="https://react-redux.js.org/api/hooks#recipe-useactions" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Этот хук был в исходном alpha-релизе, но удалён в v7.1.0-alpha.4 по предложению Дэна Абрамова. Его соображение основывалось на том, что «биндинг action creator'ов» в hooks-подходе не так полезен и приводит к слишком большим концептуальным накладным расходам и синтаксической сложности.»<br>
+          — перевод
+        </div>
+        <div class="quote">
+          "You should probably prefer to call the useDispatch hook in your components to retrieve a reference to dispatch, and manually call dispatch(someActionCreator()) in callbacks and effects as needed."<br>
+          — <a href="https://react-redux.js.org/api/hooks#recipe-useactions" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Скорее всего, вам стоит предпочесть вызов хука useDispatch в компонентах для получения ссылки на dispatch и ручной вызов dispatch(someActionCreator()) в обработчиках и эффектах по мере необходимости.»<br>
+          — перевод
+        </div>
+
+        <h3>Реализация useActions</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">bindActionCreators</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+<span class="kw">import</span> { <span class="fn">useDispatch</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import</span> { <span class="fn">useMemo</span> } <span class="kw">from</span> <span class="str">'react'</span>
+
+<span class="kw">export function</span> <span class="fn">useActions</span>(<span class="prop">actions</span>, <span class="prop">deps</span>?) {
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+  <span class="kw">return</span> <span class="fn">useMemo</span>(() =&gt; {
+    <span class="kw">if</span> (<span class="type">Array</span>.<span class="fn">isArray</span>(actions)) {
+      <span class="kw">return</span> actions.<span class="fn">map</span>(a =&gt; <span class="fn">bindActionCreators</span>(a, dispatch))
+    }
+    <span class="kw">return</span> <span class="fn">bindActionCreators</span>(actions, dispatch)
+  }, deps ? [dispatch, ...deps] : [dispatch])
+}
+        </div>
+        <p>
+          <code>bindActionCreators</code> оборачивает каждый action creator в функцию, которая
+          автоматически диспатчит результат. <code>useMemo</code> гарантирует, что объект
+          забинженных actions — стабильная ссылка (важно, если вы передаёте его в
+          <code>useEffect</code> или в дочерний компонент с <code>React.memo</code>).
+        </p>
+
+        <h3>Использование useActions</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">increment</span> = () =&gt; ({ <span class="prop">type</span>: <span class="str">'INCREMENT'</span> })
+<span class="kw">const</span> <span class="fn">decrement</span> = () =&gt; ({ <span class="prop">type</span>: <span class="str">'DECREMENT'</span> })
+
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> { increment, decrement } = <span class="fn">useActions</span>({ increment, decrement })
+
+  <span class="kw">return</span> (
+    &lt;&gt;
+      &lt;button onClick={increment}&gt;+&lt;/button&gt;
+      &lt;button onClick={decrement}&gt;−&lt;/button&gt;
+    &lt;/&gt;
+  )
+}
+        </div>
+
+        <h3>Почему Дэн Абрамов предложил удалить useActions</h3>
+        <ul>
+          <li><strong>Неявный dispatch.</strong> Чтение кода: видим вызов функции
+            <code>increment()</code> — но где происходит <code>dispatch</code>? Скрыто внутри.
+            Явный <code>dispatch(increment())</code> читается сразу.</li>
+          <li><strong>Два способа делать одно и то же.</strong>
+            <code>bindActionCreators</code> делает из action creator'а функцию, которую можно звать
+            как обычную функцию. Это ценно в старом <code>connect</code>, где такие функции
+            передаются в <em>дочерние</em> компоненты как props и могут не знать про
+            <code>dispatch</code>. В hooks-стиле <code>dispatch</code> <em>доступен везде</em> через
+            <code>useDispatch</code> — обёртка не экономит ничего.</li>
+          <li><strong>Синтаксическая сложность.</strong> Два API (<code>useDispatch</code> +
+            <code>useActions</code>) вместо одного — лишняя когнитивная нагрузка.</li>
+        </ul>
+
+        <h3>Рецепт 2: useShallowEqualSelector</h3>
+        <p>
+          Частая потребность — чтобы <code>useSelector</code> сравнивал результат через
+          <code>shallowEqual</code>, а не через <code>===</code>. Каждый раз писать второй аргумент
+          скучно, поэтому делают обёртку:
+        </p>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">useSelector</span>, <span class="fn">shallowEqual</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">export function</span> <span class="fn">useShallowEqualSelector</span>&lt;<span class="type">Selected</span>&gt;(
+  <span class="prop">selector</span>: (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; <span class="type">Selected</span>
+): <span class="type">Selected</span> {
+  <span class="kw">return</span> <span class="fn">useSelector</span>(selector, <span class="fn">shallowEqual</span>)
+}
+        </div>
+        <p>
+          Используется там же, где обычно <code>useSelector(..., shallowEqual)</code>: selector
+          возвращает объект с несколькими полями, а вы хотите ре-рендер только при изменении
+          <em>значений</em>, а не просто новой ссылки:
+        </p>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">UserPanel</span>() {
+  <span class="kw">const</span> { name, age } = <span class="fn">useShallowEqualSelector</span>(state =&gt; ({
+    <span class="prop">name</span>: state.<span class="prop">user</span>.<span class="prop">name</span>,
+    <span class="prop">age</span>:  state.<span class="prop">user</span>.<span class="prop">age</span>,
+  }))
+  <span class="kw">return</span> &lt;div&gt;{name}, {age}&lt;/div&gt;
+}
+        </div>
+
+        <h3>Чем отличается от простого useSelector(..., shallowEqual)?</h3>
+        <p>
+          Ничем — это именно обёртка. Единственная выгода — не повторять
+          <code>shallowEqual</code> на каждом call-site. Если в проекте это частый паттерн, обёртка
+          делает код короче и однообразнее. Если редкий — обычный
+          <code>useSelector(selector, shallowEqual)</code> полностью ок.
+        </p>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Оба рецепта не меняют механику подписки. При <code>dispatch</code>:
+          <code>linked list callback'ов → Subscription.notify() → checkForUpdates → selector → ===
+          (или shallowEqual) → forceRender</code>. В <code>useActions</code> шаг
+          <code>forceRender</code> вообще неактуален — этот хук только создаёт обёртки над dispatch
+          и сам по себе компонент не подписывает (хотя <code>useDispatch</code> внутри и не
+          подписывает, а <code>useMemo</code> — это уже React-мемо, не Redux-подписка). В
+          <code>useShallowEqualSelector</code> подписка — та же, что у обычного
+          <code>useSelector</code>, просто последний шаг сравнения использует
+          <code>shallowEqual</code> вместо <code>===</code>. Подробнее о Subscription —
+          <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Вывод:</strong> рецепты — это <em>конструктор</em>. Копируйте их в свой проект, если
+          видите реальную выгоду в конкретном сценарии. Современный идиоматичный react-redux —
+          явный <code>useDispatch</code> + прямой вызов action creator'а и стандартный
+          <code>useSelector</code> (опционально с <code>shallowEqual</code>). Но знать, как это
+          сделать иначе — полезно.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

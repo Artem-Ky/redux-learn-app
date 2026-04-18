@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>38 — useSelector с shallowEqual и кастомным equalityFn</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .eq-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .eq-grid { grid-template-columns: 1fr; }
+    }
+    .eq-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .eq-card--default { border-color: rgba(244, 71, 71, 0.4); }
+    .eq-card--shallow { border-color: rgba(76, 175, 80, 0.4); }
+    .eq-card--opts { border-color: rgba(86, 156, 214, 0.4); }
+    .eq-card--custom { border-color: rgba(197, 134, 192, 0.4); }
+    .eq-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .eq-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+    }
+    .eq-card__counters {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .eq-card__counter {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .eq-card__label {
+      font-size: 0.66rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .eq-card__val {
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .eq-card__val--rr { color: var(--accent-red); }
+    .eq-card__val--ok { color: var(--success); }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .state-display {
+      text-align: center;
+      font-family: var(--font-mono);
+      padding: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .state-display strong { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">38 / 70</span>
+      useSelector — shallowEqual и equalityFn
+    </div>
+    <nav class="site-header__nav">
+      <a href="../37-useselector-equality/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">38</span>
+      <a href="../39-useselector-multiple-calls/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — четыре варианта equality</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Четыре карточки используют разные варианты <code>equalityFn</code>. Первые три читают
+          один и тот же объект <code>{'{ a, b }'}</code>. Четвёртая читает дробное
+          <code>precision</code> с кастомным сравнением. Кнопки меняют state — считайте рендеры
+          каждой карточки.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — shallowEqual и кастомные equality-функции</div>
+      <div class="theory__body">
+
+        <h3>Зачем нужен второй аргумент useSelector</h3>
+        <p>
+          По умолчанию <code>useSelector</code> сравнивает результаты через <code>===</code>
+          (см. урок 37). Это плохо работает, когда selector возвращает <strong>объект</strong>
+          или <strong>массив</strong>, так как каждый вызов создаёт новую ссылку. Второй аргумент
+          <code>equalityFn</code> позволяет задать своё правило сравнения — ре-рендер будет только
+          когда <code>equalityFn(prev, next)</code> вернул <code>false</code>.
+        </p>
+
+        <h3>shallowEqual — shallow-сравнение из react-redux</h3>
+        <div class="quote">
+          "Use the shallowEqual function from React-Redux as the equalityFn argument to useSelector()"<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Используйте функцию shallowEqual из React-Redux в качестве аргумента equalityFn для useSelector().»<br>
+          — перевод
+        </div>
+
+        <p>
+          <code>shallowEqual</code> сравнивает два объекта (или массива) <strong>на один уровень глубины</strong>:
+          каждое поле сравнивается через <code>===</code>. Если все поля равны — объекты считаются
+          одинаковыми, и ре-рендера не будет, даже если ссылки разные.
+        </p>
+
+        <h3>Два способа передать equalityFn</h3>
+        <div class="code-block">
+<span class="cm">// Способ 1: второй аргумент — сама функция</span>
+<span class="kw">import</span> { <span class="fn">shallowEqual</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">const</span> <span class="prop">data</span> = <span class="fn">useSelector</span>(
+  (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; ({ <span class="prop">a</span>: state.<span class="prop">pair</span>.<span class="prop">a</span>, <span class="prop">b</span>: state.<span class="prop">pair</span>.<span class="prop">b</span> }),
+  <span class="fn">shallowEqual</span>
+)
+
+<span class="cm">// Способ 2: объект options с полем equalityFn</span>
+<span class="kw">const</span> <span class="prop">data</span> = <span class="fn">useSelector</span>(
+  (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; ({ <span class="prop">a</span>: state.<span class="prop">pair</span>.<span class="prop">a</span>, <span class="prop">b</span>: state.<span class="prop">pair</span>.<span class="prop">b</span> }),
+  { <span class="prop">equalityFn</span>: <span class="fn">shallowEqual</span> }
+)
+        </div>
+        <p>
+          Способ 2 особенно удобен, когда кроме <code>equalityFn</code> нужно передать настройки
+          dev-проверок (<code>devModeChecks</code>, урок 42).
+        </p>
+
+        <h3>Кастомная equality-функция</h3>
+        <div class="quote">
+          "Use a custom equality function as the equalityFn argument to useSelector()"<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Используйте свою функцию сравнения в качестве аргумента equalityFn для useSelector().»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "The optional comparison function also enables using something like Lodash's _.isEqual() or Immutable.js's comparison capabilities."<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Необязательная функция сравнения также позволяет использовать, например, _.isEqual() из Lodash или возможности сравнения из Immutable.js.»<br>
+          — перевод
+        </div>
+
+        <p>
+          Любая функция <code>(prev, next) =&gt; boolean</code> подходит. <code>true</code> означает
+          «одинаковые — не ре-рендерить», <code>false</code> — «разные — ре-рендерить».
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Пример: считаем числа «равными», если отличаются меньше чем на 0.01</span>
+<span class="kw">const</span> <span class="fn">customEqual</span> = (<span class="prop">a</span>: <span class="type">number</span>, <span class="prop">b</span>: <span class="type">number</span>) =&gt; <span class="type">Math</span>.<span class="fn">abs</span>(a - b) &lt; <span class="num">0.01</span>
+<span class="kw">const</span> <span class="prop">precision</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">precision</span>, <span class="fn">customEqual</span>)
+        </div>
+
+        <h3>shallowEqual vs createSelector</h3>
+        <p>
+          Оба подхода решают проблему возврата объекта из selector'а, но по-разному:
+        </p>
+        <ul style="padding-left: 20px; color: var(--text-secondary);">
+          <li style="margin: 6px 0;">
+            <strong>shallowEqual</strong> не мешает selector'у создавать новый объект при каждом вызове —
+            мы просто <em>не ре-рендерим</em>, если все поля равны.
+          </li>
+          <li style="margin: 6px 0;">
+            <strong>createSelector</strong> (из reselect) <em>мемоизирует</em> результат: если inputs не
+            изменились — возвращается <em>та же самая</em> ссылка, и дефолтного <code>===</code> уже достаточно.
+          </li>
+        </ul>
+        <p>
+          На практике <code>createSelector</code> предпочтительнее, когда вычисление тяжёлое или результат
+          передаётся дальше в <code>React.memo</code>-компоненты. <code>shallowEqual</code> —
+          лёгкое средство, когда selector просто «упаковывает» несколько полей.
+        </p>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          После <code>dispatch</code>: linked list callback'ов → <code>Subscription.notify()</code>
+          → для каждого слушателя <code>checkForUpdates</code> → запустить selector → сравнить через
+          <code>equalityFn</code> (по умолчанию <code>===</code>, иначе — то, что вы передали)
+          → <code>forceRender</code> если отличается. То есть <code>equalityFn</code> встраивается
+          ровно в шаг сравнения, остальные этапы подписки те же.
+          Подробнее про Subscription — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="warning">
+          <strong>Осторожно с тяжёлыми сравнениями:</strong> <code>equalityFn</code> вызывается при
+          <em>каждом</em> dispatch. Если вы положите туда <code>_.isEqual</code> на большой структуре —
+          это станет узким местом. <code>shallowEqual</code> почти бесплатный, но глубокое сравнение
+          больших массивов — нет.
+        </div>
+
+        <div class="tip">
+          <strong>Рабочий рецепт:</strong>
+          <ol style="padding-left: 20px; margin-top: 6px;">
+            <li>Возвращайте примитив — дефолтного <code>===</code> достаточно.</li>
+            <li>Возвращаете плоский объект из 2–5 полей — <code>shallowEqual</code>.</li>
+            <li>Derived-значение с вычислением — <code>createSelector</code> (урок 40).</li>
+            <li>Нестандартная семантика (округление, tolerant-сравнение) — кастомная equalityFn.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

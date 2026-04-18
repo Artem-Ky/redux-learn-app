@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>39 — Множественные useSelector в одном компоненте</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ml-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .ml-grid { grid-template-columns: 1fr; }
+    }
+    .ml-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ml-card--one { border-color: rgba(86, 156, 214, 0.4); }
+    .ml-card--many { border-color: rgba(76, 175, 80, 0.4); }
+    .ml-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .ml-card__subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .ml-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+    }
+    .ml-card__fields {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+    .ml-card__field {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+    }
+    .ml-card__field-key { color: #9cdcfe; }
+    .ml-card__field-val { color: var(--accent-cyan); }
+    .ml-card__rr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+    }
+    .ml-card__rr-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .ml-card__rr-val {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .ml-card__subs {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .ml-card__subs strong { color: var(--accent-yellow); }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">39 / 70</span>
+      Множественные useSelector в одном компоненте
+    </div>
+    <nav class="site-header__nav">
+      <a href="../38-useselector-shallowequal/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">39</span>
+      <a href="../40-useselector-memoized/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — один useSelector-объект vs пять отдельных</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Оба компонента показывают одни и те же 5 полей из разных срезов state. Слева — один
+          <code>useSelector</code> с объектом и <code>shallowEqual</code>. Справа — пять отдельных
+          <code>useSelector</code>-вызовов. Счётчики рендеров: <strong>оба ре-рендерятся одинаково</strong>,
+          благодаря автоматическому батчингу React 18+.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — несколько useSelector в одном компоненте</div>
+      <div class="theory__body">
+
+        <h3>Каждый вызов useSelector — отдельная подписка</h3>
+        <div class="quote">
+          "You may call useSelector() multiple times within a single function component. Each call to useSelector() creates an individual subscription to the Redux store."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Можно вызывать useSelector() много раз внутри одного функционального компонента. Каждый вызов useSelector() создаёт отдельную подписку на Redux-хранилище.»<br>
+          — перевод
+        </div>
+
+        <p>
+          «Отдельная подписка» здесь означает, что хук регистрирует свой
+          <code>checkForUpdates</code>-callback в Subscription (<a href="../03a-subscription-system/">урок 03a</a>).
+          Если в компоненте 5 вызовов <code>useSelector</code> — в linked list Subscription добавятся
+          5 узлов-слушателей, и каждый из них после <code>dispatch</code> запустит <em>свой</em>
+          selector и сравнит <em>свой</em> результат через <code>===</code>.
+        </p>
+
+        <h3>Один dispatch → один ре-рендер (батчинг)</h3>
+        <div class="quote">
+          "Because of the React update batching behavior used in React Redux v7, a dispatched action that causes multiple useSelector()s in the same component to return new values should only result in a single re-render."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Благодаря поведению батчинга обновлений React, которое используется в React Redux v7, один dispatched action, заставляющий несколько useSelector() в одном компоненте вернуть новые значения, должен привести только к одному ре-рендеру.»<br>
+          — перевод
+        </div>
+
+        <p>
+          То есть даже если <em>все пять</em> ваших <code>useSelector</code> увидят новое значение
+          после одного <code>dispatch</code> — React объединит их в <strong>один</strong> рендер.
+          А в React 18+ это работает уже и для произвольных синхронных последовательностей
+          <code>dispatch</code> внутри обработчика события — все они попадают в одну «пачку».
+        </p>
+
+        <h3>Вариант 1: один useSelector + shallowEqual</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">data</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; ({
+  <span class="prop">userName</span>:  state.<span class="prop">user</span>.<span class="prop">name</span>,
+  <span class="prop">userAge</span>:   state.<span class="prop">user</span>.<span class="prop">age</span>,
+  <span class="prop">todoCount</span>: state.<span class="prop">todos</span>.<span class="prop">list</span>.<span class="prop">length</span>,
+  <span class="prop">theme</span>:     state.<span class="prop">ui</span>.<span class="prop">theme</span>,
+  <span class="prop">loading</span>:   state.<span class="prop">ui</span>.<span class="prop">loading</span>,
+}), <span class="fn">shallowEqual</span>)
+        </div>
+
+        <h3>Вариант 2: пять отдельных useSelector</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">userName</span>  = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">user</span>.<span class="prop">name</span>)
+<span class="kw">const</span> <span class="prop">userAge</span>   = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">user</span>.<span class="prop">age</span>)
+<span class="kw">const</span> <span class="prop">todoCount</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>.<span class="prop">list</span>.<span class="prop">length</span>)
+<span class="kw">const</span> <span class="prop">theme</span>     = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">ui</span>.<span class="prop">theme</span>)
+<span class="kw">const</span> <span class="prop">loading</span>   = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">loading</span>)
+        </div>
+
+        <h3>Что рекомендуется</h3>
+        <ul style="padding-left: 20px; color: var(--text-secondary);">
+          <li style="margin: 6px 0;">
+            <strong>Один useSelector на одно значение</strong> — самый читаемый и безопасный паттерн.
+            Каждое поле — отдельная подписка, дефолтного <code>===</code> достаточно.
+          </li>
+          <li style="margin: 6px 0;">
+            Объект с <code>shallowEqual</code> — компактнее в коде, но легко ошибиться и забыть
+            <code>shallowEqual</code>, а тогда компонент будет ре-рендериться на каждом dispatch.
+          </li>
+          <li style="margin: 6px 0;">
+            Для <em>derived</em> данных (фильтрация, сортировка) — <code>createSelector</code> из reselect
+            (урок 40), а не inline-объект.
+          </li>
+        </ul>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Смоделируем что происходит при <code>dispatch</code> в компоненте с 5 хуками:
+          linked list callback'ов → <code>Subscription.notify()</code> → для каждого слушателя
+          <code>checkForUpdates</code> → запустить selector → сравнить через <code>===</code>
+          → <code>forceRender</code> если отличается. Если несколько хуков одного компонента вызовут
+          <code>forceRender</code> — React видит это как один компонент и выполнит единый рендер
+          (батчинг). Внутри этого рендера каждый <code>useSelector</code> просто вернёт актуальное
+          значение. Подробнее про Subscription — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Совет:</strong> не бойтесь большого числа <code>useSelector</code>. Эти хуки
+          очень дешёвые — подписка и сравнение крошечные, а читаемость кода выше, чем у одного
+          «комбайна». Оптимизируйте только если профайлер показал реальную проблему.
+        </div>
+
+        <div class="warning">
+          <strong>Что не делать:</strong> не превращайте один <code>useSelector</code> в
+          «<em>глобальный аггрегатор</em>»: <code>useSelector(state =&gt; state)</code> или
+          <code>useSelector(state =&gt; ({ …state }))</code>. Такой хук в dev-режиме триггерит
+          identityFunctionCheck (урок 42) и заставляет компонент ре-рендериться от <em>любого</em>
+          изменения store.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

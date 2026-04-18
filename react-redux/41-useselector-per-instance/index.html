@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>41 — useSelector + createSelector с per-instance мемоизацией</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .pi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1000px) {
+      .pi-grid { grid-template-columns: 1fr; }
+    }
+    .pi-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pi-card--bad { border-color: rgba(244, 71, 71, 0.4); }
+    .pi-card--good { border-color: rgba(76, 175, 80, 0.4); }
+    .pi-card__tag {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .pi-card--bad .pi-card__tag { background: rgba(244, 71, 71, 0.15); color: var(--accent-red); }
+    .pi-card--good .pi-card__tag { background: rgba(76, 175, 80, 0.15); color: var(--success); }
+    .pi-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .pi-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      color: var(--text-primary);
+    }
+    .pi-card__rows {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .pi-row {
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+    }
+    .pi-row--bad  { border-left: 3px solid var(--accent-red); }
+    .pi-row--good { border-left: 3px solid var(--success); }
+    .pi-row__letter {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--accent-yellow);
+      text-align: center;
+    }
+    .pi-row__words {
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pi-row__empty { color: var(--text-muted); font-style: italic; }
+    .pi-row__meta {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .pi-row__meta strong {
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+    .pi-card__stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .pi-card__stat {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .pi-card__stat-label {
+      font-size: 0.64rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .pi-card__stat-val {
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .pi-card__stat-val--red { color: var(--accent-red); }
+    .pi-card__stat-val--green { color: var(--success); }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .pi-legend {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+    .pi-legend__swatch {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .pi-legend__swatch--true { background: rgba(76, 175, 80, 0.4); }
+    .pi-legend__swatch--false { background: rgba(244, 71, 71, 0.4); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">41 / 70</span>
+      useSelector + createSelector с per-instance мемоизацией
+    </div>
+    <nav class="site-header__nav">
+      <a href="../40-useselector-memoized/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">41</span>
+      <a href="../42-useselector-dev-checks/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — один selector на всех vs selector на инстанс</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Девять инстансов компонента <code>WordsByLetter</code>. Каждый получает свою букву
+          (<code>A</code>, <code>B</code>, <code>C</code>, ...) и выводит список слов из store,
+          начинающихся на эту букву. Selector зависит от props. Слева — один общий
+          <code>createSelector</code> на всех. Справа — отдельный selector на каждый инстанс через
+          <code>useMemo</code>. Счётчики показывают, сколько раз вызвалась output-функция
+          (<code>.filter()</code>) и сколько произошло ре-рендеров. Особенно показателен
+          <em>unrelated</em> dispatch (<code>tick</code>) — <code>words.list</code> в store
+          остаётся той же ссылкой.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — per-instance мемоизация</div>
+      <div class="theory__body">
+
+        <h3>Где ломается общий мемоизированный selector</h3>
+        <p>
+          <code>createSelector</code> из <code>reselect</code> по умолчанию хранит
+          <strong>один</strong> последний результат — cache size = 1. Пока inputs приходят одни и те же,
+          output-функция не вызывается. Но как только <strong>два</strong> инстанса вызывают тот же
+          selector <em>с разными props</em> — они попеременно затирают друг другу кэш.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ ОБЩИЙ selector — cache ломается для разных props</span>
+<span class="kw">const</span> <span class="fn">selectCompletedTodosCount</span> = <span class="fn">createSelector</span>(
+  (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>,
+  (<span class="prop">_</span>: <span class="type">RootState</span>, <span class="prop">completed</span>: <span class="type">boolean</span>) =&gt; completed,
+  (<span class="prop">todos</span>, <span class="prop">completed</span>) =&gt; todos.<span class="fn">filter</span>(<span class="prop">t</span> =&gt; t.<span class="prop">completed</span> === completed).<span class="prop">length</span>
+)
+
+<span class="kw">function</span> <span class="fn">CompletedTodosCount</span>({ <span class="prop">completed</span> }: { <span class="prop">completed</span>: <span class="type">boolean</span> }) {
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt;
+    <span class="fn">selectCompletedTodosCount</span>(state, completed)
+  )
+  <span class="cm">// Два инстанса с разными completed — кэш перезаписывается</span>
+  <span class="cm">// ChildA (completed=true):  cache = { inputs=[todos, true],  output=3 }</span>
+  <span class="cm">// ChildB (completed=false): cache = { inputs=[todos, false], output=5 } ← перезаписал A</span>
+  <span class="cm">// ChildA снова: cache miss → пересчёт → cache = { ..., true, 3 } ← перезаписал B</span>
+  <span class="kw">return</span> &lt;div&gt;{count}&lt;/div&gt;
+}
+        </div>
+
+        <h3>Решение 1: фабрика selector'ов + useMemo</h3>
+        <p>
+          Функция-<strong>фабрика</strong> <code>makeSelect...()</code> возвращает <em>новый</em>
+          экземпляр <code>createSelector(...)</code> при каждом вызове. Компонент сохраняет
+          результат фабрики в <code>useMemo(..., [])</code> — у каждого инстанса теперь свой selector
+          со своим кэшем. Никто никому ничего не затирает.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Фабрика — создаёт отдельный createSelector на каждый вызов</span>
+<span class="kw">const</span> <span class="fn">makeSelectCompletedTodosCount</span> = () =&gt; <span class="fn">createSelector</span>(
+  (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>,
+  (<span class="prop">_</span>: <span class="type">RootState</span>, <span class="prop">completed</span>: <span class="type">boolean</span>) =&gt; completed,
+  (<span class="prop">todos</span>, <span class="prop">completed</span>) =&gt; todos.<span class="fn">filter</span>(<span class="prop">t</span> =&gt; t.<span class="prop">completed</span> === completed).<span class="prop">length</span>
+)
+
+<span class="kw">function</span> <span class="fn">CompletedTodosCount</span>({ <span class="prop">completed</span> }: { <span class="prop">completed</span>: <span class="type">boolean</span> }) {
+  <span class="kw">const</span> <span class="prop">selectCount</span> = <span class="fn">useMemo</span>(<span class="fn">makeSelectCompletedTodosCount</span>, [])
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; <span class="fn">selectCount</span>(state, completed))
+  <span class="cm">// Каждый инстанс имеет СВОЙ selector с СВОИМ кэшем</span>
+  <span class="kw">return</span> &lt;div&gt;{count}&lt;/div&gt;
+}
+        </div>
+
+        <p>
+          Эквивалентная запись через inline-<code>useMemo</code> без отдельной фабрики:
+          <code>useMemo(() =&gt; createSelector(...), [])</code>. Фабричный вариант удобнее тем,
+          что одну и ту же <code>makeSelect...</code> можно переиспользовать в разных компонентах.
+        </p>
+
+        <h3>Решение 2: + shallowEqual в useSelector</h3>
+        <p>
+          Фабрика спасает от лишних вычислений, когда изменилась «чужая» часть стора
+          (<code>words.list</code> та же ссылка → все кэши хитнули, filter не запускался, 0 ре-рендеров).
+          Но как только <code>words.list</code> получает <strong>новую</strong> ссылку, кэши миссуют
+          у всех инстансов, <code>filter</code> отдаёт НОВЫЙ массив, а <code>useSelector</code> по
+          умолчанию сравнивает результат через <code>===</code> — и ре-рендерятся <strong>все</strong>
+          строки, хотя содержимое у них не менялось.
+        </p>
+        <p>
+          Дополним: вторым аргументом в <code>useSelector</code> передадим <code>shallowEqual</code>.
+          Он сравнивает массивы поэлементно — если слова остались те же, ре-рендер пропускается.
+          В итоге при <code>ADD_WORD "Aew-15"</code> ре-рендерится только строка <code>A</code>,
+          остальные — нет.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">useSelector</span>, <span class="fn">shallowEqual</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">function</span> <span class="fn">WordsByLetter</span>({ <span class="prop">letter</span> }: { <span class="prop">letter</span>: <span class="type">string</span> }) {
+  <span class="kw">const</span> <span class="prop">selectByLetter</span> = <span class="fn">useMemo</span>(<span class="fn">makeSelectByLetter</span>, [])
+  <span class="kw">const</span> <span class="prop">words</span> = <span class="fn">useSelector</span>(
+    (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; <span class="fn">selectByLetter</span>(state, letter),
+    <span class="fn">shallowEqual</span>   <span class="cm">// content-equal → ре-рендер не триггерим</span>
+  )
+  <span class="kw">return</span> &lt;div&gt;{words.<span class="fn">join</span>(<span class="str">', '</span>)}&lt;/div&gt;
+}
+        </div>
+
+        <h3>Цитаты из документации</h3>
+        <div class="quote">
+          "The same is true if the selector depends on the component's props, but will only ever be used in a single instance of a single component"<br>
+          — <a href="https://react-redux.js.org/api/hooks#using-memoizing-selectors" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «То же самое верно, если selector зависит от props компонента, но будет использоваться только в одном экземпляре одного компонента.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "However, when the selector is used in multiple component instances and depends on the component's props, you need to ensure that selector's memoization behavior is properly configured (see here for details)."<br>
+          — <a href="https://react-redux.js.org/api/hooks#using-memoizing-selectors" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Однако, когда selector используется в нескольких экземплярах компонента и зависит от его props, необходимо правильно настроить поведение мемоизации selector'а.»<br>
+          — перевод
+        </div>
+
+        <h3>Варианты решения</h3>
+        <ol style="padding-left: 20px; line-height: 1.8;">
+          <li>
+            <strong><code>useMemo</code> + <code>createSelector</code>.</strong> Самый простой способ.
+            Selector создаётся в замыкании инстанса, deps <code>useMemo</code> — нужные props.
+          </li>
+          <li>
+            <strong>Фабрика selector'ов (selector factory).</strong> Функция вида
+            <code>makeSelectCount()</code>, возвращающая <em>новый</em> <code>createSelector(...)</code>
+            при каждом вызове. Компонент хранит результат фабрики в <code>useMemo</code>.
+          </li>
+          <li>
+            <strong><code>reselect</code> с cache size &gt; 1.</strong> Через
+            <code>createSelectorCreator</code> / <code>weakMapMemoize</code> (Reselect 5) — один и тот
+            же selector держит много cache-записей, по одной на комбинацию inputs.
+          </li>
+          <li>
+            <strong>Factory function в <code>connect</code>.</strong> Аналог <code>useMemo</code> для
+            класс-компонентов: <code>mapStateToProps</code> возвращает <em>ещё одну функцию</em>,
+            которая и есть per-instance <code>mapStateToProps</code>. Подробнее — урок 32.
+          </li>
+        </ol>
+
+        <div class="code-block">
+<span class="cm">// Вариант 2: selector factory</span>
+<span class="kw">const</span> <span class="fn">makeSelectCount</span> = () =&gt; <span class="fn">createSelector</span>(
+  (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>,
+  (<span class="prop">_</span>: <span class="type">RootState</span>, <span class="prop">completed</span>: <span class="type">boolean</span>) =&gt; completed,
+  (<span class="prop">todos</span>, <span class="prop">completed</span>) =&gt; todos.<span class="fn">filter</span>(<span class="prop">t</span> =&gt; t.<span class="prop">completed</span> === completed).<span class="prop">length</span>
+)
+
+<span class="kw">function</span> <span class="fn">CompletedTodosCount</span>({ <span class="prop">completed</span> }: { <span class="prop">completed</span>: <span class="type">boolean</span> }) {
+  <span class="kw">const</span> <span class="prop">selectCount</span> = <span class="fn">useMemo</span>(<span class="fn">makeSelectCount</span>, [])
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; <span class="fn">selectCount</span>(state, completed))
+  <span class="kw">return</span> &lt;div&gt;{count}&lt;/div&gt;
+}
+        </div>
+
+        <h3>Как это выглядит в системе Subscription</h3>
+        <p>
+          Мемоизация selector'а — это <em>локальная</em> оптимизация внутри самой selector-функции. Она
+          не меняет поведение подписки. Путь ре-рендера после <code>dispatch</code> всегда тот же:
+          linked list callback'ов → <code>Subscription.notify()</code> → <code>checkForUpdates</code>
+          → selector → <code>===</code> → <code>forceRender</code>, если результат изменился. Но если
+          у вас общий selector и <em>N</em> инстансов с разными props, то на каждом
+          <code>Subscription.notify()</code> output-функция запускается <em>N</em> раз вместо одного —
+          кэш стирается соседями. Per-instance selector ломает эту цепочку: каждый инстанс считает
+          свой кусок один раз и попадает в кэш до следующего изменения state.
+          Подробнее про Subscription — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="warning">
+          <strong>Опасно:</strong> нельзя создавать <code>createSelector(...)</code> прямо в теле
+          компонента <em>без</em> <code>useMemo</code>. Тогда selector пересоздаётся на каждом рендере
+          — внутренний кэш <code>reselect</code> теряется ещё до первого хита.
+        </div>
+
+        <div class="tip">
+          <strong>Правило большого пальца:</strong>
+          <ul style="padding-left: 20px; margin-top: 6px;">
+            <li>Selector <em>не зависит</em> от props → объявляйте один экземпляр на уровне модуля.</li>
+            <li>Selector зависит от props и используется в <em>одном</em> инстансе → тоже на уровне модуля.</li>
+            <li>Selector зависит от props и используется в <em>нескольких</em> инстансах →
+              <code>useMemo</code> + <code>createSelector</code> (per-instance).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

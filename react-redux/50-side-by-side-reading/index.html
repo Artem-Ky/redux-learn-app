@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>50 — Сравнение: чтение данных — mapStateToProps vs useSelector</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .sbs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .sbs-grid { grid-template-columns: 1fr; }
+    }
+    .sbs-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .sbs-card--connect { border-color: var(--accent); }
+    .sbs-card--hooks   { border-color: var(--accent-purple); }
+    .sbs-card__header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sbs-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+    .sbs-card--connect .sbs-card__title { color: var(--accent); }
+    .sbs-card--hooks   .sbs-card__title { color: var(--accent-purple); }
+    .sbs-card__renders {
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      margin-left: auto;
+    }
+    .sbs-card__title-h3 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--accent-yellow);
+    }
+    .sbs-card__body {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      padding: 8px 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .sbs-card__body strong { color: var(--accent-cyan); }
+    .sbs-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      margin: 10px 0;
+    }
+    .diff-table th, .diff-table td {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+      text-align: left;
+    }
+    .diff-table th {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+    .diff-table td {
+      color: var(--text-secondary);
+    }
+    .diff-table td code {
+      color: var(--accent-yellow);
+      font-size: 0.78rem;
+    }
+    .parent-panel {
+      background: var(--bg-panel);
+      border: 1px dashed var(--border-light);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+    .parent-panel__title {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .parent-panel__counter {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--accent-cyan);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">50 / 70</span>
+      Сравнение: чтение данных — mapStateToProps vs useSelector
+    </div>
+    <nav class="site-header__nav">
+      <a href="../49-hooks-practical-todo/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">50</span>
+      <a href="../51-side-by-side-dispatch/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — один компонент в двух реализациях</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Слева <code>connect(mapStateToProps)</code>, справа <code>useSelector</code>. Оба читают
+          <code>state.counter.value</code> и <code>state.user.name</code>. Ниже — три кнопки для
+          разных dispatch'ей и одна для ре-рендера родителя <em>без изменения state</em>. Следите
+          за счётчиками рендеров.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — mapStateToProps vs useSelector</div>
+      <div class="theory__body">
+
+        <h3>Концептуальная эквивалентность</h3>
+        <div class="quote">
+          "The selector is approximately equivalent to the mapStateToProps argument to connect conceptually."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector концептуально примерно эквивалентен аргументу mapStateToProps функции connect.»<br>
+          — перевод
+        </div>
+
+        <h3>Слева — connect + mapStateToProps</h3>
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">StateProps</span> {
+  <span class="prop">count</span>: <span class="type">number</span>
+  <span class="prop">userName</span>: <span class="type">string</span>
+}
+<span class="kw">interface</span> <span class="type">OwnProps</span> { <span class="prop">title</span>: <span class="type">string</span> }
+<span class="kw">type</span> <span class="type">Props</span> = <span class="type">StateProps</span> &amp; <span class="type">OwnProps</span>
+
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>: <span class="type">RootState</span>): <span class="type">StateProps</span> =&gt; ({
+  <span class="prop">count</span>:    state.<span class="prop">counter</span>.<span class="prop">value</span>,
+  <span class="prop">userName</span>: state.<span class="prop">user</span>.<span class="prop">name</span>,
+})
+
+<span class="kw">const</span> <span class="fn">UserCounterConnect</span> = ({ <span class="prop">title</span>, <span class="prop">count</span>, <span class="prop">userName</span> }: <span class="type">Props</span>) =&gt; (
+  &lt;div&gt;
+    &lt;h3&gt;{title}&lt;/h3&gt;
+    &lt;p&gt;User: {userName}&lt;/p&gt;
+    &lt;p&gt;Count: {count}&lt;/p&gt;
+  &lt;/div&gt;
+)
+
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>)(<span class="fn">UserCounterConnect</span>)
+        </div>
+
+        <h3>Справа — useSelector</h3>
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">OwnProps</span> { <span class="prop">title</span>: <span class="type">string</span> }
+
+<span class="kw">const</span> <span class="fn">UserCounterHook</span> = ({ <span class="prop">title</span> }: <span class="type">OwnProps</span>) =&gt; {
+  <span class="kw">const</span> <span class="prop">count</span>    = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">const</span> <span class="prop">userName</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">user</span>.<span class="prop">name</span>)
+
+  <span class="kw">return</span> (
+    &lt;div&gt;
+      &lt;h3&gt;{title}&lt;/h3&gt;
+      &lt;p&gt;User: {userName}&lt;/p&gt;
+      &lt;p&gt;Count: {count}&lt;/p&gt;
+    &lt;/div&gt;
+  )
+}
+
+<span class="kw">export default</span> <span class="fn">UserCounterHook</span>
+        </div>
+
+        <h3>Таблица различий</h3>
+        <table class="diff-table">
+          <thead>
+            <tr>
+              <th>Аспект</th>
+              <th>connect + mapStateToProps</th>
+              <th>useSelector</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Способ подключения</strong></td>
+              <td>HOC-обёртка <code>connect(mapStateToProps)(Component)</code></td>
+              <td>Вызов хука внутри функционального компонента</td>
+            </tr>
+            <tr>
+              <td><strong>Селектор на компонент</strong></td>
+              <td>Один <code>mapStateToProps</code>, возвращающий объект</td>
+              <td>Обычно несколько независимых <code>useSelector</code> (по одному на поле)</td>
+            </tr>
+            <tr>
+              <td><strong>Форма результата</strong></td>
+              <td>Объект <code>{`{ count, userName }`}</code> — собираются в props</td>
+              <td>Любое значение: примитив, объект, массив, функция</td>
+            </tr>
+            <tr>
+              <td><strong>Сравнение по умолчанию</strong></td>
+              <td><code>shallowEqual</code> для объекта целиком</td>
+              <td><code>===</code> для каждого вызова <code>useSelector</code></td>
+            </tr>
+            <tr>
+              <td><strong>ownProps</strong></td>
+              <td>Второй параметр <code>mapStateToProps(state, ownProps)</code></td>
+              <td>Через closure (ссылка на переменные в теле компонента) или curried selector</td>
+            </tr>
+            <tr>
+              <td><strong>Дерево в DevTools</strong></td>
+              <td><code>&lt;Connect(UserCounter)&gt;</code> → <code>&lt;UserCounter&gt;</code></td>
+              <td>Плоско: <code>&lt;UserCounter&gt;</code></td>
+            </tr>
+            <tr>
+              <td><strong>Типы</strong></td>
+              <td><code>StateProps</code>, <code>OwnProps</code>, <code>DispatchProps</code>,
+                <code>ConnectedProps</code></td>
+              <td>Только <code>RootState</code> + обычные props компонента</td>
+            </tr>
+            <tr>
+              <td><strong>Parent re-render без изменения state</strong></td>
+              <td>Компонент <em>не</em> ре-рендерится: <code>connect</code> делает
+                <code>shouldComponentUpdate</code>-подобную проверку</td>
+              <td>Компонент <em>ре-рендерится</em> — как обычный React-потомок. Нужен
+                <code>React.memo</code>, чтобы избежать</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>selector в useSelector — любое значение</h3>
+        <div class="quote">
+          "The selector may return any value as a result, not just an object."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector может вернуть любое значение в качестве результата, а не только объект.»<br>
+          — перевод
+        </div>
+        <p>
+          <code>mapStateToProps</code> обязан возвращать <em>объект</em> (поля становятся props).
+          <code>useSelector</code> не ограничен — можно вернуть примитив <code>state.counter.value</code>,
+          массив <code>state.todos.list</code>, строку, булево, функцию, что угодно.
+        </p>
+
+        <h3>ownProps: через второй параметр vs через closure</h3>
+        <div class="quote">
+          "The selector function does not receive an ownProps argument. However, props can be used through closure (see the examples above) or by using a curried selector."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector-функция не получает аргумент ownProps. Однако props могут использоваться через замыкание (см. примеры выше) или с помощью curried-selector'а.»<br>
+          — перевод
+        </div>
+
+        <p>В <code>connect</code>:</p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>, <span class="prop">ownProps</span>) =&gt; ({
+  <span class="prop">todo</span>: state.<span class="prop">todos</span>.<span class="prop">byIds</span>[ownProps.<span class="prop">id</span>]
+})
+        </div>
+        <p>В <code>useSelector</code> через closure:</p>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">Todo</span>({ <span class="prop">id</span> }: { <span class="prop">id</span>: <span class="type">number</span> }) {
+  <span class="kw">const</span> <span class="prop">todo</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>.<span class="prop">byIds</span>[id])
+  <span class="kw">return</span> ...
+}
+        </div>
+
+        <h3>Ключевое отличие поведения: parent re-render</h3>
+        <div class="quote">
+          "unlike connect(), useSelector() does not prevent the component from re-rendering due to its parent re-rendering, even if the component's props did not change."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «В отличие от connect(), useSelector() не предотвращает ре-рендер компонента из-за ре-рендера его родителя, даже если props компонента не изменились.»<br>
+          — перевод
+        </div>
+        <p>
+          <code>connect</code> — это HOC, который внутри сравнивает новые props с предыдущими
+          (в т.ч. результат <code>mapStateToProps</code>) через <code>shallowEqual</code>. Если
+          ничего не изменилось, дочерний рендер пропускается. <code>useSelector</code> ничего такого
+          не делает: хук работает <em>внутри</em> функционального компонента, а родитель всё равно
+          вызовет функцию-компонент дочернего при своём ре-рендере.
+        </p>
+        <p>
+          Чтобы получить поведение «не ре-рендерить, если props и результат selector'а не менялись»,
+          нужно обернуть компонент в <code>React.memo</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">UserCounterHook</span> = <span class="fn">React.memo</span>(({ <span class="prop">title</span> }: <span class="type">OwnProps</span>) =&gt; {
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">return</span> &lt;div&gt;{title}: {count}&lt;/div&gt;
+})
+        </div>
+        <p>
+          Теперь <code>React.memo</code> не даст компоненту перерисоваться при ре-рендере родителя,
+          если props не поменялись. А сам <code>useSelector</code> по-прежнему подписан на store и
+          ре-рендерит компонент при изменении <code>count</code> — независимо от родителя.
+        </p>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Обе реализации подписываются на store через одну и ту же систему: при
+          <code>dispatch</code> проходит цепочка <code>linked list callback'ов →
+          Subscription.notify() → checkForUpdates → selector → === (или shallowEqual) → forceRender</code>.
+          Разница только в том, что <code>connect</code> внутри своей HOC-обёртки ещё и проверяет
+          props родителя на shallow equality и таким образом блокирует «лишний» спуск рендера от
+          родителя. <code>useSelector</code> реагирует только на подписку — рендер от родителя
+          проходит сквозь него беспрепятственно. Подробнее о Subscription —
+          <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Практический вывод:</strong> в hooks-подходе <em>по умолчанию</em> компоненты
+          перерендериваются чаще, потому что нет встроенной «защиты» от parent re-render. Это
+          редко критично в реальных приложениях (React быстро рендерит чистые компоненты), но
+          если заметите реальную проблему — <code>React.memo</code> возвращает поведение, близкое к
+          <code>connect</code>.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

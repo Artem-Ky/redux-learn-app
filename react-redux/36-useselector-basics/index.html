@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>36 — useSelector — основы</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .slice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .slice-grid { grid-template-columns: 1fr; }
+    }
+    .slice-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+    .slice-card.flashing {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(78, 201, 176, 0.15);
+    }
+    .slice-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent-yellow);
+      margin-bottom: 6px;
+      word-break: break-all;
+    }
+    .slice-card__value {
+      font-family: var(--font-mono);
+      font-size: 1.6rem;
+      color: var(--accent-cyan);
+      font-weight: 700;
+      margin: 8px 0;
+    }
+    .slice-card__meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .slice-card__meta strong {
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .signature {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-cyan);
+      margin: 10px 0;
+    }
+    .flow-list {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 20px;
+      margin: 10px 0;
+    }
+    .flow-list li {
+      padding: 4px 0;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+    }
+    .flow-list li code {
+      color: var(--accent-yellow);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">36 / 70</span>
+      useSelector — основы
+    </div>
+    <nav class="site-header__nav">
+      <a href="../35-hooks-intro/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">36</span>
+      <a href="../37-useselector-equality/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — три компонента, три среза state</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Каждый компонент ниже использует <code>useSelector</code> для чтения только своего среза state.
+          Нажмите кнопку — изменится только один срез; ре-рендерится только тот компонент, чей
+          <code>useSelector</code> вернул новое значение. Карточка подсветится.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — useSelector основы</div>
+      <div class="theory__body">
+
+        <h3>Что делает useSelector</h3>
+        <div class="quote">
+          "Allows you to extract data from the Redux store state for use in this component, using a selector function."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Позволяет извлечь данные из state Redux-хранилища для использования в этом компоненте с помощью selector-функции.»<br>
+          — перевод
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="signature">
+          useSelector&lt;Selected&gt;(selector, equalityFn?, options?) =&gt; Selected
+        </div>
+        <p>
+          Первый аргумент — selector-функция. Второй (необязательный) — функция сравнения
+          <code>equalityFn</code>. Третий (необязательный) — объект <code>options</code>
+          (включает <code>equalityFn</code> и настройки dev-проверок). Возвращается выбранное
+          значение типа <code>Selected</code>.
+        </p>
+
+        <h3>Правила selector-функции</h3>
+        <div class="quote">
+          "The selector function should be pure since it is potentially executed multiple times and at arbitrary points in time."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector-функция должна быть чистой, поскольку потенциально выполняется много раз и в произвольные моменты времени.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "The selector will be called with the entire Redux store state as its only argument."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector вызывается с полным state Redux-хранилища в качестве единственного аргумента.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "The selector may return any value as a result, including directly returning a value that was nested inside state, or deriving new values."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector может возвращать любое значение — как непосредственно значение, лежащее внутри state, так и производное (derived) значение.»<br>
+          — перевод
+        </div>
+
+        <h3>Пример: чтение вложенного значения</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">CounterDisplay</span>() {
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">return</span> &lt;div&gt;Count: {count}&lt;/div&gt;
+}
+        </div>
+
+        <h3>Когда selector запускается</h3>
+        <div class="quote">
+          "The selector will be run whenever the function component renders... useSelector() will also subscribe to the Redux store, and run your selector whenever an action is dispatched."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector будет запущен при каждом рендере функционального компонента... useSelector() также подписывает компонент на Redux-хранилище и запускает selector при каждом dispatch action.»<br>
+          — перевод
+        </div>
+
+        <ul class="flow-list">
+          <li>1. При каждом рендере компонента — чтобы вернуть актуальное значение в текущем рендере.</li>
+          <li>2. При каждом <code>dispatch</code> — чтобы проверить, изменился ли результат, и решить, нужен ли ре-рендер.</li>
+        </ul>
+
+        <h3>Концептуальное соответствие mapStateToProps</h3>
+        <div class="quote">
+          "The selector is approximately equivalent to the mapStateToProps argument to connect conceptually."<br>
+          — <a href="https://react-redux.js.org/api/hooks#useselector" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector концептуально приблизительно эквивалентен аргументу mapStateToProps функции connect.»<br>
+          — перевод
+        </div>
+        <p>
+          Но есть важное отличие: <code>mapStateToProps</code> обычно возвращает объект, а selector чаще
+          возвращает <strong>одно</strong> значение (примитив или уже мемоизированную ссылку). Это связано
+          с тем, что <code>useSelector</code> по умолчанию сравнивает результат через <code>===</code>
+          (strict reference equality), а <code>connect</code> использует shallow-сравнение полей —
+          подробнее в уроке 37.
+        </p>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Когда компонент с <code>useSelector</code> маунтится, хук регистрирует свой
+          <code>checkForUpdates</code> в nearest Subscription через <code>store.subscribe</code>
+          (<a href="../03a-subscription-system/">подробнее в уроке 03a</a>). После каждого
+          <code>dispatch</code>: Subscription проходит по linked list callback'ов →
+          <code>Subscription.notify()</code> → для каждого слушателя <code>checkForUpdates</code>
+          → запустить selector → сравнить через <code>===</code> → <code>forceRender</code>
+          если отличается. Так каждый из трёх компонентов в демо выше слушает один и тот же store,
+          но ре-рендерится только если его selector вернул другое значение.
+        </p>
+
+        <div class="tip">
+          <strong>Итог:</strong> <code>useSelector</code> — минимальный API для чтения state из хука.
+          Селектор вызывается при рендере и после каждого dispatch. Компонент ре-рендерится, только если
+          предыдущее и новое значения <code>!==</code>. В следующих уроках мы разберём, как это
+          сравнение влияет на производительность и на выбор формы selector'а.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

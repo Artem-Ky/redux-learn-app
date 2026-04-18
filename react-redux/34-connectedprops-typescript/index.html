@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>34 — ConnectedProps — автовывод типов connect в TypeScript</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ts-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .ts-layout { grid-template-columns: 1fr; }
+    }
+    .ts-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ts-card--manual { border-color: var(--accent-orange); }
+    .ts-card--auto   { border-color: var(--success); }
+    .ts-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ts-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .ts-card--manual .ts-card__title { color: var(--accent-orange); }
+    .ts-card--auto   .ts-card__title { color: var(--success); }
+    .ts-card__badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .ts-card--manual .ts-card__badge {
+      background: rgba(206, 145, 120, 0.15);
+      color: var(--accent-orange);
+      border: 1px solid rgba(206, 145, 120, 0.3);
+    }
+    .ts-card--auto .ts-card__badge {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .ts-card__demo {
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: #fff;
+    }
+    .ts-card__demo .btn { margin: 8px auto 0; display: inline-block; }
+    .ts-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .ts-card__metric {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: right;
+    }
+    .ts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      margin: 12px 0;
+    }
+    .ts-table th, .ts-table td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .ts-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+    }
+    .ts-table td { background: var(--bg-tertiary); }
+    .ts-table code { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">34 / 70</span>
+      ConnectedProps — автовывод типов connect в TypeScript
+    </div>
+    <nav class="site-header__nav">
+      <a href="../33-connect-returns/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">34</span>
+      <a href="../35-hooks-intro/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — две эквивалентные типизации одного компонента</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Оба переключателя делают одно и то же: читают <code>state.isOn</code> и диспатчат
+          <code>toggleOn</code>. Слева — «ручная» типизация через <code>StateProps</code>,
+          <code>DispatchProps</code>, <code>OwnProps</code>. Справа — <code>ConnectedProps</code>
+          автоматически выводит типы из <code>mapStateToProps</code> и
+          <code>mapDispatchToProps</code>. Код работает одинаково, но автовариант требует в разы
+          меньше объявлений типов.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — ConnectedProps</div>
+      <div class="theory__body">
+
+        <h3>Что это такое</h3>
+        <p>
+          <code>ConnectedProps</code> — это утилитарный тип из <code>react-redux</code>, который
+          умеет вытаскивать типы «props из Redux» (всё, что приходит от <code>mapStateToProps</code>
+          и <code>mapDispatchToProps</code>) из сохранённого в переменную connector'а.
+          Работает это только в «двухэтапной» форме вызова <code>connect</code> из урока 33 —
+          именно поэтому типизация и разбиение на два шага идут рука об руку.
+        </p>
+
+        <div class="quote">«The package includes a helper type, ConnectedProps, that can extract the return types of mapStateToProps and mapDispatchToProps from the first function. This means that if you split the connect call into two steps, all of the "props from Redux" can be inferred automatically without having to write them by hand.»<br>— <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#inferring-the-connected-props-automatically" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a></div>
+        <div class="quote">«Пакет включает вспомогательный тип ConnectedProps, который способен извлечь типы, возвращаемые mapStateToProps и mapDispatchToProps, из первой функции. Это означает, что если разбить вызов connect на два шага, все "props из Redux" могут быть выведены автоматически, без необходимости писать их вручную.»<br>— перевод</div>
+
+        <div class="quote">«If you're using connect, we recommend using the ConnectedProps approach for inferring the props from Redux, as that requires the fewest explicit type declarations.»<br>— <a href="https://react-redux.js.org/using-react-redux/usage-with-typescript#recommendations" target="_blank">react-redux.js.org/using-react-redux/usage-with-typescript</a></div>
+        <div class="quote">«Если вы используете connect, мы рекомендуем использовать подход с ConnectedProps для вывода типов props из Redux, так как это требует минимального количества явных объявлений типов.»<br>— перевод</div>
+
+        <h3>Как это работает по шагам</h3>
+        <ol>
+          <li>Импортировать: <code>import { connect, ConnectedProps } from 'react-redux'</code>.</li>
+          <li>Написать <code>mapStateToProps</code> и <code>mapDispatchToProps</code> обычным
+              способом. Тип <code>state</code> в <code>mapStateToProps</code> должен быть явно
+              указан — от него пойдёт весь инференс.</li>
+          <li>Разбить вызов на два этапа: сохранить connector в переменную
+              <code>const connector = connect(mapStateToProps, mapDispatchToProps)</code>.</li>
+          <li>Извлечь «props из Redux»:
+              <code>type PropsFromRedux = ConnectedProps&lt;typeof connector&gt;</code>.</li>
+          <li>Объединить с <code>OwnProps</code>:
+              <code>type Props = PropsFromRedux &amp; OwnProps</code>.</li>
+          <li>Экспортировать: <code>export default connector(MyComponent)</code>.</li>
+        </ol>
+
+        <h3>Сравнение boilerplate</h3>
+        <table class="ts-table">
+          <thead>
+            <tr>
+              <th>Вариант</th>
+              <th>Объявлений типов</th>
+              <th>Дженерики в connect</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Ручная типизация</td>
+              <td><code>StateProps</code>, <code>DispatchProps</code>, <code>OwnProps</code>, <code>Props</code></td>
+              <td><code>connect&lt;StateProps, DispatchProps, OwnProps&gt;(...)</code></td>
+            </tr>
+            <tr>
+              <td>ConnectedProps</td>
+              <td><code>PropsFromRedux</code>, <code>OwnProps</code>, <code>Props</code></td>
+              <td><code>connect(mapState, mapDispatch)</code> — без дженериков</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Ручная типизация (много boilerplate)</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">connect</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">interface</span> <span class="type">StateProps</span>    { <span class="prop">isOn</span>: <span class="type">boolean</span> }
+<span class="kw">interface</span> <span class="type">DispatchProps</span> { <span class="prop">toggleOn</span>: () =&gt; <span class="type">void</span> }
+<span class="kw">interface</span> <span class="type">OwnProps</span>      { <span class="prop">backgroundColor</span>: <span class="type">string</span> }
+<span class="kw">type</span> <span class="type">Props</span> = <span class="type">StateProps</span> &amp; <span class="type">DispatchProps</span> &amp; <span class="type">OwnProps</span>
+
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>: <span class="type">RootState</span>): <span class="type">StateProps</span> =&gt; ({ <span class="prop">isOn</span>: state.<span class="prop">isOn</span> })
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span>: <span class="type">DispatchProps</span> = {
+  <span class="prop">toggleOn</span>: () =&gt; ({ <span class="prop">type</span>: <span class="str">'TOGGLE'</span> })
+}
+
+<span class="kw">const</span> <span class="fn">ManualToggle</span> = (<span class="prop">props</span>: <span class="type">Props</span>) =&gt; <span class="cm">/* ... */</span>
+
+<span class="kw">export default</span> <span class="fn">connect</span>&lt;<span class="type">StateProps</span>, <span class="type">DispatchProps</span>, <span class="type">OwnProps</span>&gt;(
+  <span class="fn">mapStateToProps</span>,
+  <span class="fn">mapDispatchToProps</span>
+)(<span class="fn">ManualToggle</span>)
+        </div>
+
+        <h3>ConnectedProps (минимум boilerplate)</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">connect</span>, <span class="type">ConnectedProps</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; ({ <span class="prop">isOn</span>: state.<span class="prop">isOn</span> })
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = {
+  <span class="prop">toggleOn</span>: () =&gt; ({ <span class="prop">type</span>: <span class="str">'TOGGLE'</span> })
+}
+
+<span class="kw">const</span> <span class="fn">connector</span> = <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)
+<span class="kw">type</span> <span class="type">PropsFromRedux</span> = <span class="type">ConnectedProps</span>&lt;<span class="kw">typeof</span> <span class="fn">connector</span>&gt;
+<span class="cm">// hover → { isOn: boolean; toggleOn: () =&gt; { type: 'TOGGLE' } }</span>
+
+<span class="kw">interface</span> <span class="type">OwnProps</span> { <span class="prop">backgroundColor</span>: <span class="type">string</span> }
+<span class="kw">type</span> <span class="type">Props</span> = <span class="type">PropsFromRedux</span> &amp; <span class="type">OwnProps</span>
+
+<span class="kw">const</span> <span class="fn">AutoToggle</span> = (<span class="prop">props</span>: <span class="type">Props</span>) =&gt; <span class="cm">/* ... */</span>
+
+<span class="kw">export default</span> <span class="fn">connector</span>(<span class="fn">AutoToggle</span>)
+        </div>
+
+        <h3>Что именно инференс делает</h3>
+        <ul>
+          <li><code>ReturnType&lt;typeof mapStateToProps&gt;</code> — даёт объект state-props.</li>
+          <li>Если <code>mapDispatchToProps</code> — объект action creators, библиотека вычисляет,
+              какие <strong>функции</strong> будут в props после <code>bindActionCreators</code>
+              (функции, возвращающие <code>void</code>, а не экшены).</li>
+          <li>Пересечение этих двух объектов <code>ConnectedProps</code> и возвращает.</li>
+        </ul>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          <code>ConnectedProps</code> — это <em>чисто</em> типовой уровень, TypeScript.
+          В рантайме он удаляется компиляцией и не добавляет ни одной строки. Механика подписки
+          остаётся прежней: при <code>dispatch</code> Subscription проходит по linked list
+          callback'ов → <code>Subscription.notify()</code> → для каждого слушателя
+          <code>checkForUpdates</code> → запустить <code>selector</code>
+          (<code>mapStateToProps</code>) → сравнить с <code>prevValue</code> через <code>===</code>
+          → <code>forceRender</code> если отличается. Типы только помогают вам не забыть, какие
+          поля реально приходят в props.
+          <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Рекомендация команды React Redux:</strong> если вы пишете новый код на
+          TypeScript и используете <code>connect</code> — используйте <code>ConnectedProps</code>.
+          Если же вы начинаете новый проект с нуля — команда рекомендует вообще переходить на
+          hooks API (<code>useSelector</code> / <code>useDispatch</code>), там типизация проще и
+          ещё прямее. Об этом — урок 35.
+        </div>
+
+        <div class="warning">
+          <strong>Edge case:</strong> если <code>mapDispatchToProps</code> задан как объект и
+          внутри встречаются thunk'и (<code>redux-thunk</code>), <code>ConnectedProps</code>
+          автоматически не вычислит корректный тип возврата thunk'а. Для таких случаев либо
+          типизируйте thunk вручную через <code>ThunkAction</code>, либо используйте
+          hooks-подход с типизированным <code>useAppDispatch</code>.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

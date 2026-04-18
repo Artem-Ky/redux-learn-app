@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>28 — mergeProps — третий аргумент connect</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .side-by-side {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .side-by-side { grid-template-columns: 1fr; }
+    }
+    .variant-panel {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .variant-panel__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .variant-panel__title {
+      font-weight: 600;
+      color: var(--text-bright);
+    }
+    .variant-panel__tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .variant-panel__tag--without {
+      background: rgba(244, 71, 71, 0.15);
+      color: var(--accent-red);
+      border: 1px solid rgba(244, 71, 71, 0.3);
+    }
+    .variant-panel__tag--with {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .profile-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    .profile-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .profile-card__name {
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+    .profile-card__id {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .profile-todos {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .profile-todo {
+      padding: 6px 10px;
+      background: var(--bg-panel);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .profile-todo__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+    .profile-input-row {
+      display: flex;
+      gap: 6px;
+    }
+    .profile-input {
+      flex: 1;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+    }
+    .user-switcher {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+    }
+    .user-switcher__btn {
+      padding: 6px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .user-switcher__btn--active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .props-received {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+    }
+    .props-received__title {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .key { color: #9cdcfe; }
+    .type { color: var(--accent-cyan); font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">28 / 70</span>
+      mergeProps — третий аргумент connect
+    </div>
+    <nav class="site-header__nav">
+      <a href="../27-connect-practical-todo/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">28</span>
+      <a href="../29-connect-options-context/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — профиль пользователя: без и с mergeProps</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Компонент <code>UserProfile</code> получает <code>userId</code> как ownProps и должен
+          показывать todos именно этого юзера и давать кнопку «добавить» с автоподстановкой
+          <code>userId</code>. Слева — реализация <strong>без</strong> <code>mergeProps</code>:
+          компонент сам фильтрует и сам оборачивает <code>addTodo</code>. Справа — та же логика,
+          но через <code>mergeProps</code>: компонент получает <code>todos</code> и
+          <code>addTodo</code> уже готовыми.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — mergeProps</div>
+      <div class="theory__body">
+
+        <h3>Что такое mergeProps</h3>
+        <div class="quote">«If specified, defines how the final props for your own wrapped component are determined. If you do not provide mergeProps, your wrapped component receives { ...ownProps, ...stateProps, ...dispatchProps } by default.»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«Если указан, определяет, как формируются финальные props для вашего обёрнутого компонента. Если mergeProps не указан, обёрнутый компонент получает { ...ownProps, ...stateProps, ...dispatchProps } по умолчанию.»<br>— перевод</div>
+
+        <h3>Сигнатура</h3>
+        <div class="quote">«mergeProps should be specified with maximum of three parameters. They are the result of mapStateToProps(), mapDispatchToProps(), and the wrapper component's props, respectively: stateProps, dispatchProps, ownProps»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«mergeProps должен принимать максимум три параметра — результаты mapStateToProps(), mapDispatchToProps() и props самой обёртки: stateProps, dispatchProps, ownProps.»<br>— перевод</div>
+
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">mergeProps</span>(
+  <span class="prop">stateProps</span>,    <span class="cm">// результат mapStateToProps(state, ownProps)</span>
+  <span class="prop">dispatchProps</span>, <span class="cm">// результат mapDispatchToProps(dispatch, ownProps)</span>
+  <span class="prop">ownProps</span>       <span class="cm">// props, переданные в connected-компонент снаружи</span>
+) {
+  <span class="kw">return</span> <span class="cm">/* финальные props */</span>
+}
+
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>, <span class="fn">mergeProps</span>)(<span class="type">Comp</span>)
+        </div>
+
+        <h3>Зачем нужен custom mergeProps</h3>
+        <p>
+          По умолчанию react-redux делает shallow merge:
+          <code>&#123; ...ownProps, ...stateProps, ...dispatchProps &#125;</code>.
+          Custom <code>mergeProps</code> нужен в трёх основных случаях:
+        </p>
+        <ul style="color: var(--text-secondary); padding-left: 20px; margin: 10px 0;">
+          <li><strong>Выборочная фильтрация:</strong> передать в компонент только подмножество полей из stateProps.</li>
+          <li><strong>Привязка ownProps к dispatch:</strong> обернуть action creators так, чтобы они автоматически брали часть аргументов из ownProps.</li>
+          <li><strong>Вычисление производных props:</strong> скомбинировать данные из state и ownProps во что-то новое.</li>
+        </ul>
+
+        <h3>Сравнение: без mergeProps vs с mergeProps</h3>
+        <p>Без custom mergeProps — компонент сам разбирается:</p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>) =&gt; ({ <span class="prop">allTodos</span>: state.<span class="prop">todos</span> })
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = { <span class="fn">addTodo</span> }
+
+<span class="kw">function</span> <span class="fn">UserProfile</span>({ <span class="prop">userId</span>, <span class="prop">allTodos</span>, <span class="fn">addTodo</span> }) {
+  <span class="kw">const</span> <span class="prop">todos</span> = allTodos[userId] <span class="op">||</span> []
+  <span class="kw">const</span> <span class="fn">handleAdd</span> = (<span class="prop">text</span>) =&gt; <span class="fn">addTodo</span>(userId, text)
+  <span class="cm">// компонент знает про userId И про структуру allTodos И про сигнатуру addTodo</span>
+}
+
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">UserProfile</span>)
+        </div>
+
+        <p>С custom mergeProps — компонент получает готовые props:</p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>) =&gt; ({ <span class="prop">allTodos</span>: state.<span class="prop">todos</span> })
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = { <span class="fn">addTodo</span> }
+
+<span class="kw">function</span> <span class="fn">mergeProps</span>(<span class="prop">stateProps</span>, <span class="prop">dispatchProps</span>, <span class="prop">ownProps</span>) {
+  <span class="kw">return</span> {
+    ...ownProps,
+    <span class="prop">todos</span>: stateProps.<span class="prop">allTodos</span>[ownProps.<span class="prop">userId</span>] <span class="op">||</span> [],
+    <span class="prop">addTodo</span>: (<span class="prop">text</span>) =&gt; dispatchProps.<span class="fn">addTodo</span>(ownProps.<span class="prop">userId</span>, text),
+  }
+}
+
+<span class="kw">function</span> <span class="fn">UserProfile</span>({ <span class="prop">todos</span>, <span class="fn">addTodo</span> }) {
+  <span class="cm">// компонент работает с готовыми todos и addTodo(text)</span>
+}
+
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>, <span class="fn">mergeProps</span>)(<span class="type">UserProfile</span>)
+        </div>
+
+        <h3>Опасность: новые ссылки при каждом вызове</h3>
+        <div class="quote">«Note: Creating new values in mergeProps will cause re-renders. It is recommended that you memoize fields in order to avoid unnecessary re-renders.»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«Замечание: создание новых значений в mergeProps вызовет ре-рендеры. Рекомендуется мемоизировать поля, чтобы избежать лишних ре-рендеров.»<br>— перевод</div>
+
+        <p>
+          Обратите внимание: <code>addTodo: (text) =&gt; dispatchProps.addTodo(ownProps.userId, text)</code>
+          — это <strong>новая функция при каждом вызове mergeProps</strong>. Даже если
+          <code>stateProps</code> и <code>ownProps</code> не поменялись,
+          <code>areMergedPropsEqual</code> (default shallowEqual) сравнит функции по ссылке и
+          увидит разницу. Для тяжёлых случаев фактор функции нужно мемоизировать — например,
+          через замыкание-кэш по <code>ownProps.userId</code>.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Наивный вариант — новая функция каждый раз</span>
+<span class="kw">function</span> <span class="fn">mergeProps</span>(<span class="prop">s</span>, <span class="prop">d</span>, <span class="prop">o</span>) {
+  <span class="kw">return</span> { ...o, <span class="prop">addTodo</span>: (<span class="prop">text</span>) =&gt; d.<span class="fn">addTodo</span>(o.<span class="prop">userId</span>, text) }
+}
+
+<span class="cm">// Мемоизированный вариант — кэш по userId</span>
+<span class="kw">function</span> <span class="fn">makeMergeProps</span>() {
+  <span class="kw">let</span> <span class="prop">cachedUserId</span>: <span class="type">any</span>
+  <span class="kw">let</span> <span class="prop">cachedAdd</span>: <span class="type">any</span>
+  <span class="kw">return</span> (<span class="prop">s</span>, <span class="prop">d</span>, <span class="prop">o</span>) =&gt; {
+    <span class="kw">if</span> (o.<span class="prop">userId</span> <span class="op">!==</span> cachedUserId) {
+      cachedUserId = o.<span class="prop">userId</span>
+      cachedAdd = (<span class="prop">text</span>: <span class="type">string</span>) =&gt; d.<span class="fn">addTodo</span>(o.<span class="prop">userId</span>, text)
+    }
+    <span class="kw">return</span> { ...o, <span class="prop">addTodo</span>: cachedAdd }
+  }
+}
+        </div>
+
+        <h3>Порядок вызова внутри connect</h3>
+        <ol style="color: var(--text-secondary); padding-left: 20px; margin: 10px 0;">
+          <li>ownProps приходят от родителя.</li>
+          <li>Вызывается <code>mapStateToProps(state, ownProps)</code> → stateProps.</li>
+          <li>Вызывается <code>mapDispatchToProps(dispatch, ownProps)</code> → dispatchProps.</li>
+          <li>Вызывается <code>mergeProps(stateProps, dispatchProps, ownProps)</code> → финальные props.</li>
+          <li>Финальные props сравниваются с предыдущими через <code>areMergedPropsEqual</code>.</li>
+          <li>Если отличаются — компонент ре-рендерится.</li>
+        </ol>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Когда происходит <code>dispatch</code>, Subscription проходит по linked list callback'ов →
+          <code>notify()</code> → <code>checkForUpdates</code> для connected-компонента →
+          заново запускает <code>mapStateToProps</code> с новым state → затем
+          <code>mergeProps(stateProps, dispatchProps, ownProps)</code> → сравнение результата
+          через <code>areMergedPropsEqual</code> (по умолчанию shallowEqual) → если поля отличаются
+          по <code>===</code>, вызывается <code>forceRender</code>. <code>mergeProps</code>
+          выполняется на каждой проверке — вот почему создание новых ссылок внутри него опасно.
+          <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Когда НЕ нужен mergeProps:</strong> в подавляющем большинстве случаев
+          дефолтного shallow merge достаточно. <code>mergeProps</code> — инструмент для
+          специфических задач, где нужно «запечь» ownProps в action creator или выбрать кусок
+          state по ownProps. Если вы просто хотите фильтровать данные по ownProps, чаще
+          удобнее сделать это в <code>mapStateToProps(state, ownProps)</code> — см. урок 15.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

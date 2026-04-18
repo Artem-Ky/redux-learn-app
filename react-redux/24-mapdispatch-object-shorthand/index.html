@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>24 — mapDispatchToProps как объект (рекомендуемая форма)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .evolution {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 900px) {
+      .evolution { grid-template-columns: 1fr; }
+    }
+    .stage {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      position: relative;
+    }
+    .stage--a { opacity: 0.7; }
+    .stage--b { opacity: 0.85; }
+    .stage--c { border-color: var(--accent-green); }
+    .stage__label {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+    .stage--c .stage__label { color: var(--accent-green); }
+    .stage__code {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      margin-bottom: 10px;
+      line-height: 1.55;
+      white-space: pre;
+      overflow-x: auto;
+      min-height: 180px;
+    }
+    .stage__counter {
+      font-family: var(--font-mono);
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+      color: var(--accent-cyan);
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+    }
+    .stage__buttons {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+    }
+    .recommend-banner {
+      background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-cyan) 100%);
+      color: #000;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .recommend-banner__star {
+      font-size: 1.4rem;
+    }
+    .props-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      margin: 10px 0;
+    }
+    .props-table th, .props-table td {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+    .props-table th {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .props-table td.same {
+      color: var(--accent-green);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">24 / 70</span>
+      mapDispatchToProps как объект
+    </div>
+    <nav class="site-header__nav">
+      <a href="../23-mapdispatch-bindactioncreators/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">24</span>
+      <a href="../25-dispatch-lost-gotcha/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — эволюция mapDispatchToProps</div>
+      <div class="demo-section__body">
+        <div class="recommend-banner">
+          <span class="recommend-banner__star">★</span>
+          <span>
+            Рекомендованная документацией форма — <code>mapDispatchToProps</code> как объект
+            action creators.
+          </span>
+        </div>
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Те же три счётчика, но теперь расположены как «эволюция»: функция → bindActionCreators →
+          объектная короткая форма. Под капотом все три одинаковы — это демонстрирует таблица
+          с их <code>props</code> ниже.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — объектная короткая форма</div>
+      <div class="theory__body">
+
+        <h3>Почему появилась эта форма?</h3>
+        <div class="quote">
+          «You've seen that the setup for dispatching Redux actions in a React component follows a very
+          similar process: define an action creator, wrap it in another function that looks like
+          (…args) =&gt; dispatch(actionCreator(…args)), and pass that wrapper function as a prop to
+          your component.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Вы видели, что настройка диспатча экшенов в React-компоненте идёт по очень похожему сценарию:
+          определить action creator, обернуть его в функцию вида (…args) =&gt; dispatch(actionCreator(…args))
+          и передать эту обёртку как проп в компонент.»
+          <br>— перевод
+        </div>
+
+        <h3>Как это работает</h3>
+        <div class="quote">
+          «Because this is so common, connect supports an "object shorthand" form for the
+          mapDispatchToProps argument: if you pass an object full of action creators instead of a
+          function, connect will automatically call bindActionCreators for you internally.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Поскольку этот сценарий очень распространён, connect поддерживает «объектную короткую форму»
+          для аргумента mapDispatchToProps: если передать объект action creators вместо функции,
+          connect автоматически вызовет для вас bindActionCreators внутри.»
+          <br>— перевод
+        </div>
+
+        <p>
+          По сути, react-redux делает ровно это:
+        </p>
+        <div class="code-block">
+<span class="cm">// То, что react-redux делает за вас автоматически:</span>
+(<span class="prop">dispatch</span>) =&gt; <span class="fn">bindActionCreators</span>(mapDispatchToProps, dispatch)
+        </div>
+
+        <h3>Синтаксис</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">connect</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import</span> { increment, decrement, reset } <span class="kw">from</span> <span class="str">'./counterActions'</span>
+
+<span class="cm">// Вариант 1: отдельная переменная</span>
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = { increment, decrement, reset }
+
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">Counter</span>)
+
+<span class="cm">// Вариант 2: инлайн прямо в connect</span>
+<span class="kw">export default</span> <span class="fn">connect</span>(
+  <span class="fn">mapStateToProps</span>,
+  { increment, decrement, reset }
+)(<span class="type">Counter</span>)
+
+<span class="cm">// Вариант 3: import * as — особенно удобно для большого списка</span>
+<span class="kw">import</span> * <span class="kw">as</span> actions <span class="kw">from</span> <span class="str">'./counterActions'</span>
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, actions)(<span class="type">Counter</span>)
+        </div>
+
+        <h3>Правила</h3>
+        <div class="quote">
+          «Each field of the mapDispatchToProps object is assumed to be an action creator»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Каждое поле объекта mapDispatchToProps считается action creator'ом.»
+          <br>— перевод
+        </div>
+
+        <p>
+          Поэтому в объекте должны лежать именно функции-action creators (возвращающие объект экшена),
+          а не сами объекты экшенов.
+        </p>
+
+        <div class="warning">
+          <strong>Важно:</strong> как и при функциональной форме, <code>props.dispatch</code>
+          <em>не передаётся</em> компоненту, когда используется объектная короткая форма.
+          Об этом отдельно поговорим в <a href="../25-dispatch-lost-gotcha/">уроке 25</a>.
+        </div>
+
+        <h3>Почему это рекомендуемая форма</h3>
+        <div class="quote">
+          «We recommend always using the "object shorthand" form of mapDispatchToProps, unless you have
+          a specific reason to customize the dispatching behavior.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Мы рекомендуем всегда использовать «объектную короткую форму» mapDispatchToProps, если у вас
+          нет конкретной причины кастомизировать поведение диспатча.»
+          <br>— перевод
+        </div>
+
+        <ul>
+          <li>Минимум boilerplate — один объект, без функции-обёртки;</li>
+          <li>Аргументы автоматически форвардятся (благодаря внутреннему <code>bindActionCreators</code>);</li>
+          <li>Легко импортировать все action creators через <code>import * as actions</code>;</li>
+          <li>Рекомендуется официальной документацией.</li>
+        </ul>
+
+        <h3>Когда всё же нужна функциональная форма</h3>
+        <ul>
+          <li>когда нужно использовать <code>ownProps</code> в обёртке;</li>
+          <li>когда нужно кастомизировать или логировать dispatch;</li>
+          <li>когда надо вручную вернуть <code>dispatch</code> в props (урок 25);</li>
+          <li>когда нужно комбинировать разные источники экшенов.</li>
+        </ul>
+
+        <h3>Связь с Subscription-системой</h3>
+        <p>
+          Короткая форма — это синтаксический сахар над <code>bindActionCreators</code>, а тот — сахар
+          над <code>(...args) =&gt; dispatch(actionCreator(...args))</code>. То есть поведение во время
+          выполнения одинаковое: при клике вызывается <code>dispatch</code>, store прогоняет reducer,
+          зовёт <code>Subscription.notify()</code>. Subscription — linked list callback'ов; для каждого
+          подключённого компонента <code>checkForUpdates</code> запускает <code>mapStateToProps</code>,
+          сравнивает каждое поле через <code>===</code> и при необходимости вызывает
+          <code>forceRender()</code> (<a href="../03a-subscription-system/">подробнее — урок 03a</a>).
+        </p>
+
+        <div class="tip">
+          <strong>Итог урока:</strong> если не нужны <code>ownProps</code> и специфические кастомизации —
+          пишите <code>connect(mapStateToProps, { actionA, actionB })</code>. Это идиоматичный и самый
+          лаконичный способ.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

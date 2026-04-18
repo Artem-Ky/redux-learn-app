@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>23 — mapDispatchToProps и bindActionCreators</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 900px) {
+      .three-col { grid-template-columns: 1fr; }
+    }
+    .variant {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+    }
+    .variant__badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 3px;
+      margin-bottom: 8px;
+      align-self: flex-start;
+    }
+    .variant--manual .variant__badge {
+      background: var(--accent-orange);
+      color: #000;
+    }
+    .variant--bound .variant__badge {
+      background: var(--accent-green);
+      color: #000;
+    }
+    .variant--shorthand .variant__badge {
+      background: var(--accent-purple);
+      color: #fff;
+    }
+    .variant__code {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      margin-bottom: 10px;
+      line-height: 1.55;
+      white-space: pre;
+      overflow-x: auto;
+      min-height: 150px;
+    }
+    .variant__counter {
+      font-family: var(--font-mono);
+      font-size: 2.2rem;
+      font-weight: 700;
+      text-align: center;
+      color: var(--accent-cyan);
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+    }
+    .variant__buttons {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+    .variant__stats {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      padding: 6px 8px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+    }
+    .variant__stats strong {
+      color: var(--accent-yellow);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">23 / 70</span>
+      mapDispatchToProps и bindActionCreators
+    </div>
+    <nav class="site-header__nav">
+      <a href="../22-mapdispatch-ownprops/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">23</span>
+      <a href="../24-mapdispatch-object-shorthand/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — три способа подключить action creators</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Три счётчика, подключённые к одному store тремя разными способами:
+          ручной обёрткой, через <code>bindActionCreators</code> и объектной короткой формой
+          (превью урока 24). Внешне и по props они идентичны. Нажимайте кнопки и сравнивайте
+          вызовы в консоли.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — bindActionCreators</div>
+      <div class="theory__body">
+
+        <h3>Что такое bindActionCreators?</h3>
+        <p>
+          <code>bindActionCreators</code> — это утилита из пакета <strong>redux</strong>
+          (не из react-redux!). Импортируется так:
+        </p>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">bindActionCreators</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+        </div>
+
+        <div class="quote">
+          «bindActionCreators turns an object whose values are action creators, into an object with the
+          same keys, but with every action creator wrapped into a dispatch call so they may be invoked
+          directly.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «bindActionCreators превращает объект, значениями которого являются action creators, в объект
+          с теми же ключами, но с каждым action creator, обёрнутым в вызов dispatch, так что их можно
+          вызывать напрямую.»
+          <br>— перевод
+        </div>
+
+        <h3>Параметры</h3>
+        <ol>
+          <li><strong>action creator</strong> (функция) <em>или</em> <strong>объект</strong>,
+            у которого значения — action creators;</li>
+          <li><code>dispatch</code> — функция из store.</li>
+        </ol>
+
+        <h3>Ручная обёртка vs bindActionCreators</h3>
+        <div class="code-block">
+<span class="cm">// Action creators</span>
+<span class="kw">const</span> <span class="fn">increment</span> = () =&gt; ({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> })
+<span class="kw">const</span> <span class="fn">decrement</span> = () =&gt; ({ <span class="prop">type</span>: <span class="str">'counter/decrement'</span> })
+<span class="kw">const</span> <span class="fn">reset</span>     = () =&gt; ({ <span class="prop">type</span>: <span class="str">'counter/reset'</span> })
+
+<span class="cm">// --- (A) Руками: много boilerplate ---</span>
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = (<span class="prop">dispatch</span>) =&gt; ({
+  <span class="fn">increment</span>: (...<span class="prop">args</span>) =&gt; <span class="fn">dispatch</span>(<span class="fn">increment</span>(...args)),
+  <span class="fn">decrement</span>: (...<span class="prop">args</span>) =&gt; <span class="fn">dispatch</span>(<span class="fn">decrement</span>(...args)),
+  <span class="fn">reset</span>:     (...<span class="prop">args</span>) =&gt; <span class="fn">dispatch</span>(<span class="fn">reset</span>(...args)),
+})
+
+<span class="cm">// --- (B) Через bindActionCreators: одна строка ---</span>
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = (<span class="prop">dispatch</span>) =&gt;
+  <span class="fn">bindActionCreators</span>({ increment, decrement, reset }, dispatch)
+        </div>
+
+        <h3>Автоматический форвардинг аргументов</h3>
+        <div class="quote">
+          «The wrapper functions generated by bindActionCreators will automatically forward all of
+          their arguments, so you don't need to do that by hand.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Функции-обёртки, сгенерированные bindActionCreators, автоматически пробрасывают все свои
+          аргументы, так что вам не нужно делать это вручную.»
+          <br>— перевод
+        </div>
+
+        <p>
+          Это важно, когда action creator принимает аргументы:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">addTodo</span> = (<span class="prop">text</span>) =&gt; ({ <span class="prop">type</span>: <span class="str">'todos/add'</span>, <span class="prop">payload</span>: text })
+
+<span class="kw">const</span> <span class="fn">bound</span> = <span class="fn">bindActionCreators</span>({ addTodo }, dispatch)
+<span class="cm">// bound.addTodo("Купить хлеб")
+//   ≡ dispatch(addTodo("Купить хлеб"))
+//   ≡ dispatch({ type: 'todos/add', payload: 'Купить хлеб' })</span>
+        </div>
+
+        <h3>Что возвращает bindActionCreators?</h3>
+        <p>
+          Объект с тем же набором ключей, но значения — функции-обёртки:
+        </p>
+        <div class="code-block">
+<span class="fn">bindActionCreators</span>({ increment, decrement, reset }, dispatch)
+<span class="cm">// →</span>
+{
+  <span class="fn">increment</span>: (...<span class="prop">args</span>) =&gt; <span class="fn">dispatch</span>(<span class="fn">increment</span>(...args)),
+  <span class="fn">decrement</span>: (...<span class="prop">args</span>) =&gt; <span class="fn">dispatch</span>(<span class="fn">decrement</span>(...args)),
+  <span class="fn">reset</span>:     (...<span class="prop">args</span>) =&gt; <span class="fn">dispatch</span>(<span class="fn">reset</span>(...args)),
+}
+        </div>
+
+        <h3>Можно передать и одну функцию</h3>
+        <p>
+          Если передать не объект, а один action creator — вернётся одна обёрнутая функция:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">boundIncrement</span> = <span class="fn">bindActionCreators</span>(increment, dispatch)
+<span class="fn">boundIncrement</span>() <span class="cm">// ≡ dispatch(increment())</span>
+        </div>
+
+        <h3>Превью следующего урока</h3>
+        <p>
+          Если в <code>connect</code> передать <em>объект</em> вместо функции, react-redux
+          автоматически вызовет <code>bindActionCreators</code> за вас. Это — объектная короткая форма,
+          рекомендуемая документацией. Полный разбор в <a href="../24-mapdispatch-object-shorthand/">уроке 24</a>.
+        </p>
+
+        <h3>Связь с Subscription-системой</h3>
+        <p>
+          Обёрнутые через <code>bindActionCreators</code> функции делают то же самое, что и ручные —
+          вызывают <code>dispatch(actionCreator(...args))</code>. Далее обычный путь: store обновляет
+          state, дёргает <code>Subscription.notify()</code>, тот пробегает по linked list подписчиков,
+          для каждого <code>checkForUpdates</code> запускает <code>mapStateToProps</code>, сравнивает
+          поля через <code>===</code> с предыдущими значениями и при изменении вызывает
+          <code>forceRender()</code> (<a href="../03a-subscription-system/">урок 03a</a>). Обёртки —
+          чисто синтаксический сахар, на цикл обновления они не влияют.
+        </p>
+
+        <div class="tip">
+          <strong>Итог:</strong> <code>bindActionCreators</code> спасает от boilerplate при ручной
+          обёртке action creators. Но в повседневной работе с <code>connect</code> вы будете чаще
+          использовать ещё более короткую объектную форму (следующий урок).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

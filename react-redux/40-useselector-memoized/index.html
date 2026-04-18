@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>40 — useSelector с мемоизированными селекторами</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .mem-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1000px) {
+      .mem-grid { grid-template-columns: 1fr; }
+    }
+    .mem-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .mem-card--bad { border-color: rgba(244, 71, 71, 0.4); }
+    .mem-card--meh { border-color: rgba(255, 152, 0, 0.4); }
+    .mem-card--good { border-color: rgba(76, 175, 80, 0.4); }
+    .mem-card__tag {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .mem-card--bad .mem-card__tag { background: rgba(244, 71, 71, 0.15); color: var(--accent-red); }
+    .mem-card--meh .mem-card__tag { background: rgba(255, 152, 0, 0.15); color: var(--warning); }
+    .mem-card--good .mem-card__tag { background: rgba(76, 175, 80, 0.15); color: var(--success); }
+    .mem-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .mem-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    .mem-card__list {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      min-height: 60px;
+    }
+    .mem-card__list-empty {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .mem-card__list-item {
+      color: var(--success);
+      padding: 2px 0;
+    }
+    .mem-card__stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .mem-card__stat {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .mem-card__stat-label {
+      font-size: 0.64rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .mem-card__stat-val {
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .mem-card__stat-val--red { color: var(--accent-red); }
+    .mem-card__stat-val--green { color: var(--success); }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .user-display {
+      text-align: center;
+      font-family: var(--font-mono);
+      padding: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .user-display strong { color: var(--accent-cyan); }
+    .todo-list-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .todo-list-panel__header {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .todo-list-panel__list {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+    .todo-list-panel__item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 0;
+    }
+    .todo-list-panel__item input { cursor: pointer; }
+    .todo-list-panel__item.completed .todo-list-panel__text {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">40 / 70</span>
+      useSelector с мемоизированными селекторами
+    </div>
+    <nav class="site-header__nav">
+      <a href="../39-useselector-multiple-calls/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">40</span>
+      <a href="../41-useselector-per-instance/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — три способа фильтровать todos</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Три компонента делают одно и то же — показывают завершённые todos. Отличается только способ
+          описания selector'а. Счётчик рендеров + счётчик вызовов <code>.filter()</code> показывает,
+          насколько по-разному они работают на одних и тех же dispatch'ах.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — useSelector + createSelector</div>
+      <div class="theory__body">
+
+        <h3>Проблема: inline selector, возвращающий массив</h3>
+        <p>
+          В уроке 37 мы увидели: если selector возвращает новый объект, по умолчанию
+          <code>useSelector</code> ре-рендерит на каждом dispatch. С массивами ситуация ровно такая
+          же — <code>.filter()</code>, <code>.map()</code>, <code>.slice()</code> всегда возвращают
+          <strong>новый массив</strong>, даже если содержимое совпадает с предыдущим.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ❌ Плохо: и сам selector, и массив-результат — новые на каждом рендере/dispatch</span>
+<span class="kw">const</span> <span class="prop">completed</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt;
+  state.<span class="prop">todos</span>.<span class="prop">list</span>.<span class="fn">filter</span>((<span class="prop">t</span>) =&gt; t.<span class="prop">completed</span>)
+)
+        </div>
+
+        <h3>Что даёт вынос selector'а наружу компонента</h3>
+        <div class="code-block">
+<span class="cm">// Selector стабилен как функция, но результат filter() каждый раз новый</span>
+<span class="kw">const</span> <span class="fn">selectCompletedTodos</span> = (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt;
+  state.<span class="prop">todos</span>.<span class="prop">list</span>.<span class="fn">filter</span>((<span class="prop">t</span>) =&gt; t.<span class="prop">completed</span>)
+
+<span class="kw">function</span> <span class="fn">Component</span>() {
+  <span class="kw">const</span> <span class="prop">completed</span> = <span class="fn">useSelector</span>(<span class="fn">selectCompletedTodos</span>)
+  <span class="cm">// сама функция selectCompletedTodos — одна и та же,</span>
+  <span class="cm">// но .filter() всё равно возвращает новый массив на каждом вызове.</span>
+  <span class="cm">// По-прежнему ре-рендер на каждом dispatch.</span>
+}
+        </div>
+        <p>
+          Это работает только для selector'ов, возвращающих <strong>примитив</strong> или уже
+          <strong>стабильную ссылку</strong> из state (например, <code>state.todos.list</code>
+          целиком, без <code>.filter</code>).
+        </p>
+
+        <h3>Решение: createSelector из reselect</h3>
+        <p>
+          <code>createSelector</code> принимает один или несколько <em>input selector'ов</em> и одну
+          <em>output-функцию</em>. Он запоминает последний набор результатов input'ов и последний
+          output. Если inputs совпали с предыдущим вызовом по <code>===</code> — output-функция не
+          вызывается, возвращается <strong>тот же самый</strong> закешированный результат.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createSelector</span> } <span class="kw">from</span> <span class="str">'reselect'</span>
+
+<span class="kw">const</span> <span class="fn">selectCompletedTodos</span> = <span class="fn">createSelector</span>(
+  <span class="cm">// input selector(s):</span>
+  (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>.<span class="prop">list</span>,
+  <span class="cm">// output:</span>
+  (<span class="prop">list</span>) =&gt; list.<span class="fn">filter</span>((<span class="prop">t</span>) =&gt; t.<span class="prop">completed</span>)
+)
+
+<span class="kw">function</span> <span class="fn">Component</span>() {
+  <span class="kw">const</span> <span class="prop">completed</span> = <span class="fn">useSelector</span>(<span class="fn">selectCompletedTodos</span>)
+  <span class="cm">// если state.todos.list та же ссылка → возвращается</span>
+  <span class="cm">// ТОТ ЖЕ массив, что и в прошлый раз → useSelector не рендерит</span>
+}
+        </div>
+
+        <h3>Ключевое правило: createSelector вне компонента</h3>
+        <div class="quote">
+          "When using useSelector with an inline selector as shown above, a new instance of the selector is created whenever the component is rendered. This works as long as the selector does not maintain any state. However, memoizing selectors (e.g. created via createSelector from reselect) do have internal state, and therefore care must be taken when using them."<br>
+          — <a href="https://react-redux.js.org/api/hooks#using-memoizing-selectors" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Когда useSelector используется с inline-selector'ом, как показано выше, новый экземпляр selector'а создаётся при каждом рендере компонента. Это работает, пока selector не хранит внутреннее состояние. Однако memoizing-selector'ы (например, созданные через createSelector из reselect) имеют внутреннее состояние, поэтому при их использовании требуется осторожность.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "When the selector does only depend on the state, simply ensure that it is declared outside of the component so that the same selector instance is used for each render"<br>
+          — <a href="https://react-redux.js.org/api/hooks#using-memoizing-selectors" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Когда selector зависит только от state, просто убедитесь, что он объявлен вне компонента — тогда при каждом рендере используется один и тот же экземпляр selector'а.»<br>
+          — перевод
+        </div>
+
+        <p>
+          Если создавать <code>createSelector</code> <em>внутри</em> компонента — внутренний кэш
+          создаётся заново на каждом рендере и никогда не срабатывает. Результат: нулевая выгода
+          от мемоизации. Поэтому — только на уровне модуля.
+        </p>
+
+        <h3>Когда inline selector допустим</h3>
+        <p>
+          Для <em>примитивов</em>, которые просто читаются из state без вычислений, inline-вариант
+          абсолютно нормален:
+        </p>
+        <div class="code-block">
+<span class="cm">// ✔ OK — возвращается примитив, === работает</span>
+<span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+
+<span class="cm">// ✔ OK — возвращается стабильная ссылка из state (если todos.list не пересоздаётся)</span>
+<span class="kw">const</span> <span class="prop">todos</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>.<span class="prop">list</span>)
+        </div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Ре-рендер после <code>dispatch</code> происходит по тому же пути:
+          linked list callback'ов → <code>Subscription.notify()</code> → для каждого слушателя
+          <code>checkForUpdates</code> → запустить selector → сравнить через <code>===</code>
+          → <code>forceRender</code> если отличается. Мемоизация через <code>createSelector</code>
+          не меняет механику подписки, она лишь гарантирует, что <strong>результат</strong> selector'а
+          будет <strong>той же ссылкой</strong>, если inputs не изменились — и шаг сравнения
+          <code>===</code> вернёт <code>true</code>, ре-рендер не произойдёт.
+          Подробнее про Subscription — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="warning">
+          <strong>Частая ошибка:</strong> передать в <code>useSelector</code> результат вызова
+          <code>createSelector(...)()</code>. Правильно: передавайте <em>саму функцию</em>
+          <code>selectCompletedTodos</code>, а не её вызов. <code>useSelector</code> сам подставит state.
+        </div>
+
+        <div class="tip">
+          <strong>Рабочий рецепт с createSelector:</strong>
+          <ol style="padding-left: 20px; margin-top: 6px;">
+            <li>Объявите <code>createSelector</code> на уровне модуля (вне компонента).</li>
+            <li>Input selector'ы возвращают <em>сырые</em> данные из state (как можно более «прямые»).</li>
+            <li>Output-функция делает вычисление — она вызовется, только если хоть один input поменялся.</li>
+            <li>Передайте итоговый selector в <code>useSelector</code> по ссылке, без вызова.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

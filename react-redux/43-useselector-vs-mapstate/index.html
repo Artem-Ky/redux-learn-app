@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>43 — useSelector vs mapStateToProps</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .vs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1000px) {
+      .vs-grid { grid-template-columns: 1fr; }
+    }
+    .vs-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .vs-card--connect { border-color: rgba(86, 156, 214, 0.4); }
+    .vs-card--hooks { border-color: rgba(76, 175, 80, 0.4); }
+    .vs-card__tag {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .vs-card--connect .vs-card__tag { background: rgba(86, 156, 214, 0.15); color: var(--accent); }
+    .vs-card--hooks .vs-card__tag { background: rgba(76, 175, 80, 0.15); color: var(--success); }
+    .vs-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .vs-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      color: var(--text-primary);
+    }
+    .vs-card__display {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+    .vs-card__display-val {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .vs-card__display-eq {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      margin-top: 4px;
+    }
+    .vs-card__stats {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .vs-card__stat {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .vs-card__stat-label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .vs-card__stat-val {
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .parent-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+    .parent-panel__row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .parent-panel__row:last-child { margin-bottom: 0; }
+    .parent-panel__label {
+      color: var(--text-muted);
+      min-width: 160px;
+    }
+    .parent-panel__val { color: var(--accent-yellow); font-weight: 600; }
+    .parent-panel input[type="range"] { width: 200px; }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      margin: 14px 0;
+    }
+    .compare-table th,
+    .compare-table td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .compare-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+    }
+    .compare-table td { background: var(--bg-tertiary); }
+    .compare-table .row-label { background: var(--bg-panel); color: var(--text-bright); font-weight: 600; }
+    .compare-table .col-connect { color: var(--accent); }
+    .compare-table .col-hooks { color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">43 / 70</span>
+      useSelector vs mapStateToProps — глубокое сравнение
+    </div>
+    <nav class="site-header__nav">
+      <a href="../42-useselector-dev-checks/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">43</span>
+      <a href="../44-usedispatch-basics/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — один компонент в двух реализациях</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Оба компонента читают одно и то же: <code>count * multiplier</code>. Слева —
+          <code>connect</code>, справа — <code>useSelector</code>. Слайдер меняет
+          <code>multiplier</code> (это ownProps родителя). Кнопка «render parent» форсирует ре-рендер
+          родителя без изменения store. Смотрите, как по-разному ведут себя счётчики.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — mapStateToProps vs useSelector</div>
+      <div class="theory__body">
+
+        <h3>Главное отличие: что возвращает selector</h3>
+        <div class="quote">
+          "The selector may return any value as a result, not just an object."<br>
+          — <a href="https://react-redux.js.org/api/hooks#usage-warnings" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector может возвращать любое значение — не только объект.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "The selector normally should return just a single value, and not an object. If you do return an object or an array, be sure to use a memoized selector to avoid unnecessary re-renders."<br>
+          — <a href="https://react-redux.js.org/api/hooks#usage-warnings" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector обычно должен возвращать одно значение, а не объект. Если вы всё же возвращаете объект или массив — используйте мемоизированный selector, чтобы избежать ненужных ре-рендеров.»<br>
+          — перевод
+        </div>
+
+        <p>
+          <code>mapStateToProps</code> <strong>обязан</strong> возвращать объект — его поля
+          становятся props компонента. <code>useSelector</code> возвращает <em>одно</em> значение
+          любого типа и может вызываться <em>несколько раз</em> в одном компоненте — по одному
+          на интересующий slice.
+        </p>
+
+        <h3>Ре-рендер от родителя</h3>
+        <div class="quote">
+          "unlike connect(), useSelector() does not prevent the component from re-rendering due to its parent re-rendering, even if the component's props did not change."<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «В отличие от connect(), useSelector() не препятствует ре-рендеру компонента при ре-рендере его родителя, даже если props компонента не изменились.»<br>
+          — перевод
+        </div>
+
+        <p>
+          <code>connect</code> под капотом вызывает <code>shouldComponentUpdate</code> — если ни state,
+          ни ownProps не изменились, React не ре-рендерит. <code>useSelector</code> — это просто хук,
+          его результат проверяется только внутри <em>этого</em> рендера. Если родитель ре-рендерится
+          — функциональный компонент вызывается заново, selector запускается заново, и только после
+          сравнения <code>===</code> решается, нужно ли <strong>ещё один</strong> ре-рендер
+          (<code>forceRender</code>). Но <em>этот</em> ре-рендер уже случился.
+        </p>
+
+        <p>
+          Лечится <code>React.memo</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="type">Child</span> = <span class="fn">memo</span>(<span class="kw">function</span> <span class="fn">Child</span>({ <span class="prop">multiplier</span> }: <span class="type">Props</span>) {
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">return</span> &lt;div&gt;{count * multiplier}&lt;/div&gt;
+})
+        </div>
+
+        <h3>ownProps</h3>
+        <div class="quote">
+          "The selector function does not receive an ownProps argument. However, props can be used through closure (see the examples above) or by using a curried selector."<br>
+          — <a href="https://react-redux.js.org/api/hooks#usage-warnings" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Selector не получает аргумент ownProps. Однако props можно использовать через замыкание или через curried selector.»<br>
+          — перевод
+        </div>
+
+        <div class="code-block">
+<span class="cm">// mapStateToProps — ownProps явно вторым аргументом</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>: <span class="type">RootState</span>, <span class="prop">ownProps</span>: <span class="type">Props</span>) =&gt; ({
+  <span class="prop">scaled</span>: state.<span class="prop">counter</span>.<span class="prop">value</span> * ownProps.<span class="prop">multiplier</span>
+})
+
+<span class="cm">// useSelector — ownProps через замыкание</span>
+<span class="kw">function</span> <span class="fn">Child</span>({ <span class="prop">multiplier</span> }: <span class="type">Props</span>) {
+  <span class="kw">const</span> <span class="prop">scaled</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt;
+    state.<span class="prop">counter</span>.<span class="prop">value</span> * multiplier  <span class="cm">// ← из closure</span>
+  )
+}
+        </div>
+
+        <h3>Кастомное сравнение</h3>
+        <div class="quote">
+          "You can use the equalityFn option to customize the comparison behavior"<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Вы можете передать опцию equalityFn, чтобы настроить поведение сравнения.»<br>
+          — перевод
+        </div>
+
+        <h3>Полная таблица различий</h3>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Аспект</th>
+              <th class="col-connect">mapStateToProps (connect)</th>
+              <th class="col-hooks">useSelector (hooks)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-label">Сравнение по умолчанию</td>
+              <td>shallow equal по полям объекта</td>
+              <td>strict <code>===</code> по ссылке</td>
+            </tr>
+            <tr>
+              <td class="row-label">Возвращаемое значение</td>
+              <td>object (обязательно)</td>
+              <td>any value — число, строка, объект, массив</td>
+            </tr>
+            <tr>
+              <td class="row-label">Доступ к ownProps</td>
+              <td>2-й параметр функции (если arity=2)</td>
+              <td>через closure функционального компонента</td>
+            </tr>
+            <tr>
+              <td class="row-label">Множественные селекторы</td>
+              <td>один mapStateToProps на компонент</td>
+              <td>несколько <code>useSelector</code> подряд — норма</td>
+            </tr>
+            <tr>
+              <td class="row-label">Подписка на props changes</td>
+              <td>да (если mapStateToProps 2-арный)</td>
+              <td>неявно — через замыкание на каждом рендере</td>
+            </tr>
+            <tr>
+              <td class="row-label">Ре-рендер от parent</td>
+              <td>нет — HOC реализует shouldComponentUpdate</td>
+              <td>да, компонент всегда вызывается с родителем</td>
+            </tr>
+            <tr>
+              <td class="row-label">Иерархия подписок</td>
+              <td>nested (parent connect → child connect)</td>
+              <td>flat — все подписки на уровне самого store</td>
+            </tr>
+            <tr>
+              <td class="row-label">TypeScript</td>
+              <td>сложнее — <code>ConnectedProps</code>, StateProps, DispatchProps</td>
+              <td>проще — <code>(state: RootState) =&gt; ...</code></td>
+            </tr>
+            <tr>
+              <td class="row-label">Поддержка класс-компонентов</td>
+              <td>да, напрямую</td>
+              <td>нет — хуки только в функц. компонентах</td>
+            </tr>
+            <tr>
+              <td class="row-label">Чистка кэша</td>
+              <td>factory function в mapStateToProps (урок 32)</td>
+              <td>useMemo + createSelector (урок 41)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Когда что брать</h3>
+        <ul style="padding-left: 20px; line-height: 1.8;">
+          <li>
+            <strong>Новые проекты, функциональные компоненты</strong> — <code>useSelector</code> +
+            <code>useDispatch</code>. Меньше бойлерплейта, проще типизация, лучшая интеграция с хуками.
+          </li>
+          <li>
+            <strong>Legacy-кодовая база на class-компонентах</strong> — <code>connect</code>. Или
+            переписывайте на функциональные в рамках постепенной миграции.
+          </li>
+          <li>
+            <strong>Нужна nested subscription hierarchy</strong> (редкий случай — SSR, несколько store
+            в ветвях) — <code>connect</code>. Хуки всегда подписываются на ближайший <code>&lt;Provider&gt;</code>
+            корнем, без promote-parent-notify-child логики.
+          </li>
+        </ul>
+
+        <h3>Про миграцию</h3>
+        <p>
+          Смешивать <code>connect</code> и хуки в одном приложении абсолютно нормально — это
+          официально поддерживаемый паттерн, и именно так выглядит большинство реальных миграций.
+          Пошаговое руководство и типовые трансформации — в уроке 54.
+        </p>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Оба механизма используют один и тот же
+          <a href="../03a-subscription-system/">Subscription</a>. После <code>dispatch</code>:
+          linked list callback'ов → <code>Subscription.notify()</code> → <code>checkForUpdates</code>
+          → selector → <code>===</code> → <code>forceRender</code> (если результат изменился).
+          Разница — в том, <em>откуда</em> берётся <code>selector</code>: для <code>connect</code> это
+          комбинированный <code>mapStateToProps</code> с shallow-сравнением, для хуков — пользовательская
+          функция с <code>===</code>-сравнением. В обоих случаях уровень механизма подписки один и тот же.
+        </p>
+
+        <div class="tip">
+          <strong>Практика:</strong> не бойтесь использовать <code>useSelector</code> в уже
+          существующем приложении с <code>connect</code>. Они работают поверх одного и того же
+          <code>&lt;Provider&gt;</code>, один и тот же store, одна и та же подписка — только разный
+          API на уровне компонента.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

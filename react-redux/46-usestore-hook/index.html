@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>46 — useStore — прямой доступ к store</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .store-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .store-grid { grid-template-columns: 1fr; }
+    }
+    .store-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .store-card--good { border-color: rgba(76, 175, 80, 0.4); }
+    .store-card--bad { border-color: rgba(244, 71, 71, 0.4); }
+    .store-card__tag {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .store-card--good .store-card__tag { background: rgba(76, 175, 80, 0.15); color: var(--success); }
+    .store-card--bad .store-card__tag { background: rgba(244, 71, 71, 0.15); color: var(--accent-red); }
+    .store-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .store-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    .store-card__value {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      text-align: center;
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+    }
+    .store-card__value--red { color: var(--accent-red); }
+    .store-card__stat {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+    .store-card__stat strong { color: var(--accent-cyan); }
+    .store-card__stat.stat-stale strong { color: var(--accent-red); }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .json-block {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+    }
+    .replace-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .replace-panel__title {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .replace-panel__buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .signature {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-cyan);
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">46 / 70</span>
+      useStore — прямой доступ к store
+    </div>
+    <nav class="site-header__nav">
+      <a href="../45-usedispatch-callback-memo/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">46</span>
+      <a href="../47-custom-context-hooks/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — два сценария useStore</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Слева — компонент с <code>useSelector</code>, который подписан на изменения и ре-рендерится
+          при каждом релевантном <code>dispatch</code>. Справа — компонент, читающий значение через
+          <code>useStore().getState()</code> прямо в рендере. <strong>Второй не обновляется</strong> —
+          <code>useStore</code> не подписывает компонент. Ниже — кнопки экспорта и замены reducer'а,
+          где <code>useStore</code> уместен.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — useStore</div>
+      <div class="theory__body">
+
+        <h3>Что делает useStore</h3>
+        <div class="quote">
+          "This hook returns a reference to the same Redux store that was passed in to the &lt;Provider&gt; component."<br>
+          — <a href="https://react-redux.js.org/api/hooks#usestore" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Этот хук возвращает ссылку на тот же самый Redux-store, который был передан в компонент &lt;Provider&gt;.»<br>
+          — перевод
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="signature">
+          useStore&lt;State = unknown, Action extends Action = AnyAction&gt;(): Store&lt;State, Action&gt;
+        </div>
+        <p>
+          Возвращается <strong>тот же объект</strong> <code>store</code>, который вы передавали в
+          <code>&lt;Provider store={...}&gt;</code>. Методы у него стандартные: <code>getState()</code>,
+          <code>dispatch(action)</code>, <code>subscribe(listener)</code>,
+          <code>replaceReducer(nextReducer)</code>.
+        </p>
+
+        <h3>Главное отличие от useSelector: нет подписки</h3>
+        <p>
+          <code>useSelector</code> <strong>подписывает</strong> компонент на изменения: при каждом
+          <code>dispatch</code> вызывается selector, результат сравнивается со старым по
+          <code>===</code> — если отличается, компонент ре-рендерится.
+        </p>
+        <p>
+          <code>useStore</code> <strong>не подписывает</strong>. Он просто достаёт объект store из
+          контекста и возвращает вам. Если вы вызовете <code>store.getState()</code> прямо в рендере —
+          получите актуальное значение в момент рендера, но <em>следующий</em> dispatch ре-рендер не
+          вызовет. Компонент застрянет на устаревшем значении, пока что-то другое его не ре-рендерит.
+        </p>
+
+        <h3>Когда useStore уместен</h3>
+        <div class="quote">
+          "This hook should probably not be used frequently. Prefer useSelector() as your primary choice. However, this may be useful for less common scenarios that do require access to the store, such as replacing reducers."<br>
+          — <a href="https://react-redux.js.org/api/hooks#usestore" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Этим хуком вряд ли стоит пользоваться часто. В качестве основного выбора предпочтительнее useSelector(). Однако он может быть полезен в менее частых сценариях, где действительно нужен доступ к самому store — например, для замены reducer'ов.»<br>
+          — перевод
+        </div>
+
+        <h3>Сценарий 1: снимок state в обработчике</h3>
+        <p>
+          Вам нужно прочитать state <em>в момент клика</em>, но вы не хотите ре-рендерить компонент при
+          каждом изменении этого куска state. Классический пример — кнопка «экспорт» или «сохранить»:
+          в момент клика снимается полный state, сериализуется, отправляется куда-то.
+        </p>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">ExportButton</span>() {
+  <span class="kw">const</span> <span class="prop">store</span> = <span class="fn">useStore</span>&lt;<span class="type">RootState</span>&gt;()
+
+  <span class="kw">const</span> <span class="fn">onExport</span> = () =&gt; {
+    <span class="kw">const</span> <span class="prop">state</span> = store.<span class="fn">getState</span>()
+    <span class="kw">const</span> <span class="prop">json</span> = <span class="type">JSON</span>.<span class="fn">stringify</span>(state, <span class="kw">null</span>, <span class="num">2</span>)
+    console.<span class="fn">log</span>(json)
+    <span class="cm">// Снимок state в момент клика, без подписки на ре-рендеры</span>
+  }
+
+  <span class="kw">return</span> &lt;button onClick={onExport}&gt;Export state as JSON&lt;/button&gt;
+}
+        </div>
+        <p>
+          Если бы вы сделали это через <code>useSelector(state =&gt; state)</code>, компонент
+          ре-рендерился бы на <em>каждом</em> dispatch'е всего приложения.
+        </p>
+
+        <h3>Сценарий 2: замена reducer (code splitting)</h3>
+        <p>
+          Динамическая подгрузка модуля с новым reducer'ом — пример из документации. При lazy-loaded
+          фиче вы подгружаете её reducer и встраиваете в корневой reducer через
+          <code>store.replaceReducer(newRootReducer)</code>.
+        </p>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">FeatureLoader</span>() {
+  <span class="kw">const</span> <span class="prop">store</span> = <span class="fn">useStore</span>&lt;<span class="type">RootState</span>&gt;()
+
+  <span class="kw">const</span> <span class="fn">loadFeature</span> = <span class="kw">async</span> () =&gt; {
+    <span class="kw">const</span> { <span class="prop">reducer</span> } = <span class="kw">await</span> <span class="fn">import</span>(<span class="str">'./features/chat'</span>)
+    store.<span class="fn">replaceReducer</span>(<span class="fn">combineReducers</span>({ ...<span class="prop">staticReducers</span>, <span class="prop">chat</span>: reducer }))
+  }
+
+  <span class="kw">return</span> &lt;button onClick={loadFeature}&gt;Загрузить фичу &quot;чат&quot;&lt;/button&gt;
+}
+        </div>
+
+        <h3>Сценарий 3: доступ к getState внутри thunk-подобной логики</h3>
+        <p>
+          Иногда нужно диспатчить action, значение которого зависит от актуального state —
+          <em>и</em> при этом не подписывать компонент на этот state. Типично используется в
+          комбинации с <code>useDispatch</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">SaveButton</span>() {
+  <span class="kw">const</span> <span class="prop">store</span> = <span class="fn">useStore</span>&lt;<span class="type">RootState</span>&gt;()
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+
+  <span class="kw">const</span> <span class="fn">onSave</span> = () =&gt; {
+    <span class="kw">const</span> <span class="prop">draft</span> = store.<span class="fn">getState</span>().<span class="prop">editor</span>.<span class="prop">draft</span>
+    <span class="fn">dispatch</span>({ <span class="prop">type</span>: <span class="str">'SAVE'</span>, <span class="prop">payload</span>: draft })
+  }
+
+  <span class="kw">return</span> &lt;button onClick={onSave}&gt;Сохранить&lt;/button&gt;
+}
+        </div>
+
+        <h3>Антипаттерн: чтение state в рендере</h3>
+        <div class="warning">
+          <strong>Не делайте так!</strong> Компонент не обновится при изменении state:
+        </div>
+        <div class="code-block">
+<span class="cm">// ❌ Компонент не подписан — при dispatch не ре-рендерится</span>
+<span class="kw">function</span> <span class="fn">BadTodoCount</span>() {
+  <span class="kw">const</span> <span class="prop">store</span> = <span class="fn">useStore</span>&lt;<span class="type">RootState</span>&gt;()
+  <span class="kw">return</span> &lt;div&gt;{store.<span class="fn">getState</span>().<span class="prop">todos</span>.<span class="fn">length</span>}&lt;/div&gt;
+}
+
+<span class="cm">// ✔ Правильный вариант — useSelector подписывает на изменения</span>
+<span class="kw">function</span> <span class="fn">GoodTodoCount</span>() {
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">todos</span>.<span class="fn">length</span>)
+  <span class="kw">return</span> &lt;div&gt;{count}&lt;/div&gt;
+}
+        </div>
+        <p>
+          В демо слева как раз такой «плохой» компонент: он прочитает значение один раз при первом
+          рендере — и потом будет показывать его навсегда. Справа — правильный, на
+          <code>useSelector</code>.
+        </p>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          <code>useStore</code> <strong>не</strong> регистрирует callback в подписке store. Поэтому при
+          <code>dispatch</code> цепочка <code>linked list callback'ов → Subscription.notify() →
+          checkForUpdates → selector → === → forceRender</code> <em>не задействует</em> компоненты,
+          использующие только <code>useStore</code>. Они обновятся только когда их родитель ре-рендерится
+          по другой причине (например, сработал соседний <code>useSelector</code> или изменился prop).
+          Подробнее о Subscription — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Практический совет:</strong> если вы пишете <code>useStore</code> и затем сразу же
+          <code>store.getState()</code> в рендере — это почти всегда ошибка. Замените на
+          <code>useSelector</code>. <code>useStore</code> нужен только когда доступ к store
+          <em>отложен</em> во времени (обработчики, эффекты) или вам нужны методы вроде
+          <code>replaceReducer</code>/<code>subscribe</code>.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>37 — useSelector — equality сравнение и ре-рендеры</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .pair-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .pair-grid { grid-template-columns: 1fr; }
+    }
+    .exp-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .exp-card--bad { border-color: rgba(244, 71, 71, 0.4); }
+    .exp-card--good { border-color: rgba(76, 175, 80, 0.4); }
+    .exp-card__tag {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      display: inline-block;
+      font-weight: 700;
+      align-self: flex-start;
+    }
+    .exp-card--bad .exp-card__tag {
+      background: rgba(244, 71, 71, 0.15);
+      color: var(--accent-red);
+    }
+    .exp-card--good .exp-card__tag {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+    }
+    .exp-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      line-height: 1.55;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+    }
+    .exp-card__counters {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .exp-card__counter {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .exp-card__counter-label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .exp-card__counter-val {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .exp-card__counter-val--red { color: var(--accent-red); }
+    .exp-card__counter-val--green { color: var(--success); }
+    .exp-card__val {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--accent-yellow);
+    }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      margin: 14px 0;
+    }
+    .compare-table th,
+    .compare-table td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .compare-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .compare-table td {
+      background: var(--bg-tertiary);
+    }
+    .compare-table .row-label {
+      background: var(--bg-panel);
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">37 / 70</span>
+      useSelector — equality сравнение и ре-рендеры
+    </div>
+    <nav class="site-header__nav">
+      <a href="../36-useselector-basics/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">37</span>
+      <a href="../38-useselector-shallowequal/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — «плохой» vs «хороший» useSelector</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Оба компонента читают одни и те же данные. «Плохой» возвращает из selector'а новый объект
+          каждый раз. «Хороший» делает два отдельных <code>useSelector</code> с примитивами. Кнопка
+          <strong>tick (unrelated)</strong> меняет <code>state.other</code> — «хороший» на это вообще
+          не должен реагировать.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — сравнение результатов selector'а</div>
+      <div class="theory__body">
+
+        <h3>Как useSelector решает, рендериться ли</h3>
+        <div class="quote">
+          "When an action is dispatched, useSelector() will do a reference comparison of the previous selector result value and the current result value. If they are different, the component will be forced to re-render. If they are the same, the component will not re-render."<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Когда action диспатчится, useSelector() выполняет сравнение по ссылке между предыдущим и текущим результатом selector'а. Если они различаются — компонент принудительно ре-рендерится. Если одинаковы — компонент не ре-рендерится.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "useSelector() uses strict === reference equality checks by default, not shallow equality"<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «useSelector() по умолчанию использует строгие сравнения по ссылке через ===, а не shallow-сравнение.»<br>
+          — перевод
+        </div>
+
+        <h3>Ключевое отличие от connect</h3>
+        <div class="quote">
+          "This is different than connect(), which uses shallow equality checks on the results of mapState calls to determine if re-rendering is needed."<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Это отличается от connect(), который использует shallow-сравнение результатов вызовов mapStateToProps для принятия решения о ре-рендере.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "With mapStateToProps, all individual fields were returned in a combined object. It didn't matter if the return object was a new reference or not — connect() just compared the individual fields. With useSelector(), returning a new object every time will always force a re-render by default."<br>
+          — <a href="https://react-redux.js.org/api/hooks#equality-comparisons-and-updates" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «В mapStateToProps все отдельные поля возвращались в составе одного общего объекта. Не имело значения, новая это ссылка или нет — connect() сравнивал поля по отдельности. С useSelector(), возвращение нового объекта каждый раз всегда принудительно вызывает ре-рендер по умолчанию.»<br>
+          — перевод
+        </div>
+
+        <h3>Таблица: mapStateToProps vs useSelector</h3>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>mapStateToProps (connect)</th>
+              <th>useSelector</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-label">Что возвращает</td>
+              <td>Объект со всеми полями-props</td>
+              <td>Одно значение (примитив, объект, массив — что угодно)</td>
+            </tr>
+            <tr>
+              <td class="row-label">Как сравнивается</td>
+              <td>Shallow equality по полям объекта</td>
+              <td>Strict <code>===</code> по ссылке (по умолчанию)</td>
+            </tr>
+            <tr>
+              <td class="row-label">Новый объект каждый раз?</td>
+              <td>Нормально — поля сравниваются отдельно</td>
+              <td>Всегда ре-рендер — ссылка другая</td>
+            </tr>
+            <tr>
+              <td class="row-label">Решение</td>
+              <td>Возвращайте плоский объект</td>
+              <td>Примитивы · shallowEqual · createSelector</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Три способа «починить» selector, возвращающий объект</h3>
+
+        <div class="code-block">
+<span class="cm">// ❌ Проблема: новый объект на каждом вызове selector'а</span>
+<span class="kw">const</span> <span class="prop">data</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; ({
+  <span class="prop">a</span>: state.<span class="prop">counter</span>.<span class="prop">a</span>,
+  <span class="prop">b</span>: state.<span class="prop">counter</span>.<span class="prop">b</span>
+}))
+<span class="cm">// prev = { a: 1, b: 2 }; new = { a: 1, b: 2 } — но другая ссылка!</span>
+<span class="cm">// prev !== new → ре-рендер на каждом dispatch</span>
+        </div>
+
+        <div class="code-block">
+<span class="cm">// ✔ Вариант 1: отдельные useSelector</span>
+<span class="kw">const</span> <span class="prop">a</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">a</span>)
+<span class="kw">const</span> <span class="prop">b</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">b</span>)
+
+<span class="cm">// ✔ Вариант 2: shallowEqual (урок 38)</span>
+<span class="kw">const</span> <span class="prop">data</span> = <span class="fn">useSelector</span>(
+  (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; ({ <span class="prop">a</span>: state.<span class="prop">counter</span>.<span class="prop">a</span>, <span class="prop">b</span>: state.<span class="prop">counter</span>.<span class="prop">b</span> }),
+  <span class="fn">shallowEqual</span>
+)
+
+<span class="cm">// ✔ Вариант 3: createSelector из reselect (урок 40)</span>
+<span class="kw">const</span> <span class="fn">selectAB</span> = <span class="fn">createSelector</span>(
+  (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>,
+  (<span class="prop">c</span>) =&gt; ({ <span class="prop">a</span>: c.<span class="prop">a</span>, <span class="prop">b</span>: c.<span class="prop">b</span> })
+)
+<span class="kw">const</span> <span class="prop">data</span> = <span class="fn">useSelector</span>(<span class="fn">selectAB</span>)
+        </div>
+
+        <h3>Почему так сделано?</h3>
+        <p>
+          <code>useSelector</code> — хук для <strong>одного</strong> значения. Когда вы возвращаете
+          объект, вы неявно «собираете» несколько значений — это тот же случай, что и
+          <code>mapStateToProps</code>. Но API <code>useSelector</code> проще: он не пытается угадать,
+          что вы комбинируете, а просто сравнивает по ссылке. Вы сами решаете, как собрать данные —
+          через отдельные хуки, shallowEqual или memoized-selector.
+        </p>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          После <code>dispatch</code>: linked list callback'ов → <code>Subscription.notify()</code>
+          → для каждого слушателя <code>checkForUpdates</code> → запустить selector → сравнить через
+          <code>===</code> → <code>forceRender</code> если отличается. В случае selector'а,
+          возвращающего inline-объект, каждый <code>dispatch</code> создаёт новый результат, а новая
+          ссылка !== старой → <code>forceRender</code>. Отсюда и лишние ре-рендеры.
+          Подробнее про Subscription — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="warning">
+          <strong>Dev-предупреждение:</strong> начиная с React-Redux v8.1 <code>useSelector</code>
+          в dev-режиме запускает selector ещё раз сразу после первого вызова и сравнивает результаты.
+          Если selector возвращает разные ссылки при одинаковом state — в консоль летит warning
+          «Selector unknown returned a different result when called with the same parameters».
+          Это и есть сигнал «у тебя selector возвращает новый объект». Подробнее — урок 42.
+        </div>
+
+        <div class="tip">
+          <strong>Рабочее правило:</strong> пусть selector возвращает примитив (число, строку,
+          boolean) или уже стабильную ссылку (например, <code>state.items</code>, которая не пересоздаётся,
+          пока вы её не измените). Как только вам нужен объект или массив <em>derived</em> — переходите
+          к <code>createSelector</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

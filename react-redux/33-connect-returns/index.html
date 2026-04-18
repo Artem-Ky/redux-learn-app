@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>33 — connect() Returns — двухэтапный вызов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .stages {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .stages { grid-template-columns: 1fr; }
+    }
+    .stage {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .stage--1 { border-color: var(--accent-cyan); }
+    .stage--2 { border-color: var(--accent-yellow); }
+    .stage__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .stage--1 .stage__title { color: var(--accent-cyan); }
+    .stage--2 .stage__title { color: var(--accent-yellow); }
+    .stage__desc {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+    }
+    .stage__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent-cyan);
+      white-space: pre-wrap;
+    }
+    .pipe {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      margin: 14px 0;
+      flex-wrap: wrap;
+    }
+    .pipe-node {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 0.78rem;
+      color: var(--accent-cyan);
+    }
+    .pipe-arrow { color: var(--text-muted); font-size: 1.2rem; }
+    .reuse-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .reuse-grid { grid-template-columns: 1fr; }
+    }
+    .reuse-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .reuse-card--login    { border-color: var(--accent-cyan); }
+    .reuse-card--profile  { border-color: var(--accent-orange); }
+    .reuse-card--settings { border-color: var(--accent-purple); }
+    .reuse-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .reuse-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .reuse-card--login    .reuse-card__title { color: var(--accent-cyan); }
+    .reuse-card--profile  .reuse-card__title { color: var(--accent-orange); }
+    .reuse-card--settings .reuse-card__title { color: var(--accent-purple); }
+    .reuse-card__body {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      white-space: pre-wrap;
+    }
+    .reuse-card__renders {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: right;
+    }
+    .controls {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">33 / 70</span>
+      connect() Returns — двухэтапный вызов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../32-connect-factory-functions/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">33</span>
+      <a href="../34-connectedprops-typescript/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — один HOC для трёх компонентов</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Один и тот же <code>connectUser = connect(mapStateToProps, mapDispatchToProps)</code>
+          применён к трём разным компонентам: <code>Login</code>, <code>Profile</code>,
+          <code>Settings</code>. Все три видят один и тот же срез store и получают одинаковые
+          action creators. Нажмите «Login» / «Logout» — все три карточки обновляются
+          одновременно, потому что все три подписаны на одни и те же поля state.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — что возвращает connect()</div>
+      <div class="theory__body">
+
+        <h3>Два этапа вызова</h3>
+        <p>
+          Когда вы пишете <code>connect(mapStateToProps, mapDispatchToProps)(Comp)</code> — это
+          <strong>два</strong> вызова подряд. Первый — <code>connect(...)</code> — возвращает не
+          компонент, а <strong>функцию</strong>, которую в документации называют «wrapper function».
+          Второй — применение этой функции к вашему <code>Comp</code> — возвращает уже подключённый
+          компонент.
+        </p>
+
+        <div class="quote">«The return of connect() is a wrapper function that takes your component and returns a wrapper component with the additional props it injects.»<br>— <a href="https://react-redux.js.org/api/connect#connect-returns" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«Возвращаемое значение connect() — это функция-обёртка, которая принимает ваш компонент и возвращает компонент-обёртку с дополнительными props, которые она инжектит.»<br>— перевод</div>
+
+        <div class="quote">«In most cases, the wrapper function will be called right away, without being saved in a temporary variable»<br>— <a href="https://react-redux.js.org/api/connect#connect-returns" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«В большинстве случаев функцию-обёртку вызывают сразу же, не сохраняя её в промежуточной переменной.»<br>— перевод</div>
+
+        <h3>Разворачиваем однострочник</h3>
+        <div class="stages">
+          <div class="stage stage--1">
+            <div class="stage__title">Этап 1 — настройка HOC</div>
+            <div class="stage__desc">
+              <code>connect(...)</code> запоминает <code>mapStateToProps</code> /
+              <code>mapDispatchToProps</code> и возвращает wrapper-функцию.
+            </div>
+            <div class="stage__code">
+const connectUser = connect(
+  mapStateToProps,
+  mapDispatchToProps
+)
+// typeof connectUser === 'function'
+            </div>
+          </div>
+          <div class="stage stage--2">
+            <div class="stage__title">Этап 2 — применение HOC</div>
+            <div class="stage__desc">
+              Wrapper-функция получает ваш компонент и возвращает новый,
+              подключённый к store.
+            </div>
+            <div class="stage__code">
+const ConnectedLogin    = connectUser(Login)
+const ConnectedProfile  = connectUser(Profile)
+const ConnectedSettings = connectUser(Settings)
+            </div>
+          </div>
+        </div>
+
+        <div class="pipe">
+          <div class="pipe-node">connect(mapState, mapDispatch)</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-node">wrapper: (Comp) =&gt; Connected</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-node">wrapper(Comp)</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-node">Connected&lt;Comp&gt;</div>
+        </div>
+
+        <h3>Обычная запись — в одну строку</h3>
+        <p>
+          В 99% случаев вы сразу применяете wrapper к компоненту в той же строке — именно так
+          выглядит классический <code>export default</code> в контейнерах.
+        </p>
+        <div class="code-block">
+<span class="cm">// Две формы эквивалентны:</span>
+
+<span class="kw">const</span> <span class="fn">connectUser</span> = <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)
+<span class="kw">export default</span> <span class="fn">connectUser</span>(<span class="type">Login</span>)
+
+<span class="cm">// ≡</span>
+
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">Login</span>)
+        </div>
+
+        <h3>Зачем сохранять wrapper в переменную</h3>
+        <ul>
+          <li><strong>Переиспользование:</strong> один HOC с одинаковыми
+              <code>mapStateToProps</code> / <code>mapDispatchToProps</code> можно применить к
+              нескольким компонентам (этот урок — живой пример).</li>
+          <li><strong>TypeScript / ConnectedProps:</strong> если wrapper в переменной, можно
+              извлечь типы его props через <code>ConnectedProps&lt;typeof connectUser&gt;</code>
+              (урок 34).</li>
+          <li><strong>Композиция HOC'ов:</strong> удобно передавать wrapper в цепочки
+              <code>compose(withRouter, connectUser, withTheme)</code>.</li>
+        </ul>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Wrapper-функция — это фабрика компонентов. Когда вы применяете её к разным компонентам,
+          вы получаете <strong>разные</strong> подключённые компоненты, но у них общая
+          «форма» подписки: один и тот же <code>mapStateToProps</code>. В рантайме каждый инстанс
+          всё равно подписывается <strong>отдельно</strong> — при mount вызывается
+          <code>store.subscribe(checkForUpdates)</code> и callback добавляется в linked list
+          Subscription. При <code>dispatch</code> Subscription проходит по linked list callback'ов
+          → <code>Subscription.notify()</code> → для каждого слушателя
+          <code>checkForUpdates</code> → запустить <code>selector</code> (<code>mapStateToProps</code>)
+          → сравнить с <code>prevValue</code> через <code>===</code> → <code>forceRender</code>
+          если отличается. Три инстанса <code>ConnectedLogin</code> / <code>ConnectedProfile</code>
+          / <code>ConnectedSettings</code> — это три независимых записи в linked list, у каждой
+          свои <code>prevValue</code>.
+          <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Мысленная модель:</strong> <code>connect(mapState, mapDispatch)</code> —
+          это «шаблон контейнера», <code>connectUser(Login)</code> — «инстанциация шаблона» на
+          конкретном презентационном компоненте. Пока шаблоны одинаковые — можно держать один
+          wrapper в переменной и применять его несколько раз.
+        </div>
+
+        <div class="warning">
+          <strong>Важно:</strong> две разные <code>connect(...)</code>-вызова вернут <strong>две разные</strong>
+          wrapper-функции, даже если передали им одинаковые <code>mapStateToProps</code>. Никакой
+          «кэш по ссылке на mapStateToProps» внутри библиотеки нет. Сохранение wrapper в переменную —
+          это ваше решение, а не автоматическая оптимизация.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

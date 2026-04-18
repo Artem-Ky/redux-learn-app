@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>31 — options.forwardRef — проброс ref через connect</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ref-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .ref-layout { grid-template-columns: 1fr; }
+    }
+    .ref-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ref-card--broken { border-color: var(--accent-red); }
+    .ref-card--fixed  { border-color: var(--success); }
+    .ref-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .ref-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .ref-card__title--broken { color: var(--accent-red); }
+    .ref-card__title--fixed  { color: var(--success); }
+    .ref-card__badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .ref-card__badge--broken {
+      background: rgba(244, 71, 71, 0.15);
+      color: var(--accent-red);
+      border: 1px solid rgba(244, 71, 71, 0.3);
+    }
+    .ref-card__badge--fixed {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .ref-card__config {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--accent-cyan);
+    }
+    .ref-card__input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      color: var(--text-bright);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .ref-card__input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(86, 156, 214, 0.25);
+    }
+    .ref-card__actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .ref-card__inspect {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      min-height: 56px;
+    }
+    .flow-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      margin: 12px 0;
+    }
+    .flow-table th, .flow-table td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .flow-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+    }
+    .flow-table td { background: var(--bg-tertiary); }
+    .flow-table code { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">31 / 70</span>
+      options.forwardRef — проброс ref через connect
+    </div>
+    <nav class="site-header__nav">
+      <a href="../30-connect-options-equality/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">31</span>
+      <a href="../32-connect-factory-functions/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — ref на connect-HOC vs forwardRef</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Оба варианта — один и тот же класс-компонент <code>InputComponent</code>, обёрнутый
+          <code>connect</code>. Слева — без опции <code>forwardRef</code>: ref из родителя попадает
+          на обёрточный компонент, а не на класс, <code>ref.current.focus()</code> падает. Справа —
+          с <code>{ forwardRef: true }</code>: ref пробрасывается к реальному инстансу класса, и
+          <code>focus()</code> работает. Нажмите «Focus input» в каждой карточке.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — options.forwardRef</div>
+      <div class="theory__body">
+
+        <h3>Зачем нужен forwardRef</h3>
+        <p>
+          <code>connect</code> — это высокоуровневый компонент (HOC). Он оборачивает ваш компонент в
+          собственный обёрточный: читает <code>store</code> из <code>&lt;Provider&gt;</code>,
+          запускает <code>mapStateToProps</code>, <code>mapDispatchToProps</code>, сравнивает
+          результаты и, если что-то поменялось, форсирует рендер. Когда родитель ставит
+          <code>ref</code> на connect-HOC, по умолчанию ref попадает именно на <strong>обёртку</strong>,
+          а не на ваш класс-компонент внутри. У обёртки нет <code>.focus()</code>, нет
+          <code>.scrollIntoView()</code>, нет никаких instance-методов — ref в такой форме бесполезен.
+        </p>
+
+        <div class="quote">«If {forwardRef : true} has been passed to connect, adding a ref to the connected wrapper component will actually return the instance of the wrapped component.»<br>— <a href="https://react-redux.js.org/api/connect#forwardref-boolean" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«Если в connect передано {forwardRef: true}, то добавление ref на обёрнутый компонент-обёртку вернёт инстанс внутреннего (wrapped) компонента.»<br>— перевод</div>
+
+        <div class="quote">«Note: This parameter is supported in &gt;= v6.0 only»<br>— <a href="https://react-redux.js.org/api/connect#forwardref-boolean" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«Замечание: эта опция поддерживается только начиная с v6.0.»<br>— перевод</div>
+
+        <h3>Как включить</h3>
+        <p>
+          <code>forwardRef</code> — это поле в четвёртом аргументе <code>connect</code>, объекте
+          <code>options</code> (там же, где <code>areStatesEqual</code>, <code>context</code> и т. д.).
+          Тип — <code>boolean</code>, по умолчанию <code>false</code>.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Без forwardRef — ref попадает на обёртку, а не на InputComponent</span>
+<span class="kw">const</span> <span class="type">Connected</span> = <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>)(<span class="type">InputComponent</span>)
+
+<span class="kw">const</span> inputRef = <span class="fn">useRef</span>&lt;<span class="type">InputComponent</span>&gt;(<span class="kw">null</span>)
+&lt;<span class="type">Connected</span> <span class="prop">ref</span>={inputRef} /&gt;
+inputRef.<span class="prop">current</span>.<span class="fn">focus</span>()  <span class="cm">// ✖ TypeError: inputRef.current.focus is not a function</span>
+
+<span class="cm">// С forwardRef — ref пробрасывается к реальному InputComponent</span>
+<span class="kw">const</span> <span class="type">ConnectedWithRef</span> = <span class="fn">connect</span>(
+  <span class="fn">mapStateToProps</span>,
+  <span class="kw">null</span>,
+  <span class="kw">null</span>,
+  { <span class="prop">forwardRef</span>: <span class="kw">true</span> }
+)(<span class="type">InputComponent</span>)
+
+&lt;<span class="type">ConnectedWithRef</span> <span class="prop">ref</span>={inputRef} /&gt;
+inputRef.<span class="prop">current</span>.<span class="fn">focus</span>()  <span class="cm">// ✔ работает</span>
+        </div>
+
+        <h3>Что происходит внутри</h3>
+        <p>
+          Когда <code>forwardRef: true</code>, библиотека внутри оборачивает обёрточный компонент в
+          <code>React.forwardRef</code>. Входящий <code>ref</code> не потребляется обёрткой, а
+          прокидывается в «настоящий» компонент. Для класс-компонента <code>ref.current</code> будет
+          инстансом класса (и на нём есть все методы и ссылки). Для функционального — нужен
+          <code>React.forwardRef</code> / <code>useImperativeHandle</code> внутри самого компонента,
+          потому что у функции нет «инстанса».
+        </p>
+
+        <h3>Что куда попадает: таблица</h3>
+        <table class="flow-table">
+          <thead>
+            <tr>
+              <th>Конфигурация</th>
+              <th>Куда попадает ref родителя</th>
+              <th>Что даёт ref.current</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>connect(mapStateToProps)(Comp)</code></td>
+              <td>На обёрточный компонент-connect</td>
+              <td>Обёртка; у неё нет ваших методов</td>
+            </tr>
+            <tr>
+              <td><code>connect(mapStateToProps, null, null, { forwardRef: true })(Comp)</code></td>
+              <td>На ваш <code>Comp</code> (wrapped)</td>
+              <td>Инстанс класса — доступны <code>.focus()</code>, поля и т. д.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          На подписку опция <code>forwardRef</code> <strong>не влияет</strong>. При
+          <code>dispatch</code> Subscription проходит по linked list callback'ов →
+          <code>Subscription.notify()</code> → для каждого слушателя <code>checkForUpdates</code> →
+          запустить <code>selector</code> (то есть <code>mapStateToProps</code>) → сравнить с
+          <code>prevValue</code> через <code>===</code> (точнее, <code>shallowEqual</code> над
+          результатом) → <code>forceRender</code> если отличается. Весь этот конвейер живёт в
+          <strong>обёрточном</strong> компоненте и одинаково работает с <code>forwardRef</code> и без.
+          Опция меняет только то, куда указывает внешний <code>ref</code>.
+          <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <h3>Когда использовать</h3>
+        <ul>
+          <li>Родителю нужно вызвать instance-метод класса: <code>.focus()</code>,
+              <code>.scrollIntoView()</code>, свой <code>.reset()</code>, <code>.validate()</code>.</li>
+          <li>Библиотечный компонент должен прокинуть ref «наружу» для интеграции с DOM API или
+              другими библиотеками (drag'n'drop, tooltip-позиционирование и т. п.).</li>
+          <li>Функциональный компонент использует <code>React.forwardRef</code> +
+              <code>useImperativeHandle</code> — и вы хотите сохранить эту возможность после
+              <code>connect</code>.</li>
+        </ul>
+
+        <div class="tip">
+          <strong>Альтернатива для функциональных компонентов:</strong> часто вместо
+          <code>forwardRef: true</code> проще отказаться от <code>connect</code> и перейти на хуки
+          (<code>useSelector</code> / <code>useDispatch</code>, уроки 35–49). В хук-версии вашего
+          компонента не появляется HOC-обёртка, и <code>ref</code> работает без дополнительных
+          опций — это ещё одна причина, почему команда React Redux рекомендует хуки по умолчанию.
+        </div>
+
+        <div class="warning">
+          <strong>Раньше было по-другому:</strong> в очень старых версиях React Redux
+          (v5 и ниже) вместо <code>forwardRef</code> использовалась опция <code>withRef: true</code>
+          и метод <code>getWrappedInstance()</code>. С v6 они удалены —
+          <code>forwardRef: true</code> вместе с передачей <code>ref</code> напрямую закрывает все
+          эти сценарии.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>45 — useDispatch + useCallback + React.memo</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .cb-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1000px) {
+      .cb-grid { grid-template-columns: 1fr; }
+    }
+    .cb-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cb-card--bad { border-color: rgba(244, 71, 71, 0.4); }
+    .cb-card--good { border-color: rgba(76, 175, 80, 0.4); }
+    .cb-card__tag {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .cb-card--bad .cb-card__tag { background: rgba(244, 71, 71, 0.15); color: var(--accent-red); }
+    .cb-card--good .cb-card__tag { background: rgba(76, 175, 80, 0.15); color: var(--success); }
+    .cb-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .cb-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      color: var(--text-primary);
+    }
+    .cb-child {
+      background: var(--bg-tertiary);
+      border: 1px dashed var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+    .cb-child__btn {
+      padding: 8px 16px;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--accent);
+      background: rgba(86, 156, 214, 0.15);
+      color: var(--text-bright);
+      cursor: pointer;
+    }
+    .cb-child__btn:hover { background: rgba(86, 156, 214, 0.3); }
+    .cb-child__flash {
+      animation: cb-flash 300ms ease-out;
+    }
+    @keyframes cb-flash {
+      0% { background: rgba(255, 230, 100, 0.25); }
+      100% { background: transparent; }
+    }
+    .cb-child__label {
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+    .cb-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .cb-stat {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .cb-stat__label {
+      font-size: 0.64rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .cb-stat__val {
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .cb-stat__val--red { color: var(--accent-red); }
+    .cb-stat__val--green { color: var(--success); }
+    .parent-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      text-align: center;
+    }
+    .parent-panel__row { margin-bottom: 6px; }
+    .parent-panel__row:last-child { margin-bottom: 0; }
+    .parent-panel__val { color: var(--accent-yellow); font-weight: 600; }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">45 / 70</span>
+      useDispatch + useCallback + React.memo
+    </div>
+    <nav class="site-header__nav">
+      <a href="../44-usedispatch-basics/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">45</span>
+      <a href="../46-usestore-hook/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — inline callback vs useCallback</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Два дочерних компонента обёрнуты в <code>React.memo</code>. В первый прокидывается inline
+          <code>() =&gt; dispatch(...)</code> — новая ссылка на каждом рендере родителя.
+          Во второй прокидывается <code>useCallback(..., [dispatch])</code> — ссылка стабильна.
+          Кнопка «render parent» меняет <em>только</em> локальное состояние родителя, не трогая store.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — memoизация callback'ов поверх dispatch</div>
+      <div class="theory__body">
+
+        <h3>Цитата из документации</h3>
+        <div class="quote">
+          "When passing a callback using dispatch to a child component, you may sometimes want to memoize it with useCallback. If the child component is trying to optimize render behavior using React.memo() or similar, this avoids unnecessary rendering of child components due to the changed callback reference."<br>
+          — <a href="https://react-redux.js.org/api/hooks#usedispatch" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Когда вы передаёте callback, использующий dispatch, в дочерний компонент, иногда полезно мемоизировать его через useCallback. Если дочерний компонент оптимизирует ре-рендер через React.memo() или аналоги, это предотвращает ненужные ре-рендеры из-за новой ссылки на callback.»<br>
+          — перевод
+        </div>
+
+        <h3>Проблема: inline-функция — новая ссылка на каждом рендере</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="type">Parent</span> = () =&gt; {
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+  <span class="kw">const</span> [<span class="prop">unrelated</span>, <span class="fn">setUnrelated</span>] = <span class="fn">useState</span>(<span class="num">0</span>)
+
+  <span class="cm">// ❌ новая функция на каждом рендере Parent</span>
+  <span class="kw">const</span> <span class="prop">onClick</span> = () =&gt; <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> })
+
+  <span class="kw">return</span> (
+    &lt;&gt;
+      &lt;<span class="type">button</span> onClick={() =&gt; <span class="fn">setUnrelated</span>(<span class="prop">unrelated</span> + <span class="num">1</span>)}&gt;
+        Render parent
+      &lt;/<span class="type">button</span>&gt;
+      &lt;<span class="type">IncrementButton</span> onClick={<span class="prop">onClick</span>} /&gt;
+    &lt;/&gt;
+  )
+}
+
+<span class="kw">const</span> <span class="type">IncrementButton</span> = <span class="fn">memo</span>(({ <span class="prop">onClick</span> }: { <span class="prop">onClick</span>: () =&gt; <span class="kw">void</span> }) =&gt; {
+  <span class="cm">// ре-рендерится при каждом рендере Parent:</span>
+  <span class="cm">// memo делает shallow-сравнение props, onClick — новая ссылка.</span>
+  <span class="kw">return</span> &lt;<span class="type">button</span> onClick={<span class="prop">onClick</span>}&gt;+&lt;/<span class="type">button</span>&gt;
+})
+        </div>
+
+        <h3>Решение: useCallback</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">onClick</span> = <span class="fn">useCallback</span>(() =&gt; {
+  <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> })
+}, [<span class="prop">dispatch</span>])
+<span class="cm">// dispatch стабилен → deps не меняются → useCallback возвращает ОДНУ функцию</span>
+<span class="cm">// → shallow-compare в memo → ребёнок НЕ ре-рендерится</span>
+        </div>
+
+        <h3>Как это работает</h3>
+        <p>
+          <code>React.memo</code> делает shallow-сравнение props, возвращает <em>тот же</em> React
+          element, если ничего не изменилось, и React просто не пересчитывает дерево ниже.
+          Критично: сравнение идёт по ссылкам. Две identity-equal функции считаются разными.
+        </p>
+        <p>
+          <code>useCallback(fn, deps)</code> возвращает <strong>ту же</strong> функцию между рендерами,
+          пока deps (по ссылке) совпадают. Если хотя бы один dep изменился — возвращается новая
+          функция (и memo-ребёнок ре-рендерится).
+        </p>
+        <p>
+          <code>dispatch</code> из <code>useDispatch</code> — стабильная ссылка (см. урок 44), поэтому
+          <code>[dispatch]</code> никогда не меняется, и callback живёт до размонтирования компонента.
+        </p>
+
+        <h3>Когда memoизация нужна</h3>
+        <ul style="padding-left: 20px; line-height: 1.8;">
+          <li>Callback передаётся в <code>React.memo</code>-компонент или <code>PureComponent</code>.</li>
+          <li>Callback используется как dep в других хуках (<code>useEffect</code>, <code>useMemo</code>).</li>
+          <li>Callback передаётся в тяжёлый ребёнок (большое дерево, heavy render).</li>
+        </ul>
+
+        <h3>Когда memoизация <em>не</em> нужна</h3>
+        <ul style="padding-left: 20px; line-height: 1.8;">
+          <li>
+            Callback используется <em>внутри</em> того же компонента — в собственном JSX.
+            Здесь ре-рендер всё равно происходит, и память на inline-функцию не стоит запуска
+            <code>useCallback</code>.
+          </li>
+          <li>
+            Ребёнок — обычный компонент без <code>React.memo</code>. Он ре-рендерится вместе с
+            родителем в любом случае.
+          </li>
+        </ul>
+
+        <h3>Аккуратно с deps</h3>
+        <div class="code-block">
+<span class="cm">// ❌ забыли добавить id в deps → callback замораживает старый id</span>
+<span class="kw">const</span> <span class="prop">onClick</span> = <span class="fn">useCallback</span>(() =&gt; {
+  <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/remove'</span>, <span class="prop">payload</span>: <span class="prop">id</span> })
+}, [<span class="prop">dispatch</span>])  <span class="cm">// id не в deps → stale closure</span>
+
+<span class="cm">// ✔ правильно</span>
+<span class="kw">const</span> <span class="prop">onClick</span> = <span class="fn">useCallback</span>(() =&gt; {
+  <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/remove'</span>, <span class="prop">payload</span>: <span class="prop">id</span> })
+}, [<span class="prop">dispatch</span>, <span class="prop">id</span>])
+        </div>
+
+        <p>
+          Если callback зависит от props / state, все зависимости должны быть в deps. Иначе будет
+          <em>stale closure</em>: callback будет использовать устаревшее значение переменной.
+        </p>
+
+        <h3>Альтернатива: bindActionCreators + useMemo</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">bindActionCreators</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="kw">const</span> <span class="prop">actions</span> = <span class="fn">useMemo</span>(
+  () =&gt; <span class="fn">bindActionCreators</span>({
+    <span class="prop">increment</span>: () =&gt; ({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> }),
+    <span class="prop">decrement</span>: () =&gt; ({ <span class="prop">type</span>: <span class="str">'counter/decrement'</span> }),
+  }, <span class="prop">dispatch</span>),
+  [<span class="prop">dispatch</span>]
+)
+<span class="cm">// actions.increment — стабильная ссылка, тот же эффект, что useCallback</span>
+        </div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          <code>useCallback</code> не влияет ни на Redux store, ни на подписку. Он живёт только в
+          React-слое: экономит React'у работу по сравнению props. Но важно: если из-за новой ссылки
+          ребёнок ре-рендерится и внутри него тоже есть <code>useSelector</code> — тот запускает
+          selector ещё раз и сравнивает результат. Лишняя работа на каждом пустом рендере.
+          Путь подписки после <code>dispatch</code> остаётся тем же:
+          linked list callback'ов → <code>Subscription.notify()</code> → <code>checkForUpdates</code>
+          → selector → <code>===</code> → <code>forceRender</code>. <code>useCallback</code> просто
+          экономит <em>render</em>-работу родительских и дочерних компонентов между этими dispatch'ами.
+          Подробнее про Subscription — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Паттерн:</strong>
+          <div class="code-block" style="margin-top: 8px;">
+<span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+
+<span class="kw">const</span> <span class="prop">onIncrement</span> = <span class="fn">useCallback</span>(() =&gt;
+  <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> }),
+[<span class="prop">dispatch</span>])
+
+<span class="kw">const</span> <span class="prop">onRemove</span> = <span class="fn">useCallback</span>((<span class="prop">id</span>: <span class="type">number</span>) =&gt;
+  <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/remove'</span>, <span class="prop">payload</span>: <span class="prop">id</span> }),
+[<span class="prop">dispatch</span>])
+          </div>
+        </div>
+
+        <div class="warning">
+          <strong>Не оборачивайте всё подряд:</strong> <code>useCallback</code> не бесплатен — он
+          держит функцию и массив deps в памяти и делает сравнение. Если получатель — не
+          <code>React.memo</code>, оверхед только добавляется. Используйте точечно там, где есть
+          реальный выигрыш.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

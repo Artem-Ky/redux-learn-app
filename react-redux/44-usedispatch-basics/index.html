@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>44 — useDispatch — основы</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ud-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1000px) {
+      .ud-grid { grid-template-columns: 1fr; }
+    }
+    .ud-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .ud-card--counter { border-color: rgba(76, 175, 80, 0.4); }
+    .ud-card--stability { border-color: rgba(86, 156, 214, 0.4); }
+    .ud-card__tag {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .ud-card--counter .ud-card__tag { background: rgba(76, 175, 80, 0.15); color: var(--success); }
+    .ud-card--stability .ud-card__tag { background: rgba(86, 156, 214, 0.15); color: var(--accent); }
+    .ud-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .ud-counter {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      justify-content: center;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+    }
+    .ud-counter__btn {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text-bright);
+      font-size: 1.4rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: var(--font-mono);
+    }
+    .ud-counter__btn:hover { background: var(--bg-hover); }
+    .ud-counter__val {
+      font-family: var(--font-mono);
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 80px;
+      text-align: center;
+    }
+    .ud-counter__reset {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-family: var(--font-mono);
+    }
+    .ud-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .ud-stat {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      text-align: center;
+    }
+    .ud-stat__label {
+      font-size: 0.66rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .ud-stat__val {
+      font-family: var(--font-mono);
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .ud-stat__val--green { color: var(--success); }
+    .ud-stat__val--red { color: var(--accent-red); }
+    .ud-code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      color: var(--text-primary);
+    }
+    .ud-hint {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      text-align: center;
+      padding: 8px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+    }
+    .ud-hint strong { color: var(--success); }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">44 / 70</span>
+      useDispatch — основы
+    </div>
+    <nav class="site-header__nav">
+      <a href="../43-useselector-vs-mapstate/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">44</span>
+      <a href="../45-usedispatch-callback-memo/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — счётчик и проверка стабильности dispatch</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Слева — типовой счётчик через <code>useDispatch</code>. Справа — инструмент, который при
+          каждом рендере сравнивает текущий <code>dispatch</code> с предыдущим. В одной и той же
+          сессии (пока не меняется store) ссылка должна оставаться одной и той же — это важно для
+          корректной работы <code>useEffect</code>, <code>useCallback</code> и прочих хуков с deps.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — useDispatch</div>
+      <div class="theory__body">
+
+        <h3>Что это</h3>
+        <div class="quote">
+          "This hook returns a reference to the dispatch function from the Redux store. You may use it to dispatch actions as needed."<br>
+          — <a href="https://react-redux.js.org/api/hooks#usedispatch" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Этот хук возвращает ссылку на функцию dispatch из Redux store. Её можно использовать для отправки actions по мере необходимости.»<br>
+          — перевод
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+<span class="cm">// dispatch: Dispatch&lt;AnyAction&gt;</span>
+
+<span class="cm">// Вызов такой же, как у store.dispatch:</span>
+<span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> })
+<span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'todos/addTodo'</span>, <span class="prop">payload</span>: <span class="str">'buy milk'</span> })
+        </div>
+
+        <h3>Стабильность ссылки</h3>
+        <div class="quote">
+          "The dispatch function reference will be stable as long as the same store instance is being passed to the &lt;Provider&gt;. Normally, that store instance never changes in an application."<br>
+          — <a href="https://react-redux.js.org/api/hooks#usedispatch" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Ссылка на функцию dispatch стабильна до тех пор, пока в &lt;Provider&gt; передаётся один и тот же экземпляр store. В обычном приложении store никогда не меняется.»<br>
+          — перевод
+        </div>
+
+        <p>
+          <code>dispatch</code> — это <em>метод</em> конкретного store, и если у вас один store на всё
+          приложение (обычный случай), то <code>useDispatch</code> будет возвращать <em>одну и ту же</em>
+          функцию всю жизнь приложения. Смена происходит только при смене самого store — например,
+          при замене <code>store</code> props у <code>&lt;Provider&gt;</code>.
+        </p>
+
+        <h3>Можно и нужно добавлять в dependency arrays</h3>
+        <div class="quote">
+          "However, the React hooks lint rules do not know that dispatch should be stable, and will warn that the dispatch variable should be added to dependency arrays for useEffect and useCallback. The simplest solution is to do just that"<br>
+          — <a href="https://react-redux.js.org/api/hooks#usedispatch" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Однако правила React hooks lint не знают, что dispatch стабилен, и будут предупреждать, что переменную dispatch нужно добавить в dependency array для useEffect и useCallback. Самое простое решение — так и сделать.»<br>
+          — перевод
+        </div>
+
+        <div class="code-block">
+<span class="cm">// ✔ Идиоматичный async-load-on-mount</span>
+<span class="kw">function</span> <span class="fn">TodosList</span>() {
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+  <span class="fn">useEffect</span>(() =&gt; {
+    <span class="prop">dispatch</span>(<span class="fn">fetchTodos</span>())
+  }, [<span class="prop">dispatch</span>])  <span class="cm">// dispatch стабилен, эффект запустится один раз</span>
+  <span class="cm">// ...</span>
+}
+        </div>
+
+        <p>
+          Включение <code>dispatch</code> в deps — это compromise между формальной корректностью (линт)
+          и гарантиями рантайма (react-redux): dep-array честно включает используемое значение, а
+          поскольку оно не меняется, лишних запусков эффекта не будет.
+        </p>
+
+        <h3>Работа в паре с useSelector</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">const</span> <span class="prop">dispatch</span> = <span class="fn">useDispatch</span>()
+
+  <span class="kw">return</span> (
+    &lt;<span class="type">div</span>&gt;
+      &lt;<span class="type">button</span> onClick={() =&gt; <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/decrement'</span> })}&gt;−&lt;/<span class="type">button</span>&gt;
+      &lt;<span class="type">span</span>&gt;{count}&lt;/<span class="type">span</span>&gt;
+      &lt;<span class="type">button</span> onClick={() =&gt; <span class="prop">dispatch</span>({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> })}&gt;+&lt;/<span class="type">button</span>&gt;
+    &lt;/<span class="type">div</span>&gt;
+  )
+}
+        </div>
+
+        <p>
+          <code>useSelector</code> читает state, <code>useDispatch</code> отправляет actions — это
+          симметричная пара. Вместе они заменяют связку <code>mapStateToProps</code> +
+          <code>mapDispatchToProps</code> в <code>connect</code>.
+        </p>
+
+        <h3>Типизация</h3>
+        <div class="code-block">
+<span class="cm">// Если вы хотите свой типизированный dispatch с поддержкой thunks:</span>
+<span class="kw">import</span> <span class="kw">type</span> { <span class="type">ThunkDispatch</span> } <span class="kw">from</span> <span class="str">'redux-thunk'</span>
+<span class="kw">import</span> { <span class="fn">useDispatch</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">type</span> <span class="type">AppDispatch</span> = <span class="type">ThunkDispatch</span>&lt;<span class="type">RootState</span>, <span class="kw">unknown</span>, <span class="type">AnyAction</span>&gt;
+<span class="kw">export const</span> <span class="fn">useAppDispatch</span>: () =&gt; <span class="type">AppDispatch</span> = <span class="fn">useDispatch</span>
+        </div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          <code>useDispatch</code> не трогает подписку вообще — он не подписывается на store, не
+          регистрирует callback'ов. Он просто возвращает метод <code>store.dispatch</code> из
+          контекста <code>&lt;Provider&gt;</code>. Полный путь после вызова <code>dispatch</code>:
+          reducer → новый state → linked list callback'ов → <code>Subscription.notify()</code>
+          → <code>checkForUpdates</code> → selector → <code>===</code> → <code>forceRender</code>.
+          <code>useDispatch</code> — только «входная дверь» в эту цепочку. Подробнее про Subscription —
+          <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Идиомы:</strong>
+          <ul style="padding-left: 20px; margin-top: 6px; line-height: 1.8;">
+            <li><code>const dispatch = useDispatch()</code> — где-то в начале компонента.</li>
+            <li>В <code>useEffect</code> / <code>useCallback</code> добавляйте <code>dispatch</code> в deps — линт успокоится, эффект не перезапустится лишний раз.</li>
+            <li>Для thunks / async — типизируйте свой <code>useAppDispatch</code> поверх <code>useDispatch</code>.</li>
+          </ul>
+        </div>
+
+        <div class="warning">
+          <strong>Антипаттерн:</strong> создавать dispatch-callback прямо в рендере
+          (<code>() =&gt; dispatch(...)</code>) и передавать его в <code>React.memo</code>-ребёнка.
+          Каждый рендер — новая ссылка функции, ребёнок ре-рендерится. Лечится
+          <code>useCallback</code> — об этом следующий урок (45).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

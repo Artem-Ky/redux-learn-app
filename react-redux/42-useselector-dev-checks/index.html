@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>42 — useSelector — проверки в development mode</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .dev-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1000px) {
+      .dev-grid { grid-template-columns: 1fr; }
+    }
+    .dev-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .dev-card--stability { border-color: rgba(244, 71, 71, 0.4); }
+    .dev-card--identity { border-color: rgba(255, 152, 0, 0.4); }
+    .dev-card__tag {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 10px;
+      align-self: flex-start;
+    }
+    .dev-card--stability .dev-card__tag { background: rgba(244, 71, 71, 0.15); color: var(--accent-red); }
+    .dev-card--identity .dev-card__tag { background: rgba(255, 152, 0, 0.15); color: var(--warning); }
+    .dev-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .dev-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      color: var(--text-primary);
+    }
+    .dev-card__mode {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .dev-card__mode-label {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+    .dev-mode-btn {
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .dev-mode-btn.active {
+      background: var(--bg-active);
+      border-color: var(--accent);
+      color: var(--text-bright);
+    }
+    .dev-card__output {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+    .dev-card__output strong { color: var(--accent-cyan); }
+    .global-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .provider-info {
+      text-align: center;
+      font-family: var(--font-mono);
+      padding: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+    .provider-info code { color: var(--accent-yellow); }
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      margin: 14px 0;
+    }
+    .compare-table th,
+    .compare-table td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .compare-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+    }
+    .compare-table td { background: var(--bg-tertiary); }
+    .compare-table .row-label { background: var(--bg-panel); color: var(--text-bright); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">42 / 70</span>
+      useSelector — проверки в development mode
+    </div>
+    <nav class="site-header__nav">
+      <a href="../41-useselector-per-instance/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">42</span>
+      <a href="../43-useselector-vs-mapstate/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — stabilityCheck и identityFunctionCheck</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Два заведомо «сломанных» selector'а: один возвращает новый объект каждый раз,
+          другой — весь <code>state</code> целиком. В dev-режиме <code>useSelector</code>
+          вызывает selector второй раз с тем же state и пишет предупреждение в консоль браузера.
+          Переключайте <code>devModeChecks</code> и смотрите, как меняется поведение.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — dev-mode проверки в useSelector</div>
+      <div class="theory__body">
+
+        <h3>Что это и зачем</h3>
+        <div class="quote">
+          "useSelector runs some extra checks in development mode to watch for unexpected behavior. These checks do not run in production builds."<br>
+          — <a href="https://react-redux.js.org/api/hooks#dev-mode-checks" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «useSelector выполняет несколько дополнительных проверок в development-режиме, отслеживая неожиданное поведение. В production-сборке эти проверки не запускаются.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "These checks were first added in v8.1.0"<br>
+          — <a href="https://react-redux.js.org/api/hooks#dev-mode-checks" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Эти проверки впервые появились в v8.1.0.»<br>
+          — перевод
+        </div>
+
+        <h3>Проверка 1 — stabilityCheck</h3>
+        <div class="quote">
+          "In development, the provided selector function is run an extra time with the same parameter during the first call to useSelector, and warns in the console if the selector returns a different result (based on the equalityFn provided)."<br>
+          — <a href="https://react-redux.js.org/api/hooks#stabilitycheck" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «В development provided selector вызывается ещё раз с тем же аргументом при первом вызове useSelector, и в консоль пишется предупреждение, если selector возвращает другой результат (с учётом переданной equalityFn).»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "This is important, as a selector that returns a different result reference when called again with the same inputs will cause unnecessary rerenders."<br>
+          — <a href="https://react-redux.js.org/api/hooks#stabilitycheck" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Это важно, потому что selector, возвращающий другую ссылку на результат при повторном вызове с теми же входными данными, будет вызывать ненужные ре-рендеры.»<br>
+          — перевод
+        </div>
+
+        <p>
+          Типичный триггер — selector, собирающий inline-объект или массив:
+        </p>
+        <div class="code-block">
+<span class="cm">// stabilityCheck ловит вот это:</span>
+<span class="kw">const</span> <span class="prop">data</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; ({
+  <span class="prop">count</span>: state.<span class="prop">count</span>,
+  <span class="prop">user</span>: state.<span class="prop">user</span>
+}))
+<span class="cm">// warning: "Selector unknown returned a different result when called</span>
+<span class="cm">//          with the same parameters. This can lead to unnecessary rerenders."</span>
+        </div>
+
+        <h3>Проверка 2 — identityFunctionCheck</h3>
+        <div class="quote">
+          "In development, a check is conducted on the result returned by the selector. It warns in the console if the result is the same as the parameter passed in, i.e. the root state."<br>
+          — <a href="https://react-redux.js.org/api/hooks#identityfunctioncheck" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «В development выполняется проверка результата selector'а. В консоль пишется предупреждение, если результат — это тот же самый объект, что был передан в selector, то есть весь root state.»<br>
+          — перевод
+        </div>
+
+        <div class="quote">
+          "A useSelector call returning the entire root state is almost always a mistake, as it means the component will rerender whenever anything in state changes. Selectors should be as granular as possible, like state =&gt; state.some.nested.field."<br>
+          — <a href="https://react-redux.js.org/api/hooks#identityfunctioncheck" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Вызов useSelector, возвращающий root state целиком, почти всегда ошибка: компонент ре-рендерится при любом изменении в state. Selector'ы должны быть максимально гранулированными, вроде state =&gt; state.some.nested.field.»<br>
+          — перевод
+        </div>
+
+        <div class="code-block">
+<span class="cm">// identityFunctionCheck ловит это:</span>
+<span class="kw">const</span> <span class="prop">everything</span> = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state)
+<span class="cm">// warning: "Selector unknown returned the root state when called.</span>
+<span class="cm">//          This can lead to unnecessary rerenders. Selectors that</span>
+<span class="cm">//          return the entire state are almost certainly a mistake..."</span>
+        </div>
+
+        <p>
+          До v8.1 эта проверка называлась <code>noopCheck</code>. С v8.1 переименована в
+          <code>identityFunctionCheck</code> — более точное название (selector работает как функция
+          тождества).
+        </p>
+
+        <h3>Значения frequencies</h3>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Значение</th>
+              <th>Когда проверяется</th>
+              <th>Когда брать</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-label">'never'</td>
+              <td>Никогда</td>
+              <td>Заведомо «сломанный» selector, который вы контролируете сами (например, memoized)</td>
+            </tr>
+            <tr>
+              <td class="row-label">'once' (default)</td>
+              <td>Только при первом вызове данного инстанса хука</td>
+              <td>Большинство случаев — one-shot проверка на старте</td>
+            </tr>
+            <tr>
+              <td class="row-label">'always'</td>
+              <td>При каждом вызове selector'а</td>
+              <td>Отладка регрессий — поймать селекторы, ломающиеся не сразу</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Настройка: глобально через Provider</h3>
+        <div class="code-block">
+&lt;<span class="type">Provider</span>
+  store={store}
+  stabilityCheck=<span class="str">"always"</span>
+  identityFunctionCheck=<span class="str">"always"</span>
+&gt;
+  {children}
+&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <h3>Настройка: per-hook через options</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="prop">count</span> = <span class="fn">useSelector</span>(selectCount, {
+  <span class="prop">devModeChecks</span>: { <span class="prop">stabilityCheck</span>: <span class="str">'never'</span> }
+})
+
+<span class="kw">const</span> <span class="prop">user</span> = <span class="fn">useSelector</span>(selectUser, {
+  <span class="prop">devModeChecks</span>: { <span class="prop">identityFunctionCheck</span>: <span class="str">'never'</span> }
+})
+
+<span class="cm">// Можно оба сразу:</span>
+<span class="kw">const</span> <span class="prop">data</span> = <span class="fn">useSelector</span>(selectData, {
+  <span class="prop">devModeChecks</span>: {
+    <span class="prop">stabilityCheck</span>: <span class="str">'always'</span>,
+    <span class="prop">identityFunctionCheck</span>: <span class="str">'never'</span>
+  }
+})
+        </div>
+
+        <h3>Важно: только dev</h3>
+        <p>
+          В production-сборке эти проверки полностью вырезаются (через
+          <code>process.env.NODE_ENV === 'production'</code> guard). Накладных расходов в проде нет.
+          Соответственно, полагаться на них в рантайме нельзя — они только для вас как разработчика.
+        </p>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Проверки — это просто дополнительный вызов selector'а <em>внутри</em> функции
+          <code>checkForUpdates</code>. На общий путь ре-рендера
+          (linked list callback'ов → <code>Subscription.notify()</code> → <code>checkForUpdates</code>
+          → selector → <code>===</code> → <code>forceRender</code>) они не влияют: просто запускают
+          selector ещё раз и сравнивают результаты через ту же <code>equalityFn</code>. Warning летит
+          в <code>console.error</code>. Подробнее про Subscription —
+          <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Рабочий совет:</strong> оставляйте <code>'once'</code> по умолчанию. Переключайтесь
+          на <code>'always'</code>, когда подозреваете, что selector ломается <em>со временем</em> —
+          например, кэш <code>reselect</code> рассыпается после какого-то dispatch'а. На
+          <code>'never'</code> ставьте точечно там, где вы сознательно возвращаете новый объект и
+          используете <code>shallowEqual</code>/кастомный <code>equalityFn</code>.
+        </div>
+
+        <div class="warning">
+          <strong>Мы подменяем <code>console.error</code>,</strong> чтобы показать предупреждения
+          react-redux прямо в панели снизу. Реальные warning всё равно идут в консоль браузера
+          (откройте DevTools — увидите их там же).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

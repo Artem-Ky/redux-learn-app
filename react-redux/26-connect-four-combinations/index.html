@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>26 — Четыре комбинации вызова connect</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .combo-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .combo-grid { grid-template-columns: 1fr; }
+    }
+    .combo-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .combo-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .combo-card__num {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .combo-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .combo-card__badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .combo-card__badge--sub {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .combo-card__badge--nosub {
+      background: rgba(244, 71, 71, 0.15);
+      color: var(--accent-red);
+      border: 1px solid rgba(244, 71, 71, 0.3);
+    }
+    .combo-card__code {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--accent-cyan);
+    }
+    .combo-card__counter {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+    }
+    .combo-card__counter-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .combo-card__counter-value {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .combo-card__props {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      line-height: 1.6;
+    }
+    .combo-card__props-title {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .combo-card__props-key {
+      color: #9cdcfe;
+    }
+    .combo-card__props-type {
+      color: var(--accent-cyan);
+      font-style: italic;
+    }
+    .global-controls {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      flex-wrap: wrap;
+    }
+    .state-display {
+      text-align: center;
+      font-family: var(--font-mono);
+      padding: 12px;
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+    }
+    .state-display__value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .state-display__label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      margin: 16px 0;
+    }
+    .summary-table th,
+    .summary-table td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .summary-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+      font-weight: 600;
+    }
+    .summary-table td {
+      background: var(--bg-tertiary);
+    }
+    .summary-table .row-label {
+      background: var(--bg-panel);
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+    .summary-table code {
+      color: var(--accent-cyan);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">26 / 70</span>
+      Четыре комбинации вызова connect
+    </div>
+    <nav class="site-header__nav">
+      <a href="../25-dispatch-lost-gotcha/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">26</span>
+      <a href="../27-connect-practical-todo/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — четыре варианта connect бок о бок</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Ниже — один и тот же компонент-счётчик, подключённый через connect четырьмя разными способами.
+          Все четыре варианта смотрят в один и тот же store. Кнопки сверху меняют state.
+          Обратите внимание на <strong>счётчик рендеров</strong> в каждой карточке: варианты без
+          <code>mapStateToProps</code> не подписаны на store и <strong>не ре-рендерятся</strong> при
+          изменении state. Список <code>props</code> каждого варианта тоже отличается.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 4 комбинации connect</div>
+      <div class="theory__body">
+
+        <h3>Итоговая таблица 2×2</h3>
+        <p>
+          Документация react-redux описывает четыре наиболее часто встречающихся способа вызова
+          <code>connect</code>. Разница — в двух ортогональных осях: <strong>подписывается</strong> ли
+          компонент на store (есть ли <code>mapStateToProps</code>) и <strong>инжектятся</strong> ли
+          action creators (есть ли <code>mapDispatchToProps</code>).
+        </p>
+
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Без подписки на store</th>
+              <th>С подпиской на store</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-label">Без инжекции<br>action creators</td>
+              <td><code>connect()(Comp)</code></td>
+              <td><code>connect(mapStateToProps)(Comp)</code></td>
+            </tr>
+            <tr>
+              <td class="row-label">С инжекцией<br>action creators</td>
+              <td><code>connect(null, mapDispatchToProps)(Comp)</code></td>
+              <td><code>connect(mapStateToProps, mapDispatchToProps)(Comp)</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="quote">«Depending on what kind of components you are working with, there are different ways of calling connect, with the most common ones summarized as below»<br>— <a href="https://react-redux.js.org/tutorials/connect" target="_blank">react-redux.js.org/tutorials/connect</a></div>
+        <div class="quote">«В зависимости от того, с какими компонентами вы работаете, существуют разные способы вызова connect — наиболее распространённые из них приведены ниже.»<br>— перевод</div>
+
+        <h3>Вариант 1: connect()(Component) — без аргументов</h3>
+        <div class="quote">«If you call connect without providing any arguments, your component will: not re-render when the store changes, receive props.dispatch that you may use to manually dispatch action»<br>— <a href="https://react-redux.js.org/tutorials/connect" target="_blank">react-redux.js.org/tutorials/connect</a></div>
+        <div class="quote">«Если вы вызываете connect без аргументов, ваш компонент: не будет ре-рендериться при изменениях store, получит props.dispatch, который можно использовать для ручного диспатча action.»<br>— перевод</div>
+
+        <div class="code-block">
+<span class="cm">// Вариант 1: не подписан, props.dispatch</span>
+<span class="kw">export default</span> <span class="fn">connect</span>()(<span class="type">Comp</span>)
+<span class="cm">// props = { dispatch }</span>
+<span class="cm">// store изменяется → Comp НЕ ре-рендерится</span>
+        </div>
+
+        <h3>Вариант 2: connect(mapStateToProps)(Component)</h3>
+        <p>
+          Компонент подписывается на store (есть <code>mapStateToProps</code>). Без
+          <code>mapDispatchToProps</code> он также получает <code>props.dispatch</code> по умолчанию
+          (это мы подробно разбирали в уроке 20).
+        </p>
+        <div class="code-block">
+<span class="cm">// Вариант 2: подписан, props.dispatch</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>) =&gt; ({ <span class="prop">count</span>: state.<span class="prop">counter</span> })
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>)(<span class="type">Comp</span>)
+<span class="cm">// props = { count, dispatch }</span>
+<span class="cm">// store изменяется → mapStateToProps запускается → если результат поменялся → ре-рендер</span>
+        </div>
+
+        <h3>Вариант 3: connect(null, mapDispatchToProps)(Component)</h3>
+        <p>
+          Компонент <strong>не</strong> подписан на store (первый аргумент <code>null</code>), но
+          получает action creators в виде готовых функций. Полезно для «dispatch-only» компонентов —
+          форм, кнопок, dispatcher'ов, которым не нужно читать state.
+        </p>
+        <div class="code-block">
+<span class="cm">// Вариант 3: не подписан, action creators в props</span>
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = { <span class="fn">increment</span>, <span class="fn">decrement</span> }
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="kw">null</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">Comp</span>)
+<span class="cm">// props = { increment, decrement } — dispatch НЕ передаётся</span>
+<span class="cm">// store изменяется → Comp НЕ ре-рендерится</span>
+        </div>
+
+        <h3>Вариант 4: connect(mapStateToProps, mapDispatchToProps)(Component)</h3>
+        <p>
+          Самая полная форма. Компонент подписан на store и получает action creators как props.
+          Это типичная форма для «контейнерных» компонентов из классического Redux-подхода.
+        </p>
+        <div class="code-block">
+<span class="cm">// Вариант 4: подписан, action creators в props</span>
+<span class="kw">export default</span> <span class="fn">connect</span>(
+  <span class="fn">mapStateToProps</span>,
+  <span class="fn">mapDispatchToProps</span>
+)(<span class="type">Comp</span>)
+<span class="cm">// props = { count, increment, decrement } — dispatch НЕ передаётся</span>
+<span class="cm">// store изменяется → mapStateToProps → сравнение → ре-рендер при изменениях</span>
+        </div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Подписка «включается» именно наличием <code>mapStateToProps</code>. Когда вы указываете
+          <code>mapStateToProps</code>, <code>connect</code> при маунте вызывает
+          <code>store.subscribe(checkForUpdates)</code> и добавляет callback в linked list Subscription
+          (<a href="../03a-subscription-system/">подробнее в уроке 03a</a>).
+          После <code>dispatch</code> Subscription проходит по linked list callback'ов →
+          <code>notify()</code> → <code>checkForUpdates</code> → <code>mapStateToProps</code> с новым
+          state → сравнение каждого поля результата через <code>===</code> →
+          <code>forceRender</code> если хоть одно отличается. Варианты 1 и 3 не регистрируют
+          callback в Subscription (нет <code>mapStateToProps</code>), поэтому они никогда не
+          ре-рендерятся от изменений store — только от изменений собственных ownProps.
+        </p>
+
+        <div class="tip">
+          <strong>Как запомнить:</strong> первый аргумент <code>connect</code> отвечает за
+          <strong>чтение</strong> (подписку на store), второй — за <strong>запись</strong> (dispatch).
+          Они независимы: можно иметь одно без другого. Компонент-«читатель» —
+          <code>connect(mapStateToProps)</code>. Компонент-«писатель» —
+          <code>connect(null, mapDispatchToProps)</code>. Оба —
+          <code>connect(mapStateToProps, mapDispatchToProps)</code>. Ни того ни другого —
+          <code>connect()</code>.
+        </div>
+
+        <div class="warning">
+          <strong>Помните про dispatch:</strong> если <code>mapDispatchToProps</code>
+          <strong>не указан</strong>, <code>props.dispatch</code> передаётся автоматически. Если
+          указан — <code>props.dispatch</code> не передаётся, вместо него передаётся результат
+          <code>mapDispatchToProps</code>. Подробнее — в уроке 25.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>30 — options — кастомные equality функции</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .eq-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .eq-layout { grid-template-columns: 1fr; }
+    }
+    .eq-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .eq-card--default { border-color: var(--border-light); }
+    .eq-card--custom  { border-color: var(--success); }
+    .eq-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .eq-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .eq-card__title--default { color: var(--text-muted); }
+    .eq-card__title--custom  { color: var(--success); }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .metric {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+    }
+    .metric__label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .metric__value {
+      font-family: var(--font-mono);
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .controls {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+    }
+    .cascade {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin: 16px 0;
+    }
+    .cascade-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .cascade-step:last-child { border-bottom: none; }
+    .cascade-step__num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+    .cascade-step__name {
+      font-family: var(--font-mono);
+      color: var(--accent-yellow);
+      min-width: 180px;
+    }
+    .cascade-step__desc {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+    .eq-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      margin: 12px 0;
+    }
+    .eq-table th, .eq-table td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .eq-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+    }
+    .eq-table td { background: var(--bg-tertiary); }
+    .eq-table code { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">30 / 70</span>
+      options — кастомные equality функции
+    </div>
+    <nav class="site-header__nav">
+      <a href="../29-connect-options-context/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">30</span>
+      <a href="../31-connect-options-forwardref/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — areStatesEqual в действии</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Оба компонента подключены к одному store с тяжёлым <code>mapStateToProps</code>.
+          Левый — дефолтный (<code>areStatesEqual</code>: <code>===</code>). Правый — с кастомным
+          <code>areStatesEqual</code>, который пропускает вызов <code>mapStateToProps</code>,
+          если срез <code>entities.todos</code> не изменился. Нажимайте «tick» (меняет не todos) —
+          справа <code>mapStateToProps</code> <strong>не вызывается</strong>.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — четыре equality функции connect</div>
+      <div class="theory__body">
+
+        <h3>Четвёртый аргумент connect: options</h3>
+        <p>
+          <code>connect</code> принимает четыре аргумента:
+          <code>(mapStateToProps, mapDispatchToProps, mergeProps, options)</code>.
+          Объект <code>options</code> содержит, в том числе, четыре функции сравнения, которые
+          управляют кэшированием на разных уровнях конвейера connect.
+        </p>
+
+        <table class="eq-table">
+          <thead>
+            <tr>
+              <th>Опция</th>
+              <th>Что сравнивает</th>
+              <th>По умолчанию</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>areStatesEqual</code></td>
+              <td>Новый state и предыдущий state</td>
+              <td><code>strictEqual</code> (<code>===</code>)</td>
+            </tr>
+            <tr>
+              <td><code>areOwnPropsEqual</code></td>
+              <td>Новые ownProps и предыдущие ownProps</td>
+              <td><code>shallowEqual</code></td>
+            </tr>
+            <tr>
+              <td><code>areStatePropsEqual</code></td>
+              <td>Результат mapStateToProps и предыдущий</td>
+              <td><code>shallowEqual</code></td>
+            </tr>
+            <tr>
+              <td><code>areMergedPropsEqual</code></td>
+              <td>Результат mergeProps и предыдущий</td>
+              <td><code>shallowEqual</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>areStatesEqual</h3>
+        <div class="quote">«areStatesEqual: Compares incoming store state to its previous value. default value: strictEqual: (next, prev) => prev === next»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«areStatesEqual: сравнивает новый state store с предыдущим. Значение по умолчанию: strictEqual: (next, prev) => prev === next.»<br>— перевод</div>
+
+        <div class="quote">«You may wish to override areStatesEqual if your mapStateToProps function is computationally expensive and is also only concerned with a small slice of your state.»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«Вы можете переопределить areStatesEqual, если ваш mapStateToProps вычислительно дорогой и при этом касается только маленького среза вашего state.»<br>— перевод</div>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">areStatesEqual</span> = (<span class="prop">next</span>, <span class="prop">prev</span>) =&gt;
+  prev.<span class="prop">entities</span>.<span class="prop">todos</span> <span class="op">===</span> next.<span class="prop">entities</span>.<span class="prop">todos</span>
+
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="kw">null</span>, <span class="kw">null</span>, { <span class="fn">areStatesEqual</span> })(<span class="type">Comp</span>)
+<span class="cm">// Если entities.todos не изменился — mapStateToProps даже не вызывается</span>
+        </div>
+
+        <h3>areOwnPropsEqual</h3>
+        <div class="quote">«areOwnPropsEqual: Compares incoming props to its previous value. default value: shallowEqual»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«areOwnPropsEqual: сравнивает новые props с их предыдущим значением. Значение по умолчанию: shallowEqual.»<br>— перевод</div>
+
+        <p>
+          Когда родитель ре-рендерится, он может передать обёртке те же ownProps. Дефолтный
+          <code>shallowEqual</code> проверяет все поля через <code>===</code> и, если всё совпало,
+          пропускает пересчёт. Переопределить стоит редко — например, если вы знаете что часть
+          ownProps можно безопасно игнорировать.
+        </p>
+
+        <h3>areStatePropsEqual</h3>
+        <div class="quote">«areStatePropsEqual: Compares the result of mapStateToProps to its previous value. default value: shallowEqual»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«areStatePropsEqual: сравнивает результат mapStateToProps с его предыдущим значением. Значение по умолчанию: shallowEqual.»<br>— перевод</div>
+
+        <p>
+          Это последний рубеж перед решением «нужен ли ре-рендер». <code>mapStateToProps</code>
+          уже вызван, но если возвращённый объект shallow-равен предыдущему — рендера не будет.
+          Переопределение — например, для глубокого сравнения (осторожно, это дорого).
+        </p>
+
+        <h3>areMergedPropsEqual</h3>
+        <div class="quote">«areMergedPropsEqual: Compares the result of mergeProps to its previous value. default value: shallowEqual»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«areMergedPropsEqual: сравнивает результат mergeProps с его предыдущим значением. Значение по умолчанию: shallowEqual.»<br>— перевод</div>
+
+        <p>
+          Применяется только если указан свой <code>mergeProps</code> (урок 28). Финальная
+          проверка после объединения stateProps / dispatchProps / ownProps.
+        </p>
+
+        <h3>Каскад проверок внутри connect</h3>
+        <div class="cascade">
+          <div class="cascade-step">
+            <div class="cascade-step__num">1</div>
+            <div>
+              <div class="cascade-step__name">areStatesEqual</div>
+              <div class="cascade-step__desc">
+                До вызова mapStateToProps. Если <code>true</code> → mapStateToProps
+                <strong>даже не запускается</strong>, рендера не будет.
+              </div>
+            </div>
+          </div>
+          <div class="cascade-step">
+            <div class="cascade-step__num">2</div>
+            <div>
+              <div class="cascade-step__name">areOwnPropsEqual</div>
+              <div class="cascade-step__desc">
+                Между входящими ownProps и предыдущими. Если <code>true</code> и state не менялся —
+                пропускаем mapStateToProps / mapDispatchToProps.
+              </div>
+            </div>
+          </div>
+          <div class="cascade-step">
+            <div class="cascade-step__num">3</div>
+            <div>
+              <div class="cascade-step__name">areStatePropsEqual</div>
+              <div class="cascade-step__desc">
+                После mapStateToProps. Если новый результат shallow-равен прежнему → ре-рендера не будет.
+              </div>
+            </div>
+          </div>
+          <div class="cascade-step">
+            <div class="cascade-step__num">4</div>
+            <div>
+              <div class="cascade-step__name">areMergedPropsEqual</div>
+              <div class="cascade-step__desc">
+                После mergeProps. Последний барьер: если merged-объект shallow-равен предыдущему —
+                рендера не будет.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          При <code>dispatch</code> Subscription проходит по linked list callback'ов →
+          <code>notify()</code> → <code>checkForUpdates</code> для каждого connected-компонента.
+          Именно внутри <code>checkForUpdates</code> разворачивается описанный каскад: сначала
+          <code>areStatesEqual</code> (новый state vs старый), затем <code>areOwnPropsEqual</code>,
+          затем (если пропустили) — вызов <code>mapStateToProps</code>, <code>areStatePropsEqual</code>,
+          <code>mergeProps</code>, <code>areMergedPropsEqual</code>. Только если финальное сравнение
+          показывает отличия, вызывается <code>forceRender</code> и React планирует ре-рендер.
+          <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Практика:</strong> чаще всего вы НЕ будете трогать эти опции. Дефолты
+          оптимальны для 99% случаев. Переопределяйте <code>areStatesEqual</code>, только если
+          профилировщик показал, что <code>mapStateToProps</code> — «горячий» участок и при этом
+          смотрит в маленький срез state. Для обычных селекторов лучше использовать
+          <code>reselect</code> (урок 18) — он решает ту же задачу без изменения опций connect.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

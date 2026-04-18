@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>25 — Почему пропадает dispatch при mapDispatchToProps</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 900px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+    .card {
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: var(--bg-panel);
+    }
+    .card--ok { border-color: var(--accent-green); }
+    .card--bad { border-color: var(--error); }
+    .card__title {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card--ok .card__title { color: var(--accent-green); }
+    .card--bad .card__title { color: var(--error); }
+    .card__status {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 3px;
+      letter-spacing: 0.5px;
+    }
+    .card--ok .card__status {
+      background: var(--accent-green);
+      color: #000;
+    }
+    .card--bad .card__status {
+      background: var(--error);
+      color: #000;
+    }
+    .card__snippet {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      margin-bottom: 10px;
+      line-height: 1.55;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .card__counter {
+      font-family: var(--font-mono);
+      font-size: 2.2rem;
+      font-weight: 700;
+      text-align: center;
+      color: var(--accent-cyan);
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+    }
+    .card__buttons {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .error-box {
+      background: rgba(244, 71, 71, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+      padding: 10px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      margin-top: 8px;
+      white-space: pre-wrap;
+    }
+    .fix-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--accent-cyan);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-top: 12px;
+    }
+    .fix-card__title {
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .rule-box {
+      background: var(--bg-tertiary);
+      border-left: 4px solid var(--accent-yellow);
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      margin: 14px 0;
+      font-size: 0.9rem;
+    }
+    .rule-box strong {
+      color: var(--accent-yellow);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">25 / 70</span>
+      Почему пропадает dispatch
+    </div>
+    <nav class="site-header__nav">
+      <a href="../24-mapdispatch-object-shorthand/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">25</span>
+      <a href="../26-connect-four-combinations/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — props.dispatch есть или нет?</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Два счётчика бок о бок. Слева — <code>connect(mapStateToProps)</code> без второго аргумента,
+          <code>props.dispatch</code> доступен. Справа — <code>connect(mapStateToProps, mapDispatchToProps)</code>;
+          кнопка «Ручной dispatch» вызывает <code>props.dispatch(...)</code>, но там его нет.
+          Нажмите красную кнопку справа — ErrorBoundary поймает <code>TypeError</code>.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — куда девается dispatch</div>
+      <div class="theory__body">
+
+        <h3>Правило поведения connect по умолчанию</h3>
+        <div class="rule-box">
+          <strong>Если</strong> <code>mapDispatchToProps</code> <em>не указан</em> — компонент получает
+          <code>props.dispatch</code>.<br>
+          <strong>Если</strong> <code>mapDispatchToProps</code> <em>передан</em> (функция ИЛИ объект) —
+          компонент получает <em>только</em> то, что вернул <code>mapDispatchToProps</code>.
+          <code>dispatch</code> в props <strong>пропадает</strong>.
+        </div>
+
+        <h3>Цитата из документации</h3>
+        <div class="quote">
+          «Once you've wrapped all our action creators with functions that dispatch the actions, the
+          component is free of the need of dispatch. Therefore, if you define your own
+          mapDispatchToProps, the connected component will no longer receive dispatch.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Когда вы обернули все ваши action creators функциями, которые диспатчат экшены, компонент
+          больше не нуждается в dispatch. Поэтому, если вы определяете собственный mapDispatchToProps,
+          connected-компонент больше не получает dispatch.»
+          <br>— перевод
+        </div>
+
+        <h3>Симптом</h3>
+        <div class="quote">
+          «This is a common error that happens when you try to call this.props.dispatch, but dispatch
+          is not injected to your component.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Это частая ошибка, которая случается, когда вы пытаетесь вызвать this.props.dispatch,
+          но dispatch не инжектирован в ваш компонент.»
+          <br>— перевод
+        </div>
+
+        <p>В консоли вы увидите что-то вроде:</p>
+        <div class="code-block">
+<span class="type">TypeError</span>: this.props.dispatch is not a function
+        </div>
+
+        <h3>Почему так сделано</h3>
+        <p>
+          Логика команды react-redux: если вы уже подготовили обёрнутые функции (через свой
+          <code>mapDispatchToProps</code>) — значит сырой <code>dispatch</code> компоненту не нужен,
+          и API становится «чище». Подробнее — обсуждение в
+          <a href="https://github.com/reduxjs/react-redux/issues/255" target="_blank">issue #255</a>.
+        </p>
+
+        <h3>Способ 1 — явно вернуть dispatch</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">bindActionCreators</span> } <span class="kw">from</span> <span class="str">'redux'</span>
+
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = (<span class="prop">dispatch</span>) =&gt; ({
+  ...<span class="fn">bindActionCreators</span>({ increment, decrement }, dispatch),
+  dispatch, <span class="cm">// ← вручную добавляем обратно</span>
+})
+
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">Counter</span>)
+<span class="cm">// props = { count, increment, decrement, dispatch }</span>
+        </div>
+
+        <h3>Способ 2 — просто не передавать mapDispatchToProps</h3>
+        <p>
+          Если в компоненте всего один-два редких экшена, проще вообще не писать
+          <code>mapDispatchToProps</code> и использовать <code>props.dispatch</code> напрямую
+          (поведение по умолчанию, урок 20). Это нормально для маленьких локальных случаев.
+        </p>
+
+        <h3>Способ 3 — хуки вместо connect</h3>
+        <p>
+          В современных приложениях часто используют <code>useDispatch()</code>
+          (будет в уроке 44). Он возвращает <code>dispatch</code> напрямую, не связан с
+          <code>connect</code> и не имеет этой ловушки.
+        </p>
+
+        <h3>Как ведут себя разные формы</h3>
+        <table
+          style="width:100%; border-collapse:collapse; font-family: var(--font-mono); font-size:0.82rem; margin: 10px 0;"
+        >
+          <thead>
+            <tr>
+              <th style="padding:6px 10px; border:1px solid var(--border); background: var(--bg-tertiary); text-align:left;">форма connect</th>
+              <th style="padding:6px 10px; border:1px solid var(--border); background: var(--bg-tertiary); text-align:left;">props.dispatch?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:6px 10px; border:1px solid var(--border);">connect()(C)</td>
+              <td style="padding:6px 10px; border:1px solid var(--border); color: var(--accent-green);">есть</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px; border:1px solid var(--border);">connect(mapStateToProps)(C)</td>
+              <td style="padding:6px 10px; border:1px solid var(--border); color: var(--accent-green);">есть</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px; border:1px solid var(--border);">connect(null, null)(C)</td>
+              <td style="padding:6px 10px; border:1px solid var(--border); color: var(--accent-green);">есть</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px; border:1px solid var(--border);">connect(mapStateToProps, mapDispatchToProps)(C)</td>
+              <td style="padding:6px 10px; border:1px solid var(--border); color: var(--error);">пропал</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px; border:1px solid var(--border);">connect(mapStateToProps, {'{ increment }'})(C)</td>
+              <td style="padding:6px 10px; border:1px solid var(--border); color: var(--error);">пропал</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px; border:1px solid var(--border);">connect(null, mapDispatchToProps)(C)</td>
+              <td style="padding:6px 10px; border:1px solid var(--border); color: var(--error);">пропал</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="warning">
+          <strong>Частая ошибка:</strong> вы перешли с <code>props.dispatch</code> на объектную форму
+          и забыли, что в соседнем месте компонента ещё остался старый вызов
+          <code>props.dispatch({'{'} type: ... {'}'})</code>. При клике всё падает с
+          <code>TypeError</code>. Решение — либо переписать вызов через новое поле
+          (<code>props.increment()</code>), либо вернуть <code>dispatch</code> в props явно.
+        </div>
+
+        <h3>Связь с Subscription-системой</h3>
+        <p>
+          Subscription здесь ни при чём — эта ошибка возникает <em>до</em> цикла обновления.
+          <code>this.props.dispatch(...)</code> падает на этапе клика, ещё до того как какой-либо
+          action дойдёт до store. Для справки: Subscription — это linked list callback'ов
+          (<a href="../03a-subscription-system/">урок 03a</a>): при успешном dispatch store дёргает
+          <code>Subscription.notify()</code>, для каждого подписчика <code>checkForUpdates</code>
+          запускает <code>mapStateToProps</code>, сравнивает поля через <code>===</code> с
+          предыдущими и при изменении вызывает <code>forceRender()</code>. Но если
+          <code>dispatch</code> в props отсутствует, action даже не успеет попасть в store —
+          исключение бросается в обработчике клика.
+        </p>
+
+        <div class="tip">
+          <strong>Итог урока:</strong> передача любого <code>mapDispatchToProps</code>
+          «съедает» <code>props.dispatch</code>. Запомните правило и, если всё-таки нужен
+          <code>dispatch</code> — возвращайте его явно или используйте <code>useDispatch()</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>47 — Кастомный контекст и createStoreHook / createDispatchHook / createSelectorHook</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ctx-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .ctx-grid { grid-template-columns: 1fr; }
+    }
+    .ctx-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ctx-card--user    { border-color: var(--accent); }
+    .ctx-card--product { border-color: var(--accent-purple); }
+    .ctx-card__header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ctx-card__title {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+    .ctx-card--user .ctx-card__title    { color: var(--accent); }
+    .ctx-card--product .ctx-card__title { color: var(--accent-purple); }
+    .ctx-card__tag {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(86,156,214,0.15);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+    .ctx-card--product .ctx-card__tag {
+      background: rgba(197,134,192,0.15);
+      border-color: var(--accent-purple);
+      color: var(--accent-purple);
+    }
+    .ctx-card__renders {
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      margin-left: auto;
+    }
+    .ctx-card__value {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      padding: 8px 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+    }
+    .ctx-card__value strong { color: var(--accent-cyan); }
+    .ctx-card__buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .ctx-card__list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+    .ctx-card__list li {
+      padding: 3px 0;
+    }
+    .ctx-card__list li.selected {
+      color: var(--accent-purple);
+      font-weight: 700;
+    }
+    .signature {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--accent-cyan);
+      margin: 10px 0;
+    }
+    .provider-tree {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">47 / 70</span>
+      Кастомный контекст и createHook-функции
+    </div>
+    <nav class="site-header__nav">
+      <a href="../46-usestore-hook/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">47</span>
+      <a href="../48-hooks-recipes/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — два изолированных store с собственными хуками</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          <code>UserStore</code> и <code>ProductStore</code> живут в разных React-контекстах.
+          Для каждого своя тройка хуков: <code>useUserSelector/useUserDispatch/useUserStore</code> и
+          <code>useProductSelector/useProductDispatch/useProductStore</code>. Dispatch в один store
+          <strong>не</strong> вызывает ре-рендер компонентов другого — следите за счётчиками рендеров.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — кастомный context и createHook-функции</div>
+      <div class="theory__body">
+
+        <h3>Зачем кастомный контекст</h3>
+        <p>
+          По умолчанию все встроенные хуки (<code>useSelector</code>, <code>useDispatch</code>,
+          <code>useStore</code>) смотрят во внутренний контекст React-Redux — <code>ReactReduxContext</code>.
+          В 99% случаев этого достаточно. Но иногда нужен <em>изолированный</em> контекст:
+        </p>
+        <ul>
+          <li>Переиспользуемая библиотека со своим Redux-store, которая <strong>не должна</strong>
+            конфликтовать со store приложения-потребителя.</li>
+          <li>Микрофронтенды: несколько независимых модулей, каждый со своим store, собранные в одной
+            странице.</li>
+          <li>Сценарий «главный + вспомогательный store» — когда первый управляет основным состоянием
+            приложения, а второй, например, отвечает за сложный виджет.</li>
+        </ul>
+
+        <h3>Documentation: context prop у &lt;Provider&gt;</h3>
+        <div class="quote">
+          "The &lt;Provider&gt; component allows you to specify an alternate context via the context prop. This is useful if you're building a complex reusable component, and you don't want your store to collide with any Redux store your consumers' applications might use."<br>
+          — <a href="https://react-redux.js.org/api/hooks#custom-context" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Компонент &lt;Provider&gt; позволяет указать альтернативный контекст через prop context. Это полезно, когда вы создаёте сложный переиспользуемый компонент и не хотите, чтобы ваш store конфликтовал с каким-либо Redux-store приложений-потребителей.»<br>
+          — перевод
+        </div>
+
+        <h3>Documentation: create-hook функции</h3>
+        <div class="quote">
+          "To access an alternate context via the hooks API, use the hook creator functions"<br>
+          — <a href="https://react-redux.js.org/api/hooks#custom-context" target="_blank">react-redux.js.org/api/hooks</a>
+        </div>
+        <div class="quote">
+          «Чтобы получить доступ к альтернативному контексту через hooks API, используйте функции-создатели хуков.»<br>
+          — перевод
+        </div>
+
+        <h3>Три функции-создателя</h3>
+        <div class="signature">
+          createSelectorHook(context?) =&gt; useSelector
+        </div>
+        <div class="signature">
+          createDispatchHook(context?) =&gt; useDispatch
+        </div>
+        <div class="signature">
+          createStoreHook(context?) =&gt; useStore
+        </div>
+        <p>
+          Каждая возвращает <em>новый</em> экземпляр соответствующего хука, привязанный к переданному
+          контексту. Если контекст не передан — используется встроенный <code>ReactReduxContext</code>
+          (то есть вы получите «обычный» <code>useSelector</code>).
+        </p>
+
+        <h3>Паттерн использования</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">createContext</span> } <span class="kw">from</span> <span class="str">'react'</span>
+<span class="kw">import</span> {
+  <span class="type">Provider</span>,
+  <span class="fn">createStoreHook</span>,
+  <span class="fn">createDispatchHook</span>,
+  <span class="fn">createSelectorHook</span>,
+} <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="cm">// 1. Собственный React-контекст</span>
+<span class="kw">const</span> <span class="type">UserContext</span> = <span class="fn">createContext</span>(<span class="kw">null</span>)
+
+<span class="cm">// 2. Три хука, привязанных к нему</span>
+<span class="kw">export const</span> <span class="fn">useUserStore</span>    = <span class="fn">createStoreHook</span>(<span class="type">UserContext</span>)
+<span class="kw">export const</span> <span class="fn">useUserDispatch</span> = <span class="fn">createDispatchHook</span>(<span class="type">UserContext</span>)
+<span class="kw">export const</span> <span class="fn">useUserSelector</span> = <span class="fn">createSelectorHook</span>(<span class="type">UserContext</span>)
+
+<span class="cm">// 3. Провайдер с prop context</span>
+&lt;<span class="type">Provider</span> store={userStore} context={<span class="type">UserContext</span>}&gt;
+  ...
+&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <h3>Два независимых store с разными контекстами</h3>
+        <p>
+          В нашем демо <code>userStore</code> хранит данные профиля, <code>productStore</code> — каталог
+          товаров. Каждый живёт в своём контексте, и у каждого свои хуки:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="type">UserContext</span>    = <span class="fn">createContext</span>(<span class="kw">null</span>)
+<span class="kw">const</span> <span class="type">ProductContext</span> = <span class="fn">createContext</span>(<span class="kw">null</span>)
+
+<span class="kw">export const</span> <span class="fn">useUserSelector</span>    = <span class="fn">createSelectorHook</span>(<span class="type">UserContext</span>)
+<span class="kw">export const</span> <span class="fn">useUserDispatch</span>    = <span class="fn">createDispatchHook</span>(<span class="type">UserContext</span>)
+<span class="kw">export const</span> <span class="fn">useProductSelector</span> = <span class="fn">createSelectorHook</span>(<span class="type">ProductContext</span>)
+<span class="kw">export const</span> <span class="fn">useProductDispatch</span> = <span class="fn">createDispatchHook</span>(<span class="type">ProductContext</span>)
+
+<span class="kw">function</span> <span class="fn">UserPanel</span>() {
+  <span class="kw">const</span> <span class="prop">name</span> = <span class="fn">useUserSelector</span>(s =&gt; s.<span class="prop">name</span>)
+  <span class="kw">return</span> &lt;div&gt;{name}&lt;/div&gt;
+}
+
+<span class="kw">function</span> <span class="fn">ProductList</span>() {
+  <span class="kw">const</span> <span class="prop">items</span> = <span class="fn">useProductSelector</span>(s =&gt; s.<span class="prop">items</span>)
+  <span class="kw">return</span> &lt;ul&gt;{items.<span class="fn">map</span>(p =&gt; &lt;li&gt;{p.<span class="prop">name</span>}&lt;/li&gt;)}&lt;/ul&gt;
+}
+
+<span class="cm">// Вложенные Provider'ы с разным context</span>
+&lt;<span class="type">Provider</span> store={userStore} context={<span class="type">UserContext</span>}&gt;
+  &lt;<span class="type">Provider</span> store={productStore} context={<span class="type">ProductContext</span>}&gt;
+    &lt;<span class="fn">UserPanel</span> /&gt;
+    &lt;<span class="fn">ProductList</span> /&gt;
+  &lt;/<span class="type">Provider</span>&gt;
+&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <h3>Use case 1: переиспользуемая библиотека со своим store</h3>
+        <p>
+          Ваш пакет экспортирует сложный компонент с собственной Redux-логикой (например, редактор
+          форм или дашборд с фильтрами). Потребитель скорее всего использует свой Redux — если оба
+          воспользуются встроенным <code>ReactReduxContext</code>, получится конфликт. Решение:
+          библиотека создаёт <code>MyLibContext</code>, свой <code>Provider</code> и свои хуки — и
+          никак не зависит от store приложения.
+        </p>
+
+        <h3>Use case 2: микрофронтенды</h3>
+        <p>
+          Несколько независимых модулей, каждый со своим store — собираются в общее приложение.
+          Модуль A читает данные только через <code>useAStore/useASelector/useADispatch</code>, модуль B
+          — через свои. Ни один модуль не может случайно прочитать или испортить состояние соседа.
+        </p>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Каждый <code>&lt;Provider&gt;</code> поднимает <strong>свой</strong> корневой
+          <code>Subscription</code>. Когда в <code>userStore</code> происходит <code>dispatch</code>,
+          цепочка <code>linked list callback'ов → Subscription.notify() → checkForUpdates → selector
+          → === → forceRender</code> проходит <em>только</em> по подпискам, зарегистрированным
+          <code>useUserSelector</code>/<code>connect</code> через <code>UserContext</code>.
+          Компоненты, подписанные на <code>ProductContext</code>, в эту цепочку не попадают и не
+          ре-рендерятся. Подробнее о Subscription — <a href="../03a-subscription-system/">урок 03a</a>.
+        </p>
+
+        <h3>Важно: никогда не смешивайте контексты</h3>
+        <div class="warning">
+          <strong>Частая ошибка:</strong> <code>&lt;Provider store={storeA} context={CtxA}&gt;</code>, а
+          внутри вызывается обычный <code>useSelector</code> (без кастомного контекста). Обычный
+          <code>useSelector</code> ищет <code>ReactReduxContext</code> — его в этом поддереве нет,
+          результат — ошибка «could not find react-redux context value». Нужно использовать именно
+          <code>useASelector</code>, созданный через <code>createSelectorHook(CtxA)</code>.
+        </div>
+
+        <h3>Можно ли обойтись одним Provider?</h3>
+        <p>
+          Если вам просто нужно разделить state на несколько slice'ов — используйте
+          <code>combineReducers</code> и один store, это проще и типичнее. Кастомный контекст нужен
+          именно для <em>изоляции</em>: когда одному куску UI вообще не должны быть видны чужие
+          подписки и чужой store. Пример такого разделения с одним store — урок 27. Пример с двумя
+          store (но без кастомных хуков через create-*) — урок 11.
+        </p>
+
+        <div class="tip">
+          <strong>Правило:</strong> создавайте кастомный контекст и <code>createSelectorHook</code> /
+          <code>createDispatchHook</code> / <code>createStoreHook</code> в одном модуле —
+          <code>./contexts/UserContext.ts</code>, и экспортируйте оттуда все три хука. Компоненты
+          импортируют их под именами <code>useUserSelector</code> и т.д. — это читается естественно
+          и сразу понятно, к какому store относится.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>32 — Factory Functions — per-instance мемоизация</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .factory-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1100px) {
+      .factory-layout { grid-template-columns: 1fr; }
+    }
+    .factory-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .factory-card--bad  { border-color: var(--accent-red); }
+    .factory-card--good { border-color: var(--success); }
+    .factory-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .factory-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .factory-card__title--bad  { color: var(--accent-red); }
+    .factory-card__title--good { color: var(--success); }
+    .factory-card__badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .factory-card__badge--bad {
+      background: rgba(244, 71, 71, 0.15);
+      color: var(--accent-red);
+      border: 1px solid rgba(244, 71, 71, 0.3);
+    }
+    .factory-card__badge--good {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .factory-card__config {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--accent-cyan);
+    }
+    .factory-card__totals {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .metric {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+    }
+    .metric__label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .metric__value {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    .metric__value--bad  { color: var(--accent-red); }
+    .metric__value--good { color: var(--success); }
+    .factory-card__list {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+    }
+    .item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3px 6px;
+      gap: 8px;
+      color: var(--text-secondary);
+      border-bottom: 1px dashed rgba(255,255,255,0.04);
+    }
+    .item-row:last-child { border-bottom: none; }
+    .item-row__label { color: var(--accent-yellow); }
+    .item-row__miss  { color: var(--accent-red); }
+    .item-row__hit   { color: var(--success); }
+    .controls {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 14px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">32 / 70</span>
+      Factory Functions — per-instance мемоизация
+    </div>
+    <nav class="site-header__nav">
+      <a href="../31-connect-options-forwardref/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">32</span>
+      <a href="../33-connect-returns/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — один selector на всех vs per-instance</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Две колонки рендерят по 20 карточек <code>ItemDetail</code> — каждая со своим
+          <code>itemId</code>. Слева — обычный <code>mapStateToProps</code> с одним общим
+          memoized-selector'ом. Справа — factory-функция, которая при mount каждой карточки создаёт
+          <strong>свой</strong> memoized-selector в замыкании. После любого <code>dispatch</code>
+          смотрите на счётчики: слева — 20 cache miss'ов (кэш перезаписывается на каждом соседе),
+          справа — 20 cache hit'ов (каждая карточка имеет свой стабильный кэш).
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — factory-функции mapStateToProps / mapDispatchToProps</div>
+      <div class="theory__body">
+
+        <h3>Что такое factory-форма</h3>
+        <p>
+          Обычно <code>mapStateToProps</code> — это функция, которая на каждый dispatch возвращает
+          <strong>объект</strong> props. Factory-форма — это «функция, возвращающая функцию»:
+          внешняя вызывается один раз на <strong>инстанс</strong> компонента при mount, внутренняя
+          становится настоящим <code>mapStateToProps</code> и вызывается при каждом dispatch.
+          То же самое работает и для <code>mapDispatchToProps</code>.
+        </p>
+
+        <div class="quote">«If your mapStateToProps or mapDispatchToProps functions return a function, they will be called once when the component instantiates, and their returns will be used as the actual mapStateToProps, mapDispatchToProps, functions respectively, in their subsequent calls.»<br>— <a href="https://react-redux.js.org/api/connect#factory-functions" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«Если ваши функции mapStateToProps или mapDispatchToProps возвращают функцию, то они будут вызваны один раз при создании инстанса компонента, а их возвращаемые значения станут настоящими mapStateToProps и mapDispatchToProps в последующих вызовах.»<br>— перевод</div>
+
+        <div class="quote">«The factory functions are commonly used with memoized selectors. This gives you the ability to create component-instance-specific selectors inside the closure»<br>— <a href="https://react-redux.js.org/api/connect#factory-functions" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«Factory-функции обычно используют с memoized-селекторами. Это даёт возможность создавать селекторы, специфичные для конкретного инстанса компонента, прямо в замыкании.»<br>— перевод</div>
+
+        <h3>Проблема общего селектора</h3>
+        <p>
+          <code>createSelector</code> из <code>reselect</code> запоминает <strong>последний</strong>
+          набор аргументов (cache size = 1). Если один и тот же селектор вызывают из разных
+          инстансов с разными аргументами (например, разные <code>ownProps.itemId</code>), каждый
+          следующий вызов «вытесняет» предыдущий кэш: после прохода по 20 компонентам кэш хранит
+          результат только последнего, для всех 19 других на следующем dispatch будет cache miss и
+          полный пересчёт.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// ✖ ПЛОХО — один selector на всех</span>
+<span class="kw">const</span> <span class="fn">selectItemById</span> = <span class="fn">createSelector</span>(
+  (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">items</span>,
+  (<span class="prop">_</span>: <span class="type">RootState</span>, <span class="prop">itemId</span>: <span class="type">number</span>) =&gt; itemId,
+  (<span class="prop">items</span>, <span class="prop">itemId</span>) =&gt; items.<span class="prop">find</span>(i =&gt; i.<span class="prop">id</span> === itemId)
+)
+
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>: <span class="type">RootState</span>, <span class="prop">ownProps</span>: { <span class="prop">itemId</span>: <span class="type">number</span> }) =&gt; ({
+  <span class="prop">item</span>: <span class="fn">selectItemById</span>(state, ownProps.<span class="prop">itemId</span>)
+})
+<span class="fn">connect</span>(<span class="fn">mapStateToProps</span>)(<span class="type">ItemDetail</span>)
+<span class="cm">// Проблема: у ВСЕХ 20 инстансов ОДИН кэш.</span>
+<span class="cm">// Каждый вызов с другим itemId перезаписывает кэш → мемоизация сломана.</span>
+        </div>
+
+        <h3>Решение: factory создаёт свой selector в замыкании</h3>
+        <div class="code-block">
+<span class="cm">// ✔ ХОРОШО — per-instance selector через factory</span>
+<span class="kw">const</span> <span class="fn">makeMapStateToProps</span> = () =&gt; {
+  <span class="kw">const</span> <span class="fn">selectItemByIdForThisInstance</span> = <span class="fn">createSelector</span>(
+    (<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">items</span>,
+    (<span class="prop">_</span>: <span class="type">RootState</span>, <span class="prop">itemId</span>: <span class="type">number</span>) =&gt; itemId,
+    (<span class="prop">items</span>, <span class="prop">itemId</span>) =&gt; items.<span class="prop">find</span>(i =&gt; i.<span class="prop">id</span> === itemId)
+  )
+  <span class="kw">return</span> (<span class="prop">state</span>: <span class="type">RootState</span>, <span class="prop">ownProps</span>: { <span class="prop">itemId</span>: <span class="type">number</span> }) =&gt; ({
+    <span class="prop">item</span>: <span class="fn">selectItemByIdForThisInstance</span>(state, ownProps.<span class="prop">itemId</span>)
+  })
+}
+<span class="fn">connect</span>(<span class="fn">makeMapStateToProps</span>)(<span class="type">ItemDetail</span>)
+<span class="cm">// Каждый инстанс при маунте вызовет makeMapStateToProps()</span>
+<span class="cm">// и получит СВОЙ собственный selector со СВОИМ кэшем.</span>
+        </div>
+
+        <h3>Когда это реально нужно</h3>
+        <ul>
+          <li>Списки, где каждый элемент получает свой срез state по <code>ownProps</code>
+              (<code>itemId</code>, <code>userId</code>, координаты ячейки и т. п.).</li>
+          <li>Дорогие вычисления в селекторе, которые вы <strong>не хотите</strong> повторять на
+              каждый dispatch (поиск в большой коллекции, сортировка, фильтрация, nested lookup).</li>
+          <li>Любой раз, когда в DevTools / React Profiler вы видите, что
+              <code>mapStateToProps</code> у списка — «горячий» участок.</li>
+        </ul>
+
+        <h3>Factory для mapDispatchToProps</h3>
+        <p>
+          Работает симметрично. Это реже нужно: типичный случай — когда action creators связаны с
+          <code>ownProps</code> через <code>bindActionCreators</code> и вы хотите сохранить
+          ссылочную стабильность на инстанс. Выглядит так:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">makeMapDispatchToProps</span> = (<span class="prop">_dispatch</span>, <span class="prop">ownProps</span>: { <span class="prop">itemId</span>: <span class="type">number</span> }) =&gt; {
+  <span class="kw">const</span> <span class="fn">removeThis</span> = () =&gt; ({ <span class="prop">type</span>: <span class="str">'items/remove'</span>, <span class="prop">payload</span>: ownProps.<span class="prop">itemId</span> })
+  <span class="kw">return</span> (<span class="prop">dispatch</span>) =&gt; ({
+    <span class="prop">remove</span>: () =&gt; dispatch(<span class="fn">removeThis</span>())
+  })
+}
+<span class="fn">connect</span>(<span class="kw">null</span>, <span class="fn">makeMapDispatchToProps</span>)(<span class="type">ItemDetail</span>)
+        </div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Сам механизм подписки не меняется. При <code>dispatch</code> Subscription проходит по
+          linked list callback'ов → <code>Subscription.notify()</code> → для каждого слушателя
+          <code>checkForUpdates</code> → запустить <code>selector</code> (это и есть ваша
+          внутренняя <code>mapStateToProps</code>) → сравнить с <code>prevValue</code> через
+          <code>===</code> (shallow над объектом) → <code>forceRender</code> если отличается. Разница
+          только в том, <em>какая именно</em> функция выступает селектором: без factory — одна и та
+          же на все инстансы, с factory — у каждого инстанса <strong>своя</strong> замкнутая
+          функция с собственным <code>reselect</code>-кэшем.
+          <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Мини-правило:</strong> как только в <code>mapStateToProps</code> появляется
+          <code>createSelector</code> + <code>ownProps</code>, которые «разнят» вызовы между
+          инстансами — переходите на factory. Без factory <code>reselect</code> превращается в
+          обычную функцию, которая пересчитывает всё при каждом dispatch.
+        </div>
+
+        <div class="warning">
+          <strong>Не злоупотребляйте:</strong> для одиночного компонента (не списка) factory не
+          нужен — общий селектор справится. Factory решает конкретную проблему «много инстансов —
+          один кэш». Для всего остального стандартный <code>mapStateToProps</code> и
+          <code>reselect</code> работают отлично.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

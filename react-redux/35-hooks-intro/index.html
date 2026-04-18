@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>35 — Hooks API — введение</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .intro-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .intro-layout { grid-template-columns: 1fr; }
+    }
+    .intro-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .intro-card--connect { border-color: var(--accent-orange); }
+    .intro-card--hooks   { border-color: var(--success); }
+    .intro-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .intro-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .intro-card--connect .intro-card__title { color: var(--accent-orange); }
+    .intro-card--hooks   .intro-card__title { color: var(--success); }
+    .intro-card__badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .intro-card--connect .intro-card__badge {
+      background: rgba(206, 145, 120, 0.15);
+      color: var(--accent-orange);
+      border: 1px solid rgba(206, 145, 120, 0.3);
+    }
+    .intro-card--hooks .intro-card__badge {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    .counter-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 16px;
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .counter-value {
+      font-family: var(--font-mono);
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      min-width: 80px;
+      text-align: center;
+    }
+    .intro-card__source {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .intro-card__lines {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: right;
+      font-family: var(--font-mono);
+    }
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      margin: 12px 0;
+    }
+    .compare-table th, .compare-table td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .compare-table th {
+      background: var(--bg-panel);
+      color: var(--accent-yellow);
+    }
+    .compare-table td { background: var(--bg-tertiary); }
+    .compare-table code { color: var(--accent-cyan); }
+    .compare-table .yes { color: var(--success); font-weight: 600; }
+    .compare-table .no  { color: var(--accent-red); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">35 / 70</span>
+      Hooks API — введение
+    </div>
+    <nav class="site-header__nav">
+      <a href="../34-connectedprops-typescript/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">35</span>
+      <a href="../36-useselector-basics/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — один и тот же счётчик двумя способами</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Слева — знакомый с уроков 12–27 счётчик через <code>connect</code>. Справа — такой же
+          счётчик через хуки: <code>useSelector</code> для чтения state и <code>useDispatch</code>
+          для отправки экшенов. Оба подписаны на один <code>store</code>, внешний dispatch обновляет
+          обе карточки. Обратите внимание на количество строк исходного кода в каждой карточке.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Hooks API и почему он рекомендуется</div>
+      <div class="theory__body">
+
+        <h3>Что добавили в react-redux</h3>
+        <p>
+          Hooks API — набор встроенных React-хуков, которые подключают функциональный компонент к
+          Redux-store напрямую, без <code>connect</code>. Их три основных: <code>useSelector</code>
+          (чтение state), <code>useDispatch</code> (получить функцию dispatch), <code>useStore</code>
+          (редкий случай — получить сам store для императивных операций).
+        </p>
+
+        <div class="quote">«React Redux includes its own custom hook APIs, which allow your React components to subscribe to the Redux store and dispatch actions.»<br>— <a href="https://react-redux.js.org/api/hooks" target="_blank">react-redux.js.org/api/hooks</a></div>
+        <div class="quote">«React Redux включает свои собственные API-хуки, которые позволяют вашим React-компонентам подписываться на Redux-store и диспатчить экшены.»<br>— перевод</div>
+
+        <div class="quote">«We recommend using the React-Redux hooks API as the default approach in your React components.»<br>— <a href="https://react-redux.js.org/api/hooks" target="_blank">react-redux.js.org/api/hooks</a></div>
+        <div class="quote">«Мы рекомендуем использовать React-Redux hooks API в качестве подхода по умолчанию в ваших React-компонентах.»<br>— перевод</div>
+
+        <div class="quote">«The existing connect API still works and will continue to be supported, but the hooks API is simpler and works better with TypeScript.»<br>— <a href="https://react-redux.js.org/api/hooks" target="_blank">react-redux.js.org/api/hooks</a></div>
+        <div class="quote">«Существующий API connect по-прежнему работает и будет поддерживаться, но hooks API проще и лучше сочетается с TypeScript.»<br>— перевод</div>
+
+        <div class="quote">«These hooks were first added in v7.1.0.»<br>— <a href="https://react-redux.js.org/api/hooks" target="_blank">react-redux.js.org/api/hooks</a></div>
+        <div class="quote">«Эти хуки впервые добавили в v7.1.0.»<br>— перевод</div>
+
+        <h3>Минимальный пример</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">useSelector</span>, <span class="fn">useDispatch</span> } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> count = <span class="fn">useSelector</span>((<span class="prop">state</span>: <span class="type">RootState</span>) =&gt; state.<span class="prop">counter</span>.<span class="prop">value</span>)
+  <span class="kw">const</span> dispatch = <span class="fn">useDispatch</span>()
+  <span class="kw">return</span> (
+    &lt;<span class="type">div</span>&gt;
+      &lt;<span class="type">button</span> onClick={() =&gt; dispatch({ <span class="prop">type</span>: <span class="str">'counter/decrement'</span> })}&gt;−&lt;/<span class="type">button</span>&gt;
+      &lt;<span class="type">span</span>&gt;{count}&lt;/<span class="type">span</span>&gt;
+      &lt;<span class="type">button</span> onClick={() =&gt; dispatch({ <span class="prop">type</span>: <span class="str">'counter/increment'</span> })}&gt;+&lt;/<span class="type">button</span>&gt;
+    &lt;/<span class="type">div</span>&gt;
+  )
+}
+
+&lt;<span class="type">Provider</span> store={store}&gt;&lt;<span class="fn">Counter</span> /&gt;&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <p>
+          Ни <code>mapStateToProps</code>, ни <code>mapDispatchToProps</code>, ни HOC'а, ни
+          <code>export default connect(...)</code> — весь «клей» с Redux помещается в три строки
+          внутри компонента.
+        </p>
+
+        <h3>connect vs hooks — сравнение</h3>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Критерий</th>
+              <th>connect</th>
+              <th>hooks</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Строк кода на простой компонент</td>
+              <td>~20</td>
+              <td>~10</td>
+            </tr>
+            <tr>
+              <td>Обёртка HOC в дереве</td>
+              <td><span class="no">да</span> (Connect(MyComp))</td>
+              <td><span class="yes">нет</span></td>
+            </tr>
+            <tr>
+              <td>TypeScript inference</td>
+              <td>ConnectedProps (урок 34)</td>
+              <td>прямее: типизирован <code>useSelector</code></td>
+            </tr>
+            <tr>
+              <td>Тестирование</td>
+              <td>требует <code>&lt;Provider&gt;</code> или mock'ов HOC</td>
+              <td>требует только <code>&lt;Provider&gt;</code></td>
+            </tr>
+            <tr>
+              <td>Работает с class-компонентами</td>
+              <td><span class="yes">да</span></td>
+              <td><span class="no">нет</span> (хуки только в функциях)</td>
+            </tr>
+            <tr>
+              <td>Объявления для DevTools</td>
+              <td>много обёрток Connect(...)</td>
+              <td>чистый стек компонентов</td>
+            </tr>
+            <tr>
+              <td>Рекомендуется командой Redux</td>
+              <td>поддерживается, legacy-friendly</td>
+              <td><span class="yes">по умолчанию</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Три основных хука</h3>
+        <ul>
+          <li><code>useSelector(selector, equalityFn?)</code> — читает срез state, подписывается
+              на store, ре-рендерит компонент, когда результат селектора изменился.
+              Разбираем в уроках 36–43.</li>
+          <li><code>useDispatch()</code> — возвращает <code>store.dispatch</code>.
+              Ссылка стабильна между рендерами. Уроки 44–45.</li>
+          <li><code>useStore()</code> — возвращает сам <code>store</code>. Нужен редко (доступ к
+              <code>getState()</code> в обработчиках без подписки, чтение после диспатча в
+              эффектах). Урок 46.</li>
+        </ul>
+
+        <h3>Что остаётся одинаковым</h3>
+        <p>
+          Вся «внутрянка» react-redux — одна и та же. И <code>connect</code>, и хуки используют
+          один и тот же контекст (<code>&lt;Provider&gt;</code>), одну и ту же систему подписки
+          (<code>Subscription</code>). При <code>dispatch</code> Subscription проходит по linked
+          list callback'ов → <code>Subscription.notify()</code> → для каждого слушателя
+          <code>checkForUpdates</code> → запустить <code>selector</code> (ваша функция из
+          <code>useSelector</code> или <code>mapStateToProps</code>) → сравнить с
+          <code>prevValue</code> через <code>===</code> → <code>forceRender</code> если
+          отличается. Разница — только в том, как вы подписываетесь: через HOC или через хук.
+          <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <h3>Когда всё ещё использовать connect</h3>
+        <ul>
+          <li>Класс-компоненты (хуки недоступны).</li>
+          <li>Legacy-кодовая база — менять сотни компонентов разом нет смысла.</li>
+          <li>Явное «разделение ответственности» между контейнером и презентационным компонентом,
+              когда презентационный должен оставаться «dumb» и принимать всё через props.</li>
+        </ul>
+
+        <div class="tip">
+          <strong>Стратегия миграции:</strong> команда React Redux не требует переписывать всё.
+          Новые функциональные компоненты пишите на хуках, старые — оставляйте на
+          <code>connect</code>, если они стабильны. Смешивать оба подхода в одном проекте
+          совершенно нормально — они работают рядом и подписываются на один и тот же store.
+        </div>
+
+        <div class="warning">
+          <strong>Версии:</strong> хуки появились в v7.1.0 (лето 2019). Если вы на более старой
+          версии — сначала обновитесь. В v9 (2024) API стабильный, типизированный и именно тот,
+          что документирован на сайте.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

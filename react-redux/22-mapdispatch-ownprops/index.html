@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>22 — mapDispatchToProps с ownProps</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .todo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .todo-item--done {
+      background: var(--bg-tertiary);
+      border-color: var(--border-light);
+    }
+    .todo-item__checkbox {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border-light);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+    }
+    .todo-item__checkbox--checked {
+      background: var(--accent-green);
+      border-color: var(--accent-green);
+      color: #000;
+      font-weight: 700;
+    }
+    .todo-item__text {
+      flex: 1;
+      color: var(--text-primary);
+      font-size: 0.95rem;
+    }
+    .todo-item--done .todo-item__text {
+      color: var(--text-muted);
+      text-decoration: line-through;
+    }
+    .todo-item__id {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .todo-item__remove {
+      background: transparent;
+      border: 1px solid var(--error);
+      color: var(--error);
+      font-size: 0.72rem;
+      padding: 4px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .todo-item__remove:hover {
+      background: var(--error);
+      color: #000;
+    }
+    .bind-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 14px 0;
+    }
+    @media (max-width: 800px) {
+      .bind-compare { grid-template-columns: 1fr; }
+    }
+    .bind-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    .bind-card__title {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .bind-card__title--no {
+      color: var(--accent-orange);
+    }
+    .bind-card__title--yes {
+      color: var(--accent-green);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">22 / 70</span>
+      mapDispatchToProps с ownProps
+    </div>
+    <nav class="site-header__nav">
+      <a href="../21-mapdispatch-function/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">22</span>
+      <a href="../23-mapdispatch-bindactioncreators/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — TodoItem с ownProps.todoId</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Каждый <code>TodoItem</code> получает <code>todoId</code> как проп от родителя
+          (<code>ownProps</code>). Внутри <code>mapDispatchToProps</code> мы замыкаемся на
+          <code>ownProps.todoId</code> и создаём персональные <code>toggle()</code> и
+          <code>remove()</code>. Компонент вызывает их <em>без аргументов</em> — id уже «вшит».
+          В консоли видно, как для каждого элемента <code>mapDispatchToProps</code> вызывается
+          отдельно.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — ownProps и стратегии биндинга</div>
+      <div class="theory__body">
+
+        <h3>Второй аргумент функции — ownProps</h3>
+        <p>
+          Если функция <code>mapDispatchToProps</code> объявлена с двумя параметрами, react-redux
+          передаёт ей <code>dispatch</code> первым аргументом, а пропсы родителя вторым. И,
+          что важно, <em>пересобирает</em> её результат при смене этих пропсов.
+        </p>
+
+        <div class="quote">
+          «If your mapDispatchToProps function is declared as taking two parameters, it will be called
+          with dispatch as the first parameter and the props passed to the connected component as the
+          second parameter, and will be re-invoked whenever the connected component receives new props.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Если ваша функция mapDispatchToProps объявлена с двумя параметрами, она будет вызвана с
+          dispatch в качестве первого аргумента и пропсами, переданными в connected-компонент,
+          в качестве второго, и будет вызвана повторно всякий раз, когда connected-компонент
+          получает новые пропсы.»
+          <br>— перевод
+        </div>
+
+        <h3>Синтаксис</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = (
+  <span class="prop">dispatch</span>,
+  <span class="prop">ownProps</span>: { <span class="prop">todoId</span>: <span class="type">number</span> }
+) =&gt; ({
+  <span class="fn">toggle</span>: () =&gt; <span class="fn">dispatch</span>({
+    <span class="prop">type</span>: <span class="str">'todos/toggle'</span>,
+    <span class="prop">payload</span>: ownProps.<span class="prop">todoId</span>   <span class="cm">// замыкание на id</span>
+  }),
+  <span class="fn">remove</span>: () =&gt; <span class="fn">dispatch</span>({
+    <span class="prop">type</span>: <span class="str">'todos/remove'</span>,
+    <span class="prop">payload</span>: ownProps.<span class="prop">todoId</span>
+  }),
+})
+
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">TodoItem</span>)
+        </div>
+
+        <h3>Две стратегии биндинга аргументов</h3>
+        <p>
+          Если <code>todoId</code> приходит как ownProps, то есть два места, где можно «привязать»
+          его к экшену: <strong>в render'е компонента</strong> (при каждом клике) или
+          <strong>в mapDispatchToProps</strong> (один раз, пока props не изменятся).
+        </p>
+
+        <div class="quote">
+          «This means, instead of re-binding new props to action dispatchers upon component
+          re-rendering, you may do so when your component's props change.»
+          <br>— <a href="https://react-redux.js.org/using-react-redux/connect-mapdispatch" target="_blank">react-redux.js.org/using-react-redux/connect-mapdispatch</a>
+        </div>
+        <div class="quote">
+          «Это значит, что вместо повторного связывания новых пропсов с диспатчерами экшенов при
+          каждом ре-рендере, вы можете делать это при смене пропсов компонента.»
+          <br>— перевод
+        </div>
+
+        <div class="bind-compare">
+          <div class="bind-card">
+            <div class="bind-card__title bind-card__title--no">
+              Bind on component re-rendering
+            </div>
+            <div class="code-block" style="margin:0;">
+<span class="cm">// mapDispatchToProps без ownProps:</span>
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = <span class="prop">dispatch</span> =&gt; ({
+  <span class="fn">toggleTodo</span>: <span class="prop">todoId</span> =&gt; <span class="fn">dispatch</span>(<span class="fn">toggleTodo</span>(todoId))
+})
+
+<span class="cm">// В render:</span>
+&lt;button <span class="prop">onClick</span>={() =&gt;
+  <span class="prop">this</span>.<span class="prop">props</span>.<span class="fn">toggleTodo</span>(<span class="prop">this</span>.<span class="prop">props</span>.<span class="prop">todoId</span>)
+}/&gt;
+            </div>
+          </div>
+          <div class="bind-card">
+            <div class="bind-card__title bind-card__title--yes">
+              Bind on props change
+            </div>
+            <div class="code-block" style="margin:0;">
+<span class="cm">// mapDispatchToProps с ownProps:</span>
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> =
+  (<span class="prop">dispatch</span>, <span class="prop">ownProps</span>) =&gt; ({
+    <span class="fn">toggleTodo</span>: () =&gt;
+      <span class="fn">dispatch</span>(<span class="fn">toggleTodo</span>(ownProps.<span class="prop">todoId</span>))
+  })
+
+<span class="cm">// В render:</span>
+&lt;button <span class="prop">onClick</span>={() =&gt;
+  <span class="prop">this</span>.<span class="prop">props</span>.<span class="fn">toggleTodo</span>()
+}/&gt;
+            </div>
+          </div>
+        </div>
+
+        <h3>Полный пример — Bind on props change</h3>
+        <p>
+          Ниже — полный рабочий код: родитель <code>TodoList</code> передаёт
+          <code>todoId</code> как проп → <code>connect</code> перехватывает его как
+          <code>ownProps</code> → <code>mapStateToProps</code> и <code>mapDispatchToProps</code>
+          получают его вторым аргументом → <code>toggle()</code> вызывается в компоненте
+          без аргументов, id уже в замыкании.
+        </p>
+
+        <div class="bind-card" style="margin: 14px 0;">
+          <div class="bind-card__title bind-card__title--yes">
+            Bind on props change — полный код
+          </div>
+          <div class="code-block" style="margin:0;">
+<span class="cm">// ─── 1. Типы ─────────────────────────────────────────────</span>
+<span class="kw">interface</span> <span class="type">Todo</span> { <span class="prop">id</span>: <span class="type">number</span>; <span class="prop">text</span>: <span class="type">string</span>; <span class="prop">done</span>: <span class="type">boolean</span> }
+<span class="kw">interface</span> <span class="type">RootState</span> { <span class="prop">todos</span>: { <span class="prop">items</span>: <span class="type">Todo</span>[] } }
+
+<span class="kw">type</span> <span class="type">TodosAction</span> = { <span class="prop">type</span>: <span class="str">'todos/toggle'</span>; <span class="prop">payload</span>: <span class="type">number</span> }
+
+<span class="cm">// ─── 2. Reducer ──────────────────────────────────────────</span>
+<span class="kw">function</span> <span class="fn">todosReducer</span>(<span class="prop">state</span> = { <span class="prop">items</span>: [] }, <span class="prop">action</span>: <span class="type">TodosAction</span>) {
+  <span class="kw">if</span> (action.<span class="prop">type</span> === <span class="str">'todos/toggle'</span>) {
+    <span class="kw">return</span> {
+      <span class="prop">items</span>: state.<span class="prop">items</span>.<span class="fn">map</span>(<span class="prop">t</span> =&gt;
+        t.<span class="prop">id</span> === action.<span class="prop">payload</span> ? { ...t, <span class="prop">done</span>: !t.<span class="prop">done</span> } : t
+      )
+    }
+  }
+  <span class="kw">return</span> state
+}
+
+<span class="kw">const</span> <span class="fn">store</span> = <span class="fn">createStore</span>(<span class="fn">combineReducers</span>({ <span class="prop">todos</span>: <span class="fn">todosReducer</span> }))
+
+<span class="cm">// ─── 3. Типы пропсов компонента ─────────────────────────</span>
+<span class="kw">interface</span> <span class="type">OwnProps</span>      { <span class="prop">todoId</span>: <span class="type">number</span> }             <span class="cm">// от родителя</span>
+<span class="kw">interface</span> <span class="type">StateProps</span>    { <span class="prop">todo</span>: <span class="type">Todo</span> | <span class="kw">undefined</span> }    <span class="cm">// из mapState</span>
+<span class="kw">interface</span> <span class="type">DispatchProps</span> { <span class="prop">toggle</span>: () =&gt; <span class="kw">void</span> }         <span class="cm">// из mapDispatch</span>
+<span class="kw">type</span> <span class="type">Props</span> = <span class="type">OwnProps</span> &amp; <span class="type">StateProps</span> &amp; <span class="type">DispatchProps</span>
+
+<span class="cm">// ─── 4. Компонент — НЕ знает про dispatch и id ──────────</span>
+<span class="kw">function</span> <span class="fn">TodoItemRaw</span>({ <span class="prop">todo</span>, <span class="prop">toggle</span> }: <span class="type">Props</span>) {
+  <span class="kw">if</span> (!todo) <span class="kw">return</span> <span class="kw">null</span>
+  <span class="kw">return</span> (
+    &lt;<span class="type">div</span> <span class="prop">onClick</span>={<span class="prop">toggle</span>}&gt;          <span class="cm">// БЕЗ аргументов!</span>
+      {todo.<span class="prop">done</span> ? <span class="str">'✓ '</span> : <span class="str">'○ '</span>}{todo.<span class="prop">text</span>}
+    &lt;/<span class="type">div</span>&gt;
+  )
+}
+
+<span class="cm">// ─── 5. mapStateToProps — 2-й аргумент: ownProps ────────</span>
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (
+  <span class="prop">state</span>: <span class="type">RootState</span>,
+  <span class="prop">ownProps</span>: <span class="type">OwnProps</span>          <span class="cm">// ← приходят от родителя</span>
+): <span class="type">StateProps</span> =&gt; ({
+  <span class="prop">todo</span>: state.<span class="prop">todos</span>.<span class="prop">items</span>.<span class="fn">find</span>(<span class="prop">t</span> =&gt; t.<span class="prop">id</span> === ownProps.<span class="prop">todoId</span>)
+})
+
+<span class="cm">// ─── 6. mapDispatchToProps — 2-й аргумент: ownProps ─────</span>
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = (
+  <span class="prop">dispatch</span>: <span class="type">Dispatch</span>&lt;<span class="type">TodosAction</span>&gt;,
+  <span class="prop">ownProps</span>: <span class="type">OwnProps</span>          <span class="cm">// ← те же ownProps</span>
+): <span class="type">DispatchProps</span> =&gt; ({
+  <span class="prop">toggle</span>: () =&gt; <span class="fn">dispatch</span>({
+    <span class="prop">type</span>: <span class="str">'todos/toggle'</span>,
+    <span class="prop">payload</span>: ownProps.<span class="prop">todoId</span>        <span class="cm">// ← id запечён в замыкание</span>
+  })
+})
+
+<span class="cm">// ─── 7. connect склеивает: OwnProps + StateProps + DispatchProps ─</span>
+<span class="kw">const</span> <span class="fn">TodoItem</span> = <span class="fn">connect</span>&lt;
+  <span class="type">StateProps</span>, <span class="type">DispatchProps</span>, <span class="type">OwnProps</span>, <span class="type">RootState</span>
+&gt;(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="fn">TodoItemRaw</span>)
+
+<span class="cm">// ─── 8. Родитель — передаёт только todoId ───────────────</span>
+<span class="kw">function</span> <span class="fn">TodoList</span>() {
+  <span class="kw">const</span> <span class="prop">items</span> = <span class="fn">useSelector</span>((<span class="prop">s</span>: <span class="type">RootState</span>) =&gt; s.<span class="prop">todos</span>.<span class="prop">items</span>)
+  <span class="kw">return</span> (
+    &lt;<span class="type">div</span>&gt;
+      {items.<span class="fn">map</span>(<span class="prop">t</span> =&gt; (
+        <span class="cm">// ↓ todoId становится ownProps внутри connect</span>
+        &lt;<span class="type">TodoItem</span> <span class="prop">key</span>={t.<span class="prop">id</span>} <span class="prop">todoId</span>={t.<span class="prop">id</span>} /&gt;
+      ))}
+    &lt;/<span class="type">div</span>&gt;
+  )
+}
+
+<span class="cm">// ─── 9. Render ──────────────────────────────────────────</span>
+<span class="fn">createRoot</span>(document.<span class="fn">getElementById</span>(<span class="str">'root'</span>)!).<span class="fn">render</span>(
+  &lt;<span class="type">Provider</span> <span class="prop">store</span>={<span class="fn">store</span>}&gt;
+    &lt;<span class="type">TodoList</span> /&gt;
+  &lt;/<span class="type">Provider</span>&gt;
+)
+
+<span class="cm">// ─── Поток ownProps ─────────────────────────────────────</span>
+<span class="cm">// &lt;TodoList&gt; рендерит &lt;TodoItem todoId={t.id} /&gt;</span>
+<span class="cm">//         │</span>
+<span class="cm">//         ▼   ownProps = { todoId: t.id }</span>
+<span class="cm">// [connect] ──► mapStateToProps(state, ownProps)    → { todo }</span>
+<span class="cm">//           └─► mapDispatchToProps(dispatch, ownProps) → { toggle }</span>
+<span class="cm">//         │</span>
+<span class="cm">//         ▼   props = { todoId, todo, toggle }</span>
+<span class="cm">// [TodoItemRaw]  onClick={toggle}  →  dispatch({ payload: ownProps.todoId })</span>
+          </div>
+        </div>
+
+        <h3>Про арность — как это определяется?</h3>
+        <p>
+          react-redux смотрит на <code>mapDispatchToProps.length</code>. Ровно тот же механизм,
+          что и для <code>mapStateToProps</code> (<a href="../19-mapstate-arity-behavior/">урок 19</a>):
+        </p>
+        <ul>
+          <li><code>length === 1</code> → вызывается как <code>mapDispatchToProps(dispatch)</code>
+            один раз при монтировании;</li>
+          <li><code>length === 2</code> → вызывается как
+            <code>mapDispatchToProps(dispatch, ownProps)</code> при каждом обновлении пропсов.</li>
+        </ul>
+
+        <div class="warning">
+          <strong>Грабли:</strong> если вы записали <code>(dispatch, ownProps = {'{}'})</code> —
+          <code>length</code> считается как 1, и ownProps вы не получите. Используйте форму без
+          значения по умолчанию.
+        </div>
+
+        <h3>Производительность</h3>
+        <p>
+          С <code>ownProps</code>-формой react-redux пересоздаёт возвращаемый объект при <em>каждом</em>
+          изменении ownProps. Это значит, что <code>props.toggle</code> меняет свою ссылку, и
+          <code>React.memo</code>/<code>shouldComponentUpdate</code> детей увидит «новую функцию».
+          Для большинства случаев это не проблема, но стоит помнить.
+        </p>
+
+        <h3>Связь с Subscription-системой</h3>
+        <p>
+          Цикл обновления не меняется: при каждом dispatch store пересчитывает state и зовёт
+          <code>Subscription.notify()</code>. Subscription — это linked list callback'ов. Для каждого
+          подключённого компонента <code>checkForUpdates</code> запускает
+          <code>mapStateToProps</code>, сравнивает каждое поле с предыдущим значением через
+          <code>===</code>, и если отличается — вызывает <code>forceRender()</code>
+          (<a href="../03a-subscription-system/">разбор в уроке 03a</a>).
+          <code>mapDispatchToProps</code> дополнительно пересчитывается <em>до</em> рендера,
+          если функция с двумя параметрами и пропсы родителя изменились.
+        </p>
+
+        <div class="tip">
+          <strong>Когда стоит использовать:</strong> когда action creator требует аргумент, который
+          уже есть в ownProps (id todo, параметр в URL, айди пользователя). Это делает onClick
+          без аргументов — чище в JSX, меньше закрытий в хендлерах.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

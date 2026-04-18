@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>29 — options.context — кастомный контекст для connect</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .stores-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+      .stores-grid { grid-template-columns: 1fr; }
+    }
+    .store-card {
+      background: var(--bg-panel);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .store-card--user {
+      border: 2px solid var(--accent-cyan);
+    }
+    .store-card--product {
+      border: 2px solid var(--accent-orange);
+    }
+    .store-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .store-card__title {
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+    .store-card__title--user { color: var(--accent-cyan); }
+    .store-card__title--product { color: var(--accent-orange); }
+    .store-card__ctx {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .store-card__state {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+    }
+    .store-card__actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .context-visual {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin: 16px 0;
+    }
+    .context-tree {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+    .ctx-user    { color: var(--accent-cyan); }
+    .ctx-product { color: var(--accent-orange); }
+    .ctx-comp    { color: var(--accent-yellow); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">29 / 70</span>
+      options.context — кастомный контекст для connect
+    </div>
+    <nav class="site-header__nav">
+      <a href="../28-mergeprops/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">29</span>
+      <a href="../30-connect-options-equality/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — два store, два контекста, два connect</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          На странице есть <strong>два независимых store</strong>: <code>userStore</code> и
+          <code>productStore</code>.           Каждый проброшен через свой собственный
+          <code>&lt;Provider context=&#123;UserContext&#125;&gt;</code> и
+          <code>&lt;Provider context=&#123;ProductContext&#125;&gt;</code>. Компоненты подключены
+          через <code>connect(..., ..., ..., &#123; context: UserContext &#125;)</code> и
+          <code>connect(..., ..., ..., &#123; context: ProductContext &#125;)</code> соответственно. Dispatch в один store
+          <strong>не ре-рендерит</strong> компоненты подключённые к другому store.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — кастомный контекст</div>
+      <div class="theory__body">
+
+        <h3>Зачем нужен custom context</h3>
+        <p>
+          По умолчанию react-redux использует один встроенный контекст (<code>ReactReduxContext</code>).
+          Все <code>&lt;Provider store=&#123;...&#125;&gt;</code> и все <code>connect</code> / хуки
+          видят друг друга через него. Когда в одном приложении нужно несколько независимых store
+          (например, изолированная библиотека с собственным state и главное приложение), вы можете
+          создать свой React.Context и передать его и в <code>Provider</code>, и в
+          <code>connect</code> через <code>options.context</code>. Тогда эти два слоя не будут
+          конфликтовать.
+        </p>
+
+        <h3>API options.context</h3>
+        <div class="quote">«React-Redux v6 allows you to supply a custom context instance to be used by React-Redux. You need to pass the instance of your context to both &lt;Provider /&gt; and your connected component.»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«React-Redux v6 позволяет передавать свой собственный инстанс контекста. Нужно передать инстанс вашего контекста и в &lt;Provider /&gt;, и в ваш connected-компонент.»<br>— перевод</div>
+
+        <div class="quote">«You may pass the context to your connected component either by passing it here as a field of option, or as a prop to your connected component in rendering.»<br>— <a href="https://react-redux.js.org/api/connect" target="_blank">react-redux.js.org/api/connect</a></div>
+        <div class="quote">«Вы можете передать контекст в connected-компонент либо здесь как поле опции, либо как prop при рендере connected-компонента.»<br>— перевод</div>
+
+        <h3>Два способа передать context</h3>
+        <p><strong>Способ 1:</strong> через <code>options.context</code> при создании connected-компонента:</p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">MyContext</span> = <span class="type">React</span>.<span class="fn">createContext</span>(<span class="kw">null</span>)
+
+<span class="kw">const</span> <span class="type">Connected</span> = <span class="fn">connect</span>(
+  <span class="fn">mapStateToProps</span>,
+  <span class="kw">null</span>,
+  <span class="kw">null</span>,
+  { <span class="prop">context</span>: <span class="fn">MyContext</span> }
+)(<span class="type">Comp</span>)
+
+<span class="cm">// В рендере:</span>
+&lt;<span class="type">Provider</span> <span class="prop">store</span>={myStore} <span class="prop">context</span>={MyContext}&gt;
+  &lt;<span class="type">Connected</span> /&gt;
+&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <p><strong>Способ 2:</strong> как prop при рендере:</p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="type">Connected</span> = <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>)(<span class="type">Comp</span>)
+
+&lt;<span class="type">Provider</span> <span class="prop">store</span>={myStore} <span class="prop">context</span>={MyContext}&gt;
+  &lt;<span class="type">Connected</span> <span class="prop">context</span>={MyContext} /&gt;
+&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <h3>Два независимых store на странице</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">UserContext</span> = <span class="type">React</span>.<span class="fn">createContext</span>(<span class="kw">null</span>)
+<span class="kw">const</span> <span class="fn">ProductContext</span> = <span class="type">React</span>.<span class="fn">createContext</span>(<span class="kw">null</span>)
+
+<span class="kw">const</span> <span class="fn">userStore</span> = <span class="fn">createStore</span>(<span class="fn">userReducer</span>)
+<span class="kw">const</span> <span class="fn">productStore</span> = <span class="fn">createStore</span>(<span class="fn">productReducer</span>)
+
+<span class="kw">const</span> <span class="type">UserInfo</span> = <span class="fn">connect</span>(
+  (<span class="prop">state</span>) =&gt; state,
+  <span class="kw">null</span>,
+  <span class="kw">null</span>,
+  { <span class="prop">context</span>: <span class="fn">UserContext</span> }
+)(<span class="type">UserInfoComponent</span>)
+
+<span class="kw">const</span> <span class="type">ProductList</span> = <span class="fn">connect</span>(
+  (<span class="prop">state</span>) =&gt; state,
+  <span class="kw">null</span>,
+  <span class="kw">null</span>,
+  { <span class="prop">context</span>: <span class="fn">ProductContext</span> }
+)(<span class="type">ProductListComponent</span>)
+
+&lt;<span class="type">Provider</span> <span class="prop">store</span>={userStore} <span class="prop">context</span>={UserContext}&gt;
+  &lt;<span class="type">Provider</span> <span class="prop">store</span>={productStore} <span class="prop">context</span>={ProductContext}&gt;
+    &lt;<span class="type">UserInfo</span> /&gt;
+    &lt;<span class="type">ProductList</span> /&gt;
+  &lt;/<span class="type">Provider</span>&gt;
+&lt;/<span class="type">Provider</span>&gt;
+        </div>
+
+        <h3>Обязательное правило: контексты должны совпадать</h3>
+        <div class="warning">
+          <strong>Invariant Violation</strong> — если <code>Provider</code> передаёт один
+          <code>context</code>, а <code>connect</code> ожидает другой, react-redux не сможет найти
+          store и бросит ошибку «<em>Could not find store</em>» / «<em>Invariant Violation</em>».
+          <code>Provider</code> и <code>connect</code> должны ссылаться на <strong>один и тот же
+          инстанс контекста</strong>.
+        </div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Каждый <code>Provider</code> создаёт <strong>свой</strong> Subscription внутри своего
+          context'а и отдаёт его подключённым компонентам. Когда вы диспатчите action в
+          <code>userStore</code>, Subscription именно этого store проходит по linked list
+          callback'ов → <code>notify()</code> → <code>checkForUpdates</code> → селектор →
+          сравнение через <code>===</code> → <code>forceRender</code> если отличается.
+          Подписчики <code>productStore</code> живут в другом Subscription и о событиях
+          userStore ничего не знают — поэтому их ре-рендеры не запускаются.
+          <a href="../03a-subscription-system/">Подробнее — урок 03a</a>.
+          Это же мы делали через custom hooks в уроке 11 — там использовались
+          <code>createSelectorHook</code> / <code>createDispatchHook</code>, теперь — через
+          <code>options.context</code> для <code>connect</code>.
+        </p>
+
+        <div class="tip">
+          <strong>Когда использовать custom context:</strong>
+          библиотека/виджет со своим state, которую нужно дропнуть внутрь хост-приложения;
+          микро-фронтенды с изолированными store; тесты, где нужно подменить store. Для большинства
+          обычных SPA — достаточно одного store и дефолтного контекста.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

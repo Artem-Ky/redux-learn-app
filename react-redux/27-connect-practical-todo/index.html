@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>27 — Практический пример: Todo через connect</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .todo-app {
+      max-width: 640px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .add-todo {
+      display: flex;
+      gap: 8px;
+    }
+    .add-todo__input {
+      flex: 1;
+      background: var(--bg-tertiary);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+    }
+    .add-todo__input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .filters {
+      display: flex;
+      gap: 6px;
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+    .filters__btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      transition: all 0.15s;
+      flex: 1;
+    }
+    .filters__btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    .filters__btn--active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .todo-list {
+      background: var(--bg-panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-height: 180px;
+    }
+    .todo-list__empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 30px;
+    }
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .todo-item:hover {
+      background: var(--bg-hover);
+    }
+    .todo-item__check {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .todo-item--done .todo-item__check {
+      background: var(--success);
+      border-color: var(--success);
+    }
+    .todo-item--done .todo-item__check::after {
+      content: '✓';
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+    .todo-item__text {
+      flex: 1;
+      color: var(--text-primary);
+      font-size: 0.92rem;
+    }
+    .todo-item--done .todo-item__text {
+      color: var(--text-muted);
+      text-decoration: line-through;
+    }
+    .todo-item__id {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .state-inspector {
+      margin-top: 14px;
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      overflow-x: auto;
+    }
+    .state-inspector__title {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .stats {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    .stats strong { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">27 / 70</span>
+      Практический пример: Todo-лист через connect
+    </div>
+    <nav class="site-header__nav">
+      <a href="../26-connect-four-combinations/">← Назад</a>
+      <a href="../">Все уроки</a>
+      <span class="current">27</span>
+      <a href="../28-mergeprops/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактив — полноценный Todo-лист</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Полноценное Todo-приложение из официального туториала react-redux. Четыре компонента —
+          <code>AddTodo</code>, <code>TodoList</code>, <code>Todo</code>,
+          <code>VisibilityFilters</code> — каждый подключён через <code>connect</code> с разным
+          набором аргументов. Добавляйте задачи, отмечайте выполненные, переключайте фильтр.
+        </p>
+        <div id="root"></div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Todo-приложение через connect</div>
+      <div class="theory__body">
+
+        <h3>Структура state</h3>
+        <p>
+          Мы используем нормализованную форму: todos хранятся в объекте <code>byIds</code>
+          и массиве <code>allIds</code>. Это стандартный паттерн Redux для коллекций — он даёт
+          O(1) доступ по id и позволяет менять отдельный todo без копирования всего массива.
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">initialState</span> = {
+  <span class="prop">todos</span>: {
+    <span class="prop">byIds</span>: {},
+    <span class="prop">allIds</span>: []
+  },
+  <span class="prop">visibilityFilter</span>: <span class="str">'all'</span> <span class="cm">// 'all' | 'completed' | 'incomplete'</span>
+}
+        </div>
+
+        <h3>Action creators</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">addTodo</span> = (<span class="prop">content</span>) =&gt; ({
+  <span class="prop">type</span>: <span class="str">'ADD_TODO'</span>,
+  <span class="prop">payload</span>: { <span class="prop">id</span>: <span class="fn">nextId</span>(), <span class="prop">content</span> }
+})
+
+<span class="kw">const</span> <span class="fn">toggleTodo</span> = (<span class="prop">id</span>) =&gt; ({
+  <span class="prop">type</span>: <span class="str">'TOGGLE_TODO'</span>,
+  <span class="prop">payload</span>: { <span class="prop">id</span> }
+})
+
+<span class="kw">const</span> <span class="fn">setFilter</span> = (<span class="prop">filter</span>) =&gt; ({
+  <span class="prop">type</span>: <span class="str">'SET_FILTER'</span>,
+  <span class="prop">payload</span>: { <span class="prop">filter</span> }
+})
+        </div>
+
+        <h3>Селекторы</h3>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">getTodos</span> = (<span class="prop">state</span>) =&gt;
+  state.<span class="prop">todos</span>.<span class="prop">allIds</span>.<span class="fn">map</span>(<span class="prop">id</span> =&gt; state.<span class="prop">todos</span>.<span class="prop">byIds</span>[id])
+
+<span class="kw">const</span> <span class="fn">getTodosByVisibilityFilter</span> = (<span class="prop">state</span>, <span class="prop">filter</span>) =&gt; {
+  <span class="kw">const</span> <span class="fn">all</span> = <span class="fn">getTodos</span>(state)
+  <span class="kw">switch</span> (filter) {
+    <span class="kw">case</span> <span class="str">'completed'</span>:  <span class="kw">return</span> all.<span class="fn">filter</span>(t =&gt; t.<span class="prop">completed</span>)
+    <span class="kw">case</span> <span class="str">'incomplete'</span>: <span class="kw">return</span> all.<span class="fn">filter</span>(t =&gt; !t.<span class="prop">completed</span>)
+    <span class="kw">default</span>:            <span class="kw">return</span> all
+  }
+}
+        </div>
+
+        <h3>AddTodo — connect(null, { addTodo })</h3>
+        <div class="quote">«By passing it to connect, our component receives it as a prop, and it will automatically dispatch the action when it's called.»<br>— <a href="https://react-redux.js.org/tutorials/connect" target="_blank">react-redux.js.org/tutorials/connect</a></div>
+        <div class="quote">«Передавая action creator в connect, наш компонент получает его в props, и при вызове он будет автоматически диспатчить action.»<br>— перевод</div>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = { <span class="fn">addTodo</span> }
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="kw">null</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">AddTodo</span>)
+<span class="cm">// props.addTodo('Купить хлеб') → dispatch({ type: 'ADD_TODO', payload: ... })</span>
+        </div>
+
+        <p>
+          Форме <code>AddTodo</code> не нужно читать state — только диспатчить. Поэтому первым
+          аргументом идёт <code>null</code>. Вариант 3 из предыдущего урока.
+        </p>
+
+        <h3>TodoList — connect(mapStateToProps)</h3>
+        <div class="quote">«The TodoList component is responsible for rendering the list of todos. Therefore, it needs to read data from the store. We enable it by calling connect with the mapStateToProps parameter»<br>— <a href="https://react-redux.js.org/tutorials/connect" target="_blank">react-redux.js.org/tutorials/connect</a></div>
+        <div class="quote">«Компонент TodoList отвечает за отрисовку списка задач. Поэтому ему нужно читать данные из store. Мы подключаем его, вызывая connect с параметром mapStateToProps.»<br>— перевод</div>
+
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>) =&gt; ({
+  <span class="prop">todos</span>: <span class="fn">getTodosByVisibilityFilter</span>(state, state.<span class="prop">visibilityFilter</span>)
+})
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>)(<span class="type">TodoList</span>)
+        </div>
+
+        <h3>Todo — connect(null, { toggleTodo })</h3>
+        <p>
+          Каждый отдельный <code>Todo</code> получает свои данные через ownProps от родителя
+          (<code>TodoList</code> передаёт <code>todo</code> как prop). Из store ему нужен только
+          <code>toggleTodo</code>.
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = { <span class="fn">toggleTodo</span> }
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="kw">null</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">Todo</span>)
+<span class="cm">// &lt;Todo todo={...} /&gt; — todo приходит через ownProps, toggleTodo через connect</span>
+        </div>
+
+        <h3>VisibilityFilters — connect(mapStateToProps, mapDispatchToProps)</h3>
+        <p>
+          Компоненту фильтра нужно и читать текущее значение (чтобы подсветить активную кнопку),
+          и диспатчить изменение — классический вариант 4.
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> <span class="fn">mapStateToProps</span> = (<span class="prop">state</span>) =&gt; ({
+  <span class="prop">activeFilter</span>: state.<span class="prop">visibilityFilter</span>
+})
+<span class="kw">const</span> <span class="fn">mapDispatchToProps</span> = { <span class="fn">setFilter</span> }
+<span class="kw">export default</span> <span class="fn">connect</span>(<span class="fn">mapStateToProps</span>, <span class="fn">mapDispatchToProps</span>)(<span class="type">VisibilityFilters</span>)
+        </div>
+
+        <div class="quote">«We have implemented our React UI components as follows»<br>— <a href="https://react-redux.js.org/tutorials/connect" target="_blank">react-redux.js.org/tutorials/connect</a></div>
+        <div class="quote">«Мы реализовали наши React UI-компоненты следующим образом.»<br>— перевод</div>
+
+        <h3>Связь с системой Subscription</h3>
+        <p>
+          Подписаны только те компоненты, у которых указан <code>mapStateToProps</code>:
+          <code>TodoList</code> и <code>VisibilityFilters</code>. <code>AddTodo</code> и
+          <code>Todo</code> <strong>не</strong> подписаны на store — они только диспатчат.
+          Когда пользователь нажимает «Добавить», <code>dispatch</code> проходит через reducer,
+          Subscription проходит по linked list callback'ов → <code>notify()</code> →
+          <code>checkForUpdates</code> → селектор <code>getTodosByVisibilityFilter</code>
+          для <code>TodoList</code> → === сравнение массива todos → массив новый →
+          <code>forceRender</code> для <code>TodoList</code>. <code>VisibilityFilters</code>
+          тоже проверяется: его <code>mapStateToProps</code> возвращает
+          <code>{ activeFilter: state.visibilityFilter }</code> — filter не менялся,
+          <code>activeFilter</code> остался тот же по <code>===</code> → <code>forceRender</code>
+          не вызывается. <a href="../03a-subscription-system/">Подробнее о Subscription — урок 03a</a>.
+        </p>
+
+        <div class="tip">
+          <strong>Главное наблюдение:</strong> каждый компонент использует ровно ту комбинацию
+          аргументов <code>connect</code>, которая ему нужна. Не стоит везде писать
+          <code>connect(mapStateToProps, mapDispatchToProps)</code> «на всякий случай» —
+          подписка стоит ресурсов и вызывает лишние ре-рендеры. Форма ввода, кнопка, одиночный
+          item — часто не нуждаются в подписке на store.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>
