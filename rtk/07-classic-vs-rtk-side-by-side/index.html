@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>07 — Counter classic vs RTK side-by-side</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .compare-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0;
+    }
+    @media (max-width: 1100px) { .compare-grid { grid-template-columns: 1fr; } }
+    .compare-col {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .compare-col__head { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .compare-col__title { font-family: var(--font-mono); font-size: .9rem; font-weight: 600; }
+    .compare-col--classic .compare-col__head { background: rgba(244,71,71,.1); }
+    .compare-col--classic .compare-col__title { color: var(--accent-red); }
+    .compare-col--rtk .compare-col__head { background: rgba(118,74,188,.15); }
+    .compare-col--rtk .compare-col__title { color: var(--accent-purple); }
+    .compare-col__lines {
+      font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted);
+      background: var(--bg-panel); padding: 2px 8px; border-radius: var(--radius-sm);
+    }
+    .compare-col__body { padding: 14px; }
+
+    .counter-display {
+      text-align: center; padding: 14px 0;
+      font-family: var(--font-mono); font-size: 2rem; color: var(--accent-cyan);
+      background: var(--bg-panel); border-radius: var(--radius-sm); margin-bottom: 12px;
+    }
+    .counter-display__label { font-size: .7rem; color: var(--text-muted); margin-bottom: 4px; display: block; font-family: var(--font-sans); }
+
+    .counter-buttons { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+    .counter-buttons .btn { min-width: 50px; }
+
+    .src-block {
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 10px 12px; font-family: var(--font-mono); font-size: .73rem;
+      white-space: pre; overflow-x: auto; max-height: 360px; overflow-y: auto;
+      color: var(--text-primary); line-height: 1.55;
+    }
+    .src-block .kw { color: var(--accent-purple); }
+    .src-block .str { color: var(--accent-orange); }
+    .src-block .fn { color: var(--accent-yellow); }
+    .src-block .cm { color: var(--text-muted); font-style: italic; }
+    .src-block .num { color: var(--accent-cyan); }
+
+    .scoreboard {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0;
+    }
+    .score-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px 14px; text-align: center;
+    }
+    .score-card__label { font-size: .72rem; color: var(--text-muted); }
+    .score-card__row { display: flex; justify-content: space-between; margin-top: 6px; font-family: var(--font-mono); font-size: .82rem; }
+    .score-card__row .classic { color: var(--accent-red); }
+    .score-card__row .rtk { color: var(--accent-purple); }
+    .score-card__win { font-size: .7rem; color: var(--success); margin-top: 4px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">07 / 106</span>
+      Counter side-by-side: classic + react-redux vs RTK
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../06-architecture-deps/">← Назад</a>
+      <a href="../" style="color: var(--text-muted);">Секция B →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: two counters -->
+    <div class="demo-section">
+      <div class="demo-section__header">Один и тот же counter — два подхода. Оба работают.</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Слева — классика (createStore + actions + reducer + Provider + connect).
+          Справа — RTK (configureStore + createSlice + Provider + хуки). Поведение идентично, кода в 2.5 раза меньше.
+        </p>
+
+        <div class="compare-grid">
+          <!-- CLASSIC -->
+          <div class="compare-col compare-col--classic">
+            <div class="compare-col__head">
+              <div class="compare-col__title">Classic Redux + react-redux</div>
+              <div class="compare-col__lines">~52 строки</div>
+            </div>
+            <div class="compare-col__body">
+              <div class="counter-display">
+                <span class="counter-display__label">value (classic)</span>
+                <span id="classic-value">0</span>
+              </div>
+              <div class="counter-buttons">
+                <button class="btn" id="classic-inc">+1</button>
+                <button class="btn" id="classic-dec">−1</button>
+                <button class="btn" id="classic-add5">+5</button>
+                <button class="btn btn--secondary" id="classic-reset">reset</button>
+              </div>
+              <div class="src-block" id="classic-src"></div>
+            </div>
+          </div>
+
+          <!-- RTK -->
+          <div class="compare-col compare-col--rtk">
+            <div class="compare-col__head">
+              <div class="compare-col__title">Redux Toolkit</div>
+              <div class="compare-col__lines">~20 строк</div>
+            </div>
+            <div class="compare-col__body">
+              <div class="counter-display">
+                <span class="counter-display__label">value (rtk)</span>
+                <span id="rtk-value">0</span>
+              </div>
+              <div class="counter-buttons">
+                <button class="btn" id="rtk-inc">+1</button>
+                <button class="btn" id="rtk-dec">−1</button>
+                <button class="btn" id="rtk-add5">+5</button>
+                <button class="btn btn--secondary" id="rtk-reset">reset</button>
+              </div>
+              <div class="src-block" id="rtk-src"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="scoreboard">
+          <div class="score-card">
+            <div class="score-card__label">Строк кода</div>
+            <div class="score-card__row"><span class="classic">52</span><span class="rtk">20</span></div>
+            <div class="score-card__win">RTK: −62%</div>
+          </div>
+          <div class="score-card">
+            <div class="score-card__label">Файлов / разделов</div>
+            <div class="score-card__row"><span class="classic">5+</span><span class="rtk">1</span></div>
+            <div class="score-card__win">RTK: 1 slice</div>
+          </div>
+          <div class="score-card">
+            <div class="score-card__label">npm-пакетов</div>
+            <div class="score-card__row"><span class="classic">5</span><span class="rtk">2</span></div>
+            <div class="score-card__win">RTK: всё внутри</div>
+          </div>
+          <div class="score-card">
+            <div class="score-card__label">Action types вручную</div>
+            <div class="score-card__row"><span class="classic">3</span><span class="rtk">0</span></div>
+            <div class="score-card__win">RTK: auto-gen</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что именно убирает RTK</div>
+      <div class="theory__body">
+        <h3>Что убрано в RTK-варианте</h3>
+        <ol>
+          <li>
+            <strong>Action types</strong> — нет констант <code>const INCREMENT = 'counter/INCREMENT'</code>.
+            createSlice генерирует имена сам: <code>${'counter/increment'}</code>.
+          </li>
+          <li>
+            <strong>Action creators</strong> — нет вручную написанных <code>const increment = () => ({ type: ... })</code>.
+            createSlice возвращает их в <code>slice.actions</code>.
+          </li>
+          <li>
+            <strong>switch в reducer</strong> — нет <code>switch (action.type) { case INCREMENT: return ... }</code>.
+            Каждый ключ в <code>reducers: { ... }</code> — это case.
+          </li>
+          <li>
+            <strong>Spread/copy для immutability</strong> — нет <code>return { ...state, value: state.value + 1 }</code>.
+            Immer внутри createSlice позволяет писать <code>state.value++</code>.
+          </li>
+          <li>
+            <strong>combineReducers вручную</strong> — configureStore делает это сам если передан объект.
+          </li>
+          <li>
+            <strong>applyMiddleware(thunk)</strong> — thunk включён по умолчанию.
+          </li>
+          <li>
+            <strong>Redux DevTools Extension setup</strong> — configureStore подключает devtools автоматически в development.
+          </li>
+        </ol>
+
+        <h3>Что осталось одинаковым</h3>
+        <ul>
+          <li>Концепция <em>store / action / reducer</em> — RTK не меняет паттерн.</li>
+          <li><code>store.dispatch(action)</code> — точно так же, action — обычный объект <code>{type, payload}</code>.</li>
+          <li><code>store.subscribe(listener)</code> — подписка на изменения.</li>
+          <li>В React: <code>&lt;Provider store={store}&gt;</code>, <code>useSelector</code>, <code>useDispatch</code>.</li>
+        </ul>
+
+        <h3>Цитата из доки</h3>
+        <div class="quote">
+          «createSlice() automatically generates action creators and action types that correspond to the reducers and state.
+          The Redux state for the slice will be added to the Redux store using the slice <code>name</code> as the key.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSlice" target="_blank">createSlice docs</a>
+        </div>
+        <div class="quote quote--ru">
+          «createSlice() автоматически генерирует action creators и action types, соответствующие reducer'ам и state.
+          Redux state этой slice будет добавлен в store с использованием <code>name</code> slice в качестве ключа.»
+        </div>
+
+        <h3>Что произойдёт в DevTools</h3>
+        <p>
+          В classic-версии вы увидите actions с типом <code>counter/INCREMENT</code> (в строгом верхнем кейсе, как принято в classic-стиле).
+          В RTK-версии — <code>counter/increment</code> (camelCase ключ slice). Сама структура state одинаковая:
+          <code>{ counter: { value: 0 } }</code>.
+        </p>
+
+        <h3>Подводные камни при переходе</h3>
+        <div class="warning">
+          <strong>Не пишите классические action types в createSlice.</strong> Если вы хотите слушать «свой» action из другой
+          slice — используйте <code>extraReducers</code>. Если хотите СВОЙ имя action — используйте
+          <code>createAction</code> отдельно. createSlice генерирует имена сам и переопределить их нельзя.
+        </div>
+
+        <h3>Вывод</h3>
+        <p>
+          RTK <strong>не</strong> заменяет Redux. Это удобная обёртка над теми же концепциями. Все знания про reducer/action/store
+          остаются актуальными — RTK просто убирает 70% повторяющегося кода. В следующих секциях разберём <em>как именно</em>
+          это делается под капотом.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

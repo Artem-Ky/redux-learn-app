@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>06 — Что внутри: immer, reselect, thunk</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .arch-diagram {
+      position: relative;
+      background: var(--bg-tertiary);
+      border: 2px solid var(--accent-purple);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin: 14px 0;
+    }
+    .arch-diagram__label {
+      position: absolute; top: -10px; left: 16px;
+      background: var(--bg-primary); padding: 0 8px;
+      font-family: var(--font-mono); font-size: .78rem; color: var(--accent-purple);
+    }
+    .arch-rtk-wrap { display: flex; flex-direction: column; gap: 10px; }
+    .arch-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .arch-box {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 10px 14px; cursor: pointer; transition: border-color .15s;
+    }
+    .arch-box:hover { border-color: var(--accent); }
+    .arch-box.active { border-color: var(--accent); background: rgba(86,156,214,.08); }
+    .arch-box__name { font-family: var(--font-mono); font-weight: 600; color: var(--accent-cyan); font-size: .85rem; }
+    .arch-box__sub { font-size: .72rem; color: var(--text-muted); margin-top: 4px; }
+    .arch-box__ver { float: right; font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted); }
+
+    .reexport {
+      margin: 18px 0; padding: 14px 16px; background: var(--bg-panel);
+      border-left: 3px solid var(--accent); border-radius: var(--radius-sm);
+    }
+    .reexport__title { font-family: var(--font-mono); font-size: .8rem; color: var(--accent); margin-bottom: 6px; }
+    .reexport__list {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .reexport__list code {
+      background: var(--bg-tertiary); padding: 2px 8px; border-radius: var(--radius-sm);
+      font-size: .76rem; color: var(--accent-yellow);
+    }
+
+    .detail-pane {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px 18px; min-height: 220px; margin-top: 10px;
+    }
+    .detail-pane__title { color: var(--accent); font-family: var(--font-mono); font-size: 1rem; margin-bottom: 8px; }
+    .detail-pane__role { font-size: .82rem; color: var(--text-secondary); margin-bottom: 12px; }
+    .detail-pane__quote {
+      background: var(--bg-tertiary); border-left: 2px solid var(--accent);
+      padding: 8px 12px; font-size: .8rem; color: var(--text-secondary);
+      font-style: italic; margin: 10px 0 0 0;
+    }
+    .detail-pane__quote--ru {
+      border-left-color: var(--accent-purple);
+      background: rgba(197,134,192,.06);
+      color: var(--text-primary);
+      font-style: normal;
+      margin: 0 0 10px 0;
+      display: flex; gap: 8px; align-items: flex-start;
+    }
+    .detail-pane__quote--ru .ru-tag {
+      font-family: var(--font-mono); font-size: .65rem; font-weight: 700;
+      color: var(--accent-purple); background: rgba(197,134,192,.12);
+      padding: 1px 5px; border-radius: 3px; flex-shrink: 0; margin-top: 2px; letter-spacing: 1px;
+    }
+    .detail-pane__example {
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 10px 14px; font-family: var(--font-mono); font-size: .78rem;
+      white-space: pre; color: var(--text-primary); margin-top: 10px; overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">06 / 106</span>
+      Что внутри: immer · reselect · thunk · redux
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../05-installation-bundle-size/">← Назад</a>
+      <a href="../07-classic-vs-rtk-side-by-side/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO 1: Architecture diagram -->
+    <div class="demo-section">
+      <div class="demo-section__header">RTK как зонтичный пакет</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Кликайте по любой зависимости — справа появится её роль внутри RTK, цитата из документации
+          и фрагмент кода, где RTK её использует.
+        </p>
+        <div class="arch-diagram">
+          <div class="arch-diagram__label">@reduxjs/toolkit (одна внешняя установка)</div>
+          <div class="arch-rtk-wrap">
+            <div class="arch-row">
+              <div class="arch-box" data-dep="redux">
+                <span class="arch-box__ver">^5.0</span>
+                <div class="arch-box__name">redux</div>
+                <div class="arch-box__sub">core: createStore, combineReducers, compose</div>
+              </div>
+              <div class="arch-box" data-dep="immer">
+                <span class="arch-box__ver">^10.0</span>
+                <div class="arch-box__name">immer</div>
+                <div class="arch-box__sub">мутируемая запись → иммутабельный state</div>
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-box" data-dep="reselect">
+                <span class="arch-box__ver">^5.1</span>
+                <div class="arch-box__name">reselect</div>
+                <div class="arch-box__sub">createSelector — мемоизация селекторов</div>
+              </div>
+              <div class="arch-box" data-dep="thunk">
+                <span class="arch-box__ver">^3.1</span>
+                <div class="arch-box__name">redux-thunk</div>
+                <div class="arch-box__sub">middleware для функций как actions</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="dep-detail" class="detail-pane">
+          <div style="color: var(--text-muted); font-size: .85rem; text-align: center; padding-top: 60px;">
+            Кликните на зависимость выше →
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEMO 2: Reexports -->
+    <div class="demo-section">
+      <div class="demo-section__header">Что RTK реэкспортирует напрямую</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Чтобы вы не ставили зависимости отдельно, RTK реэкспортирует ключевые API из каждой:
+        </p>
+        <div class="reexport">
+          <div class="reexport__title">из <code style="color:var(--accent-cyan)">redux</code></div>
+          <div class="reexport__list">
+            <code>compose</code><code>bindActionCreators</code><code>createStore</code>
+            <code>combineReducers</code><code>applyMiddleware</code><code>Action</code><code>Reducer</code>
+          </div>
+        </div>
+        <div class="reexport">
+          <div class="reexport__title">из <code style="color:var(--accent-cyan)">immer</code></div>
+          <div class="reexport__list">
+            <code>produce</code><code>current</code><code>original</code><code>isDraft</code><code>freeze</code>
+          </div>
+        </div>
+        <div class="reexport">
+          <div class="reexport__title">из <code style="color:var(--accent-cyan)">reselect</code></div>
+          <div class="reexport__list">
+            <code>createSelector</code><code>createSelectorCreator</code><code>weakMapMemoize</code><code>lruMemoize</code>
+          </div>
+        </div>
+        <div class="reexport">
+          <div class="reexport__title">из <code style="color:var(--accent-cyan)">redux-thunk</code></div>
+          <div class="reexport__list">
+            <code>thunk</code><code>withExtraArgument</code><code>ThunkAction</code><code>ThunkDispatch</code>
+          </div>
+        </div>
+        <div class="warning" style="margin-top: 12px;">
+          <strong>Никогда</strong> не ставьте immer/reselect/redux-thunk отдельно. Импортируйте всё из <code>@reduxjs/toolkit</code> —
+          получите ту версию, которая <em>совместима</em> с вашей версией RTK.
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Архитектура и зависимости</div>
+      <div class="theory__body">
+        <h3>Дословно из доки</h3>
+        <div class="quote">
+          «The Redux Toolkit package is intended to be the standard way to write Redux logic. It includes utilities to help simplify many common use cases,
+          including <code>store setup</code>, <code>creating reducers and writing immutable update logic</code>,
+          and even <code>creating entire "slices" of state</code> at once.»
+          <br>— <a href="https://redux-toolkit.js.org/introduction/getting-started" target="_blank">Getting Started</a>
+        </div>
+        <div class="quote quote--ru">
+          «Пакет Redux Toolkit задуман как стандартный способ писать Redux-логику. Он включает утилиты, упрощающие
+          многие типичные сценарии, в том числе <code>настройку store</code>, <code>создание reducer'ов и написание
+          иммутабельных обновлений</code>, и даже <code>создание целых «slice'ов» state</code> сразу.»
+        </div>
+
+        <h3>Зачем зонтичный пакет</h3>
+        <p>
+          Раньше для production-приложения нужно было собрать минимум 5 пакетов:
+        </p>
+        <ul>
+          <li><code>redux</code> — core store</li>
+          <li><code>react-redux</code> — биндинги для React</li>
+          <li><code>redux-thunk</code> — async actions</li>
+          <li><code>reselect</code> — мемоизация селекторов</li>
+          <li><code>immer</code> — иммутабельные обновления</li>
+        </ul>
+        <p>
+          Каждая со своими версиями, breaking changes, типами. RTK решает это: <strong>одна установка</strong>, версии
+          под контролем команды Redux, единая документация, согласованные API.
+        </p>
+
+        <h3>Почему именно эти зависимости</h3>
+        <p>
+          Это <em>исторически</em> сложившийся стек best-practice от Дэна Абрамова (создателя Redux) и Марка Эриксона (мейнтейнера).
+          Все 4 библиотеки <strong>тоже мейнтейнятся командой Redux</strong> (immer и reselect — нет, но они стандарт де-факто
+          для Redux-сообщества). RTK — это «упаковка best practices» в один пакет.
+        </p>
+
+        <h3>Совместимость версий</h3>
+        <div class="warning">
+          Если у вас в проекте уже есть <code>immer</code> или <code>reselect</code> отдельно — npm/pnpm могут поставить
+          <em>вторую копию</em> в node_modules. Это опасно: разные инстансы immer не понимают друг друга
+          (<code>isDraft(x)</code> вернёт false для draft из другой копии). Проверьте: <code>npm ls immer</code>.
+        </div>
+
+        <h3>Что НЕ входит в RTK</h3>
+        <ul>
+          <li><code>react-redux</code> — это peer dep (не реэкспортируется напрямую <em>кроме</em> <code>useDispatch/useSelector</code> в /query/react)</li>
+          <li><code>redux-saga</code> — saga middleware, alternative thunk; ставится отдельно</li>
+          <li><code>redux-observable</code> — RxJS-based middleware; отдельно</li>
+          <li><code>redux-persist</code> — для localStorage; отдельно</li>
+          <li><code>redux-form</code>, <code>connected-react-router</code> — отдельно (и устаревшие)</li>
+        </ul>
+
+        <h3>Источник: package.json RTK</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/package.json (дословно)</span>
+<span class="prop">"dependencies"</span>: {
+  <span class="str">"immer"</span>: <span class="str">"^10.0.3"</span>,
+  <span class="str">"redux"</span>: <span class="str">"^5.0.1"</span>,
+  <span class="str">"redux-thunk"</span>: <span class="str">"^3.1.0"</span>,
+  <span class="str">"reselect"</span>: <span class="str">"^5.1.0"</span>
+},
+<span class="prop">"peerDependencies"</span>: {
+  <span class="str">"react"</span>: <span class="str">"^16.9.0 || ^17.0.0 || ^18 || ^19"</span>,
+  <span class="str">"react-redux"</span>: <span class="str">"^7.2.1 || ^8.1.3 || ^9.0.0"</span>
+}
+        </div>
+
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/package.json" target="_blank">
+            packages/toolkit/package.json на GitHub
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

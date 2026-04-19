@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redux Toolkit — Полный курс</title>
+  <link rel="stylesheet" href="./shared/styles.css">
+  <style>
+    .hero {
+      background: linear-gradient(180deg, rgba(86,156,214,.08), transparent 70%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      margin-bottom: 18px;
+    }
+    .hero__title {
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+    }
+    .hero__title span { color: var(--accent); }
+    .hero__sub {
+      color: var(--text-secondary);
+      font-size: .95rem;
+      max-width: 800px;
+      line-height: 1.6;
+    }
+    .hero__meta {
+      display: flex; gap: 18px; margin-top: 14px; flex-wrap: wrap; font-size: .8rem; color: var(--text-muted);
+    }
+    .hero__meta strong { color: var(--accent-cyan); font-family: var(--font-mono); }
+    .hero__links {
+      display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+    }
+    .hero__link {
+      font-size: .8rem; color: var(--accent-blue-bright); text-decoration: none;
+      padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      transition: background .15s;
+    }
+    .hero__link:hover { background: var(--bg-hover); }
+
+    .section-title {
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 26px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-title__count { color: var(--text-muted); margin-left: 8px; font-weight: 400; font-family: var(--font-mono); font-size: .75rem; }
+
+    .index-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 10px;
+    }
+    .index-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color .15s, transform .15s, background .15s;
+      display: block;
+    }
+    .index-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      background: var(--bg-hover);
+    }
+    .index-card__num {
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: .5px;
+    }
+    .index-card__title {
+      color: var(--text-bright);
+      font-weight: 600;
+      font-size: .9rem;
+      margin: 4px 0 4px;
+    }
+    .index-card__desc {
+      color: var(--text-secondary);
+      font-size: .76rem;
+      line-height: 1.5;
+    }
+    .index-card--soon {
+      opacity: .45;
+      pointer-events: none;
+    }
+    .index-card--soon .index-card__title::after {
+      content: ' • soon';
+      color: var(--text-muted);
+      font-size: .7rem;
+      font-weight: 400;
+      font-family: var(--font-mono);
+    }
+
+    .related {
+      display: flex; gap: 10px; margin: 14px 0; flex-wrap: wrap;
+    }
+    .related a {
+      font-size: .78rem; padding: 6px 12px; background: var(--bg-tertiary);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text-secondary); text-decoration: none; transition: background .15s, color .15s;
+    }
+    .related a:hover { background: var(--bg-hover); color: var(--text-bright); }
+    .related a strong { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <svg width="20" height="20" viewBox="0 0 100 100" style="margin-right: 8px; vertical-align: middle;">
+        <circle cx="50" cy="50" r="45" stroke="#764abc" stroke-width="6" fill="none"/>
+        <circle cx="50" cy="50" r="12" fill="#764abc"/>
+      </svg>
+      Redux Toolkit — Полный курс
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">К проекту</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="hero">
+      <div class="hero__title"><span>RTK</span> + RTK Query — глубокое погружение</div>
+      <div class="hero__sub">
+        Курс из 106 интерактивных уроков по официальному инструменту Redux. От первой <code>configureStore</code>
+        до тонкостей <code>createApi</code> с tags, optimistic updates и streaming. Каждый урок —
+        живой пример + теория с цитатами из <a href="https://redux-toolkit.js.org" target="_blank" style="color: var(--accent-blue-bright);">официальной документации</a>
+        и фрагментами исходников <a href="https://github.com/reduxjs/redux-toolkit/tree/master/packages/toolkit/src" target="_blank" style="color: var(--accent-blue-bright);">@reduxjs/toolkit</a>.
+      </div>
+      <div class="hero__meta">
+        <span>Уроков: <strong>106</strong></span>
+        <span>Секций: <strong>13</strong> (A–M)</span>
+        <span>Стек: <strong>React 19 + TS + Vite</strong></span>
+        <span>Версия: <strong>@reduxjs/toolkit 2.5+</strong></span>
+      </div>
+      <div class="related">
+        <a href="../classic-redux/"><strong>← classic-redux</strong> · базовый Redux без RTK</a>
+        <a href="../react-redux/"><strong>← react-redux</strong> · биндинги для React</a>
+      </div>
+    </div>
+
+    <!-- ============ SECTION A ============ -->
+    <div class="section-title">A. Введение и мотивация <span class="section-title__count">7 уроков</span></div>
+    <div class="index-grid">
+      <a href="./01-what-is-rtk/" class="index-card">
+        <div class="index-card__num">01</div>
+        <div class="index-card__title">Что такое Redux Toolkit</div>
+        <div class="index-card__desc">3 проблемы → 3 решения, counter classic vs RTK</div>
+      </a>
+      <a href="./02-pain-of-classic/" class="index-card">
+        <div class="index-card__num">02</div>
+        <div class="index-card__title">3 проблемы классики</div>
+        <div class="index-card__desc">Setup / packages / boilerplate side-by-side</div>
+      </a>
+      <a href="./03-whats-included/" class="index-card">
+        <div class="index-card__num">03</div>
+        <div class="index-card__title">Что входит в RTK</div>
+        <div class="index-card__desc">Интерактивная карта всех API пакета</div>
+      </a>
+      <a href="./04-entry-points/" class="index-card">
+        <div class="index-card__num">04</div>
+        <div class="index-card__title">Точки входа пакета</div>
+        <div class="index-card__desc">/toolkit · /query · /query/react — кто что экспортирует</div>
+      </a>
+      <a href="./05-installation-bundle-size/" class="index-card">
+        <div class="index-card__num">05</div>
+        <div class="index-card__title">Установка и bundle size</div>
+        <div class="index-card__desc">npm install, peer deps, размер 17/19 kB</div>
+      </a>
+      <a href="./06-architecture-deps/" class="index-card">
+        <div class="index-card__num">06</div>
+        <div class="index-card__title">Что внутри: immer, reselect, thunk</div>
+        <div class="index-card__desc">Стек зависимостей и реэкспорты</div>
+      </a>
+      <a href="./07-classic-vs-rtk-side-by-side/" class="index-card">
+        <div class="index-card__num">07</div>
+        <div class="index-card__title">Counter side-by-side</div>
+        <div class="index-card__desc">Полное сравнение classic + react-redux vs RTK</div>
+      </a>
+    </div>
+
+    <!-- ============ SECTION B ============ -->
+    <div class="section-title">B. configureStore изнутри <span class="section-title__count">12 уроков</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">08</div><div class="index-card__title">configureStore базово</div><div class="index-card__desc">Первый store через configureStore</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">09</div><div class="index-card__title">configureStore vs createStore</div><div class="index-card__desc">Что делает обёртка внутри</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">10</div><div class="index-card__title">Параметр reducer</div><div class="index-card__desc">Функция vs объект-карта slices</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">11</div><div class="index-card__title">getDefaultMiddleware</div><div class="index-card__desc">Что включено по умолчанию</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">12</div><div class="index-card__title">immutableStateInvariantMiddleware</div><div class="index-card__desc">Deep dive в исходник</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">13</div><div class="index-card__title">serializableStateInvariantMiddleware</div><div class="index-card__desc">findNonSerializableValue</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">14</div><div class="index-card__title">actionCreatorInvariantMiddleware</div><div class="index-card__desc">Защита от dispatch(actionCreator)</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">15</div><div class="index-card__title">getDefaultEnhancers + autoBatch</div><div class="index-card__desc">autoBatchEnhancer по умолчанию</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">16</div><div class="index-card__title">Tuple для типизации</div><div class="index-card__desc">Почему массив не работает в TS</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">17</div><div class="index-card__title">Опция devTools</div><div class="index-card__desc">trace, predicate, actionsDenylist</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">18</div><div class="index-card__title">preloadedState</div><div class="index-card__desc">Hydration из localStorage</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">19</div><div class="index-card__title">RootState и AppDispatch</div><div class="index-card__desc">Типизация store, withTypes</div></a>
+    </div>
+
+    <!-- ============ SECTION C ============ -->
+    <div class="section-title">C. createAction и createReducer <span class="section-title__count">8 уроков</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">20</div><div class="index-card__title">createAction(type)</div><div class="index-card__desc">Базовый action creator</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">21</div><div class="index-card__title">createAction с payload</div><div class="index-card__desc">Generic payload type</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">22</div><div class="index-card__title">prepare callback</div><div class="index-card__desc">Кастомизация payload, nanoid</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">23</div><div class="index-card__title">nanoid, isAnyOf, isAllOf</div><div class="index-card__desc">Утилиты-matchers</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">24</div><div class="index-card__title">createReducer (builder)</div><div class="index-card__desc">addCase, builder API</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">25</div><div class="index-card__title">addMatcher, addDefaultCase</div><div class="index-card__desc">Сводный matcher</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">26</div><div class="index-card__title">Immer внутри createReducer</div><div class="index-card__desc">Как работает produce</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">27</div><div class="index-card__title">Подводные камни Immer</div><div class="index-card__desc">return + mutate, current/original</div></a>
+    </div>
+
+    <!-- ============ SECTION D ============ -->
+    <div class="section-title">D. createSlice глубоко <span class="section-title__count">13 уроков</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">28</div><div class="index-card__title">Первая slice</div><div class="index-card__desc">name + initialState + reducers</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">29</div><div class="index-card__title">Auto-генерация типов</div><div class="index-card__desc">${name}/${reducerKey}</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">30</div><div class="index-card__title">Prepared reducer в slice</div><div class="index-card__desc">{ reducer, prepare }</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">31</div><div class="index-card__title">extraReducers (builder)</div><div class="index-card__desc">Слушаем чужие actions</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">32</div><div class="index-card__title">Reducers как callback</div><div class="index-card__desc">create.reducer/preparedReducer/asyncThunk</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">33</div><div class="index-card__title">slice.selectors</div><div class="index-card__desc">getSelectors, прибинденные селекторы</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">34</div><div class="index-card__title">combineSlices</div><div class="index-card__desc">Замена combineReducers</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">35</div><div class="index-card__title">Lazy injection slices</div><div class="index-card__desc">.inject() для code-splitting</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">36</div><div class="index-card__title">slice.injectInto, WithSlice</div><div class="index-card__desc">Типизация injected state</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">37</div><div class="index-card__title">reducerPath ≠ name</div><div class="index-card__desc">Разница имени и пути</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">38</div><div class="index-card__title">Правила Immer-reducer</div><div class="index-card__desc">Quiz: можно/нельзя</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">39</div><div class="index-card__title">Pattern: slice per feature</div><div class="index-card__desc">Структура папок</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">40</div><div class="index-card__title">current() и original()</div><div class="index-card__desc">Дебаг draft state</div></a>
+    </div>
+
+    <!-- ============ SECTION E ============ -->
+    <div class="section-title">E. Selectors в RTK <span class="section-title__count">5 уроков</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">41</div><div class="index-card__title">createSelector из RTK</div><div class="index-card__desc">Re-export reselect</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">42</div><div class="index-card__title">createDraftSafeSelector</div><div class="index-card__desc">Safe внутри Immer-reducer</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">43</div><div class="index-card__title">weakMapMemoize</div><div class="index-card__desc">Аргументированные селекторы</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">44</div><div class="index-card__title">Memoized selectors в slice</div><div class="index-card__desc">slice.selectors + createSelector</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">45</div><div class="index-card__title">Типизация селекторов</div><div class="index-card__desc">useAppSelector + slice.selectors</div></a>
+    </div>
+
+    <!-- ============ SECTION F ============ -->
+    <div class="section-title">F. createEntityAdapter <span class="section-title__count">8 уроков</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">46</div><div class="index-card__title">Зачем нормализация</div><div class="index-card__desc">O(n) vs O(1) lookup</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">47</div><div class="index-card__title">createEntityAdapter база</div><div class="index-card__desc">Первый adapter</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">48</div><div class="index-card__title">EntityState shape</div><div class="index-card__desc">{ ids, entities } внутри</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">49</div><div class="index-card__title">addOne / setOne / upsertOne</div><div class="index-card__desc">Различия CRUD-методов</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">50</div><div class="index-card__title">updateOne shallow gotcha</div><div class="index-card__desc">Подводный камень nested</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">51</div><div class="index-card__title">selectId, sortComparer</div><div class="index-card__desc">Кастомный id и сортировка</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">52</div><div class="index-card__title">getSelectors</div><div class="index-card__desc">selectAll, selectById, ...</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">53</div><div class="index-card__title">Adapter + loading state</div><div class="index-card__desc">getInitialState({ loading })</div></a>
+    </div>
+
+    <!-- ============ SECTION G ============ -->
+    <div class="section-title">G. createAsyncThunk <span class="section-title__count">10 уроков</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">54</div><div class="index-card__title">Зачем нужен thunk</div><div class="index-card__desc">State machine pending/fulfilled/rejected</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">55</div><div class="index-card__title">createAsyncThunk база</div><div class="index-card__desc">Первый async thunk</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">56</div><div class="index-card__title">3 action creators</div><div class="index-card__desc">.pending/.fulfilled/.rejected</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">57</div><div class="index-card__title">extraReducers для thunk</div><div class="index-card__desc">addCase на life-cycle</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">58</div><div class="index-card__title">thunkAPI: dispatch, getState, signal</div><div class="index-card__desc">Все методы аргумента</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">59</div><div class="index-card__title">rejectWithValue</div><div class="index-card__desc">Типизированные ошибки</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">60</div><div class="index-card__title">condition</div><div class="index-card__desc">Отмена до старта</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">61</div><div class="index-card__title">Cancellation через signal</div><div class="index-card__desc">AbortController, thunk.abort()</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">62</div><div class="index-card__title">action.meta: requestId, arg</div><div class="index-card__desc">Race condition guard</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">63</div><div class="index-card__title">create.asyncThunk в slice</div><div class="index-card__desc">Всё в одном файле</div></a>
+    </div>
+
+    <!-- ============ SECTION H ============ -->
+    <div class="section-title">H. listenerMiddleware <span class="section-title__count">7 уроков</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">64</div><div class="index-card__title">Зачем listener</div><div class="index-card__desc">vs saga / observable / thunk</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">65</div><div class="index-card__title">Подключение к store</div><div class="index-card__desc">prepend(listener.middleware)</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">66</div><div class="index-card__title">startListening: 4 формы</div><div class="index-card__desc">actionCreator/type/matcher/predicate</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">67</div><div class="index-card__title">listenerApi полный</div><div class="index-card__desc">take, condition, fork, cancel, ...</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">68</div><div class="index-card__title">fork() и ChildTaskAPI</div><div class="index-card__desc">Long-running fork с cancellation</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">69</div><div class="index-card__title">Debounce / throttle / takeLatest</div><div class="index-card__desc">Common patterns</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">70</div><div class="index-card__title">Типизация addAppListener</div><div class="index-card__desc">withTypes для type-safe effects</div></a>
+    </div>
+
+    <!-- ============ SECTION I ============ -->
+    <div class="section-title">I. Утилиты RTK <span class="section-title__count">4 урока</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">71</div><div class="index-card__title">autoBatchEnhancer deep</div><div class="index-card__desc">raf / tick / timer / callback</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">72</div><div class="index-card__title">isPlainObject, isAction, ...</div><div class="index-card__desc">Маленькие утилиты</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">73</div><div class="index-card__title">Все matchers сводно</div><div class="index-card__desc">Таблица + примеры</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">74</div><div class="index-card__title">Sequential vs parallel thunks</div><div class="index-card__desc">await / Promise.all / race</div></a>
+    </div>
+
+    <!-- ============ SECTION J ============ -->
+    <div class="section-title">J. Сравнение Classic vs RTK vs RTK Query <span class="section-title__count">4 урока</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">75</div><div class="index-card__title">Counter в трёх вариантах</div><div class="index-card__desc">classic / RTK / RTK Query</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">76</div><div class="index-card__title">Async todos в трёх вариантах</div><div class="index-card__desc">Полный цикл загрузки</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">77</div><div class="index-card__title">Гайд миграции</div><div class="index-card__desc">5 шагов: classic → RTK</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">78</div><div class="index-card__title">RTK / RTKQ / react-query / useState</div><div class="index-card__desc">Decision tree</div></a>
+    </div>
+
+    <!-- ============ SECTION K ============ -->
+    <div class="section-title">K. RTK Query — основы <span class="section-title__count">10 уроков</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">79</div><div class="index-card__title">Что такое RTK Query</div><div class="index-card__desc">Зачем и какие фичи</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">80</div><div class="index-card__title">Первый createApi</div><div class="index-card__desc">Pokemon API endpoint</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">81</div><div class="index-card__title">Подключение к store</div><div class="index-card__desc">api.reducer + api.middleware</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">82</div><div class="index-card__title">useGetXQuery hook</div><div class="index-card__desc">data, isLoading, isFetching, refetch</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">83</div><div class="index-card__title">Cache key</div><div class="index-card__desc">serializeQueryArgs, дедупликация</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">84</div><div class="index-card__title">state.api shape</div><div class="index-card__desc">queries/mutations/subs/provided/config</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">85</div><div class="index-card__title">fetchBaseQuery</div><div class="index-card__desc">prepareHeaders, paramsSerializer, ...</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">86</div><div class="index-card__title">Mutations</div><div class="index-card__desc">useAddXMutation</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">87</div><div class="index-card__title">Tags: provides/invalidates</div><div class="index-card__desc">Auto-refetch</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">88</div><div class="index-card__title">Granular tags + LIST</div><div class="index-card__desc">{ type, id }</div></a>
+    </div>
+
+    <!-- ============ SECTION L ============ -->
+    <div class="section-title">L. RTK Query — продвинутое <span class="section-title__count">15 уроков</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">89</div><div class="index-card__title">transformResponse / Error</div><div class="index-card__desc">Преобразование данных</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">90</div><div class="index-card__title">selectFromResult</div><div class="index-card__desc">Оптимизация ререндеров</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">91</div><div class="index-card__title">skip, polling, refetch options</div><div class="index-card__desc">Все опции hook</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">92</div><div class="index-card__title">keepUnusedDataFor</div><div class="index-card__desc">Cache cleanup механизм</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">93</div><div class="index-card__title">Optimistic updates</div><div class="index-card__desc">onQueryStarted + updateQueryData</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">94</div><div class="index-card__title">Streaming (websocket)</div><div class="index-card__desc">onCacheEntryAdded</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">95</div><div class="index-card__title">Manual cache control</div><div class="index-card__desc">prefetch, upsert, patch+undo</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">96</div><div class="index-card__title">data vs currentData</div><div class="index-card__desc">isLoading vs isFetching</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">97</div><div class="index-card__title">Error handling + retry</div><div class="index-card__desc">FetchBaseQueryError</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">98</div><div class="index-card__title">Custom baseQuery</div><div class="index-card__desc">axios / graphql-request</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">99</div><div class="index-card__title">Code splitting</div><div class="index-card__desc">injectEndpoints</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">100</div><div class="index-card__title">Infinite queries</div><div class="index-card__desc">build.infiniteQuery</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">101</div><div class="index-card__title">useQuery internals</div><div class="index-card__desc">Что происходит под капотом</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">102</div><div class="index-card__title">Полная типизация RTKQ</div><div class="index-card__desc">TypedUseQueryHookResult</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">103</div><div class="index-card__title">RTKQ vs react-query / SWR</div><div class="index-card__desc">Comparison table</div></a>
+    </div>
+
+    <!-- ============ SECTION M ============ -->
+    <div class="section-title">M. Паттерны и финал <span class="section-title__count">3 урока</span></div>
+    <div class="index-grid">
+      <a class="index-card index-card--soon"><div class="index-card__num">104</div><div class="index-card__title">Mini real-world app</div><div class="index-card__desc">Books: всё RTK + RTKQ вместе</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">105</div><div class="index-card__title">Топ-15 подводных камней</div><div class="index-card__desc">Cheatsheet</div></a>
+      <a class="index-card index-card--soon"><div class="index-card__num">106</div><div class="index-card__title">Куда дальше</div><div class="index-card__desc">Curated resources</div></a>
+    </div>
+  </div>
+</body>
+</html>

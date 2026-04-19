@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>02 — 3 проблемы классического Redux</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 14px; gap: 2px; }
+    .tab { padding: 10px 18px; background: none; border: none; cursor: pointer; color: var(--text-secondary);
+           font-size: .85rem; font-weight: 600; border-bottom: 2px solid transparent;
+           transition: color .15s, border-color .15s; font-family: var(--font-sans); }
+    .tab:hover { color: var(--text-bright); }
+    .tab--active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel--active { display: block; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 1000px) { .split { grid-template-columns: 1fr; } }
+    .col { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .col__head { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: .76rem;
+                 font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+                 display: flex; justify-content: space-between; align-items: center; }
+    .col__head--bad { background: rgba(244,71,71,.08); color: var(--accent-red); }
+    .col__head--good { background: rgba(76,175,80,.08); color: var(--success); }
+    .col__head .lc { font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted); }
+    .col__body pre { margin: 0; padding: 14px; overflow-x: auto; font-family: var(--font-mono);
+                      font-size: .74rem; line-height: 1.6; color: var(--text-primary); white-space: pre; }
+    .pain-summary { padding: 12px 16px; background: rgba(244,71,71,.06); border-left: 3px solid var(--accent-red);
+                     border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-bottom: 14px; font-size: .88rem; }
+    .pain-summary strong { color: var(--accent-red); }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+    @media (max-width: 700px) { .metrics { grid-template-columns: 1fr 1fr; } }
+    .metric { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+              padding: 10px 12px; }
+    .metric__label { font-size: .68rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: .5px; }
+    .metric__value { font-family: var(--font-mono); color: var(--accent-cyan); font-size: 1.1rem; font-weight: 700; margin-top: 4px; }
+    .metric__delta { font-size: .7rem; color: var(--success); margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">02 / 106</span>
+      3 проблемы классического Redux
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../01-what-is-rtk/">← Назад</a>
+      <a href="../03-whats-included/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Боли классики vs лекарства RTK</div>
+      <div class="demo-section__body">
+        <div class="tabs">
+          <button class="tab tab--active" data-tab="setup">1. Сложный setup</button>
+          <button class="tab" data-tab="packages">2. Много пакетов</button>
+          <button class="tab" data-tab="boilerplate">3. Boilerplate</button>
+        </div>
+
+        <!-- TAB 1 -->
+        <div class="tab-panel tab-panel--active" data-panel="setup">
+          <div class="pain-summary">
+            <strong>Боль:</strong> чтобы поднять production-ready store, нужно вручную собрать combineReducers,
+            applyMiddleware, composeEnhancers, подключить DevTools-extension и thunk. 25+ строк только на инфраструктуру.
+          </div>
+          <div class="split">
+            <div class="col">
+              <div class="col__head col__head--bad">Classic Redux <span class="lc">~28 строк</span></div>
+              <div class="col__body">
+<pre>import { createStore, combineReducers,
+         applyMiddleware, compose } from 'redux'
+import thunk from 'redux-thunk'
+import logger from 'redux-logger'
+import counterReducer from './counter'
+import todosReducer from './todos'
+
+const rootReducer = combineReducers({
+  counter: counterReducer,
+  todos: todosReducer,
+})
+
+const composeEnhancers =
+  (window as any).__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
+  || compose
+
+const store = createStore(
+  rootReducer,
+  /* preloadedState */ undefined,
+  composeEnhancers(
+    applyMiddleware(thunk, logger)
+  )
+)
+
+// Без проверок на immutability!
+// Без проверок на serializability!
+// devtools-extension не подключится без window-проверки.</pre>
+              </div>
+            </div>
+            <div class="col">
+              <div class="col__head col__head--good">Redux Toolkit <span class="lc">~9 строк</span></div>
+              <div class="col__body">
+<pre>import { configureStore } from '@reduxjs/toolkit'
+import counterReducer from './counter'
+import todosReducer from './todos'
+import logger from 'redux-logger'
+
+const store = configureStore({
+  reducer: {
+    counter: counterReducer,
+    todos: todosReducer,
+  },
+  middleware: (gdm) =&gt; gdm().concat(logger),
+})
+
+// thunk + immutability check + serializability check
+// + actionCreator check + autoBatch + DevTools — ВСЁ автоматически.</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2 -->
+        <div class="tab-panel" data-panel="packages">
+          <div class="pain-summary">
+            <strong>Боль:</strong> 6 отдельных пакетов в package.json. Версии нужно следить — например при выходе redux 5
+            нужно убедиться, что redux-thunk и react-redux совместимы.
+          </div>
+          <div class="split">
+            <div class="col">
+              <div class="col__head col__head--bad">package.json (классика)</div>
+              <div class="col__body">
+<pre>{
+  "dependencies": {
+    "redux": "^5.0.1",
+    "react-redux": "^9.2.0",
+    "redux-thunk": "^3.1.0",
+    "reselect": "^5.1.1",
+    "immer": "^11.1.4",
+    "redux-devtools-extension": "^2.13.9"
+  }
+}</pre>
+              </div>
+            </div>
+            <div class="col">
+              <div class="col__head col__head--good">package.json (RTK)</div>
+              <div class="col__body">
+<pre>{
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.5.0",
+    "react-redux": "^9.2.0"
+  }
+}
+
+// Внутри @reduxjs/toolkit:
+//   • redux 5 (peer)
+//   • immer (bundled)
+//   • reselect (re-exported)
+//   • redux-thunk (bundled, по умолчанию)
+//   • RTK Query (отдельный entry point)
+//   • DevTools enhancer (встроен)
+</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3 -->
+        <div class="tab-panel" data-panel="boilerplate">
+          <div class="pain-summary">
+            <strong>Боль:</strong> для каждого action — константа + creator + кейс в switch + spread-копирование.
+            Минимальный todos-slice занимает 50+ строк. RTK генерирует всё это из объекта.
+          </div>
+          <div class="split">
+            <div class="col">
+              <div class="col__head col__head--bad">todos.ts (классика) <span class="lc">~52 строки</span></div>
+              <div class="col__body">
+<pre>const ADD = 'todos/added'
+const TOGGLE = 'todos/toggled'
+const REMOVE = 'todos/removed'
+
+let nextId = 1
+export const addTodo = (text) =&gt;
+  ({ type: ADD, payload: { id: nextId++, text, done: false } })
+export const toggleTodo = (id) =&gt;
+  ({ type: TOGGLE, payload: id })
+export const removeTodo = (id) =&gt;
+  ({ type: REMOVE, payload: id })
+
+const initial = []
+
+export default function todos(state = initial, action) {
+  switch (action.type) {
+    case ADD:
+      return [...state, action.payload]
+    case TOGGLE:
+      return state.map(t =&gt;
+        t.id === action.payload
+          ? { ...t, done: !t.done }
+          : t
+      )
+    case REMOVE:
+      return state.filter(t =&gt; t.id !== action.payload)
+    default:
+      return state
+  }
+}
+// + забываем, что nextId вне reducer ломает HMR/SSR.
+// + забываем про immutability check.</pre>
+              </div>
+            </div>
+            <div class="col">
+              <div class="col__head col__head--good">todosSlice.ts (RTK) <span class="lc">~22 строки</span></div>
+              <div class="col__body">
+<pre>import { createSlice, nanoid, PayloadAction } from '@reduxjs/toolkit'
+
+interface Todo { id: string; text: string; done: boolean }
+
+const todosSlice = createSlice({
+  name: 'todos',
+  initialState: [] as Todo[],
+  reducers: {
+    addTodo: {
+      reducer(state, action: PayloadAction&lt;Todo&gt;) {
+        state.push(action.payload) // mutating через Immer!
+      },
+      prepare(text: string) {
+        return { payload: { id: nanoid(), text, done: false } }
+      },
+    },
+    toggleTodo(state, { payload: id }: PayloadAction&lt;string&gt;) {
+      const t = state.find(t =&gt; t.id === id)
+      if (t) t.done = !t.done
+    },
+    removeTodo(state, { payload: id }: PayloadAction&lt;string&gt;) {
+      return state.filter(t =&gt; t.id !== id)
+    },
+  },
+})
+
+export const { addTodo, toggleTodo, removeTodo } = todosSlice.actions
+export default todosSlice.reducer</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric__label">Строк (todos)</div>
+            <div class="metric__value">52 → 22</div>
+            <div class="metric__delta">−58%</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">Строк (store setup)</div>
+            <div class="metric__value">28 → 9</div>
+            <div class="metric__delta">−68%</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">Пакетов</div>
+            <div class="metric__value">6 → 1</div>
+            <div class="metric__delta">−83%</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">Action types</div>
+            <div class="metric__value">3 → 0</div>
+            <div class="metric__delta">авто</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Почему RTK существует</div>
+      <div class="theory__body">
+        <h3>Дословно из документации</h3>
+        <div class="quote">
+          «It was originally created to help address three common concerns about Redux:
+          <ul>
+            <li>"Configuring a Redux store is too complicated"</li>
+            <li>"I have to add a lot of packages to get Redux to do anything useful"</li>
+            <li>"Redux requires too much boilerplate code"</li>
+          </ul>
+          We can't solve every use case, but in the spirit of create-react-app, we can try to provide some tools that
+          abstract over the setup process and handle the most common use cases.»
+          <br>— <a href="https://redux-toolkit.js.org/introduction/getting-started#purpose" target="_blank">Getting Started — Purpose</a>
+        </div>
+        <div class="quote quote--ru">
+          «Изначально RTK был создан, чтобы решить три типичные жалобы на Redux:
+          <ul>
+            <li>«Настройка Redux store слишком сложная»</li>
+            <li>«Чтобы получить от Redux хоть какую-то пользу, приходится ставить много пакетов»</li>
+            <li>«Redux требует слишком много шаблонного кода»</li>
+          </ul>
+          Мы не можем решить все задачи сразу, но в духе create-react-app можем дать инструменты,
+          которые абстрагируют процесс настройки и закрывают самые частые сценарии.»
+        </div>
+
+        <h3>Боль 1 — Setup</h3>
+        <p>
+          Классический <code>createStore</code> требует ручной композиции: <code>combineReducers</code> для нескольких
+          slice'ов, <code>applyMiddleware</code> для middleware, <code>compose</code> для соединения нескольких enhancer'ов,
+          и обязательная проверка <code>window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__</code>.
+        </p>
+        <p>
+          В RTK <code>configureStore</code> делает всё это за вас плюс добавляет <strong>4 default middleware</strong>:
+        </p>
+        <ul>
+          <li><code>redux-thunk</code> — для асинхронной логики (по умолчанию)</li>
+          <li><code>immutableStateInvariantMiddleware</code> — ловит мутации state в reducer'ах (только dev)</li>
+          <li><code>serializableStateInvariantMiddleware</code> — ловит несериализуемые значения в state/action (только dev)</li>
+          <li><code>actionCreatorInvariantMiddleware</code> — ловит вызов <code>dispatch(actionCreator)</code> вместо <code>dispatch(actionCreator())</code> (только dev)</li>
+        </ul>
+        <p>
+          Плюс автоматически подключает Redux DevTools и <code>autoBatchEnhancer</code>. Подробно об этом — уроки 11-15.
+        </p>
+
+        <h3>Боль 2 — Зоопарк пакетов</h3>
+        <p>
+          Чтобы получить полный набор инструментов в классике, нужно установить и согласовать версии:
+          <code>redux</code>, <code>redux-thunk</code>, <code>reselect</code>, <code>immer</code>,
+          <code>redux-devtools-extension</code> (или composeWithDevTools).
+          В RTK все эти зависимости либо bundled, либо peer, либо re-exported из <code>@reduxjs/toolkit</code>.
+          См. <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/package.json" target="_blank">packages/toolkit/package.json</a>.
+        </p>
+
+        <h3>Боль 3 — Boilerplate</h3>
+        <p>
+          В классическом Redux одно "событие" требует:
+        </p>
+        <ol>
+          <li>Константу для <code>action.type</code> (защита от опечаток)</li>
+          <li>Action creator (фабрика action-объекта)</li>
+          <li>Case в reducer'е</li>
+          <li>Spread-копирование для иммутабельного обновления</li>
+        </ol>
+        <p>
+          В RTK один ключ в объекте <code>reducers:</code> — это и action type (генерируется как <code>${name}/${key}</code>),
+          и action creator (доступен через <code>slice.actions.key</code>), и case-reducer. Плюс Immer позволяет писать
+          мутирующий код, который RTK конвертирует в immutable update.
+        </p>
+
+        <div class="quote">
+          «createSlice accepts an object of reducer functions, a slice name, and an initial state value, and
+          automatically generates a slice reducer with corresponding action creators and action types.»
+          <br>— <a href="https://redux-toolkit.js.org/introduction/getting-started#whats-included" target="_blank">What's Included</a>
+        </div>
+        <div class="quote quote--ru">
+          «createSlice принимает объект reducer-функций, имя slice и начальное значение state,
+          и автоматически генерирует slice-reducer вместе с соответствующими action creators и action types.»
+        </div>
+
+        <h3>Связь с уроками классики</h3>
+        <p>
+          Если вы прошли курс <a href="../../classic-redux/">classic-redux</a>, вы видели каждую из этих болей вживую:
+        </p>
+        <ul>
+          <li>Setup → <a href="../../classic-redux/36-create-store/">36-create-store</a>, <a href="../../classic-redux/57-middleware-apply/">57-middleware-apply</a></li>
+          <li>Boilerplate todos → <a href="../../classic-redux/29-reducer-multiple-actions/">29-reducer-multiple-actions</a></li>
+          <li>Иммутабельные обновления → <a href="../../classic-redux/24-reducer-immutable-nested/">24-reducer-immutable-nested</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

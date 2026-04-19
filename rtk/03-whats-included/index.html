@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03 — Что входит в Redux Toolkit</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .api-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0;
+    }
+    @media (max-width: 1000px) { .api-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 700px) { .api-grid { grid-template-columns: 1fr; } }
+    .api-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px; cursor: pointer; transition: border-color .15s, transform .15s, background .15s;
+    }
+    .api-card:hover { border-color: var(--accent); transform: translateY(-2px); background: var(--bg-hover); }
+    .api-card--active { border-color: var(--accent); background: rgba(86,156,214,.06); }
+    .api-card__name { font-family: var(--font-mono); color: var(--accent-yellow); font-size: .92rem; font-weight: 700; margin-bottom: 4px; }
+    .api-card__cat { display: inline-block; font-size: .65rem; padding: 2px 6px; border-radius: 8px;
+                     text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+    .api-card__cat--core { background: rgba(86,156,214,.15); color: var(--accent); }
+    .api-card__cat--util { background: rgba(206,145,120,.15); color: var(--accent-orange); }
+    .api-card__cat--query { background: rgba(197,134,192,.15); color: var(--accent-purple); }
+    .api-card__short { font-size: .78rem; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; }
+    .detail-pane {
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 18px; margin-top: 8px; min-height: 200px;
+    }
+    .detail-pane__name { font-family: var(--font-mono); color: var(--accent-yellow); font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+    .detail-pane__sig { font-family: var(--font-mono); font-size: .82rem; color: var(--accent-cyan);
+                         background: var(--bg-panel); padding: 8px 12px; border-radius: var(--radius-sm);
+                         margin: 8px 0; overflow-x: auto; white-space: pre; }
+    .detail-pane__desc { font-size: .88rem; color: var(--text-primary); margin: 8px 0; line-height: 1.6; }
+    .detail-pane__quote { border-left: 3px solid var(--accent); padding: 10px 14px;
+                           background: rgba(86,156,214,.06); margin: 10px 0; font-size: .82rem;
+                           color: var(--text-secondary); font-style: italic; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+    .detail-pane__lesson { margin-top: 10px; font-size: .8rem; color: var(--text-muted); }
+    .detail-pane__lesson a { color: var(--accent-blue-bright); text-decoration: none; }
+    .detail-pane__lesson a:hover { text-decoration: underline; }
+    .detail-pane__empty { color: var(--text-muted); text-align: center; padding: 40px 20px; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">03 / 106</span>
+      Что входит в @reduxjs/toolkit
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../02-pain-of-classic/">← Назад</a>
+      <a href="../04-entry-points/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интерактивная карта API — кликните карточку</div>
+      <div class="demo-section__body">
+        <div class="api-grid" id="api-grid"></div>
+
+        <div class="detail-pane" id="detail-pane">
+          <div class="detail-pane__empty">Кликните любую карточку выше — здесь появится подробное описание.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Полный список API</div>
+      <div class="theory__body">
+        <h3>Дословный список из доки</h3>
+        <div class="quote">
+          «Redux Toolkit includes these APIs: configureStore, createReducer, createAction, createSlice, combineSlices,
+          createAsyncThunk, createEntityAdapter, and the createSelector utility from Reselect, re-exported for ease of use.»
+          <br>— <a href="https://redux-toolkit.js.org/introduction/getting-started#whats-included" target="_blank">Getting Started — What's Included</a>
+        </div>
+        <div class="quote quote--ru">
+          «Redux Toolkit включает следующие API: configureStore, createReducer, createAction, createSlice, combineSlices,
+          createAsyncThunk, createEntityAdapter, а также утилиту createSelector из Reselect, реэкспортированную для удобства.»
+        </div>
+
+        <h3>Категории</h3>
+        <ul>
+          <li><strong>Store setup:</strong> <code>configureStore</code>, <code>combineSlices</code>, <code>autoBatchEnhancer</code></li>
+          <li><strong>Reducers &amp; actions:</strong> <code>createSlice</code>, <code>createReducer</code>, <code>createAction</code></li>
+          <li><strong>Async &amp; side effects:</strong> <code>createAsyncThunk</code>, <code>createListenerMiddleware</code></li>
+          <li><strong>Normalized state:</strong> <code>createEntityAdapter</code></li>
+          <li><strong>Selectors:</strong> <code>createSelector</code> (re-export), <code>createDraftSafeSelector</code></li>
+          <li><strong>Utilities:</strong> <code>nanoid</code>, <code>isAllOf</code>, <code>isAnyOf</code>, <code>isPending</code>, <code>isFulfilled</code>, <code>isRejected</code>, <code>miniSerializeError</code>, <code>Tuple</code></li>
+          <li><strong>RTK Query (через <code>/query</code> и <code>/query/react</code>):</strong> <code>createApi</code>, <code>fetchBaseQuery</code>, <code>setupListeners</code>, <code>retry</code>, <code>ApiProvider</code></li>
+        </ul>
+
+        <h3>Где смотреть исходники</h3>
+        <p>
+          Вся реализация открыта на GitHub:
+          <a href="https://github.com/reduxjs/redux-toolkit/tree/master/packages/toolkit/src" target="_blank">packages/toolkit/src</a>.
+          В уроках "deep dive" (12-15, 26, 51, 84, 92, 101) мы будем напрямую цитировать фрагменты этих файлов.
+        </p>
+
+        <h3>Что не входит (но связано)</h3>
+        <ul>
+          <li><code>react-redux</code> — отдельный peer-пакет, нужен для <code>useSelector</code>/<code>useDispatch</code>/<code>Provider</code>.</li>
+          <li><code>redux</code> — peer-зависимость; <code>configureStore</code> внутри использует его <code>createStore</code> и <code>combineReducers</code>.</li>
+          <li><code>immer</code>, <code>reselect</code> — bundled, не нужно ставить отдельно.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

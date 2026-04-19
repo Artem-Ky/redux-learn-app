@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01 — Что такое Redux Toolkit?</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .pain-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      margin: 14px 0;
+    }
+    @media (max-width: 900px) { .pain-grid { grid-template-columns: 1fr; } }
+    .pain-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      transition: border-color .2s, transform .2s;
+    }
+    .pain-card--pain { border-left: 3px solid var(--accent-red); }
+    .pain-card--cure { border-left: 3px solid var(--success); }
+    .pain-card__title { font-weight: 600; color: var(--text-bright); margin-bottom: 6px; font-size: .92rem; }
+    .pain-card__text { font-size: .82rem; color: var(--text-secondary); line-height: 1.55; }
+    .pain-card__api { display: inline-block; margin-top: 8px; font-family: var(--font-mono); font-size: .72rem;
+                      color: var(--accent); background: rgba(86,156,214,.1); padding: 2px 8px; border-radius: 3px; }
+    .vs-arrow { color: var(--text-muted); font-size: 1.4rem; text-align: center; margin: 8px 0 0; }
+    .compare-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 900px) { .compare-wrap { grid-template-columns: 1fr; } }
+    .compare-col { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .compare-col__head { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: .78rem;
+                          font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .compare-col__head--classic { background: rgba(244,71,71,.08); color: var(--accent-red); }
+    .compare-col__head--rtk { background: rgba(76,175,80,.08); color: var(--success); }
+    .compare-col__body { padding: 0; }
+    .compare-col__body pre { padding: 14px; margin: 0; overflow-x: auto; font-family: var(--font-mono);
+                             font-size: .76rem; line-height: 1.55; color: var(--text-primary); white-space: pre; }
+    .compare-col__stat { padding: 8px 12px; border-top: 1px solid var(--border); font-size: .75rem;
+                          color: var(--text-secondary); display: flex; justify-content: space-between; }
+    .compare-col__stat strong { color: var(--accent-cyan); font-family: var(--font-mono); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">01 / 106</span>
+      Что такое Redux Toolkit?
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <span class="current">01</span>
+      <a href="../02-pain-of-classic/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO 1 — pain → cure -->
+    <div class="demo-section">
+      <div class="demo-section__header">3 проблемы Redux → 3 решения RTK</div>
+      <div class="demo-section__body">
+        <div class="pain-grid">
+          <div class="pain-card pain-card--pain">
+            <div class="pain-card__title">😖 Setup слишком сложный</div>
+            <div class="pain-card__text">createStore + combineReducers + applyMiddleware + composeEnhancers + redux-thunk + Redux DevTools — 30+ строк boilerplate просто чтобы поднять store.</div>
+          </div>
+          <div class="pain-card pain-card--pain">
+            <div class="pain-card__title">📦 Слишком много пакетов</div>
+            <div class="pain-card__text">redux + react-redux + redux-thunk + reselect + immer + redux-devtools-extension — каждый ставится отдельно, версии нужно следить.</div>
+          </div>
+          <div class="pain-card pain-card--pain">
+            <div class="pain-card__title">📝 Слишком много шаблонного кода</div>
+            <div class="pain-card__text">Константы action types, action creators, switch-reducer, иммутабельные обновления через spread — повторяющиеся 100 раз.</div>
+          </div>
+        </div>
+
+        <div class="vs-arrow">↓</div>
+
+        <div class="pain-grid">
+          <div class="pain-card pain-card--cure">
+            <div class="pain-card__title">✅ Один вызов настраивает всё</div>
+            <div class="pain-card__text">configureStore автоматически combine'ит reducers, добавляет thunk, dev-checks, enhancers и подключает DevTools.</div>
+            <span class="pain-card__api">configureStore()</span>
+          </div>
+          <div class="pain-card pain-card--cure">
+            <div class="pain-card__title">✅ Один пакет</div>
+            <div class="pain-card__text">@reduxjs/toolkit включает redux, immer, reselect, thunk, RTK Query — всё в одном месте, версии согласованы.</div>
+            <span class="pain-card__api">@reduxjs/toolkit</span>
+          </div>
+          <div class="pain-card pain-card--cure">
+            <div class="pain-card__title">✅ Slice = всё-в-одном</div>
+            <div class="pain-card__text">createSlice генерирует action types, action creators и reducer из одного объекта. Reducer пишется в "мутирующем" стиле через Immer.</div>
+            <span class="pain-card__api">createSlice()</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEMO 2 — side-by-side counter -->
+    <div class="demo-section">
+      <div class="demo-section__header">Тот же counter — классика vs RTK</div>
+      <div class="demo-section__body">
+        <div class="compare-wrap">
+          <div class="compare-col">
+            <div class="compare-col__head compare-col__head--classic">Classic Redux</div>
+            <div class="compare-col__body">
+<pre>import { createStore, combineReducers, applyMiddleware, compose } from 'redux'
+import thunk from 'redux-thunk'
+
+const INCREMENT = 'counter/incremented'
+const DECREMENT = 'counter/decremented'
+
+const increment = () =&gt; ({ type: INCREMENT })
+const decrement = () =&gt; ({ type: DECREMENT })
+
+const initial = { value: 0 }
+
+function counterReducer(state = initial, action) {
+  switch (action.type) {
+    case INCREMENT: return { ...state, value: state.value + 1 }
+    case DECREMENT: return { ...state, value: state.value - 1 }
+    default: return state
+  }
+}
+
+const rootReducer = combineReducers({ counter: counterReducer })
+const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose
+const store = createStore(rootReducer, composeEnhancers(applyMiddleware(thunk)))</pre>
+            </div>
+            <div class="compare-col__stat"><span>Строк</span><strong id="stat-classic-lines">25</strong></div>
+            <div class="compare-col__stat"><span>Импортов</span><strong>2 пакета</strong></div>
+          </div>
+
+          <div class="compare-col">
+            <div class="compare-col__head compare-col__head--rtk">Redux Toolkit</div>
+            <div class="compare-col__body">
+<pre>import { configureStore, createSlice } from '@reduxjs/toolkit'
+
+const counterSlice = createSlice({
+  name: 'counter',
+  initialState: { value: 0 },
+  reducers: {
+    increment: (state) =&gt; { state.value++ },
+    decrement: (state) =&gt; { state.value-- },
+  },
+})
+
+export const { increment, decrement } = counterSlice.actions
+
+const store = configureStore({
+  reducer: { counter: counterSlice.reducer },
+})</pre>
+            </div>
+            <div class="compare-col__stat"><span>Строк</span><strong id="stat-rtk-lines">14</strong></div>
+            <div class="compare-col__stat"><span>Импортов</span><strong>1 пакет</strong></div>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; text-align: center;">
+          <button class="btn btn--accent" id="btn-run">▶ Запустить оба counter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE counters -->
+    <div class="two-col">
+      <div class="demo-section">
+        <div class="demo-section__header">Counter (classic redux под капотом)</div>
+        <div class="demo-section__body">
+          <div class="counter">
+            <button class="btn btn--accent" id="c-classic-dec">−</button>
+            <div class="counter__value" id="c-classic-val">0</div>
+            <button class="btn btn--accent" id="c-classic-inc">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="demo-section">
+        <div class="demo-section__header">Counter (RTK)</div>
+        <div class="demo-section__body">
+          <div class="counter">
+            <button class="btn btn--success" id="c-rtk-dec">−</button>
+            <div class="counter__value" id="c-rtk-val">0</div>
+            <button class="btn btn--success" id="c-rtk-inc">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Что такое Redux Toolkit?</div>
+      <div class="theory__body">
+        <h3>Определение</h3>
+        <p>
+          <strong>Redux Toolkit</strong> (RTK) — это <em>официальный, мнения-имеющий, всё-включающий</em>
+          набор инструментов для эффективной разработки на Redux. Это рекомендованный способ писать Redux-логику
+          сегодня. Раньше в команду Redux входил пакет <code>redux</code> — сегодня в команду входит <code>@reduxjs/toolkit</code>.
+        </p>
+
+        <div class="quote">
+          «The Redux Toolkit package is intended to be the standard way to write Redux logic. It was originally created
+          to help address three common concerns about Redux: "Configuring a Redux store is too complicated", "I have to
+          add a lot of packages to get Redux to do anything useful", "Redux requires too much boilerplate code".»
+          <br>— <a href="https://redux-toolkit.js.org/introduction/getting-started#purpose" target="_blank">Getting Started — Purpose</a>
+        </div>
+        <div class="quote quote--ru">
+          «Пакет Redux Toolkit задуман как стандартный способ писать Redux-логику. Он был создан, чтобы решить три
+          типичные жалобы на Redux: «Настройка Redux store слишком сложная», «Чтобы получить от Redux хоть какую-то
+          пользу, приходится ставить много пакетов», «Redux требует слишком много шаблонного кода».»
+        </div>
+
+        <h3>Три проблемы, которые решает RTK</h3>
+        <ol>
+          <li><strong>Сложная настройка store</strong>. В классике нужно вручную собрать <code>combineReducers</code>,
+            <code>applyMiddleware</code>, <code>composeEnhancers</code>, подключить DevTools — 20-30 строк копипасты.
+            RTK вместо этого предоставляет один вызов <code>configureStore</code>, который делает всё за вас и даёт
+            хорошие defaults.</li>
+          <li><strong>Много отдельных пакетов</strong>. Раньше нужны были <code>redux</code>, <code>redux-thunk</code>,
+            <code>reselect</code>, <code>immer</code>, <code>redux-devtools-extension</code>. Сейчас всё это входит в
+            один <code>@reduxjs/toolkit</code> и реэкспортируется (например <code>createSelector</code> — это
+            <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/index.ts" target="_blank">re-export из reselect</a>).</li>
+          <li><strong>Boilerplate</strong>. Константы action types, action creators-обёртки, switch-reducer,
+            spread-каскады для вложенных обновлений. RTK генерирует action types и creators автоматически из
+            <code>createSlice</code> и позволяет писать reducer'ы в "мутирующем" стиле через Immer.</li>
+        </ol>
+
+        <h3>Что НЕ изменилось</h3>
+        <div class="tip">
+          RTK — это <strong>обёртка</strong> поверх классического Redux. Он не заменяет идеи Redux:
+          <code>action → dispatch → reducer → store → subscribers</code>. Тот же однонаправленный поток данных, те же
+          три принципа (Single Source of Truth, State is Read-Only, Changes via Pure Functions). Просто меньше ручного
+          кода вокруг тех же концепций.
+        </div>
+
+        <h3>RTK Query как бонус</h3>
+        <p>
+          Внутри <code>@reduxjs/toolkit</code> также есть <strong>RTK Query</strong> — отдельный модуль для data fetching
+          и кэширования. Доступен через точку входа <code>@reduxjs/toolkit/query/react</code>. Опциональный: можно
+          использовать только core RTK без него. Подробно мы разберём его в секциях K и L.
+        </p>
+
+        <div class="quote">
+          «Redux Toolkit also includes a powerful data fetching and caching capability that we've dubbed "RTK Query".
+          It's included in the package as a separate set of entry points. It's optional, but can eliminate the need to
+          hand-write data fetching logic yourself.»
+          <br>— <a href="https://redux-toolkit.js.org/introduction/getting-started#purpose" target="_blank">Getting Started</a>
+        </div>
+        <div class="quote quote--ru">
+          «Redux Toolkit также включает мощный механизм загрузки и кеширования данных, который мы назвали «RTK Query».
+          Он входит в пакет как отдельный набор точек входа. Это опционально, но позволяет полностью отказаться от
+          ручного написания логики загрузки данных.»
+        </div>
+
+        <h3>Кому полезно</h3>
+        <ul>
+          <li>Новичкам — RTK не имеет смысла учить отдельно; начинать рекомендуется сразу с него.</li>
+          <li>Существующим Redux-проектам — миграция инкрементальная (см. урок 77).</li>
+          <li>Любому, кто пишет Redux в 2024+ — это де-факто стандарт.</li>
+        </ul>
+
+        <h3>Что дальше</h3>
+        <p>
+          В следующем уроке (02) детально разберём каждую из трёх "болей" на полноценных живых примерах.
+          Затем (03) — обзор всех API из <code>@reduxjs/toolkit</code> в виде интерактивной mind-map.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>05 — Установка и bundle size</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .install-tabs { display: flex; gap: 4px; margin-bottom: 0; border-bottom: 1px solid var(--border); }
+    .install-tab {
+      padding: 8px 16px; background: transparent; border: none; color: var(--text-secondary);
+      cursor: pointer; font-family: var(--font-mono); font-size: .82rem; border-bottom: 2px solid transparent;
+    }
+    .install-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .install-tab:hover { color: var(--text-bright); }
+    .install-cmd {
+      background: var(--bg-panel); border: 1px solid var(--border); border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius); padding: 14px 18px;
+      font-family: var(--font-mono); font-size: .85rem; color: var(--accent-cyan);
+    }
+
+    .deps-box {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px 16px; margin: 10px 0;
+    }
+    .deps-box__title { font-size: .82rem; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+    .deps-list { list-style: none; padding: 0; margin: 0; font-family: var(--font-mono); font-size: .78rem; }
+    .deps-list li { padding: 4px 0; color: var(--text-primary); display: flex; justify-content: space-between; gap: 12px; }
+    .deps-list li .ver { color: var(--text-muted); font-size: .72rem; }
+    .deps-list li.peer { color: var(--accent-yellow); }
+    .deps-list li.peer .ver::before { content: 'peer '; color: var(--accent-orange); }
+
+    .size-chart { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+    .size-row { display: grid; grid-template-columns: 200px 1fr 80px; align-items: center; gap: 12px; font-size: .82rem; }
+    .size-row__label { color: var(--text-bright); font-weight: 500; font-family: var(--font-mono); font-size: .78rem; }
+    .size-row__bar {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      height: 22px; position: relative; overflow: hidden;
+    }
+    .size-row__fill {
+      height: 100%; transition: width .4s ease;
+      display: flex; align-items: center; padding: 0 8px; font-size: .7rem; color: white; font-family: var(--font-mono);
+    }
+    .size-row__fill--rtk { background: linear-gradient(90deg, #764abc, #569cd6); }
+    .size-row__fill--rtkq { background: linear-gradient(90deg, #4ec9b0, #79b8ff); }
+    .size-row__fill--classic { background: linear-gradient(90deg, #ce9178, #f44747); }
+    .size-row__fill--single { background: var(--accent-purple); opacity: .7; }
+    .size-row__value { font-family: var(--font-mono); font-size: .8rem; color: var(--accent-yellow); text-align: right; }
+
+    .verdict {
+      margin: 14px 0; padding: 12px 16px;
+      background: rgba(76,175,80,.08); border: 1px solid var(--success); border-radius: var(--radius);
+      color: var(--success); font-size: .85rem;
+    }
+    .verdict strong { color: white; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">05 / 106</span>
+      Установка и bundle size
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../04-entry-points/">← Назад</a>
+      <a href="../06-architecture-deps/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO 1: install commands -->
+    <div class="demo-section">
+      <div class="demo-section__header">Команда установки</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Один пакет содержит всё: core RTK + RTK Query. Никаких отдельных установок для thunk/immer/reselect — они внутри.
+        </p>
+        <div class="install-tabs" id="install-tabs">
+          <button class="install-tab active" data-pm="npm">npm</button>
+          <button class="install-tab" data-pm="yarn">yarn</button>
+          <button class="install-tab" data-pm="pnpm">pnpm</button>
+          <button class="install-tab" data-pm="bun">bun</button>
+        </div>
+        <div class="install-cmd" id="install-cmd">npm install @reduxjs/toolkit react-redux</div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;">
+          <div class="deps-box">
+            <div class="deps-box__title">Что попадёт в node_modules (RTK alone)</div>
+            <ul class="deps-list">
+              <li><span>@reduxjs/toolkit</span><span class="ver">^2.5.0</span></li>
+              <li><span>redux</span><span class="ver">^5.0.1 (внутри RTK)</span></li>
+              <li><span>immer</span><span class="ver">^10.0.3 (внутри RTK)</span></li>
+              <li><span>reselect</span><span class="ver">^5.1.0 (внутри RTK)</span></li>
+              <li><span>redux-thunk</span><span class="ver">^3.1.0 (внутри RTK)</span></li>
+            </ul>
+          </div>
+          <div class="deps-box">
+            <div class="deps-box__title">Peer dependencies</div>
+            <ul class="deps-list">
+              <li class="peer"><span>react</span><span class="ver">^18 || ^19</span></li>
+              <li class="peer"><span>react-redux</span><span class="ver">^9.0.0 (для useSelector)</span></li>
+            </ul>
+            <p style="font-size: .76rem; color: var(--text-muted); margin-top: 8px;">
+              Помечено <code style="color:var(--accent-yellow)">peer</code> — RTK не тянет react/react-redux сам.
+              Для не-React проектов peer не нужен.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEMO 2: bundle size -->
+    <div class="demo-section">
+      <div class="demo-section__header">Размер бандла (min+gzip)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Цифры из <a href="https://bundlephobia.com/package/@reduxjs/toolkit" target="_blank" style="color:var(--accent-blue-bright);">bundlephobia.com</a>
+          (актуально на момент v2.x). Tree-shaking работает — реальный размер вашего приложения зависит от того, что вы импортируете.
+        </p>
+        <div class="size-chart">
+          <div class="size-row">
+            <div class="size-row__label">@reduxjs/toolkit (core)</div>
+            <div class="size-row__bar"><div class="size-row__fill size-row__fill--rtk" style="width: 17%;">17 kB</div></div>
+            <div class="size-row__value">17.1 kB</div>
+          </div>
+          <div class="size-row">
+            <div class="size-row__label">+ /query (RTK Query)</div>
+            <div class="size-row__bar"><div class="size-row__fill size-row__fill--rtkq" style="width: 26%;">+9 kB</div></div>
+            <div class="size-row__value">~26 kB</div>
+          </div>
+          <div class="size-row">
+            <div class="size-row__label">+ /query/react (хуки)</div>
+            <div class="size-row__bar"><div class="size-row__fill size-row__fill--rtkq" style="width: 28%;">+2 kB</div></div>
+            <div class="size-row__value">~28 kB</div>
+          </div>
+          <div class="size-row" style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 10px;">
+            <div class="size-row__label">vs. classic redux</div>
+            <div class="size-row__bar"><div class="size-row__fill size-row__fill--single" style="width: 4%;">2 kB</div></div>
+            <div class="size-row__value">~1.8 kB</div>
+          </div>
+          <div class="size-row">
+            <div class="size-row__label">+ react-redux</div>
+            <div class="size-row__bar"><div class="size-row__fill size-row__fill--single" style="width: 11%;">+5 kB</div></div>
+            <div class="size-row__value">~7 kB</div>
+          </div>
+          <div class="size-row">
+            <div class="size-row__label">+ redux-thunk + reselect</div>
+            <div class="size-row__bar"><div class="size-row__fill size-row__fill--single" style="width: 13%;">+1.5 kB</div></div>
+            <div class="size-row__value">~8.5 kB</div>
+          </div>
+          <div class="size-row">
+            <div class="size-row__label">+ immer</div>
+            <div class="size-row__bar"><div class="size-row__fill size-row__fill--classic" style="width: 28%;">+14 kB</div></div>
+            <div class="size-row__value">~22.5 kB</div>
+          </div>
+        </div>
+
+        <div class="verdict">
+          <strong>Вывод:</strong> classic стек (redux + react-redux + thunk + reselect + immer) ≈ <strong>22.5 kB</strong>.
+          Чистый RTK ≈ <strong>17 kB</strong>. Полный RTK + RTK Query + хуки ≈ <strong>28 kB</strong>.
+          Разница в 5-6 kB <em>в обмен на</em> весь функционал из коробки и x3 меньше кода.
+        </div>
+
+        <div style="margin-top: 14px;">
+          <button class="btn" id="show-treeshake">Показать что отпадает при tree-shaking</button>
+        </div>
+        <div id="treeshake-output" style="margin-top: 10px;"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Установка и размер</div>
+      <div class="theory__body">
+        <h3>Дословно из доки</h3>
+        <div class="quote">
+          «The recommended way to start new apps with React and Redux Toolkit is by using
+          <a href="https://github.com/reduxjs/redux-templates" target="_blank">our official Redux Toolkit + TS template for Vite</a>,
+          or by creating a new Next.js project using Next's <code>with-redux</code> template.»
+          <br>— <a href="https://redux-toolkit.js.org/introduction/getting-started" target="_blank">Getting Started</a>
+        </div>
+        <div class="quote quote--ru">
+          «Рекомендуемый способ начать новое приложение на React и Redux Toolkit — использовать
+          <a href="https://github.com/reduxjs/redux-templates" target="_blank">официальный Redux Toolkit + TS шаблон для Vite</a>
+          или создать новый Next.js-проект через шаблон Next <code>with-redux</code>.»
+        </div>
+
+        <h3>Почему RTK = 17 kB, а не сумма зависимостей</h3>
+        <p>
+          Если бы RTK просто реэкспортировал redux/immer/reselect/thunk — итог был бы ~22 kB.
+          Но RTK <strong>собирается единым ESM-бандлом</strong> с использованием rollup, и:
+        </p>
+        <ul>
+          <li>удаляются неиспользуемые ветки кода каждой зависимости (tree-shaking <em>внутри</em> RTK);</li>
+          <li>дублирующиеся хелперы (typeof, isPlainObject) переиспользуются;</li>
+          <li>terser сжимает имена переменных в production-бандле;</li>
+          <li>современный <code>"modern.mjs"</code> entry без полифиллов для legacy браузеров.</li>
+        </ul>
+        <p>
+          Итог: RTK суммарно <em>меньше</em> чем составляющие отдельно.
+        </p>
+
+        <h3>Tree-shaking RTK</h3>
+        <p>
+          Если вы используете только <code>configureStore</code> и <code>createSlice</code>, в финальный бандл попадут только они
+          + immer (нужен для slice-reducers) + redux core. Но <em>не</em> RTK Query, <em>не</em> entityAdapter, <em>не</em> thunk middleware
+          (хотя он подключён по умолчанию — bundler удалит его, если store не использует thunks).
+        </p>
+        <p>
+          Самое тяжёлое в RTK — <strong>RTK Query</strong> (~9 kB). Если вы его не используете — он автоматически выпадет из бандла
+          (Vite/webpack tree-shake по ESM-структуре пакета).
+        </p>
+
+        <h3>peerDependencies — что значит</h3>
+        <div class="warning">
+          <strong>RTK не тянет react и react-redux в зависимости.</strong> Они объявлены как
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/package.json" target="_blank">peerDependencies</a>:
+          ваше приложение должно установить их само. Это нужно чтобы:
+          <ul style="margin-top: 6px;">
+            <li>RTK работал без React (Node.js, Svelte, Vue);</li>
+            <li>не было дублей React в node_modules;</li>
+            <li>версия React контролировалась вами, а не RTK.</li>
+          </ul>
+        </div>
+
+        <h3>Шпаргалка установки</h3>
+        <div class="code-block">
+<span class="cm">// React + Redux Toolkit + RTK Query (типичный кейс)</span>
+npm install @reduxjs/toolkit react-redux
+
+<span class="cm">// Не-React (Node CLI, Vue, Svelte)</span>
+npm install @reduxjs/toolkit
+
+<span class="cm">// Vite-template (полностью настроенный TS-стартер)</span>
+npx degit reduxjs/redux-templates/packages/vite-template-redux my-app
+
+<span class="cm">// Next.js</span>
+npx create-next-app --example with-redux my-app
+        </div>
+
+        <h3>Подводный камень: версии</h3>
+        <div class="warning">
+          RTK 2.x требует <strong>react-redux 9+</strong> и <strong>redux 5+</strong>. Если у вас старый
+          <code>react-redux 7/8</code> — обновите его. RTK 2.x также требует Node 16+ для разработки и поддерживает
+          только современные браузеры (ES2020). Для legacy используйте RTK 1.9.x.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

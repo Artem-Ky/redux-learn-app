@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04 — Точки входа @reduxjs/toolkit</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .entries { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1000px) { .entries { grid-template-columns: 1fr; } }
+    .entry { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .entry__head { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .entry__import { font-family: var(--font-mono); color: var(--accent); font-size: .8rem; word-break: break-all; }
+    .entry__sub { font-size: .72rem; color: var(--text-muted); margin-top: 4px; }
+    .entry--core .entry__head { background: rgba(86,156,214,.08); }
+    .entry--query .entry__head { background: rgba(206,145,120,.08); }
+    .entry--query-react .entry__head { background: rgba(197,134,192,.08); }
+    .entry__body { padding: 12px 16px; font-size: .82rem; }
+    .entry__list { list-style: none; padding: 0; margin: 0; }
+    .entry__list li { padding: 4px 0; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-yellow);
+                       border-bottom: 1px dashed var(--border); }
+    .entry__list li:last-child { border-bottom: none; }
+    .entry__list li.included { color: var(--text-muted); text-decoration: line-through; opacity: .6; }
+    .pyramid {
+      display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 18px 0;
+    }
+    .pyramid__row {
+      background: var(--bg-tertiary); border: 1px solid var(--border); padding: 10px 16px;
+      border-radius: var(--radius-sm); text-align: center; font-family: var(--font-mono); font-size: .82rem;
+    }
+    .pyramid__row--top { width: 35%; min-width: 200px; background: rgba(197,134,192,.1); border-color: var(--accent-purple); color: var(--accent-purple); }
+    .pyramid__row--mid { width: 50%; min-width: 280px; background: rgba(206,145,120,.1); border-color: var(--accent-orange); color: var(--accent-orange); }
+    .pyramid__row--bottom { width: 65%; min-width: 360px; background: rgba(86,156,214,.1); border-color: var(--accent); color: var(--accent); }
+    .pyramid__row__lib { font-size: .72rem; color: var(--text-muted); margin-top: 2px; }
+    .repl-block { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); margin: 10px 0; }
+    .repl-block__head { background: var(--bg-tertiary); padding: 6px 12px; font-family: var(--font-mono);
+                          font-size: .72rem; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+    .repl-block__body { padding: 10px 14px; font-family: var(--font-mono); font-size: .8rem;
+                          line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; }
+    .ok-mark { color: var(--success); }
+    .err-mark { color: var(--accent-red); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">04 / 106</span>
+      Точки входа пакета
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../03-whats-included/">← Назад</a>
+      <a href="../05-installation-bundle-size/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- DEMO: 3 entry points -->
+    <div class="demo-section">
+      <div class="demo-section__header">3 точки входа — разные импорты</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Один пакет <code>@reduxjs/toolkit</code> — три точки входа. Каждая экспортирует свой набор. Подходящую
+          выбирают по тому, нужен ли RTK Query и используете ли вы React.
+        </p>
+        <div class="entries">
+          <div class="entry entry--core">
+            <div class="entry__head">
+              <div class="entry__import">@reduxjs/toolkit</div>
+              <div class="entry__sub">Core RTK без RTK Query</div>
+            </div>
+            <div class="entry__body">
+              <ul class="entry__list">
+                <li>configureStore</li>
+                <li>createSlice</li>
+                <li>createReducer</li>
+                <li>createAction</li>
+                <li>createAsyncThunk</li>
+                <li>createEntityAdapter</li>
+                <li>combineSlices</li>
+                <li>createSelector</li>
+                <li>createListenerMiddleware</li>
+                <li>nanoid, isAnyOf, Tuple, ...</li>
+                <li>autoBatchEnhancer, prepareAutoBatched</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="entry entry--query">
+            <div class="entry__head">
+              <div class="entry__import">@reduxjs/toolkit/query</div>
+              <div class="entry__sub">RTK Query <strong>без</strong> React-хуков</div>
+            </div>
+            <div class="entry__body">
+              <ul class="entry__list">
+                <li>createApi</li>
+                <li>fetchBaseQuery</li>
+                <li>setupListeners</li>
+                <li>retry</li>
+                <li>buildCreateApi (advanced)</li>
+                <li>coreModule (advanced)</li>
+              </ul>
+              <p style="font-size: .76rem; color: var(--text-muted); margin-top: 8px;">
+                Для vanilla JS / других UI-фреймворков (Svelte, Vue, ванильный JS).
+              </p>
+            </div>
+          </div>
+
+          <div class="entry entry--query-react">
+            <div class="entry__head">
+              <div class="entry__import">@reduxjs/toolkit/query/react</div>
+              <div class="entry__sub">RTK Query <strong>с</strong> auto-generated React hooks</div>
+            </div>
+            <div class="entry__body">
+              <ul class="entry__list">
+                <li>createApi <em style="color:var(--text-muted)">(с reactHooksModule)</em></li>
+                <li>fetchBaseQuery</li>
+                <li>setupListeners</li>
+                <li>retry</li>
+                <li>ApiProvider</li>
+                <li>useDispatch, useSelector <em style="color:var(--text-muted)">(re-export react-redux)</em></li>
+              </ul>
+              <p style="font-size: .76rem; color: var(--text-muted); margin-top: 8px;">
+                Главное отличие: createApi из этого entry автоматически генерирует
+                <code>use*Query</code> / <code>use*Mutation</code> хуки для каждого endpoint.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="pyramid">
+          <div class="pyramid__row pyramid__row--top">
+            @reduxjs/toolkit/query/react
+            <div class="pyramid__row__lib">+ react bindings + auto hooks</div>
+          </div>
+          <div class="pyramid__row pyramid__row--mid">
+            @reduxjs/toolkit/query
+            <div class="pyramid__row__lib">+ createApi + fetchBaseQuery + setupListeners</div>
+          </div>
+          <div class="pyramid__row pyramid__row--bottom">
+            @reduxjs/toolkit
+            <div class="pyramid__row__lib">core: configureStore + slice + thunk + entity + listener + ...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEMO: import simulator -->
+    <div class="demo-section">
+      <div class="demo-section__header">Симулятор импортов</div>
+      <div class="demo-section__body">
+        <p style="font-size: .85rem; color: var(--text-secondary); margin-bottom: 10px;">
+          Кликайте кнопки чтобы увидеть, какой импорт корректный, а какой даст ошибку.
+        </p>
+        <div class="btn-group">
+          <button class="btn" data-sim="ok-core">configureStore from /toolkit ✓</button>
+          <button class="btn" data-sim="ok-query">createApi from /toolkit/query ✓</button>
+          <button class="btn" data-sim="ok-query-react">useGetXQuery from /toolkit/query/react ✓</button>
+          <button class="btn" data-sim="bad-hooks">use*Query from /toolkit/query ✗</button>
+          <button class="btn" data-sim="bad-store-react">configureStore from /toolkit/query/react ?</button>
+        </div>
+        <div id="sim-output"></div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — Архитектура entry points</div>
+      <div class="theory__body">
+        <h3>Дословно из доки</h3>
+        <div class="quote">
+          «RTK Query is included within the installation of the core Redux Toolkit package. It is available via either
+          of the two entry points: <code>@reduxjs/toolkit/query</code> or <code>@reduxjs/toolkit/query/react</code>
+          (React-specific entry point that automatically generates hooks corresponding to the defined endpoints).»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/overview" target="_blank">RTK Query Overview</a>
+        </div>
+        <div class="quote quote--ru">
+          «RTK Query поставляется вместе с core-пакетом Redux Toolkit. Он доступен через одну из двух точек входа:
+          <code>@reduxjs/toolkit/query</code> или <code>@reduxjs/toolkit/query/react</code>
+          (React-специфичная точка входа, автоматически генерирующая хуки для каждого определённого endpoint).»
+        </div>
+
+        <h3>Почему не один entry?</h3>
+        <p>
+          Если бы хуки React всегда экспортировались из <code>@reduxjs/toolkit</code>, то <strong>react</strong>
+          стал бы обязательной peer-зависимостью. А <code>@reduxjs/toolkit</code> можно использовать в Node, Svelte,
+          Vue, ванильном JS — и react там не нужен. Поэтому React-специфичная функциональность вынесена в отдельный
+          entry <code>/query/react</code>, который импортирует react только если вы его используете.
+        </p>
+
+        <h3>Что значит "/query/react генерирует хуки"</h3>
+        <p>
+          Когда вы делаете <code>createApi(...)</code> из <code>@reduxjs/toolkit/query/react</code> — RTK подключает
+          специальный модуль <strong>reactHooksModule</strong>, который для каждого endpoint вашего API генерирует
+          React-хук с именем по правилу:
+        </p>
+        <ul>
+          <li><code>build.query({ ... })</code> с ключом <code>getPosts</code> → <code>useGetPostsQuery</code></li>
+          <li><code>build.mutation({ ... })</code> с ключом <code>addPost</code> → <code>useAddPostMutation</code></li>
+          <li><code>build.infiniteQuery(...)</code> с ключом <code>getMessages</code> → <code>useGetMessagesInfiniteQuery</code></li>
+        </ul>
+        <p>
+          Если же вы импортируете createApi из <code>@reduxjs/toolkit/query</code> (без <code>/react</code>) — этих
+          хуков просто не будет. Будут только <code>api.endpoints.getPosts.initiate(arg)</code> (для ручного dispatch),
+          <code>api.endpoints.getPosts.select(arg)</code> (selector) и middleware.
+        </p>
+
+        <h3>Источник: package.json</h3>
+        <p>
+          В <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/package.json" target="_blank">packages/toolkit/package.json</a>
+          объявлено три "exports":
+        </p>
+        <div class="code-block">
+<span class="prop">"exports"</span>: {
+  <span class="str">"."</span>: { <span class="cm">/* core */</span> <span class="str">"import"</span>: <span class="str">"./dist/redux-toolkit.modern.mjs"</span> },
+  <span class="str">"./query"</span>: { <span class="str">"import"</span>: <span class="str">"./dist/query/rtk-query.modern.mjs"</span> },
+  <span class="str">"./query/react"</span>: { <span class="str">"import"</span>: <span class="str">"./dist/query/react/rtk-query-react.modern.mjs"</span> }
+}
+        </div>
+
+        <h3>Подводный камень</h3>
+        <div class="warning">
+          <strong>Не смешивайте!</strong> Если у вас один проект использует одновременно
+          <code>createApi</code> из <code>/query</code> и из <code>/query/react</code> — это два разных набора
+          функций (с разными reactHooksModule-привязками). Лучше всегда использовать один entry для всего проекта.
+          Также <code>configureStore</code> при <code>duplicateMiddlewareCheck: true</code> (default) выдаст warning,
+          если случайно подключили middleware от двух разных API.
+        </div>
+
+        <h3>Что использовать?</h3>
+        <ul>
+          <li>React-проект с RTK Query — почти всегда <code>@reduxjs/toolkit</code> + <code>@reduxjs/toolkit/query/react</code>.</li>
+          <li>React-проект без RTK Query — только <code>@reduxjs/toolkit</code>.</li>
+          <li>Не-React проект (Node, Svelte, Vue) с RTK Query — <code>@reduxjs/toolkit</code> + <code>@reduxjs/toolkit/query</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>
