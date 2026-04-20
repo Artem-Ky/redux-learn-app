@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>23a — Matchers глубоко</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .grid-2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 14px;
+    }
+    .card h4 {
+      font-family: var(--font-mono); color: var(--accent); font-size: .85rem; margin-bottom: 8px;
+    }
+    .btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+
+    /* toasts */
+    .toasts { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; min-height: 40px; }
+    .toast {
+      display: grid; grid-template-columns: 80px 1fr 24px; align-items: center;
+      gap: 8px; padding: 6px 10px; border-radius: var(--radius-sm);
+      font-family: var(--font-mono); font-size: .76rem; border: 1px solid var(--border);
+    }
+    .toast--success { background: rgba(76,175,80,.10); border-color: var(--success); }
+    .toast--error   { background: rgba(244,67,54,.10); border-color: var(--accent-red); }
+    .toast--info    { background: rgba(86,156,214,.10); border-color: var(--accent-cyan); }
+    .toast__kind {
+      text-transform: uppercase; font-size: .68rem; padding: 2px 8px; border-radius: 8px;
+      background: var(--bg-panel); text-align: center; letter-spacing: .5px;
+    }
+    .toast--success .toast__kind { color: var(--success); }
+    .toast--error   .toast__kind { color: var(--accent-red); }
+    .toast--info    .toast__kind { color: var(--accent-cyan); }
+    .toast__msg { color: var(--text-bright); }
+    .toast__close {
+      background: transparent; border: none; color: var(--text-muted); cursor: pointer;
+      font-size: 1rem; line-height: 1; padding: 0; transition: color .15s;
+    }
+    .toast__close:hover { color: var(--text-bright); }
+    .empty {
+      text-align: center; color: var(--text-muted); font-style: italic;
+      padding: 12px; font-size: .76rem;
+    }
+
+    /* analytics log */
+    .analytics-log {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 8px 10px; font-family: var(--font-mono); font-size: .72rem;
+      min-height: 80px; max-height: 180px; overflow-y: auto;
+    }
+    .ev { display: grid; grid-template-columns: 200px 1fr; gap: 8px; padding: 2px 0; }
+    .ev__type { color: var(--accent-blue-bright); }
+    .ev__data { color: var(--accent-cyan); }
+
+    /* stats */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-top: 8px; }
+    .stat {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--font-mono); font-size: .76rem;
+    }
+    .stat span { color: var(--text-muted); }
+    .stat strong { color: var(--accent); }
+
+    /* matcher flow */
+    .matcher-flow {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 10px 12px; margin-top: 8px; font-family: var(--font-mono); font-size: .76rem;
+    }
+    .flow__title { color: var(--text-secondary); margin-bottom: 8px; font-size: .8rem; }
+    .flow__title code { color: var(--accent-cyan); }
+    .flow__row {
+      display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: center;
+      padding: 4px 8px; border-radius: 4px; margin: 2px 0;
+    }
+    .flow__row.pass { background: rgba(76,175,80,.10); color: var(--text-bright); }
+    .flow__row.fail { opacity: .35; }
+    .flow__mark { text-align: center; font-weight: 700; }
+    .flow__row.pass .flow__mark { color: var(--success); }
+    .flow__row.fail .flow__mark { color: var(--accent-red); }
+    .flow__val { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">23a / 106</span>Matchers глубоко — что это и как писать свои
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../23-matchers-utilities/">← 23. isAnyOf/isAllOf</a>
+      <a href="../24-create-reducer-builder/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <!-- =================================================================== -->
+    <div class="demo-section">
+      <div class="demo-section__header">Что такое matcher — за 30 секунд</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <strong>Matcher = функция <code>(action) =&gt; boolean</code>.</strong>
+          Всё. Никакой магии RTK. Просто функция, которая отвечает «подходит ли этот action под мой критерий».
+          В TypeScript мы дополнительно делаем её <strong>type-predicate</strong>
+          (<code>action is MyAction</code>), чтобы внутри handler'а TS знал точный тип action.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// 1. Самая базовая форма — просто функция</span>
+<span class="kw">const</span> isUserAction = (action: <span class="kw">unknown</span>) =&gt;
+  <span class="fn">isAction</span>(action) &amp;&amp; action.type.<span class="fn">startsWith</span>(<span class="str">'user/'</span>)
+
+<span class="cm">// 2. Type-predicate — даёт TS-typing внутри handler'а</span>
+<span class="kw">const</span> isNotifyAction = (action: <span class="kw">unknown</span>): action is NotifyAction =&gt; {
+  <span class="kw">if</span> (!action || <span class="kw">typeof</span> action !== <span class="str">'object'</span>) <span class="kw">return false</span>
+  <span class="kw">return</span> !!(action <span class="kw">as any</span>).meta?.notify
+}
+
+<span class="cm">// 3. Использование в reducer</span>
+builder.<span class="fn">addMatcher</span>(isNotifyAction, (state, action) =&gt; {
+  <span class="cm">// TS знает: action.meta.notify существует</span>
+  state.toasts.<span class="fn">push</span>(action.meta.notify)
+})
+        </div>
+
+        <p style="color: var(--text-muted); font-size: .82rem; margin-top: 8px;">
+          А <code>isAnyOf</code>, <code>isAllOf</code>, <code>actionCreator.match</code>,
+          <code>isPending</code>, <code>isRejectedWithValue</code> — это просто <em>фабрики</em>,
+          которые возвращают такую функцию. Можно (и нужно!) писать свои собственные.
+        </p>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <div class="demo-section">
+      <div class="demo-section__header">5 форм matcher'ов на одном примере</div>
+      <div class="demo-section__body">
+
+        <div class="code-block">
+<span class="cm">// === Action ===</span>
+<span class="kw">const</span> userLoggedIn = <span class="fn">createAction</span>(<span class="str">'user/loggedIn'</span>, (name: <span class="kw">string</span>) =&gt; ({
+  payload: { name },
+  meta: { notify: { kind: <span class="str">'success'</span>, message: <span class="str">`Привет, </span><span class="kw">${</span>name<span class="kw">}</span><span class="str">!`</span> } },
+}))
+
+<span class="cm">// === Все 5 форм matcher'а — все возвращают true для userLoggedIn('Алиса') ===</span>
+
+<span class="cm">// (a) Произвольная функция — самая гибкая</span>
+<span class="kw">const</span> m1 = (action: <span class="kw">unknown</span>) =&gt;
+  <span class="fn">isAction</span>(action) &amp;&amp; action.type === <span class="str">'user/loggedIn'</span>
+
+<span class="cm">// (b) Type-predicate — добавляет typing</span>
+<span class="kw">const</span> m2 = (action: <span class="kw">unknown</span>): action is { meta: { notify: any } } =&gt;
+  !!(action <span class="kw">as any</span>)?.meta?.notify
+
+<span class="cm">// (c) Встроенный .match на actionCreator — это уже type-predicate</span>
+<span class="kw">const</span> m3 = userLoggedIn.match
+<span class="cm">// под капотом: (action) =&gt; action.type === 'user/loggedIn'</span>
+
+<span class="cm">// (d) isAnyOf — комбинатор «ИЛИ»</span>
+<span class="kw">const</span> m4 = <span class="fn">isAnyOf</span>(userLoggedIn, userLoggedOut, fileSaved)
+
+<span class="cm">// (e) isAllOf — комбинатор «И»; принимает другие matcher'ы</span>
+<span class="kw">const</span> m5 = <span class="fn">isAllOf</span>(isUserNamespace, isNotifyAction)
+        </div>
+
+        <p style="color: var(--text-secondary); font-size: .82rem;">
+          <strong>Когда какую форму использовать:</strong>
+        </p>
+        <ul style="color: var(--text-secondary); font-size: .82rem; line-height: 1.7;">
+          <li><code>(a) функция</code> — когда логика сложная (проверка shape, namespace, meta-полей).</li>
+          <li><code>(b) type-predicate</code> — то же что (a), но <em>всегда</em> в TS-проектах. Без неё в handler'е <code>action</code> будет <code>any</code> или <code>unknown</code>.</li>
+          <li><code>(c) actionCreator.match</code> — когда нужен <em>один</em> конкретный action. Эквивалент <code>addCase(actionCreator, ...)</code>, но удобен в <code>listenerMiddleware</code>.</li>
+          <li><code>(d) isAnyOf</code> — когда нужно перечислить N конкретных action'ов. Минус: легко забыть новый.</li>
+          <li><code>(e) isAllOf</code> — когда нужно «И» между matcher'ами. Главное применение — комбинировать готовые (типа <code>isRejectedWithValue</code>) со своим namespace-фильтром.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <div class="demo-section">
+      <div class="demo-section__header">Реальный кейс: toast-уведомления + analytics через matcher'ы</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В приложении 4 разных action'а должны показывать toast (login / logout / file-saved / file-failed).
+          Вместо того чтобы в каждом slice'е дублировать <code>state.toasts.push(...)</code>,
+          мы делаем <strong>один matcher</strong> по shape'у <code>action.meta.notify</code>
+          и <strong>один addMatcher</strong> в reducer'е. То же — для analytics и lastActivity.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Один matcher → автоматически работает для ВСЕХ action'ов с meta.notify,</span>
+<span class="cm">// даже тех, которые добавят через год. Никаких изменений в reducer.</span>
+<span class="kw">const</span> isNotifyAction = (a: <span class="kw">unknown</span>): a is NotifyAction =&gt;
+  !!(a <span class="kw">as any</span>)?.meta?.notify
+
+<span class="kw">const</span> reducer = <span class="fn">createReducer</span>(initial, (b) =&gt; {
+  b
+    .<span class="fn">addCase</span>(<span class="str">'notifications/dismiss'</span>, (s, a) =&gt; { ... })
+
+    <span class="cm">// (1) toast pipeline</span>
+    .<span class="fn">addMatcher</span>(isNotifyAction,    (s, a) =&gt; { s.toasts.<span class="fn">push</span>(a.meta.notify) })
+
+    <span class="cm">// (2) analytics pipeline</span>
+    .<span class="fn">addMatcher</span>(isAnalyticsAction, (s, a) =&gt; { s.events.<span class="fn">push</span>({ type: a.type, ... }) })
+
+    <span class="cm">// (3) activity pipeline</span>
+    .<span class="fn">addMatcher</span>(isUserNamespace,   (s)    =&gt; { s.lastActivity = <span class="fn">Date.now</span>() })
+})
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h4>Кнопки — dispatch разных action'ов</h4>
+            <p style="color: var(--text-muted); font-size: .76rem; margin-bottom: 6px;">user/* — попадает под isNotifyAction + isUserNamespace</p>
+            <div class="btn-row">
+              <button class="btn" data-action="user-login">user/loggedIn</button>
+              <button class="btn" data-action="user-logout">user/loggedOut</button>
+            </div>
+            <p style="color: var(--text-muted); font-size: .76rem; margin: 8px 0 6px;">files/* — попадает только под isNotifyAction</p>
+            <div class="btn-row">
+              <button class="btn" data-action="file-save">files/saved</button>
+              <button class="btn" data-action="file-fail">files/deleteFailed</button>
+            </div>
+            <p style="color: var(--text-muted); font-size: .76rem; margin: 8px 0 6px;">analytics/* — только под isAnalyticsAction</p>
+            <div class="btn-row">
+              <button class="btn" data-action="an-click">analytics/clicked</button>
+              <button class="btn" data-action="an-view">analytics/viewed</button>
+            </div>
+            <p style="color: var(--text-muted); font-size: .76rem; margin: 8px 0 6px;">прочее — ни под какой matcher (кроме «не @@»)</p>
+            <div class="btn-row">
+              <button class="btn" data-action="silent-tick">clock/tick</button>
+              <button class="btn btn--secondary" data-action="clear-toasts">очистить toasts</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>Какие matcher'ы сработали для последнего action'а</h4>
+            <div class="matcher-flow" id="matcher-flow">
+              <div class="empty">— нажми кнопку слева —</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h4>Toast notifications (state.notifications)</h4>
+            <div class="toasts" id="toasts"></div>
+          </div>
+
+          <div class="card">
+            <h4>Analytics events (state.analytics, последние 8)</h4>
+            <div class="analytics-log" id="analytics-log"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>State summary</h4>
+          <div class="stats" id="stats"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <!-- =================================================================== -->
+    <div class="theory">
+      <div class="theory__header">Теория — matchers под лупой</div>
+      <div class="theory__body">
+
+        <h3>Матчер — это ровно одно</h3>
+        <div class="quote">
+          «A matcher utility is a type guard function that returns <code>true</code>
+          if the passed in argument matches the expected type.»
+          <br>— <a href="https://redux-toolkit.js.org/api/matching-utilities" target="_blank">Matching Utilities API</a>
+        </div>
+        <div class="quote quote--ru">
+          «Утилита-матчер — это type-guard функция, возвращающая <code>true</code>,
+          если переданный аргумент удовлетворяет ожидаемому типу.»
+        </div>
+        <p>
+          Сигнатура: <code>(value: unknown) =&gt; boolean</code>. В TypeScript почти всегда —
+          <code>(value: unknown) =&gt; value is X</code>. Это позволяет внутри
+          <code>if (matcher(action)) { ... }</code> и в <code>addMatcher(matcher, handler)</code>
+          получить точный тип <code>action</code> без <code>as</code>.
+        </p>
+
+        <h3>Зачем нужны (3 главных юзкейса)</h3>
+        <ol>
+          <li><strong>Сквозная логика в reducer'е</strong> — toast'ы, analytics, audit-log,
+            lastActivity, optimistic flush. Один <code>addMatcher</code> вместо N <code>addCase</code>.</li>
+          <li><strong>listenerMiddleware</strong> — <code>startListening({ matcher: isAnyOf(a, b) })</code>.
+            Эффект сработает на любой action, который проходит matcher.</li>
+          <li><strong>Type narrowing в обычном коде</strong> — <code>if (myAction.match(action)) { ... }</code>
+            в условном thunk'е, тесте, devtool'е.</li>
+        </ol>
+
+        <h3>Реализация isAnyOf / isAllOf — внутри они тривиальны</h3>
+        <div class="code-block">
+<span class="cm">// Из исходника RTK (matchers.ts):</span>
+<span class="kw">function</span> <span class="fn">isAnyOf</span>(...matchers) {
+  <span class="kw">return</span> (action) =&gt; matchers.<span class="fn">some</span>((m) =&gt; <span class="fn">matches</span>(m, action))
+}
+
+<span class="kw">function</span> <span class="fn">isAllOf</span>(...matchers) {
+  <span class="kw">return</span> (action) =&gt; matchers.<span class="fn">every</span>((m) =&gt; <span class="fn">matches</span>(m, action))
+}
+
+<span class="kw">const</span> matches = (matcher, action) =&gt;
+  <span class="fn">hasMatchFunction</span>(matcher)
+    ? matcher.<span class="fn">match</span>(action)   <span class="cm">// если это actionCreator — берём .match</span>
+    : <span class="fn">matcher</span>(action)        <span class="cm">// иначе — вызываем как функцию</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: .82rem;">
+          Поэтому в <code>isAnyOf</code> можно смешивать actionCreator'ы и matcher-функции —
+          обёртка <code>matches()</code> их различает.
+        </p>
+
+        <h3>actionCreator.match — встроенный matcher</h3>
+        <div class="code-block">
+<span class="kw">const</span> userLoggedIn = <span class="fn">createAction</span>&lt;{ name: <span class="kw">string</span> }&gt;(<span class="str">'user/loggedIn'</span>)
+
+<span class="cm">// .match — это (action) =&gt; action.type === 'user/loggedIn'</span>
+<span class="cm">// Но как type-predicate: action is PayloadAction&lt;{name: string}&gt;</span>
+
+userLoggedIn.<span class="fn">match</span>({ type: <span class="str">'user/loggedIn'</span>, payload: { name: <span class="str">'A'</span> } }) <span class="cm">// true</span>
+userLoggedIn.<span class="fn">match</span>({ type: <span class="str">'other'</span> })                             <span class="cm">// false</span>
+
+<span class="kw">if</span> (userLoggedIn.<span class="fn">match</span>(action)) {
+  action.payload.name <span class="cm">// ← TS знает что это string</span>
+}
+        </div>
+
+        <h3>Когда писать СВОЙ matcher (а не использовать isAnyOf)</h3>
+        <ul>
+          <li>Когда action'ов много / они растут динамически (<code>analytics/*</code>, <code>user/*</code>).</li>
+          <li>Когда условие — не «один из», а «по shape'у» (<code>action.meta.notify</code> существует).</li>
+          <li>Когда нужно комбинировать с runtime-логикой (только <code>error: true</code>).</li>
+          <li>Когда <code>isAnyOf(a, b, c)</code> легко забыть обновить, а свой matcher по namespace — само-расширяющийся.</li>
+        </ul>
+
+        <h3>Полный type-safe matcher на shape — шаблон</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="kw">type</span> Action } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">interface</span> NotifyMeta {
+  notify: { kind: <span class="str">'success'</span> | <span class="str">'error'</span> | <span class="str">'info'</span>; message: <span class="kw">string</span> }
+}
+<span class="kw">type</span> NotifyAction = Action &amp; { meta: NotifyMeta }
+
+<span class="kw">export const</span> isNotifyAction = (action: <span class="kw">unknown</span>): action <span class="kw">is</span> NotifyAction =&gt; {
+  <span class="kw">if</span> (!action || <span class="kw">typeof</span> action !== <span class="str">'object'</span>) <span class="kw">return false</span>
+  <span class="kw">const</span> a = action <span class="kw">as</span> { meta?: { notify?: <span class="kw">unknown</span> } }
+  <span class="kw">return</span> (
+    !!a.meta &amp;&amp;
+    <span class="kw">typeof</span> a.meta.notify === <span class="str">'object'</span> &amp;&amp;
+    a.meta.notify !== <span class="kw">null</span> &amp;&amp;
+    <span class="str">'kind'</span> <span class="kw">in</span> a.meta.notify &amp;&amp;
+    <span class="str">'message'</span> <span class="kw">in</span> a.meta.notify
+  )
+}
+        </div>
+        <p style="color: var(--text-muted); font-size: .8rem;">
+          Принимаем <code>unknown</code> — потому что matcher должен переваривать и невалидные actions
+          без runtime-ошибки. Внутри сужаем тип через серию проверок.
+        </p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Фабрика vs matcher.</strong>
+          <code>isPending</code>, <code>isRejected</code>, <code>isFulfilled</code>, <code>isRejectedWithValue</code>
+          — это <em>и то и другое</em>:<br>
+          • <code>isPending(myThunk)</code> — фабрика, возвращает matcher, который ловит pending только этого thunk'а.<br>
+          • <code>isPending</code> (без вызова) — сам matcher, ловит ЛЮБОЙ pending от любого thunk'а.<br>
+          Будьте внимательны: <code>addMatcher(isPending, h)</code> ≠ <code>addMatcher(isPending(thunk), h)</code>.
+        </div>
+        <div class="warning">
+          <strong>2. matcher вызывается на КАЖДЫЙ action.</strong>
+          Reducer пробегает по всем matcher'ам при каждом dispatch. Не делайте в matcher'е тяжёлых вычислений
+          (regex по большим строкам, JSON-сериализацию). Лучшие matcher'ы — O(1) проверка <code>action.type</code>
+          или <code>!!action.meta?.notify</code>.
+        </div>
+        <div class="warning">
+          <strong>3. addMatcher выполняется ДОПОЛНИТЕЛЬНО к addCase.</strong>
+          Если у вас <code>addCase(userLoggedIn, h1)</code> и <code>addMatcher(isUserNamespace, h2)</code> —
+          при <code>dispatch(userLoggedIn(...))</code> выполнятся <strong>оба</strong> handler'а.
+          Это фича (см. урок 25), но если h1 и h2 пишут в один и тот же путь state — будет затирание.
+        </div>
+        <div class="warning">
+          <strong>4. Проверка <code>action.type</code> требует typeof check.</strong>
+          Action технически может прийти <code>null</code>/<code>undefined</code>/без <code>type</code>
+          (особенно в тестах и middleware). Поэтому всегда:
+          <code>typeof (action as any)?.type === 'string'</code>, а не сразу
+          <code>action.type.startsWith(...)</code> — иначе runtime crash.
+        </div>
+
+        <h3>Matcher в listenerMiddleware</h3>
+        <div class="code-block">
+<span class="kw">import</span> { createListenerMiddleware } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> listener = <span class="fn">createListenerMiddleware</span>()
+
+<span class="cm">// Тот же matcher работает и в listener'е</span>
+listener.<span class="fn">startListening</span>({
+  matcher: isNotifyAction,
+  effect: (action, api) =&gt; {
+    <span class="cm">// в action — тип NotifyAction (благодаря type-predicate)</span>
+    <span class="fn">analytics</span>(<span class="str">'toast.shown'</span>, action.meta.notify)
+  },
+})
+
+<span class="cm">// Или предикат</span>
+listener.<span class="fn">startListening</span>({
+  predicate: (action, currentState, prevState) =&gt;
+    (currentState <span class="kw">as any</span>).user.id !== (prevState <span class="kw">as any</span>).user.id,
+  effect: (action, api) =&gt; { /* user changed */ },
+})
+        </div>
+
+        <h3>Чек-лист «как написать свой matcher»</h3>
+        <ol>
+          <li>Объяви TS-тип action'а, который ловишь: <code>type MyAction = Action &amp; { ... }</code>.</li>
+          <li>Принимай <code>unknown</code>, возвращай type-predicate <code>action is MyAction</code>.</li>
+          <li>Сначала отбей <code>null/undefined/non-object</code>.</li>
+          <li>Проверь только то, что точно нужно — никаких лишних расчётов.</li>
+          <li>Экспортируй и переиспользуй: один matcher → addMatcher + listener + if-проверка в thunk'е.</li>
+        </ol>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/matching-utilities" target="_blank">Matching Utilities API</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/matchers.ts" target="_blank">matchers.ts — исходник isAnyOf / isAllOf / isPending / ...</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAction.ts" target="_blank">createAction.ts — где определяется .match</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>21 — createAction с payload</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .demo-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+    .demo-row:last-child { border-bottom: none; }
+    .demo-row__label { font-family: var(--font-mono); font-size: .78rem; color: var(--text-secondary); }
+    .demo-row__label strong { color: var(--accent-cyan); }
+    .out { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+           padding: 8px 12px; font-family: var(--font-mono); font-size: .78rem; color: var(--accent-cyan); margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">21 / 106</span>createAction с payload — generic type</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../20-create-action-basic/">← Назад</a>
+      <a href="../22-prepare-callback/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Typed payload через generic createAction&lt;P&gt;</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Generic-параметр <code>P</code> в <code>createAction&lt;P&gt;(type)</code> задаёт тип payload.
+          Вызов <code>add(5)</code> даёт action <code>{ type, payload: 5 }</code>. TS проверяет тип на вызове.
+        </p>
+
+        <div style="margin: 14px 0;">
+          <div class="demo-row">
+            <div class="demo-row__label">
+              <strong>increment</strong> = <code>createAction&lt;void&gt;('counter/increment')</code><br>
+              <span style="color: var(--text-muted);">без payload → вызов без аргументов</span>
+            </div>
+            <button class="btn" id="inc">dispatch(increment())</button>
+          </div>
+          <div class="demo-row">
+            <div class="demo-row__label">
+              <strong>addBy</strong> = <code>createAction&lt;number&gt;('counter/addBy')</code><br>
+              <span style="color: var(--text-muted);">number → вызов с числом</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <input id="addby-val" type="number" value="5" style="width: 70px; padding: 5px 8px; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-primary); border-radius: var(--radius-sm); font-family: var(--font-mono);">
+              <button class="btn" id="add">dispatch(addBy(n))</button>
+            </div>
+          </div>
+          <div class="demo-row">
+            <div class="demo-row__label">
+              <strong>setUser</strong> = <code>createAction&lt;User&gt;('user/set')</code><br>
+              <span style="color: var(--text-muted);">интерфейс User = {'{'}id, name{'}'}</span>
+            </div>
+            <button class="btn" id="set-user">dispatch(setUser({id:1,name:"Alice"}))</button>
+          </div>
+          <div class="demo-row">
+            <div class="demo-row__label">
+              <strong>tagged</strong> = <code>createAction&lt;string[], 'tag/set'&gt;('tag/set')</code><br>
+              <span style="color: var(--text-muted);">второй generic — type (const string)</span>
+            </div>
+            <button class="btn" id="set-tags">dispatch(tagged(['a','b']))</button>
+          </div>
+        </div>
+
+        <div class="out" id="last-action">— ещё не было dispatch —</div>
+
+        <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);">
+          <h4 style="color: var(--accent); font-size: .85rem;">TS-проверки в IDE</h4>
+          <div class="code-block">
+<span class="cm">// ← правильно</span>
+<span class="fn">addBy</span>(<span class="num">5</span>)              <span class="cm">// → { type: 'counter/addBy', payload: 5 }</span>
+
+<span class="cm">// ← TS error</span>
+<span class="fn">addBy</span>(<span class="str">'five'</span>)          <span class="cm">// Argument of type 'string' is not assignable to 'number'</span>
+
+<span class="cm">// ← TS error</span>
+<span class="fn">increment</span>(<span class="num">5</span>)           <span class="cm">// Expected 0 arguments, but got 1</span>
+
+<span class="cm">// ← правильно: партиал объект</span>
+<span class="fn">setUser</span>({ id: <span class="num">1</span>, name: <span class="str">'Alice'</span> })
+
+<span class="cm">// ← TS error: отсутствует name</span>
+<span class="fn">setUser</span>({ id: <span class="num">1</span> })
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — payload и PayloadAction</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>createAction</code> accepts a generic type parameter for the payload. The generated action creator
+          will be typed to accept arguments matching that type, and the resulting action will have the correct
+          <code>payload</code> type.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createAction#using-with-typescript" target="_blank">createAction — TypeScript</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>createAction</code> принимает generic-параметр для типа payload. Получившийся action creator
+          типизируется на приём аргументов этого типа, и в итоговом action поле <code>payload</code>
+          получает правильный тип.»
+        </div>
+
+        <h3>PayloadAction</h3>
+        <p>
+          RTK экспортирует удобный тип <code>PayloadAction&lt;P, T = string, M = never, E = never&gt;</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">type</span> PayloadAction&lt;<span class="ts">P = void, T extends string = string, M = never, E = never</span>&gt; = {
+  type: <span class="ts">T</span>
+  payload: <span class="ts">P</span>
+  meta: <span class="ts">M</span>      <span class="cm">// опционально — только если задан через prepare</span>
+  error: <span class="ts">E</span>     <span class="cm">// опционально</span>
+}
+
+<span class="cm">// Используется в reducer'ах:</span>
+<span class="kw">const</span> reducer = <span class="fn">createSlice</span>({
+  reducers: {
+    addBy: (state, action: <span class="ts">PayloadAction&lt;number&gt;</span>) =&gt; {
+      state.value += action.payload   <span class="cm">// тип payload = number</span>
+    }
+  }
+})
+        </div>
+
+        <h3>Generic type parameter</h3>
+        <div class="code-block">
+<span class="cm">// Без payload</span>
+<span class="kw">const</span> reset = <span class="fn">createAction</span>(<span class="str">'reset'</span>)             <span class="cm">// P = void</span>
+<span class="fn">reset</span>()                                <span class="cm">// OK</span>
+<span class="fn">reset</span>(<span class="num">5</span>)                               <span class="cm">// TS warn (аргумент проигнорируется)</span>
+
+<span class="cm">// С payload</span>
+<span class="kw">const</span> add = <span class="fn">createAction</span>&lt;<span class="ts">number</span>&gt;(<span class="str">'add'</span>)        <span class="cm">// P = number</span>
+<span class="fn">add</span>(<span class="num">5</span>)                               <span class="cm">// OK</span>
+<span class="fn">add</span>()                                 <span class="cm">// TS error: missing argument</span>
+
+<span class="cm">// С двумя параметрами: P и T (константа)</span>
+<span class="kw">const</span> tag = <span class="fn">createAction</span>&lt;<span class="ts">string[], 'tag/set'</span>&gt;(<span class="str">'tag/set'</span>)
+tag.type   <span class="cm">// тип: 'tag/set' (не просто string!)</span>
+        </div>
+        <p>
+          Второй generic-параметр <code>T</code> — это <strong>литеральный тип</strong> для <code>type</code>.
+          Он важен для discriminated unions в reducer'ах: <code>if (action.type === tag.type)</code> сужает
+          тип action точечно.
+        </p>
+
+        <h3>Default export vs named export</h3>
+        <div class="warning">
+          Не путайте: <code>import { createAction } from '@reduxjs/toolkit'</code> — named export.
+          Default export у RTK нет. Импортируйте только через named.
+        </div>
+
+        <h3>Ограничение: один аргумент</h3>
+        <p>
+          Без <code>prepare</code>-callback (урок 22) createAction принимает <strong>один</strong>
+          аргумент — это становится <code>payload</code>. Если нужно передать несколько параметров,
+          используйте объект:
+        </p>
+        <div class="code-block">
+<span class="cm">// ✓ правильно</span>
+<span class="kw">const</span> updateUser = <span class="fn">createAction</span>&lt;{ id: <span class="ts">number</span>, name: <span class="ts">string</span> }&gt;(<span class="str">'user/update'</span>)
+<span class="fn">updateUser</span>({ id: <span class="num">1</span>, name: <span class="str">'Alice'</span> })
+
+<span class="cm">// ✗ неправильно (будет payload = id, name потеряется)</span>
+<span class="kw">const</span> bad = <span class="fn">createAction</span>&lt;<span class="ts">number</span>, <span class="ts">string</span>&gt;(<span class="str">'x'</span>)  <span class="cm">// второй generic — это T, не второй аргумент</span>
+        </div>
+
+        <h3>Подводный камень: undefined payload</h3>
+        <div class="warning">
+          Если вы забыли передать аргумент — <code>payload</code> станет <code>undefined</code>. В production это
+          сложный для debugging баг. В dev TS предупредит. Для <em>обязательного</em> payload всегда ставьте generic
+          (даже примитивный): <code>createAction&lt;number&gt;('add')</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

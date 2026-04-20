@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>20 — createAction(type)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .inspect-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1000px) { .inspect-grid { grid-template-columns: 1fr; } }
+    .inspect-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .inspect-card h4 { font-family: var(--font-mono); font-size: .82rem; color: var(--accent); margin-bottom: 8px; }
+    .inspect-row { display: grid; grid-template-columns: 130px 1fr; gap: 10px; font-family: var(--font-mono); font-size: .78rem; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+    .inspect-row:last-child { border-bottom: none; }
+    .inspect-row__k { color: var(--accent-orange); }
+    .inspect-row__v { color: var(--accent-cyan); word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">20 / 106</span>createAction — action creator в одну строку</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../19-typed-store/">← Назад</a>
+      <a href="../21-create-action-payload/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Интроспекция action creator</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>createAction(type)</code> создаёт типизированную функцию, которая при вызове возвращает action.
+          Но она — не просто функция: на ней есть <code>.type</code>, <code>.match</code>, <code>.toString()</code>.
+          Это даёт возможность использовать её в switch, в matchers, в качестве ключей.
+        </p>
+
+        <div class="inspect-grid">
+          <div class="inspect-card">
+            <h4>Создание</h4>
+            <div class="code-block">
+<span class="kw">import</span> { createAction } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> tick = <span class="fn">createAction</span>(<span class="str">'timer/tick'</span>)
+            </div>
+            <h4 style="margin-top: 12px;">Свойства самой функции</h4>
+            <div class="inspect-row"><span class="inspect-row__k">typeof tick</span><span class="inspect-row__v" id="info-typeof">—</span></div>
+            <div class="inspect-row"><span class="inspect-row__k">tick.type</span><span class="inspect-row__v" id="info-type">—</span></div>
+            <div class="inspect-row"><span class="inspect-row__k">tick.toString()</span><span class="inspect-row__v" id="info-tostring">—</span></div>
+            <div class="inspect-row"><span class="inspect-row__k">`${tick}`</span><span class="inspect-row__v" id="info-template">—</span></div>
+            <div class="inspect-row"><span class="inspect-row__k">typeof tick.match</span><span class="inspect-row__v" id="info-match-type">—</span></div>
+          </div>
+          <div class="inspect-card">
+            <h4>Результат вызова</h4>
+            <div class="code-block">
+<span class="kw">const</span> action = <span class="fn">tick</span>()
+            </div>
+            <h4 style="margin-top: 12px;">Свойства action</h4>
+            <div class="inspect-row"><span class="inspect-row__k">action</span><span class="inspect-row__v" id="info-action">—</span></div>
+            <div class="inspect-row"><span class="inspect-row__k">action.type</span><span class="inspect-row__v" id="info-action-type">—</span></div>
+            <div class="inspect-row"><span class="inspect-row__k">action.payload</span><span class="inspect-row__v" id="info-action-payload">—</span></div>
+            <div class="inspect-row"><span class="inspect-row__k">tick.match(action)</span><span class="inspect-row__v" id="info-match-true">—</span></div>
+            <div class="inspect-row"><span class="inspect-row__k">tick.match(other)</span><span class="inspect-row__v" id="info-match-false">—</span></div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 14px;">
+          <button class="btn" id="dispatch-tick">dispatch(tick())</button>
+          <button class="btn" id="dispatch-other">dispatch({ type:'other' })</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — createAction</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «A helper function for defining a Redux action type and creator. The function will call <code>toString()</code>
+          with the given action type and return the type itself, so it can be used as a key in <code>createReducer</code>
+          or with <code>switch</code> statements. Additionally, you can define a matcher via <code>match</code> for use
+          with <code>addMatcher</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createAction" target="_blank">createAction API</a>
+        </div>
+        <div class="quote quote--ru">
+          «Вспомогательная функция для определения типа Redux-экшена и его creator'а. При вызове <code>toString()</code>
+          возвращает сам тип — это позволяет использовать её как ключ в <code>createReducer</code> или в
+          <code>switch</code>-конструкциях. Также можно использовать <code>match</code> в качестве matcher'а для
+          <code>addMatcher</code>.»
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">createAction</span>&lt;<span class="ts">P = void, T extends string = string</span>&gt;(type: <span class="ts">T</span>): <span class="ts">PayloadActionCreator&lt;P, T&gt;</span>
+
+<span class="cm">// Возвращает функцию со следующими свойствами:</span>
+<span class="kw">interface</span> ActionCreator {
+  (payload?: <span class="ts">P</span>): <span class="ts">PayloadAction&lt;P, T&gt;</span>    <span class="cm">// вызов → action</span>
+  type: <span class="ts">T</span>                                 <span class="cm">// строка type (const)</span>
+  <span class="fn">toString</span>(): <span class="ts">T</span>                         <span class="cm">// возвращает type</span>
+  match(action: <span class="ts">Action</span>): action is <span class="ts">PayloadAction&lt;P, T&gt;</span>  <span class="cm">// type-guard</span>
+}
+        </div>
+
+        <h3>Реализация (упрощённо, из исходника)</h3>
+        <div class="code-block">
+<span class="kw">export function</span> <span class="fn">createAction</span>(type) {
+  <span class="kw">function</span> <span class="fn">actionCreator</span>(...args) {
+    <span class="kw">return</span> { type, payload: args[<span class="num">0</span>] }
+  }
+  actionCreator.type = type
+  actionCreator.toString = () =&gt; <span class="str">`${type}`</span>
+  actionCreator.match = (action) =&gt; action?.type === type
+  <span class="kw">return</span> actionCreator
+}
+        </div>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAction.ts" target="_blank">
+            createAction.ts — полный исходник (~100 строк)
+          </a>
+        </p>
+
+        <h3>Трюк с toString()</h3>
+        <p>
+          Когда вы пишете <code>String(tick)</code> или используете actionCreator в качестве ключа объекта
+          (<code>{ [tick]: reducer }</code>) — JS автоматически вызывает <code>.toString()</code>. Это
+          возвращает <code>'timer/tick'</code>. Такой трюк использовался в <em>классическом</em>
+          createReducer с object-map:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> reducer = <span class="fn">createReducer</span>(initial, {
+  [tick]: (state) =&gt; { state.count++ }           <span class="cm">// ключ приводится к 'timer/tick'</span>
+})
+
+<span class="cm">// В RTK 2.x object-map deprecated — используйте builder:</span>
+<span class="kw">const</span> reducer = <span class="fn">createReducer</span>(initial, (builder) =&gt; {
+  builder.<span class="fn">addCase</span>(tick, (state) =&gt; { state.count++ })
+})
+        </div>
+
+        <h3>match как type-guard</h3>
+        <div class="code-block">
+<span class="cm">// TS сужает тип action до PayloadAction&lt;P, T&gt;</span>
+<span class="kw">if</span> (tick.match(action)) {
+  action.type      <span class="cm">// typed как 'timer/tick'</span>
+  action.payload   <span class="cm">// typed как P</span>
+}
+
+<span class="cm">// Это ключ к listenerMiddleware:</span>
+listener.<span class="fn">startListening</span>({
+  matcher: tick.match,     <span class="cm">// ← именно так</span>
+  effect: (action, api) =&gt; { /* ... */ }
+})
+        </div>
+
+        <h3>Что createAction НЕ делает</h3>
+        <div class="warning">
+          createAction только <strong>создаёт action creator</strong>. Он не регистрирует его в reducer, не делает
+          подписку, не знает про store. Это чистая функция. Связывание action ↔ state происходит в reducer
+          (через switch, object-map или builder).
+        </div>
+
+        <h3>Когда использовать createAction напрямую</h3>
+        <ul>
+          <li>Shared actions между несколькими slice'ами (например, <code>resetAll</code>, <code>userLoggedOut</code>).</li>
+          <li>Actions, которые вы dispatch извне, но на которые реагирует несколько reducer'ов.</li>
+          <li>В 99% случаев внутри slice — пользуйтесь <code>slice.actions.xxx</code>, RTK сам создаёт через createAction.</li>
+        </ul>
+
+        <h3>Подводный камень: ключевое слово 'type'</h3>
+        <div class="warning">
+          Если вы случайно сделаете <code>dispatch(tick)</code> (без скобок) — вы dispatch'нете <strong>функцию</strong>.
+          Thunk попробует её выполнить (она вернёт action), но это побочный эффект. actionCreatorInvariantMiddleware
+          (урок 14) ловит такие случаи.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

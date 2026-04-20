@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>24 — createReducer (builder)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1000px) { .split { grid-template-columns: 1fr; } }
+    .split-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .split-card--old { border-left: 3px solid var(--accent-orange); }
+    .split-card--new { border-left: 3px solid var(--success); }
+    .split-card h4 { font-family: var(--font-mono); font-size: .82rem; margin-bottom: 6px; }
+    .split-card--old h4 { color: var(--accent-orange); }
+    .split-card--new h4 { color: var(--success); }
+    .todo-list { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; margin-top: 10px; min-height: 60px; }
+    .todo-item { padding: 4px 0; font-family: var(--font-mono); font-size: .78rem; color: var(--text-primary); border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .todo-item.done { color: var(--text-muted); text-decoration: line-through; }
+    .todo-item:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">24 / 106</span>createReducer — builder API</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../23-matchers-utilities/">← Назад</a>
+      <a href="../25-add-matcher-default/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Todos reducer — старый стиль vs builder</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>createReducer</code> принимает builder-callback, в котором вы цепочкой вызываете
+          <code>.addCase(action, handler)</code>. Внутри — Immer: мутируйте state без опасений.
+          Старый object-map (ключи — action types) <strong>deprecated в RTK 2.x</strong>.
+        </p>
+
+        <div class="split">
+          <div class="split-card split-card--old">
+            <h4>⚠ Deprecated: object-map (RTK 1.x)</h4>
+            <div class="code-block">
+<span class="kw">const</span> todos = <span class="fn">createReducer</span>(initial, {
+  [addTodo.type]: (state, action) =&gt; {
+    state.<span class="fn">push</span>(action.payload)
+  },
+  [toggleTodo.type]: (state, { payload }) =&gt; {
+    <span class="kw">const</span> t = state.<span class="fn">find</span>(x =&gt; x.id === payload)
+    <span class="kw">if</span> (t) t.done = !t.done
+  }
+})
+            </div>
+            <p style="font-size: .76rem; color: var(--accent-orange); margin-top: 8px;">
+              ⚠ Удалено в RTK 2.x. Используйте builder-callback.
+            </p>
+          </div>
+          <div class="split-card split-card--new">
+            <h4>✓ Рекомендовано: builder-callback</h4>
+            <div class="code-block">
+<span class="kw">const</span> todos = <span class="fn">createReducer</span>(initial, (builder) =&gt; {
+  builder
+    .<span class="fn">addCase</span>(addTodo, (state, action) =&gt; {
+      state.<span class="fn">push</span>(action.payload)
+    })
+    .<span class="fn">addCase</span>(toggleTodo, (state, { payload }) =&gt; {
+      <span class="kw">const</span> t = state.<span class="fn">find</span>(x =&gt; x.id === payload)
+      <span class="kw">if</span> (t) t.done = !t.done
+    })
+})
+            </div>
+            <p style="font-size: .76rem; color: var(--success); margin-top: 8px;">
+              ✓ Типобезопасный, поддерживает addMatcher, addDefaultCase (урок 25).
+            </p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+          <input id="todo-text" type="text" placeholder="текст задачи"
+                 style="flex: 1; min-width: 160px; padding: 8px 10px; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-primary); border-radius: var(--radius-sm); font-family: var(--font-mono);">
+          <button class="btn" id="add-todo">addTodo</button>
+          <button class="btn btn--secondary" id="clear-todos">clearAll</button>
+        </div>
+
+        <div class="todo-list" id="todo-list">— нет задач —</div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — createReducer + builder</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>createReducer</code> lets you supply a lookup table of action types to case reducer functions,
+          rather than writing switch statements. It uses <code>immer</code> internally, so you can write code
+          that "mutates" state inside the case reducers.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createReducer" target="_blank">createReducer API</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>createReducer</code> позволяет задать соответствие между action type и case-reducer'ом —
+          вместо того чтобы писать switch. Внутри используется <code>immer</code>, поэтому вы можете писать
+          код, «мутирующий» state внутри case-reducer'ов.»
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">createReducer</span>&lt;<span class="ts">S</span>&gt;(
+  initialState: <span class="ts">S | (() =&gt; S)</span>,
+  builderCallback: (builder: <span class="ts">ActionReducerMapBuilder&lt;S&gt;</span>) =&gt; <span class="ts">void</span>
+): <span class="ts">Reducer&lt;S&gt;</span>
+
+<span class="kw">interface</span> ActionReducerMapBuilder&lt;S&gt; {
+  addCase(actionCreator, reducer): <span class="ts">this</span>
+  addCase(actionType: <span class="ts">string</span>, reducer): <span class="ts">this</span>
+  addMatcher(matcher, reducer): <span class="ts">this</span>         <span class="cm">// урок 25</span>
+  addDefaultCase(reducer): <span class="ts">this</span>              <span class="cm">// урок 25</span>
+}
+        </div>
+
+        <h3>initialState может быть функцией</h3>
+        <div class="code-block">
+<span class="cm">// Функция вызывается один раз при инициализации</span>
+<span class="kw">const</span> reducer = <span class="fn">createReducer</span>(
+  () =&gt; ({ value: <span class="num">0</span>, startedAt: Date.<span class="fn">now</span>() }),   <span class="cm">// ← lazy init</span>
+  (builder) =&gt; { ... }
+)
+        </div>
+        <p>
+          Полезно, если initialState зависит от side-effects (например, чтение localStorage).
+          Функция вызывается один раз при первом <code>@@INIT</code>.
+        </p>
+
+        <h3>Правило чистоты reducer'а</h3>
+        <div class="warning">
+          Reducer ДОЛЖЕН быть <strong>чистой функцией</strong>: для одинакового входа — одинаковый выход.
+          <ul style="margin-top: 6px;">
+            <li>Никаких <code>Date.now()</code>, <code>Math.random()</code>, <code>nanoid()</code> внутри.</li>
+            <li>Никаких API-вызовов (<code>fetch</code>).</li>
+            <li>Только чтение из action.payload и запись в state.</li>
+          </ul>
+          Все side-effects — в <code>prepare</code>-callback или в thunk.
+        </div>
+
+        <h3>Почему object-map deprecated</h3>
+        <ol>
+          <li><strong>Порядок matcher'ов потерян</strong> — при object-map вы не могли гарантировать порядок
+              вызова handlers. Builder делает это явно: addCase вызывается в том порядке, в котором вы его написали.</li>
+          <li><strong>Нет addMatcher / addDefaultCase</strong> — для них нужен builder-паттерн, который сохраняет
+              цепочку действий.</li>
+          <li><strong>TS-вывод хуже</strong> — builder лучше выводит типы через цепочку методов.</li>
+        </ol>
+
+        <h3>Можно комбинировать с строковым type</h3>
+        <div class="code-block">
+builder
+  .<span class="fn">addCase</span>(addTodo, handler)           <span class="cm">// через actionCreator</span>
+  .<span class="fn">addCase</span>(<span class="str">'legacy/action'</span>, handler)   <span class="cm">// через строку (редко нужно)</span>
+        </div>
+
+        <h3>Подводный камень: обязательно addCase перед addMatcher</h3>
+        <div class="warning">
+          Порядок в builder важен: <strong>addCase → addMatcher → addDefaultCase</strong>.
+          Если попытаетесь вызвать addCase после addMatcher — получите runtime error
+          «<em>addCase</em> cannot be called after <em>addMatcher</em>». Подробнее в уроке 25.
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createReducer.ts" target="_blank">createReducer.ts</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/mapBuilders.ts" target="_blank">mapBuilders.ts — реализация builder'а</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

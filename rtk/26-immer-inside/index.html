@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>26 — Immer внутри createReducer</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .draft-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1100px) { .draft-grid { grid-template-columns: 1fr; } }
+    .draft-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .draft-card h4 { font-family: var(--font-mono); color: var(--accent); font-size: .82rem; margin-bottom: 8px; }
+    .refs { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 10px 14px; margin: 12px 0; font-family: var(--font-mono); font-size: .76rem; }
+    .refs .yes { color: var(--success); font-weight: 700; }
+    .refs .no  { color: var(--accent-red); font-weight: 700; }
+    .refs .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--border); }
+    .refs .row:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">26 / 106</span>Immer — как produce работает изнутри</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../25-add-matcher-default/">← Назад</a>
+      <a href="../27-immer-pitfalls/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Как Immer превращает мутацию в новый объект</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Immer создаёт <strong>Proxy-обёртку</strong> над state (draft). Когда вы «мутируете» draft,
+          Immer на самом деле записывает в внутренний map изменений. После reducer'а он строит новый объект
+          <em>только для изменённых путей</em>. Непроизменные ветки — <strong>та же ссылка</strong> (structural sharing).
+        </p>
+
+        <div class="draft-grid">
+          <div class="draft-card">
+            <h4>Структура state</h4>
+            <div class="code-block">
+{
+  counter: { value: <span class="num">0</span> },
+  user:    { name: <span class="str">'Alice'</span>, age: <span class="num">30</span> },
+  tags:    [<span class="str">'a'</span>, <span class="str">'b'</span>],
+  items:   { ids: [], byId: {} },
+}
+            </div>
+            <h4 style="margin-top: 12px;">Действия</h4>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <button class="btn" data-act="inc">state.counter.value += 1</button>
+              <button class="btn" data-act="rename">state.user.name = 'Bob'</button>
+              <button class="btn" data-act="push">state.tags.push('c')</button>
+              <button class="btn" data-act="noop">noop (ничего не мутирует)</button>
+            </div>
+          </div>
+          <div class="draft-card">
+            <h4>Ссылочное равенство до/после</h4>
+            <p style="color: var(--text-secondary); font-size: .78rem; margin-bottom: 8px;">
+              Зелёный = та же ссылка (<code>===</code>), красный = новая ссылка.
+              После <code>state.counter.value += 1</code> — <strong>только</strong> ветка counter обновится.
+            </p>
+            <div class="refs" id="refs-out">— нажмите кнопку —</div>
+
+            <h4 style="margin-top: 12px;">JSON state</h4>
+            <pre id="state-json" style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-family: var(--font-mono); font-size: .75rem; color: var(--text-primary); margin: 0; overflow-x: auto; white-space: pre;"></pre>
+          </div>
+        </div>
+
+        <p style="color: var(--text-secondary); font-size: .8rem; margin-top: 14px;">
+          Проверьте в DevTools: в Diff-вкладке увидите только изменённое поле.
+          В State-вкладке — весь новый объект. Но вы можете быть уверены: <strong>90% объекта — та же память</strong>,
+          селекторы получают те же ссылки, React не будет ре-рендерить лишнего.
+        </p>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Immer</div>
+      <div class="theory__body">
+        <h3>Из доки RTK</h3>
+        <div class="quote">
+          «<code>createReducer</code> uses Immer under the hood to let you write "mutating" immutable update logic.
+          Inside a case reducer, you can modify the state directly, and Immer will produce a safely copied new state.»
+          <br>— <a href="https://redux-toolkit.js.org/usage/immer-reducers" target="_blank">Writing Reducers with Immer</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>createReducer</code> использует Immer под капотом, чтобы позволить писать «мутирующую»
+          иммутабельную логику обновления. Внутри case-reducer'а вы можете модифицировать state напрямую,
+          а Immer произведёт безопасно скопированный новый state.»
+        </div>
+
+        <h3>Упрощённая реализация produce</h3>
+        <div class="code-block">
+<span class="kw">import</span> { produce } <span class="kw">from</span> <span class="str">'immer'</span>
+
+<span class="kw">function</span> <span class="fn">reducer</span>(state, action) {
+  <span class="kw">return</span> <span class="fn">produce</span>(state, (draft) =&gt; {
+    <span class="cm">// draft — это Proxy(state)</span>
+    <span class="kw">if</span> (action.type === <span class="str">'increment'</span>) {
+      draft.count += <span class="num">1</span>   <span class="cm">// set-trap на Proxy</span>
+    }
+    <span class="cm">// ничего не возвращаем → Immer сам построит новый state</span>
+  })
+}
+
+<span class="cm">// createReducer делает примерно это:</span>
+<span class="kw">const</span> wrappedReducer = (state, action) =&gt; {
+  <span class="kw">return</span> <span class="fn">produce</span>(state, (draft) =&gt; {
+    <span class="kw">for</span> (<span class="kw">const</span> caseReducer <span class="kw">of</span> matchingReducers) {
+      <span class="fn">caseReducer</span>(draft, action)
+    }
+  })
+}
+        </div>
+
+        <h3>Как работает Proxy draft</h3>
+        <ol>
+          <li>produce создаёт Proxy над вашим state.</li>
+          <li>При <strong>чтении</strong> (get-trap) Proxy возвращает значение или создаёт вложенный Proxy.</li>
+          <li>При <strong>записи</strong> (set-trap) Proxy ставит <code>modified: true</code> на ноду и запоминает изменение.</li>
+          <li>После reducer'а Immer рекурсивно обходит draft:
+            <ul>
+              <li>если нода не modified — возвращает оригинал (тот же объект);</li>
+              <li>если modified — создаёт копию и применяет изменения.</li>
+            </ul>
+          </li>
+        </ol>
+
+        <h3>Structural sharing</h3>
+        <p>
+          Ключевая оптимизация: <strong>непроизменные ветки state остаются с той же ссылкой</strong>.
+          Это критично для React-Redux: селекторы, возвращающие ссылку на немутировавшую ветку,
+          не триггерят ре-рендер.
+        </p>
+
+        <h3>Возврат из reducer'а</h3>
+        <div class="code-block">
+<span class="cm">// Вариант 1: мутация draft, без return (самый частый)</span>
+(state, action) =&gt; {
+  state.value += <span class="num">1</span>
+}
+
+<span class="cm">// Вариант 2: возврат нового значения</span>
+(state, action) =&gt; {
+  <span class="kw">return</span> { ...state, value: state.value + <span class="num">1</span> }
+}
+
+<span class="cm">// Вариант 3: возврат совершенно нового state</span>
+(state, action) =&gt; {
+  <span class="kw">return</span> <span class="fn">createInitialState</span>()
+}
+        </div>
+        <p>
+          Но <strong>нельзя смешивать</strong> мутацию draft и <code>return</code> — подробнее в уроке 27.
+        </p>
+
+        <h3>Исключение: draft + primitive</h3>
+        <p>
+          Если state — это примитив (number, string), «мутация» невозможна. Вы обязаны
+          <code>return newValue</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> reducer = <span class="fn">createReducer</span>(<span class="num">0</span>, (builder) =&gt; {
+  builder.<span class="fn">addCase</span>(increment, (state) =&gt; state + <span class="num">1</span>)  <span class="cm">// обязательно return</span>
+})
+        </div>
+
+        <h3>Производительность</h3>
+        <div class="warning">
+          Immer имеет оверхед ~2-5x на создание/обход Proxy по сравнению с ручным копированием. Для
+          большинства reducer'ов это незаметно (микросекунды). Для больших массивов (1000+) можно
+          использовать обычный иммутабельный return без мутации.
+        </div>
+
+        <h3>setAutoFreeze</h3>
+        <p>
+          Immer по умолчанию <strong>замораживает</strong> (Object.freeze) результирующий state. Это ловит
+          случайные мутации вне reducer'а. RTK включает autoFreeze на уровне produce — вы не можете
+          <code>state.value = 999</code> после dispatch.
+        </p>
+
+        <h3>original() и current()</h3>
+        <p>
+          Внутри reducer'а у вас draft — не тот же объект, что state. Если нужен <strong>оригинал</strong>
+          или <strong>снэпшот</strong> draft'а — используйте утилиты Immer (урок 27):
+        </p>
+        <div class="code-block">
+<span class="kw">import</span> { current, original } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+(state, action) =&gt; {
+  <span class="fn">console</span>.log(<span class="fn">original</span>(state))   <span class="cm">// исходный объект до мутаций</span>
+  state.x = <span class="num">1</span>
+  <span class="fn">console</span>.log(<span class="fn">current</span>(state))    <span class="cm">// snapshot draft'а в данный момент</span>
+}
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://immerjs.github.io/immer/" target="_blank">Документация Immer</a></li>
+          <li><a href="https://redux-toolkit.js.org/usage/immer-reducers" target="_blank">Writing Reducers with Immer (RTK docs)</a></li>
+          <li><a href="https://immerjs.github.io/immer/structural-sharing" target="_blank">Structural sharing explanation</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

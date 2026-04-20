@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>23 — nanoid, isAnyOf, isAllOf</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .match-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1000px) { .match-grid { grid-template-columns: 1fr; } }
+    .match-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .match-card h4 { font-family: var(--font-mono); color: var(--accent); font-size: .85rem; margin-bottom: 8px; }
+    .match-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px;
+                 font-family: var(--font-mono); font-size: .76rem; margin-top: 8px; min-height: 30px;
+                 color: var(--accent-cyan); }
+    .ids-out { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+               padding: 10px 12px; font-family: var(--font-mono); font-size: .72rem; color: var(--success);
+               white-space: pre-wrap; margin-top: 8px; max-height: 120px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">23 / 106</span>nanoid, isAnyOf, isAllOf — утилиты RTK</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../22-prepare-callback/">← Назад</a>
+      <a href="../23a-matchers-deep/">23a — matchers глубоко →</a>
+      <a href="../24-create-reducer-builder/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">nanoid(), isAnyOf, isAllOf — утилиты в живом коде</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Три утилиты, которые часто используются вместе с createAction и createReducer.
+        </p>
+
+        <div class="match-grid">
+          <div class="match-card">
+            <h4>nanoid() — безопасный id-генератор</h4>
+            <p style="color: var(--text-secondary); font-size: .8rem; margin-bottom: 8px;">
+              Встроен в RTK. Использует crypto.getRandomValues. 21 символ по умолчанию, URL-safe алфавит.
+            </p>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button class="btn" data-op="id-default">nanoid()</button>
+              <button class="btn" data-op="id-10">nanoid(10)</button>
+              <button class="btn" data-op="id-5">nanoid(5)</button>
+              <button class="btn" data-op="id-100">100 штук — коллизии?</button>
+              <button class="btn btn--secondary" data-op="id-clear">очистить</button>
+            </div>
+            <div class="ids-out" id="ids-out">— здесь появятся сгенерированные id —</div>
+          </div>
+
+          <div class="match-card">
+            <h4>isAnyOf(...actionCreators)</h4>
+            <p style="color: var(--text-secondary); font-size: .8rem; margin-bottom: 8px;">
+              Matcher, который возвращает true если <em>хотя бы один</em> из actionCreators совпал.
+            </p>
+            <div class="code-block">
+<span class="kw">const</span> userAction = <span class="fn">isAnyOf</span>(loggedIn, loggedOut, userUpdated)
+
+<span class="kw">if</span> (<span class="fn">userAction</span>(action)) {
+  <span class="cm">// action — один из трёх</span>
+}
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+              <button class="btn" data-op="any-login">dispatch(loggedIn)</button>
+              <button class="btn" data-op="any-update">dispatch(userUpdated)</button>
+              <button class="btn" data-op="any-other">dispatch(other)</button>
+            </div>
+            <div class="match-out" id="any-out">—</div>
+          </div>
+        </div>
+
+        <div class="match-grid">
+          <div class="match-card">
+            <h4>isAllOf(...actionCreators)</h4>
+            <p style="color: var(--text-secondary); font-size: .8rem; margin-bottom: 8px;">
+              Matcher для случаев, когда нужно проверить, что action <em>удовлетворяет нескольким условиям</em>.
+              Используется с type-predicates: <code>isAllOf(isRejectedWithValue, isUserAction)</code>.
+            </p>
+            <div class="code-block">
+<span class="kw">const</span> userError = <span class="fn">isAllOf</span>(isRejectedWithValue, isUserAction)
+
+<span class="kw">if</span> (<span class="fn">userError</span>(action)) {
+  <span class="cm">// action — и rejected, и user-related</span>
+}
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+              <button class="btn" data-op="all-userfail">user/fetch rejected</button>
+              <button class="btn" data-op="all-otherfail">other rejected</button>
+              <button class="btn" data-op="all-userok">user/fetch fulfilled</button>
+            </div>
+            <div class="match-out" id="all-out">—</div>
+          </div>
+
+          <div class="match-card">
+            <h4>isAsyncThunkAction, isRejectedWithValue, …</h4>
+            <p style="color: var(--text-secondary); font-size: .8rem; margin-bottom: 8px;">
+              Специальные matcher'ы для createAsyncThunk actions. Подробно — в секции G.
+            </p>
+            <div class="code-block">
+<span class="kw">import</span> {
+  isPending,
+  isFulfilled,
+  isRejected,
+  isRejectedWithValue,
+  isAsyncThunkAction,
+} <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="fn">isPending</span>(myThunk)(action)          <span class="cm">// любой pending от myThunk</span>
+<span class="fn">isPending</span>(myThunk, otherThunk)(action)
+<span class="fn">isPending</span>()                          <span class="cm">// pending от любого thunk</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: .75rem; margin-top: 8px;">
+              Эти matcher'ы возвращают функцию, которую нужно вызвать с action.
+              Идеально для <code>builder.addMatcher(isPending(thunk), handler)</code>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — matchers и utilities</div>
+      <div class="theory__body">
+        <h3>nanoid — из доки</h3>
+        <div class="quote">
+          «<code>nanoid</code> returns a non-secure random string ID. For most use cases this is sufficient.
+          If you need cryptographically strong IDs, use a dedicated library.»
+          <br>— <a href="https://redux-toolkit.js.org/api/other-exports#nanoid" target="_blank">nanoid in RTK</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>nanoid</code> возвращает не-секьюрную случайную строку-id. Для большинства случаев этого достаточно.
+          Если нужны криптографически стойкие id — используйте специальную библиотеку.»
+        </div>
+
+        <h3>Почему RTK переэкспортирует nanoid</h3>
+        <p>
+          <code>nanoid</code> используется внутри <code>createAsyncThunk</code> для генерации
+          <code>requestId</code> и в <code>createEntityAdapter</code>. RTK переэкспортирует его,
+          чтобы вы могли использовать без доп. установки пакета <code>nanoid</code>.
+        </p>
+
+        <h3>isAnyOf — из доки</h3>
+        <div class="quote">
+          «<code>isAnyOf</code> takes one or more action creators or matchers as arguments. It returns a matcher
+          that returns <code>true</code> if the action matches any of the provided conditions.»
+          <br>— <a href="https://redux-toolkit.js.org/api/matching-utilities#isanyof" target="_blank">isAnyOf API</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>isAnyOf</code> принимает один или несколько action creator'ов или matcher'ов. Возвращает matcher,
+          который возвращает <code>true</code>, если action удовлетворяет <em>хотя бы одному</em> из условий.»
+        </div>
+
+        <h3>isAllOf — из доки</h3>
+        <div class="quote">
+          «<code>isAllOf</code> ...returns <code>true</code> only if the action matches all of the provided conditions.»
+          <br>— <a href="https://redux-toolkit.js.org/api/matching-utilities#isallof" target="_blank">isAllOf API</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>isAllOf</code> …возвращает <code>true</code>, только если action удовлетворяет <em>всем</em>
+          условиям сразу.»
+        </div>
+
+        <h3>Матчеры — что это вообще</h3>
+        <p>
+          Matcher — функция сигнатуры <code>(action) =&gt; boolean</code> (в TS — type-predicate).
+          Именно так построен RTK: <code>.match</code> на actionCreator'е — это matcher. Комбинаторы
+          <code>isAnyOf</code> и <code>isAllOf</code> объединяют несколько matcher'ов в один.
+        </p>
+
+        <h3>Полный список utility-matchers</h3>
+        <ul>
+          <li><code>isAction(action)</code> — базовая проверка, что это action</li>
+          <li><code>isPlainObject(value)</code> — plain object helper</li>
+          <li><code>isAsyncThunkAction(thunk1, thunk2, ...)</code> — любой action этих thunk'ов</li>
+          <li><code>isPending(thunk?)</code> — pending action</li>
+          <li><code>isFulfilled(thunk?)</code> — fulfilled action</li>
+          <li><code>isRejected(thunk?)</code> — rejected action</li>
+          <li><code>isRejectedWithValue(thunk?)</code> — rejected c rejectWithValue</li>
+          <li><code>isAllOf(...)</code></li>
+          <li><code>isAnyOf(...)</code></li>
+        </ul>
+
+        <h3>Где использовать</h3>
+        <div class="code-block">
+<span class="cm">// 1) builder.addMatcher</span>
+builder.<span class="fn">addMatcher</span>(<span class="fn">isRejected</span>(fetchUser, fetchPosts), (state, action) =&gt; {
+  state.error = action.error.message
+})
+
+<span class="cm">// 2) listenerMiddleware</span>
+listener.<span class="fn">startListening</span>({
+  matcher: <span class="fn">isAnyOf</span>(loggedIn, userUpdated),
+  effect: (action, api) =&gt; { /* ... */ }
+})
+
+<span class="cm">// 3) Условно в thunk'е</span>
+<span class="kw">if</span> (<span class="fn">isAction</span>(maybeAction)) { ... }
+        </div>
+
+        <h3>Подводный камень: isPending(thunk) — фабрика</h3>
+        <div class="warning">
+          <code>isPending(thunk)</code> — это НЕ matcher, это <strong>фабрика</strong>. Она возвращает matcher.
+          Нужно: <code>builder.addMatcher(isPending(fetchUser), handler)</code>. Если пишете
+          <code>builder.addMatcher(isPending, handler)</code> — это сработает как matcher для
+          <em>любого</em> pending, что может быть нежелательно.
+        </div>
+
+        <h3>Подводный камень: isRejectedWithValue требует requestId</h3>
+        <div class="warning">
+          Если вручную создаёте «rejected»-action через <code>createAction(..., prepare)</code>,
+          то <code>isRejectedWithValue(action)</code> вернёт <code>false</code>, пока в meta нет
+          <strong>и</strong> <code>requestStatus: 'rejected'</code>, <strong>и</strong>
+          <code>requestId: string</code>, <strong>и</strong> <code>rejectedWithValue: true</code>.
+          Внутри RTK это <code>hasExpectedRequestMetadata(action, ['rejected']) &amp;&amp; meta.rejectedWithValue</code>.
+          <code>createAsyncThunk</code> расставляет всё это сам — вам думать не надо. Но в учебном
+          коде / тестах нужно вручную:
+          <div class="code-block">
+<span class="kw">const</span> userFail = <span class="fn">createAction</span>(<span class="str">'user/fetch/rejected'</span>, (msg: <span class="kw">string</span>) =&gt; ({
+  payload: msg,
+  error: { message: msg, name: <span class="str">'RejectedError'</span> },
+  meta: {
+    arg: <span class="kw">undefined</span>,
+    requestId: <span class="fn">nanoid</span>(),                <span class="cm">// ← обязательно</span>
+    requestStatus: <span class="str">'rejected'</span> <span class="kw">as const</span>, <span class="cm">// ← обязательно</span>
+    aborted: <span class="kw">false</span>,
+    condition: <span class="kw">false</span>,
+    rejectedWithValue: <span class="kw">true</span>,        <span class="cm">// ← обязательно</span>
+  },
+}))
+          </div>
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/matching-utilities" target="_blank">Matching Utilities API</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/matchers.ts" target="_blank">matchers.ts — реализация</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/nanoid.ts" target="_blank">nanoid.ts — реализация</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

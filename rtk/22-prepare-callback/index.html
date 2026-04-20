@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>22 — prepare callback</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .prep-grid { display: grid; gap: 12px; margin: 14px 0; }
+    .prep-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .prep-card__title { font-family: var(--font-mono); color: var(--accent); font-size: .82rem; margin-bottom: 6px; }
+    .prep-card__result { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 6px 10px;
+                         font-family: var(--font-mono); font-size: .74rem; color: var(--accent-cyan); margin-top: 8px;
+                         white-space: pre; overflow-x: auto; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">22 / 106</span>prepare callback — кастомизация payload, meta, error</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../21-create-action-payload/">← Назад</a>
+      <a href="../23-matchers-utilities/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">4 сценария prepare — меняют саму структуру action</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>prepare</code> — второй аргумент <code>createAction</code>. Это функция, которая получает
+          входные параметры и возвращает <code>{ payload, meta?, error? }</code>. Так можно генерировать
+          id, timestamp, прятать non-сериализуемые данные, принимать несколько аргументов.
+        </p>
+
+        <div class="prep-grid">
+          <div class="prep-card">
+            <div class="prep-card__title">1. nanoid — автогенерация id</div>
+            <div class="code-block">
+<span class="kw">const</span> addTodo = <span class="fn">createAction</span>(<span class="str">'todos/add'</span>, (text: <span class="ts">string</span>) =&gt; ({
+  payload: { id: <span class="fn">nanoid</span>(), text, done: <span class="kw">false</span> }
+}))
+
+<span class="fn">addTodo</span>(<span class="str">'купить хлеб'</span>)
+<span class="cm">// { type: 'todos/add', payload: { id: 'V1StGXR8_Z', text: '...', done: false } }</span>
+            </div>
+            <div class="prep-card__result" id="out-todo">—</div>
+            <button class="btn" style="margin-top: 8px;" data-demo="todo">dispatch(addTodo(...))</button>
+          </div>
+
+          <div class="prep-card">
+            <div class="prep-card__title">2. Несколько аргументов → один payload</div>
+            <div class="code-block">
+<span class="kw">const</span> addUser = <span class="fn">createAction</span>(<span class="str">'users/add'</span>, (name: <span class="ts">string</span>, age: <span class="ts">number</span>) =&gt; ({
+  payload: { name, age, id: <span class="fn">nanoid</span>() }
+}))
+
+<span class="fn">addUser</span>(<span class="str">'Alice'</span>, <span class="num">30</span>)
+            </div>
+            <div class="prep-card__result" id="out-user">—</div>
+            <button class="btn" style="margin-top: 8px;" data-demo="user">dispatch(addUser('Alice', 30))</button>
+          </div>
+
+          <div class="prep-card">
+            <div class="prep-card__title">3. meta — timestamp, analytics</div>
+            <div class="code-block">
+<span class="kw">const</span> logged = <span class="fn">createAction</span>(<span class="str">'event/logged'</span>, (message: <span class="ts">string</span>) =&gt; ({
+  payload: message,
+  meta: { timestamp: Date.<span class="fn">now</span>(), source: <span class="str">'user-action'</span> }
+}))
+            </div>
+            <div class="prep-card__result" id="out-meta">—</div>
+            <button class="btn" style="margin-top: 8px;" data-demo="meta">dispatch(logged('hello'))</button>
+          </div>
+
+          <div class="prep-card">
+            <div class="prep-card__title">4. error — SerializedError</div>
+            <div class="code-block">
+<span class="kw">const</span> failed = <span class="fn">createAction</span>(<span class="str">'fetch/failed'</span>, (err: <span class="ts">Error</span>) =&gt; ({
+  payload: err.message,
+  error: <span class="kw">true</span>,
+  meta: { name: err.name, stack: err.stack }
+}))
+            </div>
+            <div class="prep-card__result" id="out-err">—</div>
+            <button class="btn" style="margin-top: 8px;" data-demo="error">dispatch(failed(new Error('404')))</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — prepare callback</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «If provided, <code>prepare</code> is called as part of the action creator with whatever arguments
+          the creator received, and should return either an object with a <code>payload</code> field, or an object
+          with <code>payload</code>, <code>meta</code>, and/or <code>error</code> fields.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createAction#using-prepare-callbacks-to-customize-action-contents" target="_blank">prepare callback docs</a>
+        </div>
+        <div class="quote quote--ru">
+          «Если передан, <code>prepare</code> вызывается как часть action creator'а с теми аргументами, что
+          получил creator, и должен вернуть либо объект с полем <code>payload</code>, либо объект с полями
+          <code>payload</code>, <code>meta</code> и/или <code>error</code>.»
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">createAction</span>&lt;<span class="ts">Args, PA extends PayloadActionCreator</span>&gt;(
+  type: <span class="ts">string</span>,
+  prepare?: (...args: <span class="ts">Args</span>) =&gt; {
+    payload: <span class="ts">unknown</span>,
+    meta?: <span class="ts">unknown</span>,
+    error?: <span class="ts">unknown</span>
+  }
+): PA
+
+<span class="cm">// prepare — это preparation-функция, не reducer!</span>
+        </div>
+
+        <h3>FSA (Flux Standard Action)</h3>
+        <p>
+          RTK следует <a href="https://github.com/redux-utilities/flux-standard-action" target="_blank">FSA</a> —
+          конвенции структуры action:
+        </p>
+        <div class="code-block">
+<span class="kw">interface</span> FSA {
+  type: <span class="ts">string</span>            <span class="cm">// обязательно</span>
+  payload?: <span class="ts">unknown</span>       <span class="cm">// данные action</span>
+  error?: <span class="ts">boolean</span>         <span class="cm">// true если ошибка (payload содержит Error-like объект)</span>
+  meta?: <span class="ts">unknown</span>          <span class="cm">// метаданные (id, timestamp, source)</span>
+}
+        </div>
+        <p>
+          <strong>Строгое правило:</strong> если <code>error: true</code>, то <code>payload</code>
+          должен соответствовать <code>Error</code>-shape. Это ключ для <code>isRejectedWithValue</code> matcher'а.
+        </p>
+
+        <h3>nanoid — встроенный id-generator</h3>
+        <div class="code-block">
+<span class="kw">import</span> { nanoid } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="cm">// nanoid() → строка 21 символ, криптографически random</span>
+<span class="cm">// Примеры: 'V1StGXR8_Z5jdHi6B-myT'</span>
+<span class="fn">nanoid</span>()       <span class="cm">// дефолтная длина</span>
+<span class="fn">nanoid</span>(<span class="num">10</span>)     <span class="cm">// 10 символов</span>
+        </div>
+        <p>
+          nanoid — это не alias на UUID, это <strong>отдельная функция</strong>, переэкспортированная
+          RTK из <code>@reduxjs/toolkit</code>. Использует crypto.getRandomValues.
+        </p>
+
+        <h3>Вариант в createSlice</h3>
+        <div class="code-block">
+<span class="kw">const</span> todoSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'todos'</span>,
+  initialState: [],
+  reducers: {
+    addTodo: {
+      reducer: (state, action) =&gt; {
+        state.<span class="fn">push</span>(action.payload)
+      },
+      prepare: (text: <span class="ts">string</span>) =&gt; ({
+        payload: { id: <span class="fn">nanoid</span>(), text, done: <span class="kw">false</span> }
+      })
+    }
+  }
+})
+
+<span class="cm">// В компоненте:</span>
+dispatch(<span class="fn">addTodo</span>(<span class="str">'купить хлеб'</span>))   <span class="cm">// передаём только text</span>
+        </div>
+
+        <h3>Подводный камень: id внутри reducer'а — запрещено</h3>
+        <div class="warning">
+          Reducer должен быть <strong>чистой функцией</strong>: без Math.random, без Date.now, без nanoid.
+          Иначе time-travel в DevTools сломается: при откате назад reducer сгенерирует <em>новый</em> id.
+          Всегда делайте <code>nanoid()</code> в <strong>prepare</strong>, не в reducer.
+        </div>
+
+        <h3>Подводный камень: возврат из prepare</h3>
+        <div class="warning">
+          prepare обязан вернуть <strong>объект с полем payload</strong>. Если вернёте просто значение,
+          получите <code>{ type, payload: undefined, meta: 'ваше-значение' }</code> — неожиданная
+          структура. Правильно: <code>return { payload: value }</code>.
+        </div>
+
+        <h3>Источник</h3>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAction.ts" target="_blank">
+            createAction.ts
+          </a> — функция <code>createAction</code>, если есть prepare, делает вызов
+          <code>prepared = prepare(...args)</code> и разбрасывает его поля в action.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

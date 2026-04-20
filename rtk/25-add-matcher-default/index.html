@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>25 — addMatcher, addDefaultCase</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .flow {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px; margin: 14px 0;
+    }
+    .flow-step {
+      display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center;
+      padding: 10px 14px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      margin-bottom: 8px; font-family: var(--font-mono); font-size: .82rem;
+    }
+    .flow-step.matched { border-color: var(--success); background: rgba(76,175,80,.08); }
+    .flow-step.skipped { opacity: .4; }
+    .flow-step__num { color: var(--accent); font-weight: 700; }
+    .flow-step__status { font-family: var(--font-mono); font-size: .72rem; padding: 2px 8px; border-radius: 10px; }
+    .flow-step__status.wait { background: var(--bg-tertiary); color: var(--text-muted); }
+    .flow-step__status.match { background: var(--success); color: white; }
+    .flow-step__status.skip { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+    .ev-log { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+              padding: 10px 12px; font-family: var(--font-mono); font-size: .76rem; max-height: 120px; overflow-y: auto; }
+    .ev-log__item { padding: 2px 0; color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">25 / 106</span>addMatcher & addDefaultCase — порядок важен</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../24-create-reducer-builder/">← Назад</a>
+      <a href="../26-immer-inside/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Как builder решает, кого вызвать</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Здесь два разных «порядка», их часто путают. Разделим:
+        </p>
+        <ol style="color: var(--text-secondary); font-size: .85rem; line-height: 1.7;">
+          <li>
+            <strong>Правило написания кода (constraint API).</strong> Builder бросает ошибку,
+            если нарушить порядок: сначала идут все <code>addCase</code>, затем все
+            <code>addMatcher</code>, и в самом конце один <code>addDefaultCase</code>. После первого
+            <code>addMatcher</code> уже нельзя писать <code>addCase</code>.
+          </li>
+          <li>
+            <strong>Порядок выполнения при dispatch (runtime).</strong> Для каждого action reducer:
+            <br>(а) ищет ОДИН подходящий <code>addCase</code> по точному <code>action.type</code> →
+            <br>(б) затем перебирает <strong>все</strong> <code>addMatcher</code> в том порядке, в каком они были добавлены,
+            и вызывает handler'ы у тех, что вернули <code>true</code> →
+            <br>(в) <code>addDefaultCase</code> вызывается, только если ни (а), ни (б) ничего не нашли.
+          </li>
+        </ol>
+        <p style="color: var(--text-secondary); font-size: .82rem;">
+          Эти два порядка совпадают: правило (1) делает невозможным написать <code>addMatcher</code>
+          раньше <code>addCase</code>, поэтому в (2) addCase-handler всегда вызывается первым,
+          а matcher'ы — после, в порядке записи.
+        </p>
+
+        <div class="code-block">
+<span class="fn">createReducer</span>(initial, (builder) =&gt; {
+  builder
+    .<span class="fn">addCase</span>(userLoggedIn, handlerA)         <span class="cm">// 1</span>
+    .<span class="fn">addCase</span>(userLoggedOut, handlerB)        <span class="cm">// 2</span>
+    .<span class="fn">addMatcher</span>(isUserAction, handlerC)      <span class="cm">// 3</span>
+    .<span class="fn">addMatcher</span>(isRejected, handlerD)        <span class="cm">// 4</span>
+    .<span class="fn">addDefaultCase</span>(fallbackHandler)         <span class="cm">// 5 — последний</span>
+})
+        </div>
+
+        <div class="flow">
+          <div style="font-family: var(--font-mono); color: var(--accent); font-size: .82rem; margin-bottom: 10px;">
+            Текущий action: <span id="curr-action" style="color: var(--accent-cyan);">—</span>
+          </div>
+
+          <div class="flow-step" id="step-1">
+            <div class="flow-step__num">#1</div>
+            <div>addCase(userLoggedIn, ...)</div>
+            <div class="flow-step__status wait">wait</div>
+          </div>
+          <div class="flow-step" id="step-2">
+            <div class="flow-step__num">#2</div>
+            <div>addCase(userLoggedOut, ...)</div>
+            <div class="flow-step__status wait">wait</div>
+          </div>
+          <div class="flow-step" id="step-3">
+            <div class="flow-step__num">#3</div>
+            <div>addMatcher(isUserAction, ...)</div>
+            <div class="flow-step__status wait">wait</div>
+          </div>
+          <div class="flow-step" id="step-4">
+            <div class="flow-step__num">#4</div>
+            <div>addMatcher(isRejected, ...)</div>
+            <div class="flow-step__status wait">wait</div>
+          </div>
+          <div class="flow-step" id="step-5">
+            <div class="flow-step__num">#5</div>
+            <div>addDefaultCase(...)</div>
+            <div class="flow-step__status wait">wait</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap;">
+          <button class="btn" data-do="login">dispatch(userLoggedIn)</button>
+          <button class="btn" data-do="logout">dispatch(userLoggedOut)</button>
+          <button class="btn" data-do="userreject">dispatch(userFetchRejected)</button>
+          <button class="btn" data-do="otherreject">dispatch(otherRejected)</button>
+          <button class="btn" data-do="random">dispatch(randomAction)</button>
+        </div>
+
+        <div>
+          <h4 style="color: var(--accent); font-size: .85rem; margin-bottom: 6px;">История событий state.events</h4>
+          <div class="ev-log" id="ev-log">— пусто —</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — addMatcher + addDefaultCase</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «The <code>addMatcher</code> method accepts a matcher function and a reducer. If multiple <code>addCase</code>
+          or <code>addMatcher</code> reducers match the action, they will each be called in the order they were added
+          to the builder.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createReducer#builderaddmatcher" target="_blank">addMatcher API</a>
+        </div>
+        <div class="quote quote--ru">
+          «Метод <code>addMatcher</code> принимает matcher-функцию и reducer. Если несколько <code>addCase</code>
+          или <code>addMatcher</code> совпадают с action, они все вызываются в том порядке, в котором были
+          добавлены в builder.»
+        </div>
+
+        <h3>addDefaultCase — из доки</h3>
+        <div class="quote">
+          «<code>addDefaultCase</code> registers a reducer that will be called if no other reducer was called
+          for a given action.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createReducer#builderadddefaultcase" target="_blank">addDefaultCase API</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>addDefaultCase</code> регистрирует reducer, который будет вызван, если ни один другой
+          reducer не отработал для данного action.»
+        </div>
+
+        <h3>Два разных «порядка» — без путаницы</h3>
+
+        <h4 style="color: var(--accent); font-size: .85rem; margin: 10px 0 6px;">A. Правила НАПИСАНИЯ кода (enforced API)</h4>
+        <ol>
+          <li><code>addCase</code> можно вызывать <strong>только до</strong> первого <code>addMatcher</code>.
+            Иначе builder бросит: <code>builder.addCase should only be called before calling builder.addMatcher</code>.</li>
+          <li><code>addMatcher</code> можно цепочкой, сколько угодно — но <strong>до</strong> <code>addDefaultCase</code>.</li>
+          <li><code>addDefaultCase</code> можно вызвать <strong>только один раз и только последним</strong>.</li>
+          <li>Дублировать <code>addCase</code> на один и тот же <code>action.type</code> запрещено.</li>
+        </ol>
+
+        <div class="code-block">
+<span class="cm">// ✗ Throws: addCase after addMatcher</span>
+builder
+  .<span class="fn">addMatcher</span>(m, h)
+  .<span class="fn">addCase</span>(a, h2)                    <span class="cm">// ошибка</span>
+
+<span class="cm">// ✓ Правильный порядок</span>
+builder
+  .<span class="fn">addCase</span>(a1, h1)
+  .<span class="fn">addCase</span>(a2, h2)                   <span class="cm">// несколько addCase подряд — ок</span>
+  .<span class="fn">addMatcher</span>(m1, h3)
+  .<span class="fn">addMatcher</span>(m2, h4)                <span class="cm">// несколько addMatcher подряд — ок</span>
+  .<span class="fn">addDefaultCase</span>(fallback)          <span class="cm">// только один и только последним</span>
+        </div>
+
+        <h4 style="color: var(--accent); font-size: .85rem; margin: 14px 0 6px;">B. Порядок ВЫПОЛНЕНИЯ при dispatch (runtime)</h4>
+        <p>
+          Внутри <code>createReducer</code> каждый dispatch проходит три шага. Вот фактический псевдокод
+          из <code>createReducer.ts</code>:
+        </p>
+        <div class="code-block">
+<span class="cm">// 1. Кладём в массив один (или ноль) handler из addCase</span>
+<span class="cm">//    + ВСЕ handler'ы из addMatcher, чьи matcher'ы вернули true,</span>
+<span class="cm">//    в порядке, в котором они были добавлены в builder.</span>
+<span class="kw">let</span> caseReducers = [
+  actionsMap[action.type],                                  <span class="cm">// addCase</span>
+  ...finalActionMatchers
+    .<span class="fn">filter</span>(({ matcher }) =&gt; <span class="fn">matcher</span>(action))            <span class="cm">// addMatcher (все совпавшие)</span>
+    .<span class="fn">map</span>(({ reducer }) =&gt; reducer),
+]
+
+<span class="cm">// 2. Если не совпал НИКТО — берём defaultCase</span>
+<span class="kw">if</span> (caseReducers.<span class="fn">filter</span>(<span class="fn">Boolean</span>).length === 0) {
+  caseReducers = [finalDefaultCaseReducer]
+}
+
+<span class="cm">// 3. Прогоняем state через каждый handler по очереди</span>
+<span class="kw">return</span> caseReducers.<span class="fn">reduce</span>((prev, h) =&gt; h ? <span class="fn">h</span>(prev, action) : prev, state)
+        </div>
+        <ul>
+          <li><strong>addCase</strong> — максимум ОДИН срабатывает на dispatch (ключ = exact <code>action.type</code>).</li>
+          <li><strong>addMatcher</strong> — срабатывают <strong>все</strong>, чьи matcher'ы вернули <code>true</code>,
+            в порядке добавления.</li>
+          <li><strong>addDefaultCase</strong> — только если <em>ни один</em> addCase и <em>ни один</em>
+            addMatcher не совпал.</li>
+          <li>Совпавшие handler'ы применяются <strong>накопительно</strong>: каждый получает state, который вернул
+            предыдущий. Это важно — порядок может влиять на результат, если они трогают одно и то же поле state.</li>
+        </ul>
+
+        <p style="color: var(--text-muted); font-size: .82rem;">
+          Поскольку правило (A) запрещает писать <code>addMatcher</code> до <code>addCase</code>,
+          в runtime addCase-handler <strong>всегда</strong> идёт первым в массиве. Поэтому утверждения
+          «сначала addCase, потом addMatcher» (про код) и «в порядке добавления» (про matcher'ы) —
+          не противоречат друг другу: addCase ⇒ строго один и первый; matcher'ы ⇒ дальше по порядку записи.
+        </p>
+
+        <h3>Типичные matcher'ы в addMatcher</h3>
+        <div class="code-block">
+<span class="cm">// 1) Type-predicate от actionCreator</span>
+builder.<span class="fn">addMatcher</span>(myAction.match, handler)
+
+<span class="cm">// 2) isAnyOf / isAllOf из RTK</span>
+builder.<span class="fn">addMatcher</span>(<span class="fn">isAnyOf</span>(a, b, c), handler)
+
+<span class="cm">// 3) Matcher на группу thunk-actions</span>
+builder.<span class="fn">addMatcher</span>(<span class="fn">isPending</span>(fetchUser, fetchPosts), (s) =&gt; { s.loading = <span class="kw">true</span> })
+builder.<span class="fn">addMatcher</span>(<span class="fn">isRejected</span>(fetchUser, fetchPosts), (s, a) =&gt; { s.error = a.error.message })
+
+<span class="cm">// 4) Произвольная функция</span>
+builder.<span class="fn">addMatcher</span>(
+  (action) =&gt; action.type.<span class="fn">endsWith</span>(<span class="str">'/rejected'</span>),
+  (s, a) =&gt; { s.lastError = a.error }
+)
+        </div>
+
+        <h3>Пример: глобальная обработка loading/error</h3>
+        <div class="code-block">
+<span class="kw">const</span> uiSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'ui'</span>,
+  initialState: { loading: <span class="kw">false</span>, error: <span class="kw">null</span> },
+  reducers: {},
+  extraReducers: (builder) =&gt; {
+    builder
+      .<span class="fn">addMatcher</span>(<span class="fn">isPending</span>,    (s) =&gt; { s.loading = <span class="kw">true</span>;  s.error = <span class="kw">null</span> })
+      .<span class="fn">addMatcher</span>(<span class="fn">isFulfilled</span>,  (s) =&gt; { s.loading = <span class="kw">false</span> })
+      .<span class="fn">addMatcher</span>(<span class="fn">isRejected</span>,   (s, a) =&gt; { s.loading = <span class="kw">false</span>; s.error = a.error.message })
+  }
+})
+<span class="cm">// Теперь любой thunk в приложении обновляет ui.loading автоматически</span>
+        </div>
+
+        <h3>addDefaultCase в редких случаях</h3>
+        <p>
+          addDefaultCase нужен в двух сценариях:
+        </p>
+        <ol>
+          <li><strong>Логирование</strong> неизвестных actions в dev: <code>addDefaultCase((_, a) =&gt; { console.warn('unhandled', a) })</code>.</li>
+          <li><strong>Fallback</strong> для динамически подгружаемых slice'ов, где action может прийти от неинжектированного slice.</li>
+        </ol>
+        <p style="color: var(--text-muted);">
+          В 99% случаев addDefaultCase не нужен — builder и так возвращает state unchanged.
+        </p>
+
+        <h3>Подводный камень: все matcher'ы вызываются — кумулятивно</h3>
+        <div class="warning">
+          Если у вас <code>addCase(a, h1)</code> и <code>addMatcher(anyOf(a, b), h2)</code> — при
+          <code>dispatch(a)</code> выполнятся <strong>оба</strong>: сначала h1, потом h2.
+          State, который вернул h1, передаётся в h2. Если оба пишут в одно поле — выиграет последний.
+          Это <em>фича</em>, а не баг: на ней строится «сквозная логика» вроде toast'ов и analytics
+          (см. <a href="../23a-matchers-deep/">урок 23a</a>).
+        </div>
+
+        <h3>Что НЕ нужно делать с порядком</h3>
+        <div class="warning">
+          Не закладывайтесь на «обходной» порядок matcher'ов для бизнес-логики. Если matcher A должен
+          обязательно отработать раньше matcher B — это сигнал, что они оба читают/пишут одно поле
+          state и должны быть объединены в один handler с явной логикой. Иначе любой рефакторинг
+          (перетасовка <code>addMatcher</code>) сломает поведение молча.
+        </div>
+
+        <h3>Источник</h3>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/mapBuilders.ts" target="_blank">
+            mapBuilders.ts
+          </a> — класс <code>ActionReducerMapBuilder</code>, функция <code>executeReducerBuilderCallback</code>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

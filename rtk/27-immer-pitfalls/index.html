@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>27 — Immer подводные камни</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .pit-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 12px 0; border-left: 3px solid var(--accent-red); }
+    .pit-card--ok { border-left-color: var(--success); }
+    .pit-card__title { font-family: var(--font-mono); font-size: .85rem; margin-bottom: 6px; }
+    .pit-card--ok .pit-card__title { color: var(--success); }
+    .pit-card:not(.pit-card--ok) .pit-card__title { color: var(--accent-red); }
+    .pit-card__body { font-size: .82rem; color: var(--text-secondary); }
+    .pit-result { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px;
+                  font-family: var(--font-mono); font-size: .75rem; margin-top: 8px; white-space: pre; overflow-x: auto; color: var(--accent-cyan); min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">27 / 106</span>Immer — подводные камни</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../26-immer-inside/">← Назад</a>
+      <a href="../" style="color: var(--text-muted);">Секция D →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">6 типичных ошибок + как их избежать</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Immer делает код удобным, но прячет сложность Proxy. Вот грабли, на которые наступают большинство
+          разработчиков. Все примеры запускаются вживую — смотрите результат.
+        </p>
+
+        <div class="pit-card">
+          <div class="pit-card__title">⚠ 1. Нельзя одновременно мутировать ДРАФТ и возвращать новый объект</div>
+          <div class="pit-card__body">
+            <div class="code-block">
+(state, action) =&gt; {
+  state.value += <span class="num">1</span>                    <span class="cm">// ← мутация draft</span>
+  <span class="kw">return</span> { ...state, extra: <span class="num">42</span> }    <span class="cm">// ← И return</span>
+}
+<span class="cm">// Error: An immer producer returned a new value *and* modified its draft.</span>
+            </div>
+            <button class="btn" data-act="mix">запустить</button>
+            <div class="pit-result" id="mix-out">—</div>
+          </div>
+        </div>
+
+        <div class="pit-card pit-card--ok">
+          <div class="pit-card__title">✓ 2. Или мутация, ИЛИ return — но не оба</div>
+          <div class="pit-card__body">
+            <div class="code-block">
+<span class="cm">// Вариант A: только мутация</span>
+(state, action) =&gt; { state.value += <span class="num">1</span> }
+
+<span class="cm">// Вариант B: только return (замена всего state)</span>
+(state, action) =&gt; { <span class="kw">return</span> { value: state.value + <span class="num">1</span> } }
+
+<span class="cm">// Вариант C: return undefined — означает "оставить без изменений"</span>
+(state, action) =&gt; { <span class="kw">return undefined</span> }   <span class="cm">// то же, что без return</span>
+            </div>
+            <p style="color: var(--success); font-size: .78rem; margin-top: 8px;">✓ работает корректно</p>
+          </div>
+        </div>
+
+        <div class="pit-card">
+          <div class="pit-card__title">⚠ 3. Draft работает только в пределах reducer'а</div>
+          <div class="pit-card__body">
+            <p style="font-size: .8rem;">Draft — это Proxy с коротким lifecycle. Сохранить его вне reducer'а нельзя — получите revoked proxy error.</p>
+            <div class="code-block">
+<span class="kw">let</span> savedDraft
+(state, action) =&gt; {
+  savedDraft = state      <span class="cm">// ← плохо</span>
+}
+
+<span class="cm">// Позже:</span>
+savedDraft.value = <span class="num">5</span>     <span class="cm">// TypeError: Cannot perform 'get' on a proxy that has been revoked</span>
+            </div>
+            <button class="btn" data-act="revoked">запустить</button>
+            <div class="pit-result" id="revoked-out">—</div>
+          </div>
+        </div>
+
+        <div class="pit-card">
+          <div class="pit-card__title">⚠ 4. Нельзя возвращать undefined явно + мутировать</div>
+          <div class="pit-card__body">
+            <p style="font-size: .8rem;">Да, это запутанно. TS-правило: либо ничего не возвращать, либо возвращать значение.</p>
+            <div class="code-block">
+(state) =&gt; {
+  state.x = <span class="num">1</span>
+  <span class="kw">return undefined</span>    <span class="cm">// ← ок, равнозначно отсутствию return</span>
+}
+
+(state) =&gt; {
+  state.x = <span class="num">1</span>
+  <span class="kw">return null</span>         <span class="cm">// ← ОШИБКА: null !== undefined, Immer сочтёт это return'ом</span>
+}
+            </div>
+            <button class="btn" data-act="null-return">запустить null return</button>
+            <div class="pit-result" id="null-out">—</div>
+          </div>
+        </div>
+
+        <div class="pit-card">
+          <div class="pit-card__title">⚠ 5. current() vs original() — знайте различие</div>
+          <div class="pit-card__body">
+            <div class="code-block">
+<span class="kw">import</span> { current, original } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+(state, action) =&gt; {
+  state.count = <span class="num">10</span>
+
+  <span class="fn">original</span>(state.count)    <span class="cm">// исходное значение ДО всех мутаций в этом reducer'е</span>
+  <span class="fn">current</span>(state.count)     <span class="cm">// snapshot draft'а в данный момент</span>
+
+  state.count = <span class="num">20</span>
+  <span class="fn">current</span>(state.count)     <span class="cm">// 20</span>
+  <span class="fn">original</span>(state.count)    <span class="cm">// оригинал (0 или initial)</span>
+}
+            </div>
+            <button class="btn" data-act="curr-orig">запустить пример</button>
+            <div class="pit-result" id="co-out">—</div>
+          </div>
+        </div>
+
+        <div class="pit-card">
+          <div class="pit-card__title">⚠ 6. console.log(state) выведет Proxy, не читаемый JSON</div>
+          <div class="pit-card__body">
+            <p style="font-size: .8rem;">В консоли увидите <code>Proxy {...}</code>, а не полный объект. Используйте <code>current(state)</code> для snapshot'а.</p>
+            <div class="code-block">
+(state, action) =&gt; {
+  <span class="cm">// ✗ плохо: увидите Proxy</span>
+  <span class="fn">console</span>.log(<span class="str">'state:'</span>, state)
+
+  <span class="cm">// ✓ хорошо: увидите plain object</span>
+  <span class="fn">console</span>.log(<span class="str">'state:'</span>, <span class="fn">current</span>(state))
+  <span class="fn">console</span>.log(<span class="str">'state:'</span>, JSON.<span class="fn">parse</span>(JSON.<span class="fn">stringify</span>(state)))
+}
+            </div>
+            <button class="btn" data-act="log">запустить лог</button>
+            <div class="pit-result" id="log-out">—</div>
+          </div>
+        </div>
+
+        <div class="pit-card pit-card--ok">
+          <div class="pit-card__title">✓ 7. isDraft() — проверка Proxy</div>
+          <div class="pit-card__body">
+            <p style="font-size: .8rem;">Если нужно в селекторе/helper понять, что пришло — draft или plain:</p>
+            <div class="code-block">
+<span class="kw">import</span> { isDraft } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="fn">isDraft</span>(draft)          <span class="cm">// true внутри reducer'а</span>
+<span class="fn">isDraft</span>(plainState)     <span class="cm">// false</span>
+            </div>
+            <button class="btn" data-act="isdraft">проверить</button>
+            <div class="pit-result" id="isdraft-out">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — правила Immer в RTK</div>
+      <div class="theory__body">
+        <h3>Из доки RTK</h3>
+        <div class="quote">
+          «You can never mix "mutating" the draft with returning a new value. Either return a completely new value,
+          or mutate the existing draft — but not both.»
+          <br>— <a href="https://redux-toolkit.js.org/usage/immer-reducers#reducers-and-immer" target="_blank">Immer Reducers — Rules</a>
+        </div>
+        <div class="quote quote--ru">
+          «Нельзя смешивать «мутирование» draft'а с возвратом нового значения. Либо возвращайте совершенно
+          новое значение, либо мутируйте существующий draft — но не оба варианта одновременно.»
+        </div>
+
+        <h3>Правила в одном списке</h3>
+        <ol>
+          <li>Не смешивайте мутацию draft и return.</li>
+          <li>Не сохраняйте draft вне reducer'а (он будет revoked).</li>
+          <li>Для примитивов (state = 0) обязательно return.</li>
+          <li>Используйте <code>current(state)</code> для snapshot вместо console.log(state).</li>
+          <li>Immer не замораживает рекурсивно: если вы хранили Map/Set, это остаётся изменяемым.</li>
+          <li><code>enablePatches()</code>, <code>enableMapSet()</code> — уже включены в RTK по умолчанию (с v2).</li>
+        </ol>
+
+        <h3>current() — как работает</h3>
+        <div class="code-block">
+<span class="kw">import</span> { current } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+(state, action) =&gt; {
+  state.items.<span class="fn">push</span>(<span class="num">1</span>)
+  state.items.<span class="fn">push</span>(<span class="num">2</span>)
+
+  <span class="cm">// Нужно "заморозить" состояние на этот момент, чтобы передать куда-то:</span>
+  <span class="kw">const</span> snapshot = <span class="fn">current</span>(state)    <span class="cm">// { items: [1, 2] } — plain object</span>
+  <span class="fn">log</span>(snapshot)                       <span class="cm">// безопасно</span>
+
+  state.items.<span class="fn">push</span>(<span class="num">3</span>)
+  <span class="cm">// snapshot всё ещё [1, 2], state.items уже [1, 2, 3]</span>
+}
+        </div>
+
+        <h3>original() — как работает</h3>
+        <div class="code-block">
+<span class="kw">import</span> { original } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+(state, action) =&gt; {
+  <span class="kw">const</span> origItems = <span class="fn">original</span>(state.items)    <span class="cm">// ссылка на ОРИГИНАЛ (до reducer'а)</span>
+  state.items.<span class="fn">push</span>(<span class="num">1</span>)
+  <span class="fn">original</span>(state.items) === origItems       <span class="cm">// всё ещё true</span>
+
+  <span class="fn">original</span>(state.items) === state.items      <span class="cm">// false (state.items уже draft)</span>
+}
+        </div>
+        <p>
+          <strong>Разница:</strong> <code>current</code> — snapshot <em>текущего</em> draft'а (plain copy).
+          <code>original</code> — ссылка на <em>оригинальный</em> объект до изменений.
+        </p>
+
+        <h3>Подводный камень: defaultCase внутри Immer</h3>
+        <div class="warning">
+          В addDefaultCase вы получаете draft. Если вы ничего не меняете и ничего не возвращаете —
+          Immer вернёт оригинал (та же ссылка). Это корректно. Не пишите <code>return state</code>
+          вручную — это затянет перестройку объекта.
+        </div>
+
+        <h3>enableMapSet — использование Map/Set в state</h3>
+        <p>
+          Immer по умолчанию не поддерживает Map/Set (как драфт). RTK активирует <code>enableMapSet()</code>
+          глобально. Теперь можно:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> slice = <span class="fn">createSlice</span>({
+  name: <span class="str">'cache'</span>,
+  initialState: { entries: <span class="kw">new</span> <span class="fn">Map</span>() },
+  reducers: {
+    setEntry: (s, a) =&gt; {
+      s.entries.<span class="fn">set</span>(a.payload.key, a.payload.value)   <span class="cm">// works!</span>
+    }
+  }
+})
+        </div>
+        <p>
+          <strong>НО!</strong> Map/Set не сериализуемы. serializableStateInvariantMiddleware выдаст warning.
+          Для production лучше хранить как <code>Record&lt;string, T&gt;</code>.
+        </p>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/usage/immer-reducers" target="_blank">Writing Reducers with Immer</a></li>
+          <li><a href="https://immerjs.github.io/immer/pitfalls" target="_blank">Immer Pitfalls (official docs)</a></li>
+          <li><a href="https://immerjs.github.io/immer/current" target="_blank">current() docs</a></li>
+          <li><a href="https://immerjs.github.io/immer/original" target="_blank">original() docs</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>
