@@ -1,4 +1,4 @@
-export type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'success'
+export type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'success' | 'action'
 
 interface LogEntry {
   level: LogLevel
@@ -12,6 +12,7 @@ const LEVEL_ICONS: Record<LogLevel, string> = {
   warn: '⚠',
   error: '✖',
   success: '✔',
+  action: '→',
 }
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
@@ -20,6 +21,7 @@ const LEVEL_COLORS: Record<LogLevel, string> = {
   warn: '#ff9800',
   error: '#f44747',
   success: '#4caf50',
+  action: '#c586c0',
 }
 
 const CSS = `
@@ -192,6 +194,10 @@ export class ConsolePanel {
   warn(...args: unknown[]): void { this.addEntry('warn', ...args) }
   error(...args: unknown[]): void { this.addEntry('error', ...args) }
   success(...args: unknown[]): void { this.addEntry('success', ...args) }
+  action(action: { type: string; payload?: unknown }, label?: string): void {
+    const prefix = label ? `[${label}] ` : ''
+    this.addEntry('action', `${prefix}dispatch → ${action.type}`, action.payload !== undefined ? action.payload : '')
+  }
 
   clear(): void {
     this.entries = []
