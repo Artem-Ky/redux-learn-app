@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>15 — getDefaultEnhancers + autoBatch</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .perf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1000px) { .perf-grid { grid-template-columns: 1fr; } }
+    .perf-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+    .perf-card h4 { font-family: var(--font-mono); font-size: .85rem; color: var(--accent); margin-bottom: 8px; }
+    .perf-num { font-family: var(--font-mono); font-size: 2.2rem; color: var(--accent-cyan); text-align: center; padding: 8px 0; }
+    .perf-num .label { display: block; font-size: .7rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">15 / 106</span>getDefaultEnhancers + autoBatchEnhancer</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../14-action-invariant-middleware/">← Назад</a>
+      <a href="../16-tuple-typing/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">100 dispatch'ей подряд: с autoBatch и без</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          autoBatchEnhancer объединяет уведомления subscribers, отмеченных как «low priority» (через
+          <code>SHOULD_AUTOBATCH</code> в meta). Каждый subscribers вызывается один раз на пачку, не на каждый
+          отдельный dispatch. Это ускоряет React-рендеры в 5-10 раз.
+        </p>
+
+        <div class="perf-grid">
+          <div class="perf-card">
+            <h4>Без autoBatch</h4>
+            <div class="perf-num">
+              <span id="no-batch-renders">0</span>
+              <span class="label">subscriber вызовов</span>
+            </div>
+            <div style="text-align: center;"><button class="btn" id="run-no-batch">100 dispatch без batch</button></div>
+            <p style="font-size: .75rem; color: var(--text-muted); margin-top: 8px;">
+              Каждый dispatch уведомляет subscribers. 100 actions → 100 уведомлений.
+            </p>
+          </div>
+          <div class="perf-card">
+            <h4>С autoBatch</h4>
+            <div class="perf-num">
+              <span id="batch-renders">0</span>
+              <span class="label">subscriber вызовов</span>
+            </div>
+            <div style="text-align: center;"><button class="btn" id="run-batch">100 dispatch с batch</button></div>
+            <p style="font-size: .75rem; color: var(--text-muted); margin-top: 8px;">
+              Subscribers с SHOULD_AUTOBATCH=true получают 1 уведомление на пачку.
+            </p>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin: 14px 0;">
+          <button class="btn btn--secondary" id="reset-counters">сбросить счётчики</button>
+        </div>
+
+        <p style="color: var(--text-secondary); font-size: .82rem;">
+          В DevTools <strong>все 100 actions</strong> записаны (autoBatch не пропускает их),
+          но subscriber вызывается только один раз на пачку — это и даёт прирост.
+        </p>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Enhancers + autoBatch</div>
+      <div class="theory__body">
+        <h3>Что такое enhancer</h3>
+        <p>
+          Enhancer — это «обёртка над createStore». В отличие от middleware, который перехватывает actions,
+          enhancer перехватывает <strong>все методы store</strong>: dispatch, subscribe, getState, replaceReducer.
+          <code>applyMiddleware</code> — самый известный enhancer. Любой enhancer имеет сигнатуру:
+        </p>
+        <div class="code-block">
+<span class="kw">type</span> StoreEnhancer = (createStore: <span class="ts">CreateStore</span>) =&gt; <span class="ts">CreateStore</span>
+
+<span class="cm">// например: applyMiddleware</span>
+<span class="kw">const</span> myEnhancer: StoreEnhancer = (createStore) =&gt; (reducer, preloadedState) =&gt; {
+  <span class="kw">const</span> store = <span class="fn">createStore</span>(reducer, preloadedState)
+  <span class="kw">return</span> {
+    ...store,
+    dispatch: (action) =&gt; { <span class="cm">/* кастомный dispatch */</span> <span class="kw">return</span> store.<span class="fn">dispatch</span>(action) }
+  }
+}
+        </div>
+
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>configureStore</code> includes <code>autoBatchEnhancer</code> by default. The enhancer batches together
+          subscriber notifications for actions tagged with <code>SHOULD_AUTOBATCH = true</code>. RTK Query and
+          <code>createListenerMiddleware</code> use this enhancer for their internal actions.»
+          <br>— <a href="https://redux-toolkit.js.org/api/autoBatchEnhancer" target="_blank">autoBatchEnhancer</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>configureStore</code> по умолчанию включает <code>autoBatchEnhancer</code>. Этот enhancer
+          объединяет уведомления subscriber'ов для actions, помеченных <code>SHOULD_AUTOBATCH = true</code>.
+          RTK Query и <code>createListenerMiddleware</code> используют этот enhancer для своих внутренних actions.»
+        </div>
+
+        <h3>Как пометить action как batchable</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="fn">prepareAutoBatched</span> } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="cm">// Способ 1: через createSlice + prepare</span>
+<span class="kw">const</span> slice = <span class="fn">createSlice</span>({
+  name: <span class="str">'data'</span>,
+  initialState: { items: [] },
+  reducers: {
+    addItem: {
+      reducer: (s, a) =&gt; { s.items.push(a.payload) },
+      prepare: <span class="fn">prepareAutoBatched</span>&lt;<span class="ts">Item</span>&gt;()
+    }
+  }
+})
+
+<span class="cm">// Способ 2: вручную в meta</span>
+<span class="fn">dispatch</span>({ type: <span class="str">'data/loaded'</span>, payload, meta: { SHOULD_AUTOBATCH: <span class="kw">true</span> } })
+        </div>
+
+        <h3>4 режима autoBatch</h3>
+        <div class="code-block">
+<span class="cm">// По умолчанию: 'raf' — batched в requestAnimationFrame (~16ms)</span>
+<span class="fn">configureStore</span>({
+  reducer,
+  enhancers: (gde) =&gt; <span class="fn">gde</span>({
+    autoBatch: { type: <span class="str">'raf'</span> }    <span class="cm">// или 'tick' / 'timer' / 'callback'</span>
+  })
+})
+
+<span class="cm">// 'tick' — batched в Promise.resolve().then() (микро-таска, ~0ms)</span>
+<span class="cm">// 'timer' — batched через setTimeout(0)</span>
+<span class="cm">// 'callback' — пользовательская функция batching</span>
+        </div>
+
+        <h3>RTK Query и autoBatch</h3>
+        <p>
+          RTK Query использует <code>SHOULD_AUTOBATCH</code> для своих внутренних actions
+          <code>api/queryFulfilled</code>, <code>api/subscriptionsUpdated</code>. Это и есть причина, почему
+          подписаться на 50 query одновременно не вызывает 50 React-рендеров — все они батчатся в один.
+        </p>
+
+        <h3>Подводный камень: getDefaultEnhancers необязателен</h3>
+        <div class="warning">
+          Если вы передаёте <code>enhancers</code>, нужно <strong>явно</strong> вызывать <code>getDefaultEnhancers()</code>,
+          иначе <strong>autoBatch и middlewareEnhancer пропадут</strong>. Правильно:
+          <code>enhancers: (gde) =&gt; gde().concat(myEnhancer)</code>.
+          Неправильно: <code>enhancers: () =&gt; [myEnhancer]</code> — у вас не будет middleware и batching.
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/autoBatchEnhancer.ts" target="_blank">autoBatchEnhancer.ts</a></li>
+          <li><a href="https://redux-toolkit.js.org/api/autoBatchEnhancer" target="_blank">autoBatchEnhancer API</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

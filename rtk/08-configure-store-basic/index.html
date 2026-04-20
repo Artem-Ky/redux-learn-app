@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>08 — configureStore базово</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .stack-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin: 10px 0; }
+    .stack-card h4 { color: var(--accent); font-size: .85rem; margin-bottom: 6px; font-family: var(--font-mono); }
+    .stack-card ul { padding-left: 18px; font-size: .82rem; color: var(--text-secondary); }
+    .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    @media (max-width: 900px) { .features-grid { grid-template-columns: 1fr; } }
+    .feature {
+      background: var(--bg-panel); border-left: 3px solid var(--accent-cyan);
+      padding: 8px 12px; border-radius: var(--radius-sm);
+      font-size: .78rem;
+    }
+    .feature strong { color: var(--accent-cyan); font-family: var(--font-mono); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">08 / 106</span>
+      configureStore — первый знакомый store
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../07-classic-vs-rtk-side-by-side/">← Назад</a>
+      <a href="../09-configure-vs-create-store/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Counter через configureStore + Redux DevTools</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Самый минимальный store на RTK. Всего 4 строки: импорт, slice, configureStore, готово.
+          Внизу — наш встроенный <strong>Redux DevTools</strong>: подключился к store и записывает каждый dispatch.
+          Кликайте кнопки и смотрите вкладки <em>Action / State / Diff</em>.
+        </p>
+        <div style="display: flex; gap: 8px; align-items: center; margin: 14px 0;">
+          <span style="font-family: var(--font-mono); color: var(--text-muted);">value =</span>
+          <span id="value" style="font-family: var(--font-mono); font-size: 1.6rem; color: var(--accent-cyan); min-width: 50px; text-align: center;">0</span>
+        </div>
+        <div class="btn-group">
+          <button class="btn" id="inc">+1</button>
+          <button class="btn" id="dec">−1</button>
+          <button class="btn" id="add5">+5</button>
+          <button class="btn btn--secondary" id="reset">reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — что такое configureStore</div>
+      <div class="theory__body">
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">configureStore</span>&lt;S, A, M, E&gt;(options: ConfigureStoreOptions&lt;S, A, M, E&gt;): <span class="ts">EnhancedStore</span>
+        </div>
+
+        <h3>Из документации</h3>
+        <div class="quote">
+          «A friendly abstraction over the standard Redux <code>createStore</code> function that adds good defaults
+          to the store setup for a better development experience.»
+          <br>— <a href="https://redux-toolkit.js.org/api/configureStore" target="_blank">configureStore API</a>
+        </div>
+        <div class="quote quote--ru">
+          «Дружелюбная абстракция над стандартной Redux-функцией <code>createStore</code>, которая добавляет
+          хорошие умолчания при настройке store ради лучшего опыта разработки.»
+        </div>
+
+        <h3>Что configureStore делает за вас (5 пунктов)</h3>
+        <div class="features-grid">
+          <div class="feature"><strong>1. combineReducers</strong> — если вы передали объект-карту slice'ов, он сам соединит их в rootReducer</div>
+          <div class="feature"><strong>2. applyMiddleware</strong> — добавит default middleware (thunk + 3 invariant)</div>
+          <div class="feature"><strong>3. composeWithDevTools</strong> — подключит Redux DevTools Extension в development</div>
+          <div class="feature"><strong>4. autoBatchEnhancer</strong> — добавит batching subscribers</div>
+          <div class="feature"><strong>5. preloadedState</strong> — поддержит hydration из localStorage / SSR</div>
+          <div class="feature"><strong>6. duplicateMiddlewareCheck</strong> — предупредит про повторное подключение того же middleware</div>
+        </div>
+
+        <h3>Все опции configureStore</h3>
+        <div class="code-block">
+<span class="kw">interface</span> ConfigureStoreOptions {
+  reducer: <span class="ts">Reducer | ReducersMapObject</span>     <span class="cm">// функция или объект-карта</span>
+  middleware?: (getDefaultMiddleware) =&gt; Tuple  <span class="cm">// callback с дефолтами</span>
+  devTools?: <span class="ts">boolean | DevToolsOptions</span>     <span class="cm">// включить/настроить devtools</span>
+  preloadedState?: <span class="ts">DeepPartial&lt;State&gt;</span>     <span class="cm">// начальное состояние</span>
+  enhancers?: (getDefaultEnhancers) =&gt; Tuple    <span class="cm">// доп. enhancers</span>
+}
+        </div>
+
+        <h3>Источник</h3>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/configureStore.ts" target="_blank">
+            packages/toolkit/src/configureStore.ts
+          </a> — здесь живёт реализация. Подробно разберём в уроке 09.
+        </p>
+
+        <h3>Подводный камень</h3>
+        <div class="warning">
+          <strong>Не вызывайте configureStore несколько раз</strong> для одного приложения. Один store на приложение —
+          это ключевой принцип Redux. Если нужны несколько изолированных state — используйте <code>combineSlices</code>
+          или несколько Provider с одним store, разделяя ключи.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>11 — getDefaultMiddleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .mw-list { display: grid; gap: 8px; margin: 14px 0; }
+    .mw-item {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 14px; display: grid; grid-template-columns: 28px 1fr auto auto; gap: 12px; align-items: center;
+    }
+    .mw-item__num { font-family: var(--font-mono); color: var(--text-muted); }
+    .mw-item__name { font-family: var(--font-mono); color: var(--accent); font-weight: 600; font-size: .88rem; }
+    .mw-item__desc { font-size: .76rem; color: var(--text-secondary); margin-top: 2px; }
+    .mw-item__env { font-family: var(--font-mono); font-size: .68rem; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+    .mw-item__env--dev { background: rgba(206,145,120,.15); color: var(--accent-orange); border: 1px solid var(--accent-orange); }
+    .mw-item__env--all { background: rgba(86,156,214,.15); color: var(--accent); border: 1px solid var(--accent); }
+    .mw-toggle { padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-panel);
+                 color: var(--text-secondary); cursor: pointer; font-size: .72rem; font-family: var(--font-mono); }
+    .mw-toggle.on { background: var(--success); color: white; border-color: var(--success); }
+    .mw-toggle.off { background: var(--bg-tertiary); color: var(--text-muted); }
+    .config-display {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 12px 14px; font-family: var(--font-mono); font-size: .76rem; white-space: pre; overflow-x: auto; margin-top: 12px;
+      color: var(--text-primary); line-height: 1.55;
+    }
+    .config-display .kw { color: var(--accent-purple); }
+    .config-display .fn { color: var(--accent-yellow); }
+    .config-display .cm { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">11 / 106</span>getDefaultMiddleware — что включено по умолчанию</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../10-reducer-param/">← Назад</a>
+      <a href="../12-immutable-middleware/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">4 default middleware. Включайте/выключайте каждый</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          configureStore автоматически подключает 4 middleware. В development — все 4. В production —
+          <strong>только thunk</strong> (invariants отключены ради производительности).
+          Внизу — кастомизация через callback <code>(getDefaultMiddleware) =&gt; getDefaultMiddleware({...})</code>.
+        </p>
+
+        <div class="mw-list">
+          <div class="mw-item">
+            <div class="mw-item__num">1</div>
+            <div>
+              <div class="mw-item__name">thunk</div>
+              <div class="mw-item__desc">Позволяет dispatch функций. Для async-логики и доступа к getState.</div>
+            </div>
+            <div class="mw-item__env mw-item__env--all">DEV + PROD</div>
+            <button class="mw-toggle on" data-mw="thunk">on</button>
+          </div>
+          <div class="mw-item">
+            <div class="mw-item__num">2</div>
+            <div>
+              <div class="mw-item__name">immutableStateInvariantMiddleware</div>
+              <div class="mw-item__desc">Глубокое сравнение state до/после reducer. Throw если state мутирован.</div>
+            </div>
+            <div class="mw-item__env mw-item__env--dev">DEV ONLY</div>
+            <button class="mw-toggle on" data-mw="immutableCheck">on</button>
+          </div>
+          <div class="mw-item">
+            <div class="mw-item__num">3</div>
+            <div>
+              <div class="mw-item__name">serializableStateInvariantMiddleware</div>
+              <div class="mw-item__desc">Проверяет action.payload и state на не-сериализуемые значения (Date, Map, Promise).</div>
+            </div>
+            <div class="mw-item__env mw-item__env--dev">DEV ONLY</div>
+            <button class="mw-toggle on" data-mw="serializableCheck">on</button>
+          </div>
+          <div class="mw-item">
+            <div class="mw-item__num">4</div>
+            <div>
+              <div class="mw-item__name">actionCreatorInvariantMiddleware</div>
+              <div class="mw-item__desc">Throw если вы dispatch'нули actionCreator (функцию) вместо action (объекта).</div>
+            </div>
+            <div class="mw-item__env mw-item__env--dev">DEV ONLY</div>
+            <button class="mw-toggle on" data-mw="actionCreatorCheck">on</button>
+          </div>
+        </div>
+
+        <div class="config-display" id="config-display"></div>
+
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <button class="btn" id="recreate">пересоздать store с этим middleware</button>
+          <button class="btn" id="dispatch">dispatch test action</button>
+          <button class="btn" id="dispatch-async">dispatch async thunk</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — getDefaultMiddleware изнутри</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>getDefaultMiddleware</code> returns an array containing the default list of middleware
+          included with the store created by <code>configureStore</code>. By default, this includes:
+          <code>thunk</code>, <code>immutableStateInvariant</code>, <code>serializableStateInvariant</code>,
+          and <code>actionCreatorInvariant</code> (in development mode only).»
+          <br>— <a href="https://redux-toolkit.js.org/api/getDefaultMiddleware" target="_blank">getDefaultMiddleware API</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>getDefaultMiddleware</code> возвращает массив со списком middleware, которые по умолчанию
+          включены в store, созданный <code>configureStore</code>. По умолчанию это:
+          <code>thunk</code>, <code>immutableStateInvariant</code>, <code>serializableStateInvariant</code>
+          и <code>actionCreatorInvariant</code> (последние три — только в development).»
+        </div>
+
+        <h3>Кастомизация через callback</h3>
+        <p>
+          Опция <code>middleware</code> в configureStore — это <strong>функция</strong>, которой передают
+          <code>getDefaultMiddleware</code>. Вы возвращаете <code>Tuple</code> из middleware.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Добавить свой middleware к default</span>
+<span class="fn">configureStore</span>({
+  reducer,
+  middleware: (getDefaultMiddleware) =&gt;
+    <span class="fn">getDefaultMiddleware</span>().<span class="fn">concat</span>(myLogger),
+})
+
+<span class="cm">// Поставить свой middleware ДО default</span>
+<span class="fn">configureStore</span>({
+  reducer,
+  middleware: (getDefaultMiddleware) =&gt;
+    <span class="fn">getDefaultMiddleware</span>().<span class="fn">prepend</span>(listenerMiddleware.middleware),
+})
+
+<span class="cm">// Отключить отдельные default middleware через опции</span>
+<span class="fn">configureStore</span>({
+  reducer,
+  middleware: (getDefaultMiddleware) =&gt; <span class="fn">getDefaultMiddleware</span>({
+    thunk: <span class="kw">false</span>,                 <span class="cm">// убрать thunk полностью</span>
+    immutableCheck: <span class="kw">false</span>,        <span class="cm">// убрать immutable check</span>
+    serializableCheck: { ignoredActions: [<span class="str">'auth/setUser'</span>] }
+  }),
+})
+        </div>
+
+        <h3>Варианты опций каждого middleware</h3>
+        <ul>
+          <li><code>thunk: false</code> или <code>thunk: { extraArgument: api }</code></li>
+          <li><code>immutableCheck: false</code> или <code>{ warnAfter: 32, ignoredPaths: ['some.path'] }</code></li>
+          <li><code>serializableCheck: false</code> или <code>{ ignoredActions, ignoredActionPaths, ignoredPaths, warnAfter, isSerializable }</code></li>
+          <li><code>actionCreatorCheck: false</code></li>
+        </ul>
+
+        <h3>Production vs development</h3>
+        <p>
+          В production-сборке (<code>process.env.NODE_ENV === 'production'</code>) RTK <strong>автоматически</strong> исключает
+          immutable/serializable/action invariant — ради скорости. В бандл попадает только thunk. Это не нужно настраивать вручную.
+        </p>
+
+        <h3>Подводный камень: warnAfter</h3>
+        <div class="warning">
+          immutable и serializable middleware рекурсивно обходят весь state. Если у вас большой state, это может занимать
+          несколько мс на каждый dispatch. По умолчанию <code>warnAfter: 32</code> ms. При превышении — warning в консоль.
+          Решения: <code>ignoredPaths</code>, увеличить <code>warnAfter</code>, или отключить middleware для конкретного slice.
+        </div>
+
+        <h3>Подводный камень: Tuple, не Array</h3>
+        <div class="warning">
+          В TypeScript метод <code>concat</code> на обычном массиве сужает тип до <code>Middleware[]</code> и теряет
+          информацию о типах thunk/extra. RTK 2.x ввёл <code>Tuple</code> — расширение массива с правильными типами concat/prepend.
+          Если вы делаете <code>middleware: () =&gt; [thunk, myMw]</code> — TS выдаст ошибку. Используйте Tuple
+          или <code>getDefaultMiddleware().concat(...)</code>.
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/getDefaultMiddleware.ts" target="_blank">getDefaultMiddleware.ts</a></li>
+          <li><a href="https://redux-toolkit.js.org/usage/usage-guide#middleware" target="_blank">Middleware Usage Guide</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

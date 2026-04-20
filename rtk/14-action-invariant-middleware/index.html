@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>14 — actionCreatorInvariantMiddleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ac-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+    @media (max-width: 1000px) { .ac-grid { grid-template-columns: 1fr; } }
+    .ac-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .ac-card.bad { border-left: 3px solid var(--accent-red); }
+    .ac-card.ok { border-left: 3px solid var(--success); }
+    .ac-card h4 { font-family: var(--font-mono); font-size: .8rem; margin-bottom: 6px; }
+    .ac-card.bad h4 { color: var(--accent-red); }
+    .ac-card.ok h4 { color: var(--success); }
+    .ac-card pre { font-family: var(--font-mono); font-size: .73rem; color: var(--text-primary); margin: 6px 0; }
+    .err-display { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                   padding: 10px 14px; margin: 12px 0; min-height: 50px; font-family: var(--font-mono);
+                   font-size: .76rem; white-space: pre-wrap; color: var(--text-muted); }
+    .err-display.warn { color: var(--warning); border-color: var(--warning); border-left: 3px solid var(--warning); }
+    .err-display.ok { color: var(--success); border-color: var(--success); border-left: 3px solid var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">14 / 106</span>actionCreatorInvariantMiddleware</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../13-serializable-middleware/">← Назад</a>
+      <a href="../15-enhancers-autobatch/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">«Я забыл скобки» — частая ошибка</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Это самый молодой default middleware (добавлен в RTK 1.7). Ловит одну конкретную ошибку: dispatch
+          <strong>самой функции actionCreator</strong> вместо <em>результата её вызова</em>.
+          Без него reducer молча игнорирует action (потому что type === undefined), и баг сложно заметить.
+        </p>
+
+        <div class="ac-grid">
+          <div class="ac-card bad">
+            <h4>1. Забыли скобки</h4>
+            <pre>// неправильно
+dispatch(increment)    // ← без ()
+// reducer молча скипает</pre>
+            <button class="btn" data-mode="forgot">воспроизвести</button>
+          </div>
+          <div class="ac-card ok">
+            <h4>2. Корректный вызов</h4>
+            <pre>// правильно
+dispatch(increment())  // ← со ()
+// → { type: 'counter/increment' }</pre>
+            <button class="btn" data-mode="ok">воспроизвести</button>
+          </div>
+          <div class="ac-card bad">
+            <h4>3. bindActionCreators забыт</h4>
+            <pre>// при connect используют map
+const mapDispatch = { increment }
+// → бинды НЕ применены, dispatch получает функцию</pre>
+            <button class="btn" data-mode="connect">воспроизвести</button>
+          </div>
+          <div class="ac-card ok">
+            <h4>4. .toString() для использования</h4>
+            <pre>// actionCreator имеет toString() → 'counter/increment'
+[increment.type]: handler  // в objectReducer
+[increment]: handler        // тоже работает</pre>
+            <button class="btn btn--secondary" data-mode="tostring">показать</button>
+          </div>
+        </div>
+
+        <div class="err-display" id="err-out">— ожидание dispatch —</div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — actionCreatorInvariant</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>actionCreatorInvariantMiddleware</code> checks to see if dispatch was called with an action creator
+          (a function returned from <code>createAction</code>) instead of the action itself. This is a common mistake,
+          since action creators look like simple functions.»
+          <br>— <a href="https://redux-toolkit.js.org/api/getDefaultMiddleware#actioncreatorinvariantmiddleware" target="_blank">actionCreatorCheck docs</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>actionCreatorInvariantMiddleware</code> проверяет, не был ли dispatch вызван с самим actionCreator
+          (функцией, возвращённой из <code>createAction</code>) вместо action. Это типичная ошибка,
+          потому что actionCreator выглядит как обычная функция.»
+        </div>
+
+        <h3>Реализация (исходник)</h3>
+        <div class="code-block">
+<span class="cm">// actionCreatorInvariantMiddleware.ts (упрощённо)</span>
+<span class="kw">export const</span> <span class="fn">createActionCreatorInvariantMiddleware</span> = (options) =&gt; {
+  <span class="kw">return</span> () =&gt; (next) =&gt; (action) =&gt; {
+    <span class="kw">if</span> (<span class="fn">isActionCreator</span>(action)) {
+      <span class="kw">const</span> msg = <span class="str">`Detected an action creator with \`type\` property being dispatched, instead of an action object! ...`</span>
+      console.warn(msg)
+    }
+    <span class="kw">return</span> <span class="fn">next</span>(action)
+  }
+}
+
+<span class="cm">// isActionCreator — проверяет наличие .type на функции</span>
+<span class="kw">function</span> <span class="fn">isActionCreator</span>(action: unknown): action is ActionCreator {
+  <span class="kw">return</span> (
+    <span class="kw">typeof</span> action === <span class="str">'function'</span> &amp;&amp;
+    <span class="str">'type'</span> <span class="kw">in</span> action &amp;&amp;
+    <span class="kw">typeof</span> (action <span class="kw">as</span> { type?: unknown }).type === <span class="str">'string'</span>
+  )
+}
+        </div>
+        <p>
+          Поведение зависит от версии: в современных RTK middleware пишет <code>console.warn</code>,
+          но проходит action дальше. В redux ванильном такой dispatch вызовет ошибку «Actions must be plain objects.
+          Use custom middleware for async actions.»
+        </p>
+
+        <h3>Опции</h3>
+        <div class="code-block">
+<span class="kw">interface</span> ActionCreatorInvariantMiddlewareOptions {
+  isActionCreator?: (action: <span class="ts">unknown</span>) =&gt; <span class="ts">boolean</span>
+  <span class="cm">// можно подменить функцию-проверку, если у вас свои actionCreators</span>
+}
+        </div>
+
+        <h3>Почему это важно</h3>
+        <p>
+          Без middleware баг с забытыми скобками <em>не вызывает ошибку</em>: action.type === undefined,
+          reducer его не обрабатывает, state не меняется. Вы видите «приложение не реагирует» и часами
+          ищете причину. Middleware говорит сразу: «вы передали функцию, не action».
+        </p>
+
+        <h3>Подводный камень: thunk и actionCreatorInvariant</h3>
+        <div class="warning">
+          У thunk-actions тоже есть <code>.type</code> (например, <code>fetchTodos.fulfilled.type</code>).
+          Но thunk сам как функция — без <code>.type</code>. Поэтому middleware не путает их с обычными actionCreators.
+          Если же вы делаете <code>dispatch(fetchTodos.fulfilled)</code> вместо
+          <code>dispatch(fetchTodos.fulfilled({...}))</code> — middleware поймает.
+        </div>
+
+        <h3>Совмещение с thunk</h3>
+        <p>
+          Порядок default middleware: <strong>actionCreatorInvariant → immutable → serializable → thunk</strong>.
+          Сначала проверки, потом thunk обрабатывает функции. Если actionCreator проходит — он считается
+          функцией, и thunk попытается её выполнить. Это и происходит без middleware: «thunk выполнил вашу
+          функцию, ничего не изменилось».
+        </p>
+
+        <h3>Источник</h3>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/actionCreatorInvariantMiddleware.ts" target="_blank">
+            actionCreatorInvariantMiddleware.ts
+          </a> — крошечный файл, ~30 строк.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

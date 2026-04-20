@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>18 — preloadedState</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ls-row { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+              padding: 12px 14px; margin: 12px 0; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+    .ls-row__key { font-family: var(--font-mono); color: var(--accent); font-size: .8rem; }
+    .ls-row__val { font-family: var(--font-mono); color: var(--accent-cyan); font-size: .82rem; }
+    .ls-row__val em { color: var(--text-muted); font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">18 / 106</span>preloadedState — hydration store</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../17-devtools-option/">← Назад</a>
+      <a href="../19-typed-store/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Counter с состоянием в localStorage</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Этот урок демонстрирует <strong>persistence через preloadedState</strong>. Counter сохраняется в
+          <code>localStorage</code>. При перезагрузке страницы (F5) состояние восстанавливается через
+          <code>preloadedState</code>. В DevTools первый <code>@@INIT</code> уже содержит non-zero value.
+        </p>
+
+        <div class="ls-row">
+          <div>
+            <div class="ls-row__key">localStorage["rtk-lesson18-counter"]</div>
+            <div class="ls-row__val" id="ls-display"><em>(пусто)</em></div>
+          </div>
+          <button class="btn btn--secondary" id="clear-ls">очистить localStorage</button>
+        </div>
+
+        <div style="display: flex; gap: 12px; align-items: center; margin: 14px 0;">
+          <span style="font-family: var(--font-mono); color: var(--text-muted);">value =</span>
+          <span id="value" style="font-family: var(--font-mono); font-size: 1.6rem; color: var(--accent-cyan); min-width: 60px;">0</span>
+          <button class="btn" id="inc">+1</button>
+          <button class="btn" id="dec">−1</button>
+          <button class="btn" id="add10">+10</button>
+        </div>
+
+        <div style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                    padding: 10px 14px; font-size: .82rem; color: var(--text-secondary);">
+          <strong style="color: var(--accent);">Попробуйте:</strong>
+          <ol style="margin: 6px 0 0 18px;">
+            <li>Кликните +1 несколько раз → значение в localStorage обновится автоматически.</li>
+            <li>Нажмите F5 → страница перезагрузится, value восстановится из localStorage.</li>
+            <li>В DevTools (внизу) первый @@INIT покажет уже non-zero state.</li>
+            <li>«Очистить localStorage» → перезагрузка → counter снова с нуля.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — preloadedState</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>preloadedState</code>: An optional initial state value to be passed to the Redux <code>createStore</code>
+          function. This may be useful for resuming state from the server in universal apps, or to restore a
+          previously serialized user session.»
+          <br>— <a href="https://redux-toolkit.js.org/api/configureStore#preloadedstate" target="_blank">preloadedState option</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>preloadedState</code>: опциональное начальное значение state, передаваемое в Redux-функцию
+          <code>createStore</code>. Может быть полезно для восстановления state с сервера в universal-приложениях
+          или для восстановления ранее сериализованной пользовательской сессии.»
+        </div>
+
+        <h3>3 типичных сценария</h3>
+        <ol>
+          <li><strong>localStorage hydration</strong> — сохраняем state при изменениях, читаем при старте.</li>
+          <li><strong>SSR (Next.js, Remix)</strong> — сервер рендерит state, клиент гидрирует.</li>
+          <li><strong>Тесты</strong> — создаём store с уже задуманным state для конкретного теста.</li>
+        </ol>
+
+        <h3>Шаблон localStorage hydration</h3>
+        <div class="code-block">
+<span class="cm">// 1) Загрузить state</span>
+<span class="kw">function</span> <span class="fn">loadState</span>(): <span class="ts">Partial&lt;RootState&gt; | undefined</span> {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> raw = localStorage.<span class="fn">getItem</span>(<span class="str">'app-state'</span>)
+    <span class="kw">if</span> (!raw) <span class="kw">return undefined</span>
+    <span class="kw">return</span> JSON.<span class="fn">parse</span>(raw)
+  } <span class="kw">catch</span> { <span class="kw">return undefined</span> }
+}
+
+<span class="cm">// 2) Создать store</span>
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer,
+  preloadedState: <span class="fn">loadState</span>()
+})
+
+<span class="cm">// 3) Подписаться на изменения и сохранять</span>
+store.<span class="fn">subscribe</span>(() =&gt; {
+  <span class="kw">const</span> state = store.<span class="fn">getState</span>()
+  localStorage.<span class="fn">setItem</span>(<span class="str">'app-state'</span>, JSON.<span class="fn">stringify</span>(state))
+})
+        </div>
+
+        <h3>Подводный камень: только часть state</h3>
+        <p>
+          Часто вы хотите сохранять только <strong>часть</strong> state (например, auth + theme), но не cache RTK Query
+          (он временный). Решение — селективно:
+        </p>
+        <div class="code-block">
+store.<span class="fn">subscribe</span>(<span class="fn">throttle</span>(() =&gt; {
+  <span class="kw">const</span> { auth, theme } = store.<span class="fn">getState</span>()
+  localStorage.<span class="fn">setItem</span>(<span class="str">'app-state'</span>, JSON.<span class="fn">stringify</span>({ auth, theme }))
+}, <span class="num">1000</span>))
+        </div>
+
+        <h3>preloadedState и initialState slice</h3>
+        <div class="warning">
+          Если у вас <strong>и</strong> <code>preloadedState: { counter: { value: 5 } }</code>,
+          <strong>и</strong> в slice <code>initialState: { value: 0 }</code> — RTK использует
+          <code>preloadedState</code>. Это поведение Redux: при первом call'е reducer'а
+          <code>state === preloadedState[key]</code>, а не undefined, поэтому initialState проигнорируется.
+        </div>
+
+        <h3>Подводный камень: схема изменилась</h3>
+        <div class="warning">
+          Если вы выпустили новую версию приложения с новой структурой state, а у пользователя в localStorage
+          старая схема — приложение упадёт. Решения:
+          <ul style="margin-top: 4px;">
+            <li>Версионирование: <code>{ version: 2, state: {...} }</code> + миграции;</li>
+            <li>redux-persist (поддерживает миграции);</li>
+            <li>Простая <code>try/catch</code> + <code>localStorage.clear()</code> при ошибке.</li>
+          </ul>
+        </div>
+
+        <h3>SSR-вариант (Next.js)</h3>
+        <div class="code-block">
+<span class="cm">// _app.tsx (упрощённо)</span>
+<span class="kw">function</span> <span class="fn">App</span>({ Component, pageProps }) {
+  <span class="kw">const</span> store = useMemo(() =&gt; <span class="fn">configureStore</span>({
+    reducer,
+    preloadedState: pageProps.initialReduxState  <span class="cm">// от getServerSideProps</span>
+  }), [pageProps.initialReduxState])
+
+  <span class="kw">return</span> &lt;Provider store={store}&gt;&lt;Component {...pageProps} /&gt;&lt;/Provider&gt;
+}
+        </div>
+
+        <h3>redux-persist vs ручной hydration</h3>
+        <p>
+          Если нужны миграции схемы, blacklist/whitelist, debounce — берите <a href="https://github.com/rt2zz/redux-persist" target="_blank">redux-persist</a>.
+          Для простых кейсов (counter, theme, user-prefs) preloadedState + subscribe достаточно.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

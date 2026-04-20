@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>17 — Опция devTools</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .opt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin: 14px 0; }
+    .opt-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; cursor: pointer; }
+    .opt-card.active { border-color: var(--accent); background: rgba(86,156,214,.08); }
+    .opt-card h5 { font-family: var(--font-mono); font-size: .78rem; color: var(--accent); }
+    .opt-card p { font-size: .72rem; color: var(--text-muted); margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">17 / 106</span>devTools — опции и фильтры</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../16-tuple-typing/">← Назад</a>
+      <a href="../18-preloaded-state/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Конфигурация Redux DevTools (наша + внешняя)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          configureStore передаёт опции в <code>composeWithDevToolsExtension(options)</code>.
+          Эти опции работают для официального Redux DevTools Extension в Chrome/FF.
+          В нашей встроенной DevTools-панели ниже мы реализовали аналогичный <strong>actionsDenylist</strong>
+          — попробуйте отфильтровать actions.
+        </p>
+
+        <div style="display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px;">
+          <input type="text" id="denylist" placeholder="actionsDenylist (regex), напр.: ^counter/tick$"
+                 style="flex: 1; padding: 6px 10px; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-primary); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: .8rem;">
+          <button class="btn" id="apply-deny">применить фильтр</button>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn" id="dispatch-tick">dispatch counter/tick</button>
+          <button class="btn" id="dispatch-noisy">dispatch debug/noisy</button>
+          <button class="btn" id="dispatch-import">dispatch user/save</button>
+          <button class="btn btn--secondary" id="clear-dev">очистить DevTools</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — devTools options</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>devTools</code>: If <code>true</code>, configureStore will use <code>composeWithDevToolsExtension</code>
+          if available. If an object, configureStore will pass that object to <code>composeWithDevToolsExtension</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/api/configureStore#devtools" target="_blank">devTools option</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>devTools</code>: если <code>true</code>, configureStore использует
+          <code>composeWithDevToolsExtension</code> при наличии. Если объект — configureStore передаст его
+          в <code>composeWithDevToolsExtension</code>.»
+        </div>
+
+        <h3>Полезные опции</h3>
+        <div class="code-block">
+<span class="fn">configureStore</span>({
+  reducer,
+  devTools: {
+    name: <span class="str">'My App'</span>,                       <span class="cm">// имя в DevTools (если несколько store)</span>
+    trace: <span class="kw">true</span>,                            <span class="cm">// сохранять stack-trace каждого action</span>
+    traceLimit: <span class="num">25</span>,                          <span class="cm">// глубина stack</span>
+    maxAge: <span class="num">50</span>,                              <span class="cm">// сколько actions держать в истории</span>
+
+    <span class="cm">// Фильтрация actions</span>
+    actionsDenylist: [<span class="str">'^counter/tick$'</span>],     <span class="cm">// regex: не показывать</span>
+    actionsAllowlist: [<span class="str">'^user/'</span>],            <span class="cm">// regex: показывать только эти</span>
+    predicate: (state, action) =&gt; action.type !== <span class="str">'noisy'</span>,
+
+    <span class="cm">// Сериализация</span>
+    serialize: { options: <span class="kw">true</span> },             <span class="cm">// jsan-сериализация (для Map/Set/Date)</span>
+    actionSanitizer: (action) =&gt; ({ ...action, password: <span class="str">'***'</span> }),
+    stateSanitizer: (state) =&gt; ({ ...state, secret: <span class="str">'***'</span> }),
+
+    <span class="cm">// Импорт/экспорт</span>
+    shouldHotReload: <span class="kw">true</span>,                  <span class="cm">// перезагружать историю при HMR</span>
+    shouldRecordChanges: <span class="kw">true</span>,              <span class="cm">// автостарт записи</span>
+  }
+})
+        </div>
+
+        <h3>actionsDenylist vs predicate</h3>
+        <ul>
+          <li><strong>actionsDenylist</strong> — массив regex-строк. Простой кейс «не записывать тиковые actions».</li>
+          <li><strong>actionsAllowlist</strong> — обратное: записывать <em>только</em> matching actions.</li>
+          <li><strong>predicate(state, action)</strong> — функция. Динамическое условие, например «не записывать если state.devMode === false».</li>
+        </ul>
+
+        <h3>Sanitizer для секретов</h3>
+        <p>
+          <code>actionSanitizer</code> и <code>stateSanitizer</code> применяются <strong>только для DevTools</strong>:
+          в реальный store попадает оригинальное значение. Используйте, чтобы скрыть пароли, токены, PII в логах.
+        </p>
+
+        <h3>devTools: false</h3>
+        <p>
+          В production <strong>обязательно</strong> ставьте <code>devTools: false</code> или используйте
+          <code>process.env.NODE_ENV !== 'production'</code>. Иначе любой пользователь сможет посмотреть state
+          приложения через расширение и увидеть JWT-токены, личные данные.
+        </p>
+
+        <h3>Подводный камень: trace</h3>
+        <div class="warning">
+          <code>trace: true</code> сохраняет stack-trace каждого action — очень удобно для debugging.
+          Но включает оверхед на каждый dispatch (~3-5ms). В проде <strong>точно false</strong>, в dev включайте
+          по необходимости.
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://github.com/reduxjs/redux-devtools/tree/main/extension#configuration" target="_blank">Полный список опций redux-devtools-extension</a></li>
+          <li><a href="https://redux-toolkit.js.org/api/configureStore#devtools" target="_blank">RTK docs — devTools option</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

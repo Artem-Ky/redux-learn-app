@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>12 — immutableStateInvariantMiddleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .scenarios { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+    @media (max-width: 1000px) { .scenarios { grid-template-columns: 1fr; } }
+    .scenario { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .scenario--bad { border-left: 3px solid var(--accent-red); }
+    .scenario--ok { border-left: 3px solid var(--success); }
+    .scenario h4 { font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px; }
+    .scenario--bad h4 { color: var(--accent-red); }
+    .scenario--ok h4 { color: var(--success); }
+    .scenario pre { font-family: var(--font-mono); font-size: .74rem; color: var(--text-primary); white-space: pre; overflow-x: auto; margin: 6px 0; }
+    .err-display { background: var(--bg-panel); border: 1px solid var(--accent-red); border-left: 3px solid var(--accent-red);
+                   padding: 10px 14px; border-radius: var(--radius-sm); margin: 12px 0; color: var(--accent-red);
+                   font-family: var(--font-mono); font-size: .78rem; white-space: pre-wrap; min-height: 50px; }
+    .err-display.empty { color: var(--text-muted); border-color: var(--border); border-left-color: var(--border); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">12 / 106</span>immutableStateInvariantMiddleware — ловит мутации state</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../11-default-middleware/">← Назад</a>
+      <a href="../13-serializable-middleware/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Что middleware ловит, а что — пропускает</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Это middleware делает <strong>shallow + deep сравнение</strong> state до и после dispatch.
+          Если ссылка на nested объект осталась той же, но содержимое изменилось — это мутация. Throw.
+          Реальные сценарии ниже:
+        </p>
+
+        <div class="scenarios">
+          <div class="scenario scenario--bad">
+            <h4>1. Прямая мутация в reducer (без Immer)</h4>
+            <pre>const reducer = (state, action) =&gt; {
+  state.value += 1   // ← мутация!
+  return state
+}</pre>
+            <button class="btn" data-mut="direct">воспроизвести</button>
+          </div>
+          <div class="scenario scenario--bad">
+            <h4>2. Push в массив без копии</h4>
+            <pre>const reducer = (state, action) =&gt; {
+  state.list.push(action.payload)  // ← мутация массива
+  return state
+}</pre>
+            <button class="btn" data-mut="push">воспроизвести</button>
+          </div>
+          <div class="scenario scenario--bad">
+            <h4>3. Мутация state ВНЕ reducer</h4>
+            <pre>// прямой доступ к состоянию
+store.getState().value = 999  // ← никогда</pre>
+            <button class="btn" data-mut="outside">воспроизвести</button>
+          </div>
+          <div class="scenario scenario--ok">
+            <h4>4. Корректно: возврат нового объекта</h4>
+            <pre>const reducer = (state, action) =&gt; ({
+  ...state,
+  value: state.value + 1
+})</pre>
+            <button class="btn" data-mut="ok">воспроизвести</button>
+          </div>
+        </div>
+
+        <div class="err-display empty" id="err-out">— ожидание dispatch —</div>
+
+        <p style="font-size: .82rem; color: var(--text-secondary); margin-top: 8px;">
+          Откройте также <strong>браузерную консоль</strong> — middleware пишет туда подробный stack-trace с путём
+          до нарушенной ноды (например, <code>state.list.0</code>).
+        </p>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — как работает immutable check</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «Redux expects that all state updates are done immutably. The Immutable State Invariant Middleware deeply compares
+          state values for mutations. It can detect mutations in reducers during a dispatch, and also mutations that occur
+          between dispatches (such as in a component or a selector).»
+          <br>— <a href="https://redux-toolkit.js.org/api/immutabilityMiddleware" target="_blank">immutabilityMiddleware API</a>
+        </div>
+        <div class="quote quote--ru">
+          «Redux ожидает, что все обновления state делаются иммутабельно. Immutable State Invariant Middleware
+          выполняет глубокое сравнение значений state на мутации. Он может обнаружить мутации в reducer'ах во время
+          dispatch, а также мутации, происходящие между dispatch'ами (например, в компоненте или селекторе).»
+        </div>
+
+        <h3>Алгоритм (упрощённо)</h3>
+        <ol>
+          <li>Перед каждым dispatch middleware делает <code>trackedState = trackProperties(state)</code> — рекурсивно строит дерево с метаинформацией.</li>
+          <li>После выполнения reducer'а делает <code>detectMutations(trackedState, newState)</code>.</li>
+          <li>Если найдена ссылочно-неизменённая нода с другим содержимым — throw <code>Invariant failed: A state mutation was detected at "path"</code>.</li>
+          <li>Также делает второй проход <strong>между</strong> dispatch'ами — ловит мутации из компонентов и селекторов.</li>
+        </ol>
+
+        <h3>Опции</h3>
+        <div class="code-block">
+<span class="kw">interface</span> ImmutableStateInvariantMiddlewareOptions {
+  isImmutable?: (value) =&gt; <span class="ts">boolean</span>      <span class="cm">// custom isImmutable check</span>
+  ignoredPaths?: (<span class="ts">string</span> | RegExp)[]      <span class="cm">// игнорировать эти пути</span>
+  warnAfter?: <span class="ts">number</span>                      <span class="cm">// warn если check &gt; N мс (default 32)</span>
+}
+
+<span class="cm">// Пример использования</span>
+<span class="fn">configureStore</span>({
+  reducer,
+  middleware: (gdm) =&gt; <span class="fn">gdm</span>({
+    immutableCheck: {
+      ignoredPaths: [<span class="str">'someBigBlob'</span>, /^cache\./],
+      warnAfter: <span class="num">100</span>,
+    }
+  })
+})
+        </div>
+
+        <h3>Почему Immer не вызывает ошибок</h3>
+        <p>
+          createSlice оборачивает reducer в <code>produce()</code> (immer). Внутри produce вы пишете
+          <code>state.value++</code>, но это не мутация исходного state — это мутация Proxy-draft.
+          immer возвращает новый объект только для изменённых веток (структурный sharing). Поэтому
+          immutable middleware не видит проблемы.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// Внутри createSlice происходит:</span>
+<span class="kw">const</span> wrappedReducer = (state, action) =&gt; {
+  <span class="kw">return</span> <span class="fn">produce</span>(state, draft =&gt; {
+    yourReducer(draft, action)  <span class="cm">// здесь мутируйте draft сколько угодно</span>
+  })
+}
+        </div>
+
+        <h3>Производительность</h3>
+        <div class="warning">
+          Immutable check рекурсивно обходит весь state. Для большого state (1000+ entities) это может быть медленно.
+          Используйте <code>ignoredPaths</code> для тяжёлых веток (например, нормализованные данные RTK Query)
+          или отключите middleware полностью с предупреждением.
+        </div>
+
+        <h3>Источник</h3>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/immutableStateInvariantMiddleware.ts" target="_blank">
+            immutableStateInvariantMiddleware.ts
+          </a> (~150 строк, реализация detectMutations).
+        </p>
+
+        <h3>Подводный камень: NODE_ENV</h3>
+        <div class="warning">
+          Этот middleware <strong>отключён</strong> в production-сборке. Если у вас баг с мутацией, который проявляется только
+          в production — он мог скрываться, потому что middleware не предупредил. Решение: запускайте production-сборку
+          локально с включённым immutable check (передайте <code>immutableCheck: true</code> явно, не полагаясь на дефолт).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

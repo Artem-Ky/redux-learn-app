@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>10 — Параметр reducer: функция vs объект</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1000px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .form-card__head { padding: 8px 14px; background: var(--bg-panel); border-bottom: 1px solid var(--border); font-family: var(--font-mono); color: var(--accent-yellow); font-size: .82rem; }
+    .form-card__body { padding: 12px 14px; }
+    .form-card__body code { background: var(--bg-secondary); padding: 1px 6px; border-radius: 3px; }
+    .switcher { display: flex; gap: 6px; margin-bottom: 10px; }
+    .switcher__btn { padding: 6px 14px; background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: .8rem; }
+    .switcher__btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">10 / 106</span>Параметр reducer — функция или объект</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../09-configure-vs-create-store/">← Назад</a>
+      <a href="../11-default-middleware/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">3 формы reducer в configureStore</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          configureStore принимает reducer в трёх формах. Переключайте — внизу будет создаваться разный store
+          и DevTools покажет одинаковый результирующий <strong>state shape</strong>.
+        </p>
+
+        <div class="switcher">
+          <button class="switcher__btn active" data-form="object">1. Объект-карта (рекомендуется)</button>
+          <button class="switcher__btn" data-form="combine">2. combineReducers вручную</button>
+          <button class="switcher__btn" data-form="single">3. Один reducer-функция</button>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-card">
+            <div class="form-card__head">configureStore({ reducer: <span id="form-display">...</span> })</div>
+            <div class="form-card__body">
+              <pre id="form-code" style="font-family: var(--font-mono); font-size: .76rem; color: var(--text-primary); white-space: pre; overflow-x: auto; margin: 0; line-height: 1.55;"></pre>
+            </div>
+          </div>
+          <div class="form-card">
+            <div class="form-card__head">Получившийся state shape</div>
+            <div class="form-card__body">
+              <pre id="state-shape" style="font-family: var(--font-mono); font-size: .82rem; color: var(--accent-cyan); margin: 0; padding: 6px 0;"></pre>
+              <p style="font-size: .76rem; color: var(--text-muted); margin-top: 10px;" id="form-note"></p>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 12px; align-items: center;">
+          <button class="btn" id="dispatch-counter">+1 counter</button>
+          <button class="btn" id="dispatch-todo">+ todo</button>
+          <button class="btn btn--secondary" id="recreate">пересоздать store с этой формой</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — что configureStore делает с reducer</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>reducer</code>: A single reducer function that will be used as the root reducer, or an object of slice reducers
+          that will be passed to <code>combineReducers()</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/api/configureStore#reducer" target="_blank">configureStore — reducer</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>reducer</code>: либо одна reducer-функция, которая будет использована как root reducer,
+          либо объект slice-reducers, который будет передан в <code>combineReducers()</code>.»
+        </div>
+
+        <h3>Логика внутри (исходник)</h3>
+        <div class="code-block">
+<span class="cm">// configureStore.ts (упрощённо)</span>
+<span class="kw">let</span> rootReducer
+<span class="kw">if</span> (<span class="kw">typeof</span> reducer === <span class="str">'function'</span>) {
+  rootReducer = reducer                       <span class="cm">// Форма 3: уже готовый</span>
+} <span class="kw">else if</span> (isPlainObject(reducer)) {
+  rootReducer = <span class="fn">combineReducers</span>(reducer)  <span class="cm">// Форма 1: объект → combineReducers</span>
+} <span class="kw">else</span> {
+  <span class="kw">throw new</span> <span class="fn">Error</span>(<span class="str">'"reducer" is a required argument...'</span>)
+}
+        </div>
+
+        <h3>Все три формы дают одинаковый state</h3>
+        <div class="code-block">
+<span class="cm">// Форма 1 — объект (RTK сам сделает combineReducers)</span>
+<span class="fn">configureStore</span>({
+  reducer: { counter: counterReducer, todos: todosReducer }
+})
+
+<span class="cm">// Форма 2 — вы сами вызвали combineReducers</span>
+<span class="fn">configureStore</span>({
+  reducer: <span class="fn">combineReducers</span>({ counter: counterReducer, todos: todosReducer })
+})
+
+<span class="cm">// Форма 3 — единый reducer (без combineReducers)</span>
+<span class="fn">configureStore</span>({
+  reducer: rootReducer  <span class="cm">// (state, action) =&gt; newState</span>
+})
+
+<span class="cm">// → во всех трёх state.counter и state.todos доступны</span>
+        </div>
+
+        <h3>Когда использовать какую</h3>
+        <ul>
+          <li><strong>Форма 1 (объект)</strong> — стандартная и рекомендуемая. Меньше boilerplate, RTK сам зовёт combineReducers.</li>
+          <li><strong>Форма 2 (явный combineReducers)</strong> — если нужно сделать что-то с rootReducer (например, обернуть в reducerEnhancer для resetState).</li>
+          <li><strong>Форма 3 (одна функция)</strong> — для крошечных приложений или нестандартных случаев (custom rootReducer, например с redux-persist).</li>
+        </ul>
+
+        <h3>combineSlices vs combineReducers</h3>
+        <p>
+          В RTK 2.x появился <code>combineSlices()</code> — расширенная версия combineReducers, которая поддерживает
+          <strong>lazy injection</strong> slice'ов (для code-splitting). Подробнее в уроке 34.
+        </p>
+
+        <h3>Подводный камень: конфликт ключей</h3>
+        <div class="warning">
+          Если у вас в Объект-карте есть ключ <code>counter</code>, и одновременно вы делаете
+          <code>preloadedState: { counter: ... }</code> — RTK инициализирует state из preloadedState,
+          а ваш initialState slice проигнорирует. Это поведение Redux, а не баг RTK.
+        </div>
+
+        <h3>Подводный камень: typeof reducer === 'function'</h3>
+        <div class="warning">
+          Если вы передадите массив или Map — будет error <code>"reducer" is a required argument and must be a function or an object of functions</code>.
+          Только plain object или function принимаются.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

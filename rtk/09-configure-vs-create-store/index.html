@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>09 — configureStore vs createStore</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .vs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1100px) { .vs-grid { grid-template-columns: 1fr; } }
+    .vs-col { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .vs-col__head { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .vs-col--legacy .vs-col__head { background: rgba(244,71,71,.08); }
+    .vs-col--rtk .vs-col__head { background: rgba(118,74,188,.12); }
+    .vs-col__title { font-family: var(--font-mono); font-size: .9rem; font-weight: 600; }
+    .vs-col--legacy .vs-col__title { color: var(--accent-red); }
+    .vs-col--rtk .vs-col__title { color: var(--accent-purple); }
+    .vs-col__body { padding: 14px; }
+    .src-block { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                 padding: 10px 12px; font-family: var(--font-mono); font-size: .73rem; white-space: pre;
+                 overflow-x: auto; line-height: 1.55; color: var(--text-primary); }
+    .src-block .kw { color: var(--accent-purple); }
+    .src-block .str { color: var(--accent-orange); }
+    .src-block .fn { color: var(--accent-yellow); }
+    .src-block .cm { color: var(--text-muted); font-style: italic; }
+    .src-block .num { color: var(--accent-cyan); }
+    .src-block .add { background: rgba(76,175,80,.15); display: block; padding: 0 4px; border-left: 2px solid var(--success); }
+    .src-block .del { background: rgba(244,71,71,.12); display: block; padding: 0 4px; border-left: 2px solid var(--accent-red); opacity: .7; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 8px; margin-top: 10px; }
+    .stat { background: var(--bg-panel); border: 1px solid var(--border); padding: 8px 12px; border-radius: var(--radius-sm); text-align: center; }
+    .stat__n { font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent-cyan); }
+    .stat__l { font-size: .7rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">09 / 106</span>configureStore vs createStore — что внутри</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../08-configure-store-basic/">← Назад</a>
+      <a href="../10-reducer-param/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Один и тот же counter — две версии. Оба работают одинаково</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Слева — низкоуровневый <code>createStore</code> с ручной настройкой. Справа — <code>configureStore</code>,
+          который делает всё то же самое автоматически. Зелёным выделено, что RTK <strong>добавил</strong>;
+          красным — что вы можете <strong>удалить</strong>.
+        </p>
+
+        <div class="vs-grid">
+          <div class="vs-col vs-col--legacy">
+            <div class="vs-col__head">
+              <div class="vs-col__title">createStore (legacy)</div>
+              <div style="color: var(--text-muted); font-size: .72rem;">14 строк</div>
+            </div>
+            <div class="vs-col__body">
+              <div class="src-block" id="src-legacy"></div>
+              <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+                <span style="font-family: var(--font-mono); color: var(--text-muted);">value =</span>
+                <span id="legacy-value" style="font-family: var(--font-mono); font-size: 1.4rem; color: var(--accent-red); min-width: 40px;">0</span>
+                <button class="btn" id="legacy-inc">+1</button>
+                <button class="btn btn--secondary" id="legacy-reset">reset</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="vs-col vs-col--rtk">
+            <div class="vs-col__head">
+              <div class="vs-col__title">configureStore (RTK)</div>
+              <div style="color: var(--text-muted); font-size: .72rem;">3 строки</div>
+            </div>
+            <div class="vs-col__body">
+              <div class="src-block" id="src-rtk"></div>
+              <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+                <span style="font-family: var(--font-mono); color: var(--text-muted);">value =</span>
+                <span id="rtk-value" style="font-family: var(--font-mono); font-size: 1.4rem; color: var(--accent-purple); min-width: 40px;">0</span>
+                <button class="btn" id="rtk-inc">+1</button>
+                <button class="btn btn--secondary" id="rtk-reset">reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="stat__n">3</div><div class="stat__l">middleware (RTK)</div></div>
+          <div class="stat"><div class="stat__n">+1</div><div class="stat__l">enhancer autoBatch</div></div>
+          <div class="stat"><div class="stat__n">auto</div><div class="stat__l">DevTools setup</div></div>
+          <div class="stat"><div class="stat__n">auto</div><div class="stat__l">combineReducers</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <div class="demo-section__header">Оба store работают параллельно. DevTools подключён к RTK-store.</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Кнопки выше управляют двумя независимыми store. DevTools показывает actions второго (RTK) store.
+          Заметьте: action.type один и тот же — <code>counter/incremented</code>. Поведение тоже одинаковое.
+        </p>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — что configureStore делает изнутри</div>
+      <div class="theory__body">
+        <h3>Дословно из доки</h3>
+        <div class="quote">
+          «<code>configureStore</code> wraps <code>createStore</code> to provide simplified configuration options and good defaults.
+          It can automatically combine your slice reducers, adds whatever Redux middleware you supply, includes
+          <code>redux-thunk</code> by default, and enables use of the Redux DevTools Extension.»
+          <br>— <a href="https://redux-toolkit.js.org/api/configureStore" target="_blank">configureStore API</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>configureStore</code> оборачивает <code>createStore</code>, предоставляя упрощённые опции конфигурации
+          и хорошие умолчания. Он может автоматически собрать ваши slice-reducers, добавить любые предоставленные
+          Redux middleware, по умолчанию включает <code>redux-thunk</code> и активирует Redux DevTools Extension.»
+        </div>
+
+        <h3>Псевдокод реализации (упрощённо)</h3>
+        <div class="code-block">
+<span class="kw">export function</span> <span class="fn">configureStore</span>(options) {
+  <span class="kw">const</span> {
+    reducer = <span class="kw">undefined</span>,
+    middleware,
+    devTools = <span class="kw">true</span>,
+    preloadedState = <span class="kw">undefined</span>,
+    enhancers = <span class="kw">undefined</span>,
+  } = options
+
+  <span class="cm">// 1. Собрать rootReducer</span>
+  <span class="kw">let</span> rootReducer
+  <span class="kw">if</span> (<span class="kw">typeof</span> reducer === <span class="str">'function'</span>) {
+    rootReducer = reducer
+  } <span class="kw">else if</span> (isPlainObject(reducer)) {
+    rootReducer = <span class="fn">combineReducers</span>(reducer)
+  }
+
+  <span class="cm">// 2. Получить middleware (default + кастомные)</span>
+  <span class="kw">let</span> finalMiddleware = <span class="kw">typeof</span> middleware === <span class="str">'function'</span>
+    ? <span class="fn">middleware</span>(getDefaultMiddleware)
+    : <span class="fn">getDefaultMiddleware</span>()
+
+  <span class="cm">// 3. Собрать enhancers (default + кастомные)</span>
+  <span class="kw">let</span> finalEnhancers = <span class="kw">typeof</span> enhancers === <span class="str">'function'</span>
+    ? <span class="fn">enhancers</span>(getDefaultEnhancers)
+    : <span class="fn">getDefaultEnhancers</span>()
+
+  <span class="cm">// 4. composeWithDevTools если включён</span>
+  <span class="kw">const</span> composer = devTools
+    ? composeWithDevTools({ trace: <span class="kw">false</span>, ...devTools })
+    : compose
+
+  <span class="cm">// 5. Создать store через ванильный createStore</span>
+  <span class="kw">return</span> <span class="fn">createStore</span>(
+    rootReducer,
+    preloadedState,
+    <span class="fn">composer</span>(<span class="fn">applyMiddleware</span>(...finalMiddleware), ...finalEnhancers)
+  )
+}
+        </div>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/configureStore.ts" target="_blank">
+            Реальный исходник configureStore.ts (~150 строк)
+          </a>
+        </p>
+
+        <h3>Что добавляется бесплатно</h3>
+        <ul>
+          <li><strong>thunk middleware</strong> — async actions без отдельной установки.</li>
+          <li><strong>immutableStateInvariantMiddleware</strong> — ловит мутации state в reducer (только dev).</li>
+          <li><strong>serializableStateInvariantMiddleware</strong> — ловит не-сериализуемые payload (только dev).</li>
+          <li><strong>actionCreatorInvariantMiddleware</strong> — ловит <code>dispatch(actionCreator)</code> вместо <code>dispatch(actionCreator())</code>.</li>
+          <li><strong>autoBatchEnhancer</strong> — батчит уведомления подписчиков.</li>
+          <li><strong>composeWithDevToolsExtension</strong> — DevTools подключается без условий <code>typeof window</code>.</li>
+        </ul>
+
+        <h3>Подводный камень: тип store</h3>
+        <div class="warning">
+          configureStore возвращает не <code>Store</code>, а <strong>EnhancedStore</strong>. Разница: EnhancedStore содержит
+          типы middleware и enhancers в дженериках. При вытаскивании типа делайте
+          <code>type AppDispatch = typeof store.dispatch</code> и <code>type RootState = ReturnType&lt;typeof store.getState&gt;</code> —
+          получите правильную сигнатуру с поддержкой thunk dispatch.
+        </div>
+
+        <h3>Что вы теряете без configureStore</h3>
+        <p>
+          Если вы используете <code>createStore</code> напрямую — у вас нет: thunk (нужно
+          <code>applyMiddleware(thunk)</code>), invariant-проверок (баги пройдут в production), DevTools
+          (нужна conditional проверка <code>__REDUX_DEVTOOLS_EXTENSION__</code>), batching (каждый dispatch — отдельный render).
+          Команда Redux рекомендует: <strong>не используйте createStore напрямую</strong>, оно поэтому переименовано
+          в <code>legacy_createStore</code>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

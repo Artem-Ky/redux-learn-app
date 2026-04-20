@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>13 — serializableStateInvariantMiddleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ser-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+    @media (max-width: 1000px) { .ser-grid { grid-template-columns: 1fr; } }
+    .ser-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; }
+    .ser-card.bad { border-left: 3px solid var(--accent-red); }
+    .ser-card.ok { border-left: 3px solid var(--success); }
+    .ser-card h4 { font-family: var(--font-mono); font-size: .8rem; margin-bottom: 4px; }
+    .ser-card.bad h4 { color: var(--accent-red); }
+    .ser-card.ok h4 { color: var(--success); }
+    .ser-card pre { font-family: var(--font-mono); font-size: .73rem; color: var(--text-primary); margin: 6px 0; }
+    .err-display { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                   padding: 10px 14px; margin: 12px 0; min-height: 50px; font-family: var(--font-mono); font-size: .76rem; white-space: pre-wrap; color: var(--text-muted); }
+    .err-display.warn { color: var(--warning); border-color: var(--warning); border-left: 3px solid var(--warning); }
+    .err-display.ok   { color: var(--success); border-color: var(--success); border-left: 3px solid var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">13 / 106</span>serializableStateInvariantMiddleware</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../12-immutable-middleware/">← Назад</a>
+      <a href="../14-action-invariant-middleware/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Что считается «не-сериализуемым»</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Redux ожидает, что весь state и payload экшенов сериализуются в JSON. Это нужно для:
+          time-travel debugging в DevTools, persistence, SSR, hydration.
+          Middleware ловит запретные значения и кричит warning в консоль (не throw).
+        </p>
+
+        <div class="ser-grid">
+          <div class="ser-card bad">
+            <h4>1. Date</h4>
+            <pre>dispatch({ type: 'set/date', payload: new Date() })</pre>
+            <button class="btn" data-test="date">воспроизвести</button>
+          </div>
+          <div class="ser-card bad">
+            <h4>2. Map</h4>
+            <pre>dispatch({ type: 'set/map', payload: new Map([['a', 1]]) })</pre>
+            <button class="btn" data-test="map">воспроизвести</button>
+          </div>
+          <div class="ser-card bad">
+            <h4>3. Promise</h4>
+            <pre>dispatch({ type: 'set/promise', payload: Promise.resolve(1) })</pre>
+            <button class="btn" data-test="promise">воспроизвести</button>
+          </div>
+          <div class="ser-card bad">
+            <h4>4. Function</h4>
+            <pre>dispatch({ type: 'set/fn', payload: () => 'hi' })</pre>
+            <button class="btn" data-test="fn">воспроизвести</button>
+          </div>
+          <div class="ser-card bad">
+            <h4>5. class instance</h4>
+            <pre>class User {} dispatch({ type:'set/cls', payload: new User() })</pre>
+            <button class="btn" data-test="class">воспроизвести</button>
+          </div>
+          <div class="ser-card ok">
+            <h4>6. Plain object — OK</h4>
+            <pre>dispatch({ type: 'set/plain', payload: { a: 1, b: [2,3] } })</pre>
+            <button class="btn" data-test="plain">воспроизвести</button>
+          </div>
+        </div>
+
+        <div class="err-display" id="err-out">— ожидание dispatch —</div>
+
+        <p style="font-size: .82rem; color: var(--text-secondary);">
+          Откройте также <strong>браузерную консоль</strong> — middleware выводит точный путь до невалидного значения,
+          например <code>action.payload.date</code>.
+        </p>
+
+        <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);">
+          <h4 style="font-size: .85rem; color: var(--accent); margin-bottom: 8px;">Опции конфигурации</h4>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn" id="ignore-action">ignoredActions: ['set/date']</button>
+            <button class="btn" id="ignore-path">ignoredPaths: ['cache']</button>
+            <button class="btn btn--secondary" id="reset-options">сбросить опции</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — serializable check</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «It's recommended that you only put plain serializable values, like plain objects, arrays, and primitives,
+          into your Redux store. There are some rare cases where you may need to bend this rule... For those cases,
+          the middleware accepts options to allow non-serializable values.»
+          <br>— <a href="https://redux-toolkit.js.org/api/serializabilityMiddleware" target="_blank">serializabilityMiddleware</a>
+        </div>
+        <div class="quote quote--ru">
+          «Рекомендуется хранить в Redux store только простые сериализуемые значения — обычные объекты, массивы и
+          примитивы. В редких случаях это правило приходится нарушать… Для них middleware принимает опции,
+          позволяющие пропускать не-сериализуемые значения.»
+        </div>
+
+        <h3>Что считается сериализуемым</h3>
+        <ul>
+          <li><code>null</code>, <code>undefined</code></li>
+          <li><code>boolean</code>, <code>number</code>, <code>string</code>, <code>bigint</code></li>
+          <li>plain object (созданный через <code>{}</code> или <code>Object.create(null)</code>)</li>
+          <li>Array из сериализуемых значений</li>
+        </ul>
+
+        <h3>Что НЕ сериализуемо</h3>
+        <ul>
+          <li>Date (нужно <code>.toISOString()</code> при сохранении)</li>
+          <li>Map, Set, WeakMap, WeakSet</li>
+          <li>Promise, любой другой Thenable</li>
+          <li>Function, class instance, Symbol</li>
+          <li>DOM-элементы, File, Blob, FormData</li>
+          <li>Error (исключение — RTK Query сам сериализует ошибки в SerializedError)</li>
+        </ul>
+
+        <h3>Опции</h3>
+        <div class="code-block">
+<span class="kw">interface</span> SerializableStateInvariantMiddlewareOptions {
+  isSerializable?: (value: <span class="ts">unknown</span>) =&gt; <span class="ts">boolean</span>     <span class="cm">// custom check</span>
+  getEntries?: (value: <span class="ts">unknown</span>) =&gt; [<span class="ts">string</span>, <span class="ts">unknown</span>][]
+  ignoredActions?: <span class="ts">string</span>[]                            <span class="cm">// типы actions для пропуска</span>
+  ignoredActionPaths?: (<span class="ts">string</span> | RegExp)[]            <span class="cm">// пути в action для пропуска</span>
+  ignoredPaths?: (<span class="ts">string</span> | RegExp)[]                  <span class="cm">// пути в state для пропуска</span>
+  warnAfter?: <span class="ts">number</span>                                  <span class="cm">// warn если check &gt; N мс</span>
+  ignoreState?: <span class="ts">boolean</span>                               <span class="cm">// не проверять state, только actions</span>
+  ignoreActions?: <span class="ts">boolean</span>                             <span class="cm">// не проверять actions, только state</span>
+  disableCache?: <span class="ts">boolean</span>                               <span class="cm">// не кешировать результат WeakMap</span>
+}
+        </div>
+
+        <h3>Реальный пример: redux-persist</h3>
+        <p>
+          redux-persist использует action <code>persist/PERSIST</code>, который содержит функцию-callback.
+          Без настройки middleware кричит warning. Решение — добавить путь в <code>ignoredActions</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">import</span> { PERSIST, REHYDRATE, FLUSH, PURGE, REGISTER, PAUSE } <span class="kw">from</span> <span class="str">'redux-persist'</span>
+
+<span class="fn">configureStore</span>({
+  reducer,
+  middleware: (gdm) =&gt; <span class="fn">gdm</span>({
+    serializableCheck: {
+      ignoredActions: [PERSIST, REHYDRATE, FLUSH, PURGE, REGISTER, PAUSE]
+    }
+  })
+})
+        </div>
+
+        <h3>Подводный камень: Date в payload</h3>
+        <div class="warning">
+          Очень частая ошибка: <code>dispatch(addEvent({ date: new Date() }))</code>. Решение — передавайте
+          ISO-строку: <code>dispatch(addEvent({ date: new Date().toISOString() }))</code>. В компоненте
+          парсите обратно: <code>new Date(event.date)</code>.
+        </div>
+
+        <h3>Источник</h3>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/serializableStateInvariantMiddleware.ts" target="_blank">
+            serializableStateInvariantMiddleware.ts
+          </a> — обратите внимание на функцию <code>findNonSerializableValue</code>: она рекурсивно обходит
+          объект, кешируя проверенные узлы в WeakMap.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

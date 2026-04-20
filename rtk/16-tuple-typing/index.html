@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>16 — Tuple для типизации middleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ts-block { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                padding: 12px 14px; margin: 10px 0; font-family: var(--font-mono); font-size: .78rem;
+                white-space: pre; line-height: 1.55; color: var(--text-primary); overflow-x: auto; }
+    .ts-block .err { background: rgba(244,71,71,.18); display: block; padding: 0 4px; }
+    .ts-block .ok { background: rgba(76,175,80,.12); display: block; padding: 0 4px; }
+    .ts-block .kw { color: var(--accent-purple); }
+    .ts-block .str { color: var(--accent-orange); }
+    .ts-block .fn { color: var(--accent-yellow); }
+    .ts-block .ts { color: var(--accent-cyan); }
+    .ts-block .cm { color: var(--text-muted); font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">16 / 106</span>Tuple — типобезопасный массив middleware</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../15-enhancers-autobatch/">← Назад</a>
+      <a href="../17-devtools-option/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Почему обычный Array ломает типы</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В RTK 2.x была введена обёртка <code>Tuple</code> вокруг массива middleware/enhancers.
+          Это нужно потому, что TypeScript при <code>concat</code> на обычном массиве теряет литеральный тип
+          и сводит элементы к общему типу <code>Middleware</code> — а это разрушает inference для thunk-actions.
+        </p>
+
+        <h3 style="font-size: .85rem; color: var(--accent); margin-top: 14px;">Проблема: обычный массив</h3>
+        <div class="ts-block">
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer,
+<span class="err">  middleware: () =&gt; [thunk, myLogger]   // ← TS error в RTK 2.x</span>
+})
+<span class="cm">// Argument of type '() =&gt; [...]' is not assignable to type</span>
+<span class="cm">// '(getDefaultMiddleware: ...) =&gt; Tuple&lt;Middlewares&gt;'</span>
+<span class="cm">// Type 'Middleware[]' is missing the following properties</span>
+<span class="cm">// from type 'Tuple&lt;Middlewares&gt;': prepend, concat</span>
+            </div>
+
+        <h3 style="font-size: .85rem; color: var(--accent); margin-top: 14px;">Решение 1: getDefaultMiddleware().concat(...)</h3>
+        <div class="ts-block">
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer,
+<span class="ok">  middleware: (gdm) =&gt; <span class="fn">gdm</span>().<span class="fn">concat</span>(myLogger)   // ← Tuple сохраняет типы</span>
+})
+<span class="cm">// store.dispatch остаётся типизированным:</span>
+<span class="cm">// AppDispatch = ThunkDispatch + Dispatch + ...</span>
+        </div>
+
+        <h3 style="font-size: .85rem; color: var(--accent); margin-top: 14px;">Решение 2: импортировать Tuple вручную</h3>
+        <div class="ts-block">
+<span class="kw">import</span> { <span class="ts">Tuple</span> } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer,
+<span class="ok">  middleware: () =&gt; <span class="kw">new</span> <span class="ts">Tuple</span>(thunk, myLogger)   // ← OK</span>
+})
+        </div>
+
+        <h3 style="font-size: .85rem; color: var(--accent); margin-top: 14px;">.prepend() — поставить ДО default</h3>
+        <div class="ts-block">
+<span class="kw">const</span> listenerMw = <span class="fn">createListenerMiddleware</span>()
+
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer,
+<span class="ok">  middleware: (gdm) =&gt; <span class="fn">gdm</span>().<span class="fn">prepend</span>(listenerMw.middleware)</span>
+})
+<span class="cm">// listenerMiddleware ВСЕГДА должен быть первым</span>
+<span class="cm">// — иначе он не увидит actions, которые отвергнуты другими middleware</span>
+        </div>
+
+        <p style="font-size: .8rem; color: var(--text-secondary); margin-top: 10px;">
+          В DevTools ниже показан реально работающий store, собранный с использованием
+          <code>gdm().concat(loggerMiddleware)</code>. Кликайте кнопку — logger перехватывает action,
+          DevTools тоже его записывает.
+        </p>
+
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+          <button class="btn" id="dispatch">dispatch action</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — что такое Tuple</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>Tuple</code> is an extension of <code>Array</code>, which preserves the types of its elements
+          when calling <code>.concat()</code> and <code>.prepend()</code>. This is necessary because TypeScript's
+          built-in <code>Array.prototype.concat</code> has a return type that loses tuple information.»
+          <br>— <a href="https://redux-toolkit.js.org/api/configureStore#middleware" target="_blank">middleware option docs</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>Tuple</code> — это расширение <code>Array</code>, которое сохраняет типы своих элементов
+          при вызове <code>.concat()</code> и <code>.prepend()</code>. Это необходимо потому, что встроенный
+          TypeScript-метод <code>Array.prototype.concat</code> имеет возвращаемый тип, теряющий tuple-информацию.»
+        </div>
+
+        <h3>Реализация (исходник)</h3>
+        <div class="code-block">
+<span class="cm">// utils.ts (упрощённо)</span>
+<span class="kw">export class</span> Tuple&lt;<span class="ts">Items extends ReadonlyArray&lt;unknown&gt;</span>&gt; <span class="kw">extends</span> Array&lt;<span class="ts">Items[number]</span>&gt; {
+  <span class="kw">constructor</span>(...items: <span class="ts">Items</span>) {
+    <span class="fn">super</span>(...items)
+    Object.<span class="fn">setPrototypeOf</span>(<span class="kw">this</span>, Tuple.prototype)
+  }
+
+  <span class="fn">concat</span>&lt;<span class="ts">AdditionalItems extends ReadonlyArray&lt;unknown&gt;</span>&gt;(
+    items: <span class="ts">Tuple&lt;AdditionalItems&gt; | AdditionalItems</span>
+  ): <span class="ts">Tuple&lt;[...Items, ...AdditionalItems]&gt;</span> {
+    <span class="kw">return new</span> <span class="fn">Tuple</span>(...<span class="kw">this</span>, ...items)
+  }
+
+  <span class="fn">prepend</span>&lt;<span class="ts">AdditionalItems extends ReadonlyArray&lt;unknown&gt;</span>&gt;(
+    items: <span class="ts">Tuple&lt;AdditionalItems&gt; | AdditionalItems</span>
+  ): <span class="ts">Tuple&lt;[...AdditionalItems, ...Items]&gt;</span> {
+    <span class="kw">return new</span> <span class="fn">Tuple</span>(...items, ...<span class="kw">this</span>)
+  }
+}
+        </div>
+        <p>
+          Ключ — typescript-сигнатура: <code>concat&lt;AdditionalItems extends ReadonlyArray&lt;unknown&gt;&gt;</code>
+          возвращает <code>[...Items, ...AdditionalItems]</code>. Это сохраняет точный кортежный тип.
+          У стандартного <code>Array.concat</code> возврат — <code>T[]</code>, т.е. сужается до общего типа.
+        </p>
+
+        <h3>Когда замечаете разницу</h3>
+        <p>
+          Без Tuple <code>store.dispatch</code> теряет thunk-overload. Вы делаете
+          <code>store.dispatch(myThunk())</code> — и TS говорит «Argument of type 'ThunkAction&lt;...&gt;' is not assignable to
+          parameter of type 'AnyAction'». Лекарство: всегда возвращайте <strong>Tuple</strong> из
+          <code>middleware</code> callback.
+        </p>
+
+        <h3>То же для enhancers</h3>
+        <p>
+          Опция <code>enhancers</code> работает по тому же принципу:
+          <code>enhancers: (gde) =&gt; gde().concat(myEnhancer)</code>.
+          Метод <code>getDefaultEnhancers()</code> возвращает Tuple, и concat сохраняет тип.
+        </p>
+
+        <h3>Почему не использовать <code>as const</code></h3>
+        <div class="warning">
+          Можно было бы написать <code>middleware: () =&gt; [thunk, myMw] as const</code> —
+          и TypeScript бы вывел кортежный тип. Но <code>as const</code> делает массив <em>readonly</em>,
+          а internal-код RTK ожидает <code>concat/prepend/push/...</code>. Поэтому был выбран Tuple-класс.
+        </div>
+
+        <h3>Источник</h3>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/utils.ts" target="_blank">
+            packages/toolkit/src/utils.ts
+          </a> — найдите <code>export class Tuple</code>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

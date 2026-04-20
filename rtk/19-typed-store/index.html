@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>19 — RootState и AppDispatch</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ts-block { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                padding: 12px 14px; margin: 10px 0; font-family: var(--font-mono); font-size: .78rem;
+                white-space: pre; line-height: 1.55; color: var(--text-primary); overflow-x: auto; }
+    .ts-block .kw { color: var(--accent-purple); }
+    .ts-block .str { color: var(--accent-orange); }
+    .ts-block .fn { color: var(--accent-yellow); }
+    .ts-block .ts { color: var(--accent-cyan); }
+    .ts-block .cm { color: var(--text-muted); font-style: italic; }
+    .ts-block .ok { background: rgba(76,175,80,.12); display: block; padding: 0 4px; }
+    .ts-block .err { background: rgba(244,71,71,.18); display: block; padding: 0 4px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">19 / 106</span>RootState · AppDispatch · withTypes</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../18-preloaded-state/">← Назад</a>
+      <a href="../" style="color: var(--text-muted);">Секция C →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Типизированный store + хуки + selector — итог секции B</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Здесь — готовый рабочий React-counter с полностью типизированным store. Все типы выводятся <strong>из самого store</strong>,
+          ничего не пишется руками. <code>useAppSelector</code> и <code>useAppDispatch</code> — типизированные обёртки над useSelector/useDispatch.
+        </p>
+
+        <div id="root" style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 14px 0;"></div>
+
+        <h4 style="color: var(--accent); font-size: .85rem; margin: 14px 0 6px;">Шаг 1: типы из store</h4>
+        <div class="ts-block">
+<span class="kw">import</span> { configureStore } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">export const</span> store = <span class="fn">configureStore</span>({ reducer: { counter: counterSlice.reducer } })
+
+<span class="cm">// → Авто-выведение типов</span>
+<span class="kw">export type</span> <span class="ts">RootState</span> = ReturnType&lt;<span class="kw">typeof</span> store.getState&gt;
+<span class="kw">export type</span> <span class="ts">AppDispatch</span> = <span class="kw">typeof</span> store.dispatch
+<span class="kw">export type</span> <span class="ts">AppStore</span> = <span class="kw">typeof</span> store
+        </div>
+
+        <h4 style="color: var(--accent); font-size: .85rem; margin: 14px 0 6px;">Шаг 2: типизированные хуки (старый способ)</h4>
+        <div class="ts-block">
+<span class="kw">import</span> { useDispatch, useSelector, type TypedUseSelectorHook } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">export const</span> <span class="fn">useAppDispatch</span>: () =&gt; <span class="ts">AppDispatch</span> = useDispatch
+<span class="kw">export const</span> <span class="fn">useAppSelector</span>: <span class="ts">TypedUseSelectorHook&lt;RootState&gt;</span> = useSelector
+        </div>
+
+        <h4 style="color: var(--accent); font-size: .85rem; margin: 14px 0 6px;">Шаг 3: новый способ через .withTypes() (react-redux 9+)</h4>
+        <div class="ts-block">
+<span class="kw">import</span> { useDispatch, useSelector, useStore } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="ok"><span class="kw">export const</span> <span class="fn">useAppDispatch</span> = useDispatch.withTypes&lt;<span class="ts">AppDispatch</span>&gt;()</span>
+<span class="ok"><span class="kw">export const</span> <span class="fn">useAppSelector</span> = useSelector.withTypes&lt;<span class="ts">RootState</span>&gt;()</span>
+<span class="ok"><span class="kw">export const</span> <span class="fn">useAppStore</span>     = useStore.withTypes&lt;<span class="ts">AppStore</span>&gt;()</span>
+        </div>
+
+        <h4 style="color: var(--accent); font-size: .85rem; margin: 14px 0 6px;">Шаг 4: использование в компонентах</h4>
+        <div class="ts-block">
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="cm">// тип value автоматически number</span>
+  <span class="kw">const</span> value = <span class="fn">useAppSelector</span>(state =&gt; state.counter.value)
+  <span class="cm">// dispatch знает про thunk</span>
+  <span class="kw">const</span> dispatch = <span class="fn">useAppDispatch</span>()
+
+  <span class="kw">return</span> &lt;button onClick={() =&gt; <span class="fn">dispatch</span>(<span class="fn">incremented</span>())}&gt;{value}&lt;/button&gt;
+}
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — типизация store</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «You should infer these types from the store itself, which means that they correctly update as you add
+          more state slices or modify middleware settings. <code>RootState</code> and <code>AppDispatch</code>
+          should be inferred from the store, not declared manually.»
+          <br>— <a href="https://redux-toolkit.js.org/tutorials/typescript" target="_blank">TypeScript Quick Start</a>
+        </div>
+        <div class="quote quote--ru">
+          «Эти типы следует выводить из самого store — тогда они автоматически обновляются при добавлении
+          новых slice'ов или изменении middleware. <code>RootState</code> и <code>AppDispatch</code>
+          выводятся из store, а не объявляются вручную.»
+        </div>
+
+        <h3>Почему .withTypes() лучше</h3>
+        <p>
+          Старый способ через generic <code>TypedUseSelectorHook&lt;RootState&gt;</code> работает,
+          но не покрывает <code>useDispatch</code> (там нет аналогичного типа). Приходилось писать
+          <code>: () =&gt; AppDispatch = useDispatch</code> — теряется stack trace, выводимый при ошибке.
+        </p>
+        <p>
+          В <strong>react-redux 9.1+</strong> у каждого хука есть статический метод <code>.withTypes&lt;T&gt;()</code>:
+        </p>
+        <ul>
+          <li><code>useSelector.withTypes&lt;RootState&gt;()</code></li>
+          <li><code>useDispatch.withTypes&lt;AppDispatch&gt;()</code></li>
+          <li><code>useStore.withTypes&lt;AppStore&gt;()</code></li>
+          <li><code>useEffect</code>-style: <code>useSyncExternalStore</code> тоже можно типизировать.</li>
+        </ul>
+
+        <h3>RootState с lazy-injected slices</h3>
+        <div class="warning">
+          Если вы используете <code>combineSlices</code> + <code>.inject()</code> для code-splitting,
+          инжектируемые slice появляются в state позже, чем вычисляется <code>ReturnType&lt;typeof store.getState&gt;</code>.
+          Решение — <code>WithSlice</code>-тип:
+          <code>type RootState = ReturnType&lt;typeof rootReducer&gt; & WithSlice&lt;typeof productsSlice&gt;</code>.
+          Подробнее в уроке 35-36.
+        </div>
+
+        <h3>Структура файла store.ts (best practice)</h3>
+        <div class="code-block">
+<span class="cm">// app/store.ts</span>
+<span class="kw">import</span> { configureStore } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+<span class="kw">import</span> counterReducer <span class="kw">from</span> <span class="str">'../features/counter/counterSlice'</span>
+
+<span class="kw">export const</span> store = <span class="fn">configureStore</span>({
+  reducer: { counter: counterReducer },
+})
+
+<span class="kw">export type</span> <span class="ts">AppStore</span> = <span class="kw">typeof</span> store
+<span class="kw">export type</span> <span class="ts">RootState</span> = ReturnType&lt;<span class="kw">typeof</span> store.getState&gt;
+<span class="kw">export type</span> <span class="ts">AppDispatch</span> = <span class="kw">typeof</span> store.dispatch
+
+<span class="cm">// app/hooks.ts</span>
+<span class="kw">import</span> { useDispatch, useSelector, useStore } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import</span> <span class="kw">type</span> { <span class="ts">RootState</span>, <span class="ts">AppDispatch</span>, <span class="ts">AppStore</span> } <span class="kw">from</span> <span class="str">'./store'</span>
+
+<span class="kw">export const</span> <span class="fn">useAppDispatch</span> = useDispatch.withTypes&lt;<span class="ts">AppDispatch</span>&gt;()
+<span class="kw">export const</span> <span class="fn">useAppSelector</span> = useSelector.withTypes&lt;<span class="ts">RootState</span>&gt;()
+<span class="kw">export const</span> <span class="fn">useAppStore</span>    = useStore.withTypes&lt;<span class="ts">AppStore</span>&gt;()
+        </div>
+
+        <h3>Подводный камень: импортируйте useAppDispatch, не useDispatch</h3>
+        <div class="warning">
+          Один из самых частых багов: разработчик импортирует <code>useDispatch</code> напрямую из
+          <code>react-redux</code>, и тогда <code>dispatch(myThunk())</code> падает на TS-проверке
+          «Argument of type 'ThunkAction' is not assignable to 'AnyAction'».
+          Всегда импортируйте <strong>useAppDispatch</strong> из вашего <code>hooks.ts</code>.
+        </div>
+
+        <h3>thunk-параметры: AppDispatch + RootState</h3>
+        <div class="code-block">
+<span class="kw">import</span> <span class="kw">type</span> { <span class="ts">RootState</span>, <span class="ts">AppDispatch</span> } <span class="kw">from</span> <span class="str">'./store'</span>
+
+<span class="kw">export const</span> fetchUser = <span class="fn">createAsyncThunk</span>&lt;
+  <span class="ts">User</span>,                      <span class="cm">// Returned</span>
+  <span class="ts">number</span>,                    <span class="cm">// ThunkArg</span>
+  { state: <span class="ts">RootState</span>, dispatch: <span class="ts">AppDispatch</span>, rejectValue: <span class="ts">string</span> }
+&gt;(<span class="str">'user/fetch'</span>, <span class="kw">async</span> (id, { getState, dispatch, rejectWithValue }) =&gt; {
+  <span class="cm">// тип getState() выведен как RootState</span>
+})
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/tutorials/typescript" target="_blank">RTK TypeScript Quick Start</a></li>
+          <li><a href="https://react-redux.js.org/tutorials/typescript-quick-start" target="_blank">react-redux TypeScript guide</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>
