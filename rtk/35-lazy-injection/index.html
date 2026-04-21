@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>35 — Lazy injection</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .injected-list { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 12px 0; }
+    .injected-row { padding: 6px 0; font-family: var(--font-mono); font-size: .8rem; border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .injected-row:last-child { border-bottom: none; }
+    .injected-row__name { color: var(--accent-cyan); }
+    .injected-row__status--core { color: var(--text-muted); font-size: .7rem; }
+    .injected-row__status--injected { color: var(--success); font-size: .7rem; }
+    .injected-row__status--missing { color: var(--accent-red); font-size: .7rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">35 / 106</span>Lazy injection slices — code-splitting state</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../34-combine-slices/">← Назад</a>
+      <a href="../35a-lazy-loading-real/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">slice.injectInto(rootReducer) — динамическое добавление</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В большом приложении не все slice'ы нужны сразу. Lazy injection позволяет загружать reducer
+          вместе с feature-кодом (динамический import). Размер главного бандла меньше, state растёт
+          по мере открытия features.
+        </p>
+
+        <div class="code-block">
+<span class="cm">// 1. Базовый rootReducer — только core slices</span>
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(coreSlice).<span class="fn">withLazyLoadedSlices</span>&lt;<span class="ts">LazyState</span>&gt;()
+
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({ reducer: rootReducer })
+
+<span class="cm">// 2. Позже инжектим feature slice</span>
+<span class="kw">const</span> chartSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'chart'</span>,
+  initialState: { data: [] },
+  reducers: { ... }
+}).<span class="fn">injectInto</span>(rootReducer)
+<span class="cm">// ↑ injectInto возвращает копию slice'а с гарантией, что reducer уже подключён</span>
+
+<span class="cm">// 3. Используем actions/selectors как обычно</span>
+store.<span class="fn">dispatch</span>(chartSlice.actions.<span class="fn">addPoint</span>(<span class="num">42</span>))
+chartSlice.selectors.<span class="fn">selectData</span>(store.<span class="fn">getState</span>())
+        </div>
+
+        <div class="injected-list" id="slices-list"></div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
+          <button class="btn" id="inject-chart">inject chartSlice</button>
+          <button class="btn" id="inject-cart">inject cartSlice</button>
+          <button class="btn" id="inject-search">inject searchSlice</button>
+        </div>
+
+        <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 14px 0;">
+          <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px;">
+            Текущий root state (растёт по мере inject)
+          </h4>
+          <pre id="state-out" style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); margin: 0; overflow-x: auto; white-space: pre;">—</pre>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn" data-do="inc">core.increment (всегда есть)</button>
+          <button class="btn" data-do="point">chart.addPoint (нужен chart)</button>
+          <button class="btn" data-do="add">cart.add (нужен cart)</button>
+          <button class="btn" data-do="search">search.set (нужен search)</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — lazy injection</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>combineSlices</code> returns an enhanced reducer with an <code>inject</code> method that allows you to
+          inject a new slice/reducer at runtime. This is most useful for large applications where some slices are
+          loaded only when needed (code splitting).»
+          <br>— <a href="https://redux-toolkit.js.org/api/combineSlices#injecting-reducers" target="_blank">combineSlices — Injecting reducers</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>combineSlices</code> возвращает улучшенный reducer с методом <code>inject</code>, который
+          позволяет внедрять новый slice/reducer в runtime. Полезно для больших приложений, где некоторые
+          slice'ы загружаются по мере необходимости (code splitting).»
+        </div>
+
+        <h3>Два API: rootReducer.inject и slice.injectInto</h3>
+        <div class="code-block">
+<span class="cm">// Способ 1: rootReducer.inject — для произвольных reducer'ов</span>
+rootReducer.<span class="fn">inject</span>({ reducerPath: <span class="str">'feature'</span>, reducer: featureReducer })
+
+<span class="cm">// Способ 2: slice.injectInto(rootReducer) — для slice'ов (рекомендуется)</span>
+<span class="kw">const</span> injectedSlice = featureSlice.<span class="fn">injectInto</span>(rootReducer)
+<span class="cm">// Возвращает "клон" slice'а с гарантией, что reducer добавлен</span>
+<span class="cm">// Если slice уже был injected — возвращает существующий</span>
+        </div>
+
+        <h3>Под капотом</h3>
+        <p>
+          combineSlices хранит <strong>Map&lt;reducerPath, reducer&gt;</strong>. Inject добавляет в эту map
+          новую запись. На следующем dispatch'е root reducer будет вызывать ВСЕ reducer'ы, включая новый.
+          Это безопасная операция — старые ветки state остаются без изменений.
+        </p>
+        <div class="code-block">
+<span class="cm">// Псевдо-код:</span>
+<span class="kw">function</span> <span class="fn">combineSlices</span>(...slices) {
+  <span class="kw">const</span> reducers = <span class="kw">new</span> <span class="fn">Map</span>()
+  <span class="cm">// добавляем initial slices</span>
+
+  <span class="kw">function</span> <span class="fn">root</span>(state, action) {
+    <span class="kw">const</span> next = {}
+    <span class="kw">for</span> (<span class="kw">const</span> [path, reducer] <span class="kw">of</span> reducers) {
+      next[path] = <span class="fn">reducer</span>(state?.[path], action)
+    }
+    <span class="kw">return</span> next
+  }
+
+  root.inject = (slice) =&gt; { reducers.<span class="fn">set</span>(slice.reducerPath, slice.reducer) }
+  <span class="kw">return</span> root
+}
+        </div>
+
+        <h3>Когда state injected slice'а появляется</h3>
+        <p>
+          После <code>inject</code> на следующем <code>dispatch</code> root reducer вызовет inject'нутый
+          reducer с <code>state[path] = undefined</code>. Reducer вернёт <code>initialState</code>.
+          Так в state добавляется новая ветка.
+        </p>
+        <p style="color: var(--text-muted);">
+          Чтобы спровоцировать обновление сразу, можете dispatch любой no-op action или просто
+          <code>dispatch({ type: '@@INIT_INJECTED' })</code>.
+        </p>
+
+        <h3>withLazyLoadedSlices — типизация</h3>
+        <p>
+          В TS root state должен «знать» о всех возможных injected slices, иначе селекторы не будут
+          типизированы. Решение — <code>withLazyLoadedSlices&lt;T&gt;()</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">type</span> LazyState = {
+  chart?:  ChartState,        <span class="cm">// опционально, потому что lazy</span>
+  cart?:   CartState,
+  search?: SearchState,
+}
+
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(coreSlice)
+  .<span class="fn">withLazyLoadedSlices</span>&lt;<span class="ts">LazyState</span>&gt;()
+
+<span class="kw">type</span> RootState = ReturnType&lt;<span class="kw">typeof</span> rootReducer&gt;
+<span class="cm">// RootState = { core: CoreState, chart?: ChartState, cart?: ..., search?: ... }</span>
+        </div>
+        <p>
+          Подробнее в уроке 36.
+        </p>
+
+        <h3>Интеграция с React.lazy()</h3>
+        <div class="code-block">
+<span class="cm">// chartFeature/index.ts</span>
+<span class="kw">export const</span> chartSlice = <span class="fn">createSlice</span>({ ... }).<span class="fn">injectInto</span>(rootReducer)
+<span class="kw">export</span> ChartView <span class="kw">from</span> <span class="str">'./ChartView'</span>
+
+<span class="cm">// App.tsx</span>
+<span class="kw">const</span> ChartPage = <span class="fn">lazy</span>(() =&gt; <span class="fn">import</span>(<span class="str">'./chartFeature'</span>))   <span class="cm">// при первом рендере:</span>
+<span class="cm">// → загрузится chunk → injectInto добавит reducer → state.chart появится</span>
+        </div>
+
+        <h3>Подводный камень: doubled inject</h3>
+        <div class="warning">
+          Если вызвать <code>injectInto</code> для одного и того же slice дважды (например, если chunk
+          грузится дважды) — RTK <strong>не</strong> заменит reducer. Возвращается тот же объект.
+          Reducer сохраняется (state не обнуляется).
+        </div>
+
+        <h3>Подводный камень: undefined в селекторах</h3>
+        <div class="warning">
+          До inject'а <code>state.chart === undefined</code>. Если используете <code>chartSlice.selectors</code>
+          до inject — получите runtime error. Решение: всегда импортируйте slice через
+          <code>chartSlice.injectInto(...)</code> в момент монтирования компонента.
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/combineSlices#injecting-reducers" target="_blank">combineSlices — Injecting reducers</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/combineSlices.ts" target="_blank">combineSlices.ts — implementation</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

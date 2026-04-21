@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>40 — current() в дебаге</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .trace-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 12px 0; }
+    .trace-card h4 { color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px; }
+    .trace-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px;
+                 font-family: var(--font-mono); font-size: .75rem; color: var(--accent-cyan); white-space: pre;
+                 overflow-x: auto; max-height: 240px; overflow-y: auto; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">40 / 106</span>current() в дебаге slice'а</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../39-feature-folder-pattern/">← Назад</a>
+      <a href="../" style="color: var(--text-muted);">Секция E →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Лог snapshot'ов draft внутри reducer'а</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Когда reducer сложный (несколько мутаций, фильтрация, обновление множества полей), полезно
+          логировать <strong>промежуточные snapshot'ы</strong> через <code>current(state)</code>.
+          Без него в console.log увидите только Proxy.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { current, original } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+reducers: {
+  processTodos: (state) =&gt; {
+    <span class="fn">console</span>.log(<span class="str">'1. до фильтрации:'</span>, <span class="fn">current</span>(state))
+
+    state.items = state.items.<span class="fn">filter</span>(t =&gt; !t.done)
+
+    <span class="fn">console</span>.log(<span class="str">'2. после фильтрации:'</span>, <span class="fn">current</span>(state))
+
+    state.items.<span class="fn">forEach</span>(t =&gt; { t.priority = <span class="fn">computePriority</span>(t) })
+
+    <span class="fn">console</span>.log(<span class="str">'3. после priority:'</span>, <span class="fn">current</span>(state))
+    <span class="fn">console</span>.log(<span class="str">'оригинал:'</span>, <span class="fn">original</span>(state))   <span class="cm">// исходный, без мутаций</span>
+  }
+}
+        </div>
+
+        <div class="trace-card">
+          <h4>Текущий state</h4>
+          <div class="trace-out" id="state-out">—</div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
+          <button class="btn" id="add-multi">добавить 5 todos</button>
+          <button class="btn" id="mark-some">пометить 3 как done</button>
+          <button class="btn" id="process">processTodos (со snapshot'ами)</button>
+          <button class="btn btn--secondary" id="clear">очистить</button>
+        </div>
+
+        <div class="trace-card">
+          <h4>Snapshot'ы из reducer'а (через current() и original())</h4>
+          <div class="trace-out" id="snapshots-out">— нажмите "processTodos" —</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — current(), original(), isDraft()</div>
+      <div class="theory__body">
+        <h3>current(value) — snapshot draft'а</h3>
+        <div class="quote">
+          «<code>current</code> takes a draft and returns a copy with the current state of that draft. Useful for
+          logging or for passing a snapshot to other code that does not understand drafts.»
+          <br>— <a href="https://immerjs.github.io/immer/current/" target="_blank">Immer current() docs</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>current</code> принимает draft и возвращает копию с текущим состоянием этого draft'а.
+          Полезно для логирования или передачи snapshot'а в код, который не работает с draft'ами.»
+        </div>
+
+        <h3>original(value) — оригинальный объект</h3>
+        <div class="quote">
+          «<code>original</code> returns the original object that was wrapped by the draft. Useful when you need
+          to compare the draft to the original to detect changes, or to maintain referential equality with the original.»
+          <br>— <a href="https://immerjs.github.io/immer/original/" target="_blank">Immer original() docs</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>original</code> возвращает оригинальный объект, обёрнутый draft'ом. Полезно когда нужно
+          сравнить draft с оригиналом для детекции изменений, или сохранить referential equality с оригиналом.»
+        </div>
+
+        <h3>Сравнение</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 10px;">
+          <thead style="background: var(--bg-panel);">
+            <tr>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); text-align: left; color: var(--accent);">Утилита</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); text-align: left;">Что возвращает</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); text-align: left;">Когда использовать</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">current()</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">plain copy текущего draft'а</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">console.log, breakpoint debugging, передача в API</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">original()</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">ссылка на оригинальный объект (state до reducer'а)</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">сравнение «было/стало», referential equality</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">isDraft()</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">boolean: это Proxy?</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">в helper'ах/селекторах, чтобы понять контекст</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Стоимость</h3>
+        <div class="warning">
+          <code>current()</code> делает <strong>полную глубокую копию</strong> draft'а. Для большого state
+          (тысячи элементов) это медленно. Используйте только в dev-логах или точечно для отдельных полей:
+          <code>current(state.user)</code> — копия только user-ветки.
+        </div>
+
+        <h3>original() — для оптимизации</h3>
+        <div class="code-block">
+<span class="cm">// Ленивая обработка: если поле не изменилось — не пересчитываем</span>
+reducers: {
+  recomputeStats: (state) =&gt; {
+    <span class="kw">if</span> (state.items === <span class="fn">original</span>(state.items)) {
+      <span class="cm">// items не изменились с прошлого dispatch — не пересчитываем</span>
+      <span class="kw">return</span>
+    }
+    state.stats = <span class="fn">computeStats</span>(state.items)
+  }
+}
+        </div>
+
+        <h3>isDraft() — пример из реального кода</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">addItemSafe</span>(stateOrDraft, item) {
+  <span class="kw">if</span> (<span class="fn">isDraft</span>(stateOrDraft)) {
+    stateOrDraft.items.<span class="fn">push</span>(item)             <span class="cm">// можно мутировать</span>
+  } <span class="kw">else</span> {
+    <span class="kw">return</span> { ...stateOrDraft, items: [...stateOrDraft.items, item] }
+  }
+}
+
+<span class="cm">// В reducer'е:</span>
+reducers: {
+  addInDraft: (state, action) =&gt; {
+    <span class="fn">addItemSafe</span>(state, action.payload)
+  }
+}
+
+<span class="cm">// Вне draft (в селекторе/тесте):</span>
+<span class="kw">const</span> next = <span class="fn">addItemSafe</span>(plainState, item)
+        </div>
+
+        <h3>DevTools показывает финальный state</h3>
+        <p>
+          Custom DevToolsPanel и Redux DevTools Extension <strong>всегда</strong> показывают финальный
+          state после reducer'а — это уже plain object (Immer заморозил его). Для intermediate snapshots
+          нужны console.log + current().
+        </p>
+
+        <h3>Anti-pattern: console.log(state)</h3>
+        <div class="warning">
+          Прямой <code>console.log(state)</code> в reducer'е выведет <code>Proxy(Object) {}</code>. Если
+          раскрыть в DevTools — содержимое не структурируется. <strong>Всегда оборачивайте</strong>
+          в <code>current(state)</code> или <code>JSON.parse(JSON.stringify(state))</code>.
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://immerjs.github.io/immer/current/" target="_blank">Immer current()</a></li>
+          <li><a href="https://immerjs.github.io/immer/original/" target="_blank">Immer original()</a></li>
+          <li><a href="https://redux-toolkit.js.org/api/other-exports#current" target="_blank">RTK other exports — current</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

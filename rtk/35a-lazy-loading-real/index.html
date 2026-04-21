@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>35a — Lazy loading real · code-splitting + React.lazy</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    /* ── Grid две колонки ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .col-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 14px;
+    }
+    .col-card h4 {
+      font-family: var(--font-mono); color: var(--accent); font-size: .82rem; margin-bottom: 8px;
+    }
+    .col-card__tag {
+      display: inline-block; font-size: .65rem; padding: 1px 6px; border-radius: 4px;
+      margin-left: 6px; font-family: var(--font-mono); letter-spacing: .3px;
+    }
+    .col-card__tag--bad  { background: rgba(244,71,71,.14); color: var(--accent-red); }
+    .col-card__tag--good { background: rgba(76,175,80,.14); color: var(--success); }
+
+    /* ── Feature cards grid ── */
+    .features {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 16px 0;
+    }
+    @media (max-width: 1100px) { .features { grid-template-columns: 1fr; } }
+
+    .feature-card {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .feature-card__head {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    }
+    .feature-card__name { font-family: var(--font-mono); color: var(--accent-cyan); font-size: .9rem; }
+    .feature-card__status {
+      font-family: var(--font-mono); font-size: .68rem; padding: 2px 6px; border-radius: 3px;
+      background: var(--bg-active); color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .feature-card__status--loading { background: rgba(206,145,120,.15); color: var(--accent-orange); }
+    .feature-card__status--loaded  { background: rgba(76,175,80,.15);  color: var(--success); }
+    .feature-card__status--failed  { background: rgba(244,71,71,.15);  color: var(--accent-red); }
+
+    .feature-card__desc {
+      font-size: .78rem; color: var(--text-secondary); line-height: 1.45; min-height: 45px;
+    }
+    .feature-card__desc code {
+      background: var(--bg-active); color: var(--accent-cyan); padding: 0 4px; border-radius: 2px;
+    }
+    .feature-card__host {
+      background: var(--bg-secondary); border: 1px dashed var(--border); border-radius: var(--radius-sm);
+      padding: 8px 10px; min-height: 70px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: .75rem; font-family: var(--font-mono);
+    }
+    .feature-card__host:empty::before {
+      content: '— не загружено —';
+    }
+
+    /* ── Inside feature UI ── */
+    .feature-ui {
+      width: 100%; display: flex; flex-direction: column; gap: 8px; color: var(--text-primary);
+    }
+    .feature-ui__title {
+      font-family: var(--font-mono); color: var(--accent); font-size: .78rem;
+    }
+    .feature-ui__btns {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .feature-ui__empty {
+      color: var(--text-muted); font-style: italic; font-size: .72rem;
+    }
+    .feature-ui__bars {
+      display: flex; align-items: flex-end; gap: 2px; height: 70px;
+      background: var(--bg-panel); padding: 4px; border-radius: var(--radius-sm);
+    }
+    .feature-ui__bars .bar {
+      flex: 1; min-width: 4px; background: var(--accent-cyan); border-radius: 2px 2px 0 0;
+      transition: height .15s;
+    }
+    .feature-ui__list {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .cart-row {
+      display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px; align-items: center;
+      font-family: var(--font-mono); font-size: .75rem; padding: 3px 6px;
+      background: var(--bg-panel); border-radius: var(--radius-sm);
+    }
+    .cart-row__qty { color: var(--accent-orange); }
+    .feature-ui__aggregate {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .agg-row {
+      display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center;
+      padding: 3px 8px; background: var(--bg-panel); border-radius: var(--radius-sm);
+      font-family: var(--font-mono); font-size: .75rem;
+    }
+    .agg-row__cat { color: var(--accent-cyan); }
+    .agg-row__count { color: var(--text-muted); }
+    .agg-row__sum { color: var(--accent-orange); }
+
+    /* ── Buttons (mini) ── */
+    .btn--tiny { padding: 4px 8px !important; font-size: .7rem !important; }
+    .btn--active { background: rgba(86,156,214,.2) !important; border-color: var(--accent) !important; color: var(--accent-cyan) !important; }
+
+    /* ── Network panel ── */
+    .network-panel {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 12px; margin: 12px 0;
+    }
+    .network-panel__head {
+      font-family: var(--font-mono); color: var(--accent); font-size: .78rem; margin-bottom: 8px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .network-panel__head small { color: var(--text-muted); font-size: .65rem; font-weight: normal; }
+    .network-panel__empty {
+      color: var(--text-muted); font-style: italic; font-size: .75rem; font-family: var(--font-mono);
+    }
+    .network-row {
+      display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+      padding: 5px 8px; font-family: var(--font-mono); font-size: .74rem;
+      border-bottom: 1px dashed var(--border);
+    }
+    .network-row:last-child { border-bottom: none; }
+    .network-row__name { color: var(--accent-cyan); word-break: break-all; }
+    .network-row__time { color: var(--accent-orange); }
+    .network-row__ok { color: var(--success); font-size: .7rem; }
+
+    /* ── Decision matrix ── */
+    .decision { width: 100%; border-collapse: collapse; font-size: .82rem; margin: 10px 0; }
+    .decision th, .decision td {
+      padding: 7px 10px; border: 1px solid var(--border); text-align: left;
+    }
+    .decision th { background: var(--bg-panel); color: var(--accent); font-family: var(--font-mono); font-size: .76rem; }
+    .decision td:nth-child(2) { text-align: center; white-space: nowrap; font-family: var(--font-mono); font-size: .85rem; }
+    .decision .yes { color: var(--success); }
+    .decision .no  { color: var(--accent-red); }
+    .decision .mid { color: var(--accent-orange); }
+
+    /* ── React demo styles ── */
+    .react-demo {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px 14px; margin: 14px 0;
+    }
+    .react-demo__controls { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .react-demo__hint {
+      color: var(--text-secondary); font-size: .78rem; line-height: 1.5;
+      border-left: 2px solid var(--accent); padding: 4px 10px;
+    }
+    .react-demo__hint code {
+      background: var(--bg-active); color: var(--accent-cyan); padding: 0 4px; border-radius: 2px;
+      font-family: var(--font-mono);
+    }
+    .react-demo__loading {
+      display: flex; align-items: center; gap: 10px; color: var(--accent-orange);
+      font-family: var(--font-mono); font-size: .82rem;
+      padding: 10px; background: var(--bg-secondary); border-radius: var(--radius-sm);
+    }
+    .react-demo__spinner {
+      width: 16px; height: 16px; border: 2px solid var(--accent-orange); border-top-color: transparent;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .react-demo__view {
+      background: var(--bg-secondary); border: 1px solid var(--accent);
+      border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .react-demo__header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .react-demo__sub { color: var(--text-muted); font-size: .7rem; font-family: var(--font-mono); }
+    .react-demo__chart {
+      display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 4px;
+      background: var(--bg-panel); border-radius: var(--radius-sm);
+    }
+    .react-demo__bar {
+      flex: 1; background: var(--accent); border-radius: 2px 2px 0 0;
+      min-height: 2px; transition: background .15s, transform .15s;
+    }
+    .react-demo__bar:hover, .react-demo__bar--active {
+      background: var(--accent-cyan); transform: scaleY(1.05);
+    }
+    .react-demo__caption {
+      font-family: var(--font-mono); font-size: .75rem; color: var(--text-secondary); min-height: 18px;
+    }
+    .react-demo__error {
+      background: rgba(244,71,71,.1); border: 1px solid var(--accent-red);
+      color: var(--accent-red); padding: 10px; border-radius: var(--radius-sm);
+      font-family: var(--font-mono); font-size: .82rem;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+
+    /* ── ASCII flow schema ── */
+    .flow-box {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 14px 18px; font-family: var(--font-mono); font-size: .76rem; color: var(--text-primary);
+      white-space: pre; overflow-x: auto; line-height: 1.5; margin: 10px 0;
+    }
+
+    /* ── Build output table ── */
+    .build-output {
+      background: #0d0d0d; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 10px 14px; font-family: var(--font-mono); font-size: .76rem;
+      color: var(--text-primary); white-space: pre; overflow-x: auto; margin: 10px 0; line-height: 1.6;
+    }
+    .build-output .dim  { color: var(--text-muted); }
+    .build-output .hi   { color: var(--accent-cyan); }
+    .build-output .big  { color: var(--accent-orange); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">35a / 106</span>Lazy loading — реальный code-splitting + React.lazy</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../35-lazy-injection/">← Назад</a>
+      <a href="../36-with-slice-typing/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Секция 1 — Зачем
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="demo-section">
+      <div class="demo-section__header">Зачем lazy loading в Redux-приложении</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Урок 35 показал <strong>механику</strong> <code>slice.injectInto()</code>. В этом уроке —
+          <strong>реальный</strong> code-splitting: feature-модули лежат в отдельных <code>.ts</code>-файлах,
+          попадают в <strong>отдельные chunks</strong>, грузятся через <code>await import('./features/...')</code>
+          и видны отдельной строкой в DevTools → Network.
+        </p>
+
+        <div class="quote">
+          «Splitting up reducer code becomes more of a concern with larger apps.
+          We may want to keep some reducers out of the initial bundle.»
+          <br>— <a href="https://redux.js.org/usage/code-splitting" target="_blank">Redux — Code Splitting</a>
+        </div>
+
+        <ul style="color: var(--text-secondary); font-size: .85rem; line-height: 1.7; margin: 12px 0 0 20px;">
+          <li><strong>First paint / TTI.</strong> Юзер увидит header и loading раньше, если тяжёлая feature не в main.</li>
+          <li><strong>Pay-as-you-go.</strong> Admin-панель грузит только админ (~1% трафика). Зачем платить остальным 99%?</li>
+          <li><strong>Изоляция риска.</strong> Сломалась feature-chunk — остальное приложение работает.</li>
+          <li><strong>Параллельные релизы.</strong> Команда может деплоить feature-chunk отдельно от core.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Секция 2 — Side-by-side: статически vs лениво
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="demo-section">
+      <div class="demo-section__header">Статически vs лениво — один и тот же slice, две разные судьбы</div>
+      <div class="demo-section__body">
+        <div class="grid-2">
+          <!-- Лево -->
+          <div class="col-card">
+            <h4>
+              main.tsx — ВСЁ статически
+              <span class="col-card__tag col-card__tag--bad">в main.js</span>
+            </h4>
+            <div class="code-block">
+<span class="kw">import</span> { chartSlice } <span class="kw">from</span> <span class="str">'./chart-feature'</span>
+<span class="kw">import</span> { cartSlice  } <span class="kw">from</span> <span class="str">'./cart-feature'</span>
+<span class="kw">import</span> { analyticsSlice } <span class="kw">from</span> <span class="str">'./analytics-feature'</span>
+
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer: <span class="fn">combineReducers</span>({
+    chart: chartSlice.reducer,
+    cart:  cartSlice.reducer,
+    analytics: analyticsSlice.reducer,
+  }),
+})
+
+<span class="cm">// build output:</span>
+<span class="cm">// main.js ~ 85 KB — всё внутри</span>
+            </div>
+            <p style="color: var(--accent-red); font-size: .74rem; font-family: var(--font-mono); margin-top: 6px;">
+              ✗ Analytics грузится первым даже если юзер туда никогда не зайдёт
+            </p>
+          </div>
+
+          <!-- Право -->
+          <div class="col-card">
+            <h4>
+              main.tsx — лениво
+              <span class="col-card__tag col-card__tag--good">main + 3 chunks</span>
+            </h4>
+            <div class="code-block">
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(coreSlice)
+  .<span class="fn">withLazyLoadedSlices</span>&lt;<span class="ts">LazyState</span>&gt;()
+
+<span class="cm">// по клику — настоящий dynamic import()</span>
+<span class="kw">async function</span> <span class="fn">loadAnalytics</span>() {
+  <span class="kw">const</span> mod = <span class="kw">await</span> <span class="fn">import</span>(<span class="str">'./features/analytics-feature'</span>)
+  mod.<span class="fn">register</span>(rootReducer, store, hostEl, con)
+}
+
+<span class="cm">// build output:</span>
+<span class="cm">// main.js                ~ 25 KB</span>
+<span class="cm">// chart-feature.*.js      ~ 1 KB    ← грузится при клике</span>
+<span class="cm">// cart-feature.*.js       ~ 2 KB    ←</span>
+<span class="cm">// analytics-feature.*.js  ~ 4 KB    ←</span>
+            </div>
+            <p style="color: var(--success); font-size: .74rem; font-family: var(--font-mono); margin-top: 6px;">
+              ✓ main меньше, тяжёлая analytics лежит в отдельном файле
+            </p>
+          </div>
+        </div>
+
+        <div class="warning">
+          <strong>Критически важно:</strong> чтобы Vite/Rollup вынесли модуль в отдельный chunk —
+          import должен быть <strong>динамическим</strong> (<code>await import('...')</code>) и
+          <strong>статически НЕ использоваться</strong>. Если где-то сверху файла есть
+          <code>import x from './features/analytics-feature'</code> — модуль попадёт в main chunk,
+          и dynamic import в том же файле станет бесполезным.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Демо 1 — интерактивная загрузка feature-chunks
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="demo-section">
+      <div class="demo-section__header">Демо · нажмите и увидите в Network новый chunk</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Откройте DevTools → Network → фильтр <strong>JS</strong>. Нажимайте «Загрузить фичу» —
+          браузер запросит новый <code>*-feature-*.js</code> файл. До клика он недоступен.
+          <em>Подсказка: hover на кнопку предзагрузит chunk — в Network появится строчка ещё до клика.</em>
+        </p>
+
+        <div class="features">
+          <div class="feature-card" data-feature="chart">
+            <div class="feature-card__head">
+              <span class="feature-card__name">chart</span>
+              <span class="feature-card__status">not loaded</span>
+            </div>
+            <div class="feature-card__desc">
+              Самый лёгкий feature: slice с массивом чисел.
+              Всё RTK уже в main — только свой reducer.
+            </div>
+            <button class="btn" data-load="chart">▶ Загрузить фичу</button>
+            <div class="feature-card__host"></div>
+          </div>
+
+          <div class="feature-card" data-feature="cart">
+            <div class="feature-card__head">
+              <span class="feature-card__name">cart</span>
+              <span class="feature-card__status">not loaded</span>
+            </div>
+            <div class="feature-card__desc">
+              Средний: <code>createEntityAdapter</code> внутри slice'а.
+              Adapter попадёт в этот chunk, а не в main.
+            </div>
+            <button class="btn" data-load="cart">▶ Загрузить фичу</button>
+            <div class="feature-card__host"></div>
+          </div>
+
+          <div class="feature-card" data-feature="analytics">
+            <div class="feature-card__head">
+              <span class="feature-card__name">analytics</span>
+              <span class="feature-card__status">not loaded</span>
+            </div>
+            <div class="feature-card__desc">
+              Тяжёлый: <code>createSelector</code> + inline моковые данные (120 событий).
+              Именно такую фичу надо лениво.
+            </div>
+            <button class="btn" data-load="analytics">▶ Загрузить фичу</button>
+            <div class="feature-card__host"></div>
+          </div>
+        </div>
+
+        <div class="network-panel">
+          <div class="network-panel__head">
+            <span>Mini-Network · загруженные chunks</span>
+            <small>для реальных данных — DevTools → Network</small>
+          </div>
+          <div id="network-panel"></div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; align-items: center;">
+          <button class="btn btn--secondary" id="btn-core-inc">core.increment (всегда работает)</button>
+          <button class="btn btn--secondary" id="btn-race">Demo 2: загрузить chart дважды</button>
+          <button class="btn btn--secondary" id="btn-broken">Demo 3: broken import</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Devtools + Console
+         ═══════════════════════════════════════════════════════════════ -->
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Секция — Что покажет npm run build
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="demo-section">
+      <div class="demo-section__header">Что покажет <code>npm run build</code></div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          После <code>cd rtk && npm run build</code> в <code>dist/</code> будет главный chunk
+          для страницы 35a плюс отдельные файлы для каждой feature. Реальные числа
+          из последней сборки этого урока:
+        </p>
+
+        <div class="build-output" id="build-output"><span class="dim">── Главный чанк страницы 35a ─────────────────────────────────────────────</span>
+<span class="dim">dist/35a-lazy-loading-real/index.html</span>                <span class="hi">51.8 KB  gzip: 12.0 KB</span>
+<span class="dim">dist/assets/35a-lazy-loading-real-&lt;hash&gt;.js</span>           <span class="hi"> 7.7 KB  gzip:  3.4 KB</span>   <span class="dim">← core + UI + React shell</span>
+
+<span class="dim">── Lazy feature chunks (грузятся по клику) ──────────────────────────────</span>
+<span class="dim">dist/assets/chart-feature-&lt;hash&gt;.js</span>                   <span class="hi"> 1.4 KB  gzip:  0.8 KB</span>
+<span class="dim">dist/assets/cart-feature-&lt;hash&gt;.js</span>                    <span class="hi"> 2.0 KB  gzip:  1.0 KB</span>   <span class="dim">← + createEntityAdapter</span>
+<span class="dim">dist/assets/analytics-feature-&lt;hash&gt;.js</span>               <span class="big"> 2.3 KB  gzip:  1.1 KB</span>   <span class="big">← heavy (reselect + 120 mock events)</span>
+
+<span class="dim">── React.lazy chunk ──────────────────────────────────────────────────────</span>
+<span class="dim">dist/assets/AnalyticsView-&lt;hash&gt;.js</span>                   <span class="hi"> 1.1 KB  gzip:  0.7 KB</span>
+
+<span class="dim">── Shared (один раз на всю страницу) ────────────────────────────────────</span>
+<span class="dim">dist/assets/redux-toolkit.modern-&lt;hash&gt;.js</span>            <span class="dim">31.2 KB  gzip: 11.9 KB</span>
+<span class="dim">dist/assets/client-&lt;hash&gt;.js (react + react-dom)</span>      <span class="dim">193.9 KB  gzip: 60.5 KB</span>
+<span class="dim">dist/assets/console-panel-&lt;hash&gt;.js</span>                   <span class="dim"> 5.0 KB  gzip:  2.1 KB</span>
+<span class="dim">dist/assets/devtools-panel-&lt;hash&gt;.js</span>                  <span class="dim">26.4 KB  gzip:  6.9 KB</span></div>
+
+        <p style="color: var(--text-secondary); font-size: .82rem; line-height: 1.55;">
+          <strong>Арифметика:</strong> вся «своя» логика страницы (core slice + UI + React
+          shell) поместилась в <strong>3.4 KB gzip</strong>. Три feature-модуля добавляют
+          ещё <strong>2.9 KB gzip</strong> — но <em>только если юзер их открыл</em>. Большая
+          часть веса страницы — React (60 KB) и Redux Toolkit (12 KB) — один раз на всё SPA.
+        </p>
+        <p style="color: var(--text-secondary); font-size: .82rem; line-height: 1.55; margin-top: 8px;">
+          Демонстрация в миниатюре: наши фичи маленькие (это курс, а не Figma). В реальном
+          приложении analytics-chunk с реальным графическим движком будет ~50–200 KB. Именно
+          такие модули окупают lazy-подход.
+        </p>
+
+        <div class="warning" style="background: rgba(86,156,214,.08); border-color: var(--accent);">
+          <strong>Проверьте сами:</strong> выполните <code>npm run build</code> и откройте
+          <code>dist/assets/</code>. Все <code>*-feature-*.js</code> — отдельные физические
+          файлы. Удалите один — соответствующая feature перестанет работать, но остальное
+          приложение продолжит жить.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Секция — React.lazy + Suspense
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="demo-section">
+      <div class="demo-section__header">React.lazy + Suspense + injectInto</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          <code>React.lazy()</code> — это обёртка вокруг того же <code>dynamic import()</code>,
+          но с интеграцией в React render-цикл. Когда компонент загружается, React
+          показывает <code>&lt;Suspense fallback&gt;</code>. После загрузки — перерисовывает.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { lazy, Suspense } <span class="kw">from</span> <span class="str">'react'</span>
+
+<span class="kw">const</span> AnalyticsView = <span class="fn">lazy</span>(() =&gt; <span class="fn">import</span>(<span class="str">'./AnalyticsView'</span>))
+
+<span class="kw">function</span> <span class="fn">App</span>() {
+  <span class="kw">const</span> [open, setOpen] = <span class="fn">useState</span>(<span class="kw">false</span>)
+  <span class="kw">return</span> (
+    &lt;&gt;
+      &lt;button <span class="ts">onClick</span>={() =&gt; <span class="fn">setOpen</span>(<span class="kw">true</span>)}&gt;Open analytics&lt;/button&gt;
+      {open &amp;&amp; (
+        &lt;Suspense <span class="ts">fallback</span>={&lt;div&gt;Loading analytics…&lt;/div&gt;}&gt;
+          &lt;AnalyticsView /&gt;
+        &lt;/Suspense&gt;
+      )}
+    &lt;/&gt;
+  )
+}
+        </div>
+
+        <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin: 14px 0 6px;">
+          Живое демо — React.lazy + Suspense + ErrorBoundary
+        </h4>
+
+        <div id="react-demo-root"></div>
+
+        <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin: 20px 0 6px;">
+          Жизненный цикл ленивой загрузки
+        </h4>
+
+        <div class="flow-box">click → setOpen(true)
+  │
+  ▼
+React рендерит &lt;AnalyticsView /&gt;
+  │
+  ▼
+lazy() внутренне throws Promise  ─────►  &lt;Suspense&gt; catches, рендерит fallback
+                                            │
+                                            ▼
+                                    браузер: GET /assets/AnalyticsView-*.js
+                                            │
+                                            ▼
+                                    выполняется top-level модуля:
+                                      - import React
+                                      - (если нужно) slice.injectInto(...)
+                                      - export default AnalyticsView
+                                            │
+                                            ▼
+                                    React re-renders
+                                            │
+                                            ▼
+                                    &lt;AnalyticsView /&gt; реально монтируется
+                                    dispatch(...) работает, slice уже в store</div>
+
+        <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin: 16px 0 6px;">
+          Комбо: React.lazy + slice.injectInto в одном модуле
+        </h4>
+
+        <div class="code-block">
+<span class="cm">// features/analytics/AnalyticsPage.tsx  — сам будет lazy chunk</span>
+<span class="kw">import</span> { createSlice } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+<span class="kw">import</span> { rootReducer } <span class="kw">from</span> <span class="str">'@/app/store'</span>
+
+<span class="kw">const</span> analyticsSlice = <span class="fn">createSlice</span>({ ... })
+
+<span class="cm">// ↓ выполнится на top-level при первой загрузке chunk'а</span>
+<span class="cm">//   reducer уже в rootReducer к моменту render'а</span>
+<span class="kw">const</span> injected = analyticsSlice.<span class="fn">injectInto</span>(rootReducer)
+
+<span class="kw">export default function</span> <span class="fn">AnalyticsPage</span>() {
+  <span class="kw">const</span> data = <span class="fn">useAppSelector</span>(injected.selectors.selectData)
+  <span class="kw">return</span> &lt;Chart data={data} /&gt;
+}
+        </div>
+
+        <div class="warning">
+          <strong>Почему top-level, а не в useEffect?</strong> Если делать inject в
+          <code>useEffect</code>, то первый render произойдёт с <code>state.analytics === undefined</code>,
+          и ваши селекторы упадут. На top-level модуля inject срабатывает до того, как React
+          начнёт рендерить компонент.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Секция — Decision matrix
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="demo-section">
+      <div class="demo-section__header">Decision matrix · lazy или не lazy</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Не всё надо лениво грузить. Оверхед — лишний HTTP-запрос, время подождать
+          Suspense fallback, сложность debug'а. Правило: lazy окупается, если <strong>вес
+          feature &gt; 5 KB</strong> и <strong>используется &lt; 50% юзеров</strong>.
+        </p>
+
+        <table class="decision">
+          <thead>
+            <tr>
+              <th>Сценарий</th>
+              <th>Lazy?</th>
+              <th>Причина</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Header, Nav, AuthGate</td>
+              <td class="no">❌ нет</td>
+              <td>Нужны на первом пикселе. Lazy = визуальный сбой.</td>
+            </tr>
+            <tr>
+              <td>Core Redux slices (auth, user, theme)</td>
+              <td class="no">❌ нет</td>
+              <td>Нужны везде. Разбрасывать по chunks — пересбор одного и того же.</td>
+            </tr>
+            <tr>
+              <td><code>/dashboard</code> после логина</td>
+              <td class="yes">✅ да</td>
+              <td>Не-залогиненный юзер никогда не увидит.</td>
+            </tr>
+            <tr>
+              <td>Editor с Monaco / tiptap (~1 MB)</td>
+              <td class="yes">✅ обязательно</td>
+              <td>Иначе main bundle неприемлем.</td>
+            </tr>
+            <tr>
+              <td>Feature под A/B-тестом (50% off)</td>
+              <td class="yes">✅ да</td>
+              <td>Платит только variant B. Вариант A вообще не грузит.</td>
+            </tr>
+            <tr>
+              <td>Маленькая форма в диалоге</td>
+              <td class="mid">⚠ вряд ли</td>
+              <td>&lt; 3 KB — оверхед import'а не окупается.</td>
+            </tr>
+            <tr>
+              <td>Admin <code>/users/:id/edit</code></td>
+              <td class="yes">✅ да</td>
+              <td>1% трафика. Экономия для 99% юзеров.</td>
+            </tr>
+            <tr>
+              <td>i18n словари (fr, de, ja)</td>
+              <td class="yes">✅ по локали</td>
+              <td>Один язык — один chunk. Не тяните все 20.</td>
+            </tr>
+            <tr>
+              <td>Mobile-only фича <code>isMobile && load(...)</code></td>
+              <td class="yes">✅ условно</td>
+              <td>Desktop-юзер вообще не грузит.</td>
+            </tr>
+            <tr>
+              <td>Settings / Profile / Account</td>
+              <td class="yes">✅ да</td>
+              <td>Посещают редко, но каждая — большая.</td>
+            </tr>
+            <tr>
+              <td>Notification bell (иконка в header)</td>
+              <td class="no">❌ нет</td>
+              <td>Видна сразу, маленькая — lazy нечего грузить.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Секция — Предзагрузка
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="demo-section">
+      <div class="demo-section__header">Предзагрузка · modulepreload, prefetch-on-hover</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Lazy — это не обязательно «пусть юзер подождёт». Chunk можно начать тянуть
+          <em>заранее</em>, пока юзер ещё не кликнул. Когда кликнет — chunk уже в кеше.
+        </p>
+
+        <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin: 10px 0 6px;">
+          Prefetch on hover (используется в этом уроке)
+        </h4>
+
+        <div class="code-block">
+<span class="cm">// как только курсор на кнопке — начинаем грузить (без await, без UI)</span>
+btn.<span class="fn">addEventListener</span>(<span class="str">'mouseenter'</span>, () =&gt; {
+  <span class="fn">import</span>(<span class="str">'./features/chart-feature'</span>)   <span class="cm">// Promise игнорируется</span>
+}, { once: <span class="kw">true</span> })
+
+<span class="cm">// при клике: Promise уже resolved (или почти), import() мгновенный</span>
+btn.<span class="fn">addEventListener</span>(<span class="str">'click'</span>, <span class="fn">loadChart</span>)
+        </div>
+
+        <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin: 14px 0 6px;">
+          modulepreload — hint браузеру
+        </h4>
+
+        <div class="code-block">
+<span class="cm">// в idle-момент (requestIdleCallback или setTimeout):</span>
+<span class="kw">const</span> link = document.<span class="fn">createElement</span>(<span class="str">'link'</span>)
+link.rel  = <span class="str">'modulepreload'</span>
+link.href = <span class="str">'/assets/analytics-feature-abc.js'</span>
+document.head.<span class="fn">appendChild</span>(link)
+
+<span class="cm">// Отличие от обычного fetch: браузер распарсит и скомпилирует JS</span>
+<span class="cm">// заранее, но не выполнит. Выполнение — при реальном import().</span>
+        </div>
+
+        <div class="warning">
+          Vite сам ставит <code>&lt;link rel="modulepreload"&gt;</code> для <em>статических</em>
+          импортов. Для <em>динамических</em> — вручную или пишете плагин. Проверьте
+          <a href="https://vite.dev/config/build-options.html#build-modulepreload" target="_blank">build.modulePreload</a>.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Секция — Подводные камни
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="demo-section">
+      <div class="demo-section__header">Подводные камни</div>
+      <div class="demo-section__body">
+
+        <h4 style="color: var(--accent); margin-bottom: 6px;">1. State появляется только на следующем dispatch'е</h4>
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          После <code>injectInto</code> state[path] === <code>undefined</code>, пока не прилетит action.
+          Решение: сразу после inject сделать <code>store.dispatch({ type: '@@INIT_INJECTED/&lt;name&gt;' })</code>.
+          Это noop-action — все reducers получат текущий state, injected reducer получит undefined и вернёт initialState.
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> injected = slice.<span class="fn">injectInto</span>(rootReducer)
+store.<span class="fn">dispatch</span>({ type: <span class="str">'@@INIT_INJECTED/analytics'</span> })
+<span class="cm">// теперь state.analytics === initialState</span>
+        </div>
+
+        <h4 style="color: var(--accent); margin: 16px 0 6px;">2. Двойной inject в React.StrictMode</h4>
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          StrictMode в dev вызывает эффекты дважды. Если <code>injectInto</code> на top-level модуля —
+          не страшно, модуль выполнится один раз. Если в <code>useEffect</code> — вызовется дважды.
+          <code>injectInto</code> идемпотентен: второй вызов вернёт тот же slice, reducer не заменится.
+        </p>
+
+        <h4 style="color: var(--accent); margin: 16px 0 6px;">3. Selectors падают до inject'а</h4>
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          Если <code>state.analytics === undefined</code>, а селектор пишет <code>state.analytics.events</code> —
+          runtime TypeError. Решение: <code>state.analytics?.events ?? []</code> ИЛИ не рендерьте
+          компонент, пока feature не injected.
+        </p>
+        <div class="code-block">
+<span class="cm">// ✗ падает если state.analytics undefined</span>
+<span class="kw">const</span> selectEvents = (state: <span class="ts">RootState</span>) =&gt; state.analytics.events
+
+<span class="cm">// ✓ безопасно</span>
+<span class="kw">const</span> selectEvents = (state: <span class="ts">RootState</span>) =&gt; state.analytics?.events ?? []
+        </div>
+
+        <h4 style="color: var(--accent); margin: 16px 0 6px;">4. Race condition · одновременные загрузки</h4>
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          Если юзер быстро кликает «Open» дважды — браузер всё равно загрузит chunk один раз
+          (module dedup по URL). Но ваш handler может запустить inject + mount дважды.
+          Решение: <code>Map&lt;feature, Promise&gt;</code> с in-flight промисами (см. main.tsx).
+        </p>
+
+        <h4 style="color: var(--accent); margin: 16px 0 6px;">5. Chunk не загрузился</h4>
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          Сеть упала, сервер вернул 404 (старый deploy), браузер заблокировал — <code>import()</code>
+          реджектится. Обязательный retry с экспоненциальным backoff:
+        </p>
+        <div class="code-block">
+<span class="kw">async function</span> <span class="fn">loadWithRetry</span>&lt;<span class="ts">T</span>&gt;(
+  factory: () =&gt; <span class="ts">Promise&lt;T&gt;</span>,
+  attempts = <span class="num">3</span>,
+): <span class="ts">Promise&lt;T&gt;</span> {
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; attempts; i++) {
+    <span class="kw">try</span> {
+      <span class="kw">return await</span> <span class="fn">factory</span>()
+    } <span class="kw">catch</span> (e) {
+      <span class="kw">if</span> (i === attempts - <span class="num">1</span>) <span class="kw">throw</span> e
+      <span class="kw">await new</span> <span class="fn">Promise</span>(r =&gt; <span class="fn">setTimeout</span>(r, <span class="num">2</span> ** i * <span class="num">300</span>))
+    }
+  }
+  <span class="kw">throw new</span> <span class="fn">Error</span>(<span class="str">'unreachable'</span>)
+}
+
+<span class="cm">// usage:</span>
+<span class="kw">const</span> mod = <span class="kw">await</span> <span class="fn">loadWithRetry</span>(() =&gt; <span class="fn">import</span>(<span class="str">'./features/analytics-feature'</span>))
+        </div>
+
+        <h4 style="color: var(--accent); margin: 16px 0 6px;">6. Stale chunks после deploy</h4>
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          Юзер открыл страницу в понедельник (<code>main-abc.js</code>). Во вторник вы задеплоили
+          новую версию (<code>main-def.js</code>, <code>analytics-XYZ.js</code>). Старый main у юзера
+          всё ещё в памяти — он пытается <code>import('./features/analytics-OLD-hash.js')</code>,
+          а такого файла на сервере уже нет → 404.
+        </p>
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          Решения: (а) CDN хранит старые chunks несколько дней, (б) при <code>import()</code>-ошибке
+          делаете <code>window.location.reload()</code>, (в) service worker с proper caching strategy.
+        </p>
+
+        <h4 style="color: var(--accent); margin: 16px 0 6px;">7. SSR + lazy</h4>
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          В SSR (Next.js, Remix) <code>React.lazy</code> традиционно не работал — Suspense нельзя
+          было «подождать» на сервере. В React 19 это решили streaming SSR. Детали — в
+          <a href="https://react.dev/reference/react/Suspense" target="_blank">React docs — Suspense</a>.
+        </p>
+
+        <h4 style="color: var(--accent); margin: 16px 0 6px;">8. Hot Module Replacement</h4>
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          В dev-режиме при редактировании <code>features/chart-feature.ts</code> Vite
+          перезагружает только этот chunk. Reducer в store остаётся — <code>injectInto</code>
+          идемпотентен. Но state не сбросится: если вы поменяли shape initialState,
+          старый state может оказаться несовместим. Решение — ручной reload страницы после
+          изменения shape'а.
+        </p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Теория
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="theory">
+      <div class="theory__header">Теория — lazy loading в RTK + React</div>
+      <div class="theory__body">
+        <h3>Цитата из RTK docs</h3>
+        <div class="quote">
+          «<code>combineSlices</code> returns an enhanced reducer with an <code>inject</code> method
+          that allows you to inject a new slice/reducer at runtime. This is most useful for large
+          applications where some slices are loaded only when needed (code splitting).»
+          <br>— <a href="https://redux-toolkit.js.org/api/combineSlices#injecting-reducers" target="_blank">combineSlices — Injecting reducers</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>combineSlices</code> возвращает расширенный reducer с методом <code>inject</code>,
+          который позволяет внедрять новый slice в runtime. Наиболее полезно в больших приложениях,
+          где некоторые slice'ы подгружаются только при необходимости (code splitting).»
+        </div>
+
+        <h3>Цитата из React docs</h3>
+        <div class="quote">
+          «<code>lazy</code> lets you defer loading a component's code until it is rendered for
+          the first time. &hellip; The loading code is typically included in a separate bundle from
+          the rest of your app.»
+          <br>— <a href="https://react.dev/reference/react/lazy" target="_blank">React — lazy</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>lazy</code> позволяет отложить загрузку кода компонента до его первого рендера.
+          Код обычно выносится в отдельный bundle.»
+        </div>
+
+        <h3>Как Vite создаёт chunks</h3>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Rollup (его использует Vite) при build-е ищет все <code>import()</code>-выражения
+          в коде. Для каждого уникального target'а создаёт отдельный output chunk. Если
+          target используется из нескольких chunks — создаётся общий shared chunk. Модули,
+          импортируемые только статически — остаются в том chunk, откуда импортируются.
+        </p>
+
+        <h3>Зачем writeable rootReducer?</h3>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Обычный <code>combineReducers</code> возвращает замороженную функцию — добавить reducer
+          нельзя. <code>combineSlices</code> возвращает функцию-с-методом <code>inject</code>:
+          под капотом это <code>Map&lt;reducerPath, reducer&gt;</code>, в которую можно добавлять
+          записи в runtime. На каждом dispatch root reducer обходит Map и вызывает все.
+        </p>
+
+        <h3>injectInto vs rootReducer.inject</h3>
+        <div class="code-block">
+<span class="cm">// rootReducer.inject — универсальный API, для любых reducer'ов</span>
+rootReducer.<span class="fn">inject</span>({
+  reducerPath: <span class="str">'feature'</span>,
+  reducer: featureReducer,
+})
+
+<span class="cm">// slice.injectInto — для slice'ов, рекомендуемый</span>
+<span class="kw">const</span> injected = slice.<span class="fn">injectInto</span>(rootReducer)
+<span class="cm">// Возвращает "клон" slice'а — все actions/selectors работают</span>
+<span class="cm">// Идемпотентен: повторный вызов вернёт существующий</span>
+        </div>
+
+        <h3>Connecting to routing — React Router 6.4+</h3>
+        <div class="code-block">
+<span class="cm">// Современный React Router — встроенный lazy для роутов</span>
+<span class="kw">import</span> { createBrowserRouter } <span class="kw">from</span> <span class="str">'react-router-dom'</span>
+
+<span class="kw">const</span> router = <span class="fn">createBrowserRouter</span>([
+  {
+    path: <span class="str">'/analytics'</span>,
+    lazy: <span class="kw">async</span> () =&gt; {
+      <span class="kw">const</span> mod = <span class="kw">await</span> <span class="fn">import</span>(<span class="str">'./features/analytics'</span>)
+      <span class="kw">return</span> { Component: mod.default }
+    },
+  },
+])
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/combineSlices#injecting-reducers" target="_blank">RTK — combineSlices Injecting reducers</a></li>
+          <li><a href="https://redux.js.org/usage/code-splitting" target="_blank">Redux — Code Splitting</a></li>
+          <li><a href="https://react.dev/reference/react/lazy" target="_blank">React — lazy</a></li>
+          <li><a href="https://react.dev/reference/react/Suspense" target="_blank">React — Suspense</a></li>
+          <li><a href="https://vite.dev/guide/features.html#dynamic-import" target="_blank">Vite — Dynamic import</a></li>
+          <li><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import" target="_blank">MDN — dynamic import</a></li>
+          <li><a href="https://web.dev/articles/code-splitting-suspense" target="_blank">web.dev — Code splitting with Suspense</a></li>
+          <li><a href="https://reactrouter.com/en/main/route/lazy" target="_blank">React Router — route.lazy</a></li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

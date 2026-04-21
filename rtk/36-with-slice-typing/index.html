@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>36 — WithSlice типизация</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ts-out { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+              padding: 10px 14px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan);
+              white-space: pre; overflow-x: auto; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">36 / 106</span>WithSlice — типизация injected state</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../35a-lazy-loading-real/">← Назад</a>
+      <a href="../37-reducer-path-vs-name/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">withLazyLoadedSlices&lt;T&gt; и WithSlice</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Lazy injection (урок 35) даёт runtime-гибкость, но TS не знает о lazy slice'ах.
+          <code>.withLazyLoadedSlices&lt;LazyState&gt;()</code> объявляет, какие ветки <em>могут</em>
+          появиться. RTK делает их опциональными в RootState.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { combineSlices, type WithSlice } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="cm">// Способ 1: вручную через type</span>
+<span class="kw">type</span> LazyLoadedSlices = {
+  chart?:  ChartState
+  cart?:   CartState
+  search?: SearchState
+}
+
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(coreSlice, userSlice)
+  .<span class="fn">withLazyLoadedSlices</span>&lt;<span class="ts">LazyLoadedSlices</span>&gt;()
+
+<span class="kw">type</span> RootState = ReturnType&lt;<span class="kw">typeof</span> rootReducer&gt;
+<span class="cm">// =&gt; { core: CoreState; user: UserState; chart?: ChartState; cart?: CartState; search?: SearchState }</span>
+
+
+<span class="cm">// Способ 2: через WithSlice helper для каждого slice</span>
+<span class="kw">type</span> LazyLoadedSlices = WithSlice&lt;<span class="kw">typeof</span> chartSlice&gt; &amp; WithSlice&lt;<span class="kw">typeof</span> cartSlice&gt;
+<span class="cm">// =&gt; { chart?: ChartState } &amp; { cart?: CartState }</span>
+        </div>
+
+        <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 14px 0;">
+          <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px;">
+            ReturnType&lt;typeof rootReducer&gt; в TS (демо)
+          </h4>
+          <div class="ts-out" id="ts-types-out"></div>
+        </div>
+
+        <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 14px 0;">
+          <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px;">
+            Текущий runtime state
+          </h4>
+          <div class="ts-out" id="state-out"></div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn" id="inject-chart">inject chartSlice</button>
+          <button class="btn" id="inject-cart">inject cartSlice</button>
+          <button class="btn" id="add-point">chart.addPoint</button>
+          <button class="btn" id="add-cart">cart.add</button>
+          <button class="btn" data-do="check">проверить state.chart</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — WithSlice и withLazyLoadedSlices</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «By default, the type returned from <code>combineSlices</code> assumes that all slices passed in are
+          already required. To declare types for slices that may be lazy-loaded later, use the
+          <code>withLazyLoadedSlices&lt;T&gt;()</code> method or the <code>WithSlice</code> helper type.»
+          <br>— <a href="https://redux-toolkit.js.org/api/combineSlices#typescript-usage" target="_blank">combineSlices — TypeScript</a>
+        </div>
+        <div class="quote quote--ru">
+          «По умолчанию тип, возвращённый из <code>combineSlices</code>, предполагает, что все переданные
+          slice'ы уже обязательны. Чтобы объявить типы для slice'ов, которые могут быть lazy-загружены,
+          используйте метод <code>withLazyLoadedSlices&lt;T&gt;()</code> или helper-тип <code>WithSlice</code>.»
+        </div>
+
+        <h3>WithSlice — устройство</h3>
+        <div class="code-block">
+<span class="cm">// Сигнатура:</span>
+<span class="kw">type</span> WithSlice&lt;<span class="ts">S extends Slice | { reducerPath: string, reducer: Reducer }</span>&gt; = {
+  [K <span class="kw">in</span> S[<span class="str">'reducerPath'</span>]]?: <span class="fn">ReturnType</span>&lt;S[<span class="str">'reducer'</span>]&gt;
+}
+
+<span class="cm">// Пример:</span>
+<span class="kw">type</span> ChartLazy = WithSlice&lt;<span class="kw">typeof</span> chartSlice&gt;
+<span class="cm">// = { chart?: ChartState }</span>
+
+<span class="cm">// Композиция нескольких slice'ов через intersection:</span>
+<span class="kw">type</span> LazyState = WithSlice&lt;<span class="kw">typeof</span> chartSlice&gt; &amp; WithSlice&lt;<span class="kw">typeof</span> cartSlice&gt;
+<span class="cm">// = { chart?: ChartState; cart?: CartState }</span>
+        </div>
+
+        <h3>Зачем именно опциональность</h3>
+        <p>
+          State injected slice'а появляется только <strong>после</strong> <code>injectInto</code>.
+          До этого <code>state.chart === undefined</code>. TS должен это знать, иначе <code>state.chart.points</code>
+          в селекторе сломается без проверки.
+        </p>
+        <div class="code-block">
+<span class="cm">// Плохой селектор (если NOT lazy):</span>
+<span class="kw">const</span> selectPoints = (state: <span class="ts">RootState</span>) =&gt; state.chart.points
+<span class="cm">// Если chart не injected — runtime crash</span>
+
+<span class="cm">// Хороший селектор (с lazy типизацией):</span>
+<span class="kw">const</span> selectPoints = (state: <span class="ts">RootState</span>) =&gt; state.chart?.points ?? []
+<span class="cm">// TS заставит написать оптимистичный fallback</span>
+        </div>
+
+        <h3>useSelector + injected slice</h3>
+        <div class="code-block">
+<span class="cm">// В компоненте:</span>
+<span class="kw">function</span> <span class="fn">ChartView</span>() {
+  <span class="kw">useEffect</span>(() =&gt; { chartSlice.<span class="fn">injectInto</span>(rootReducer) }, [])
+
+  <span class="kw">const</span> points = <span class="fn">useAppSelector</span>(
+    (state) =&gt; state.chart?.points ?? []   <span class="cm">// fallback пока не injected</span>
+  )
+
+  <span class="kw">return</span> &lt;<span class="ts">Chart</span> data={points} /&gt;
+}
+        </div>
+
+        <h3>Альтернатива: обязательные slice'ы</h3>
+        <p>
+          Если уверены, что slice будет injected до первого рендера компонента (например, в <code>useEffect</code>
+          родителя), можно не объявлять как опциональный — но это <strong>опасно</strong>. Лучше всегда
+          оставлять опциональными, а в селекторе делать non-null assertion после монтирования.
+        </p>
+        <div class="code-block">
+<span class="cm">// "уверены, что injected" — non-null assertion в одном месте</span>
+<span class="kw">const</span> selectChart = (state: <span class="ts">RootState</span>) =&gt; state.chart!   <span class="cm">// !</span>
+
+<span class="cm">// Лучше через guard:</span>
+<span class="kw">function</span> <span class="fn">selectChart</span>(state: <span class="ts">RootState</span>) {
+  <span class="kw">if</span> (!state.chart) <span class="kw">throw new</span> <span class="fn">Error</span>(<span class="str">'chartSlice not injected'</span>)
+  <span class="kw">return</span> state.chart
+}
+        </div>
+
+        <h3>Подводный камень: rootReducer.inject() и типизация</h3>
+        <div class="warning">
+          Если используете низкоуровневый <code>rootReducer.inject({ reducerPath, reducer })</code> (без slice),
+          TS не сможет вывести тип. Лучше всегда работать через <code>slice.injectInto(rootReducer)</code>.
+        </div>
+
+        <h3>Пример с lazy + код-сплит</h3>
+        <div class="code-block">
+<span class="cm">// store/index.ts</span>
+<span class="kw">export const</span> rootReducer = <span class="fn">combineSlices</span>(coreSlice)
+  .<span class="fn">withLazyLoadedSlices</span>&lt;<span class="ts">LazyState</span>&gt;()
+
+<span class="kw">export type</span> RootState = ReturnType&lt;<span class="kw">typeof</span> rootReducer&gt;
+
+<span class="cm">// features/chart/index.tsx</span>
+<span class="kw">import</span> { rootReducer } <span class="kw">from</span> <span class="str">'@/store'</span>
+
+<span class="kw">export const</span> chartSlice = <span class="fn">createSlice</span>({ name: <span class="str">'chart'</span>, ... }).<span class="fn">injectInto</span>(rootReducer)
+
+<span class="kw">export default function</span> <span class="fn">ChartView</span>() { ... }
+
+<span class="cm">// App.tsx</span>
+<span class="kw">const</span> ChartView = <span class="fn">React</span>.lazy(() =&gt; <span class="fn">import</span>(<span class="str">'@/features/chart'</span>))
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/combineSlices#typescript-usage" target="_blank">combineSlices — TypeScript</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/combineSlices.ts" target="_blank">combineSlices.ts — WithSlice type</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

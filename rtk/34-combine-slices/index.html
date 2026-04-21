@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>34 — combineSlices</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1100px) { .compare { grid-template-columns: 1fr; } }
+    .compare-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .compare-card--old { border-left: 3px solid var(--accent-orange); }
+    .compare-card--new { border-left: 3px solid var(--success); }
+    .compare-card h4 { font-family: var(--font-mono); font-size: .82rem; margin-bottom: 6px; }
+    .compare-card--old h4 { color: var(--accent-orange); }
+    .compare-card--new h4 { color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">34 / 106</span>combineSlices — замена combineReducers</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../33-slice-selectors/">← Назад</a>
+      <a href="../35-lazy-injection/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">combineReducers vs combineSlices — два способа</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>combineSlices</code> — новая утилита RTK 2.x. Принимает <strong>сами slice-объекты</strong>
+          (а не <code>.reducer</code> у них) и автоматически использует <code>slice.reducerPath</code>
+          как ключ в state. Главное — даёт <code>.inject()</code> для lazy-loading (урок 35).
+        </p>
+
+        <div class="compare">
+          <div class="compare-card compare-card--old">
+            <h4>configureStore с reducer-объектом (старый способ)</h4>
+            <div class="code-block">
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer: {
+    <span class="cm">// нужно явно указать ключ И .reducer</span>
+    counter: counterSlice.reducer,
+    user:    userSlice.reducer,
+    posts:   postsSlice.reducer,
+  }
+})
+
+<span class="cm">// state.counter, state.user, state.posts</span>
+            </div>
+          </div>
+          <div class="compare-card compare-card--new">
+            <h4>combineSlices (RTK 2.x)</h4>
+            <div class="code-block">
+<span class="kw">import</span> { combineSlices } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(counterSlice, userSlice, postsSlice)
+<span class="cm">// Ключ в state = slice.reducerPath (по умолчанию = slice.name)</span>
+
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({ reducer: rootReducer })
+
+<span class="cm">// state.counter, state.user, state.posts</span>
+
+<span class="cm">// Бонус: можно подмешивать обычные reducer'ы:</span>
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(
+  counterSlice,
+  userSlice,
+  { theme: themeReducer, formData: formDataReducer }
+)
+            </div>
+          </div>
+        </div>
+
+        <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 14px 0;">
+          <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px;">
+            Текущий root state
+          </h4>
+          <pre id="state-out" style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); margin: 0; overflow-x: auto; white-space: pre;">—</pre>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
+          <button class="btn" data-act="inc">counter.increment</button>
+          <button class="btn" data-act="setname">user.setName('Bob')</button>
+          <button class="btn" data-act="addpost">posts.add('hello')</button>
+          <button class="btn" data-act="setlight">theme.set('light')</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — combineSlices</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>combineSlices</code> is an enhanced version of <code>combineReducers</code> that allows you to
+          combine slices and reducers, and also supports lazy-loading slices later via <code>injectSlices</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/api/combineSlices" target="_blank">combineSlices API</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>combineSlices</code> — улучшенная версия <code>combineReducers</code>, которая позволяет
+          объединять slice'ы и reducer'ы, а также поддерживает позднюю lazy-загрузку slice'ов через
+          <code>injectSlices</code>.»
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">combineSlices</span>(
+  ...slicesOrReducerMaps: (<span class="ts">Slice | { [key]: Reducer }</span>)[]
+): <span class="ts">Reducer&lt;State&gt; &amp; { inject: ..., selector: ..., withLazyLoadedSlices: ... }</span>
+        </div>
+        <p>
+          Принимает любую комбинацию slice-объектов и/или плоских объектов <code>{ key: reducer }</code>.
+          Возвращает обычный root reducer с дополнительными методами для lazy-injection (урок 35).
+        </p>
+
+        <h3>reducerPath — что это</h3>
+        <p>
+          Каждый slice имеет поле <code>reducerPath</code>. По умолчанию <code>reducerPath = name</code>.
+          Можно переопределить:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> usersSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'users'</span>,
+  reducerPath: <span class="str">'data/users'</span>,        <span class="cm">// (плоский ключ, не вложенный)</span>
+  initialState: ...,
+  reducers: { ... }
+})
+
+<span class="kw">const</span> root = <span class="fn">combineSlices</span>(usersSlice)
+<span class="cm">// state['data/users']  — да, ключ со слешем (но это плохая практика)</span>
+        </div>
+        <p>
+          В большинстве случаев reducerPath совпадает с name. Разница важна для RTK Query
+          (<code>reducerPath = 'api'</code>) и для slice'ов, которые нужно положить в нестандартное место.
+        </p>
+
+        <h3>Смешивание slice + reducer</h3>
+        <div class="code-block">
+<span class="kw">import</span> { persistReducer } <span class="kw">from</span> <span class="str">'redux-persist'</span>
+
+<span class="kw">const</span> persistedTheme = <span class="fn">persistReducer</span>(persistConfig, themeReducer)
+
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(
+  counterSlice,
+  userSlice,
+  { theme: persistedTheme, legacy: oldReducer }   <span class="cm">// объект с произвольными reducer'ами</span>
+)
+
+<span class="cm">// state.counter, state.user, state.theme, state.legacy</span>
+        </div>
+
+        <h3>combineReducers vs combineSlices — feature comparison</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 10px;">
+          <thead style="background: var(--bg-panel);">
+            <tr>
+              <th style="padding: 6px 10px; text-align: left; border: 1px solid var(--border); color: var(--accent); font-family: var(--font-mono);">Feature</th>
+              <th style="padding: 6px 10px; text-align: center; border: 1px solid var(--border);">combineReducers</th>
+              <th style="padding: 6px 10px; text-align: center; border: 1px solid var(--border);">combineSlices</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">Принимает map { key: reducer }</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✓</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✓</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">Принимает slice-объект напрямую</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✗</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✓</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">Lazy injection (.inject)</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✗</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✓</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">withLazyLoadedSlices типизация</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✗</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✓</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">.selector helper для root</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✗</td><td style="padding: 6px 10px; border: 1px solid var(--border); text-align: center;">✓</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Что вернёт root.selector</h3>
+        <div class="code-block">
+<span class="cm">// Если в RTK Query слайс лежит в state.api,</span>
+<span class="cm">// можно отдать root.selector в createApi для гибкости:</span>
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(usersSlice, postsSlice)
+
+createApi({
+  baseQuery,
+  reducerPath: <span class="str">'api'</span>,
+  endpoints,
+  <span class="cm">// прокидываем root.selector чтобы найти api state</span>
+})
+        </div>
+
+        <h3>Подводный камень: name vs ключ store</h3>
+        <div class="warning">
+          С combineSlices вы ОБЯЗАНЫ полагаться на <code>slice.reducerPath</code>. Если хотите свои ключи,
+          используйте плоский map: <code>combineSlices({ myKey: slice.reducer })</code>.
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/combineSlices" target="_blank">combineSlices API</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/combineSlices.ts" target="_blank">combineSlices.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

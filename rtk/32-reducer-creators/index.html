@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>32 — reducer creators (RTK 2)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .crud-list { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                 padding: 10px 14px; margin: 12px 0; min-height: 40px; }
+    .crud-row { padding: 5px 0; font-family: var(--font-mono); font-size: .76rem; border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .crud-row:last-child { border-bottom: none; }
+    .crud-loading { color: var(--accent-orange); font-style: italic; }
+    .crud-error { color: var(--accent-red); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">32 / 106</span>reducers как callback (RTK 2.x)</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../31-extra-reducers/">← Назад</a>
+      <a href="../32a-reducers-syntax-bundle/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">3 типа reducers через create-callback</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В RTK 2.x появился альтернативный синтаксис: <code>reducers: (create) =&gt; ({...})</code>.
+          Он даёт три helper'а: <code>create.reducer</code>, <code>create.preparedReducer</code>,
+          <code>create.asyncThunk</code>. Главное преимущество — async thunk прямо в slice'е, без отдельного
+          <code>createAsyncThunk</code> и <code>extraReducers</code>.
+        </p>
+
+        <div class="warning">
+          Чтобы использовать <code>create.asyncThunk</code>, нужно создать свой <code>createAppSlice</code>
+          через <code>buildCreateSlice({ creators: { asyncThunk: asyncThunkCreator } })</code>. Это сделано
+          для того, чтобы <em>не пулить createAsyncThunk в bundle</em>, если он вам не нужен.
+        </div>
+
+        <div class="code-block">
+<span class="kw">import</span> { buildCreateSlice, asyncThunkCreator, nanoid } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">export const</span> createAppSlice = <span class="fn">buildCreateSlice</span>({
+  creators: { asyncThunk: asyncThunkCreator },
+})
+
+<span class="kw">const</span> todosSlice = <span class="fn">createAppSlice</span>({
+  name: <span class="str">'todos'</span>,
+  initialState: { items: [], loading: <span class="kw">false</span>, error: <span class="kw">null</span> },
+  reducers: (create) =&gt; ({
+
+    <span class="cm">// 1. create.reducer — простой case reducer</span>
+    deleteTodo: create.<span class="fn">reducer</span>&lt;<span class="ts">string</span>&gt;((state, action) =&gt; {
+      state.items = state.items.<span class="fn">filter</span>(t =&gt; t.id !== action.payload)
+    }),
+
+    <span class="cm">// 2. create.preparedReducer — с prepare callback</span>
+    addTodo: create.<span class="fn">preparedReducer</span>(
+      (text: <span class="ts">string</span>) =&gt; ({ payload: { id: <span class="fn">nanoid</span>(), text, done: <span class="kw">false</span> } }),
+      (state, action) =&gt; { state.items.<span class="fn">push</span>(action.payload) }
+    ),
+
+    <span class="cm">// 3. create.asyncThunk — full thunk inside slice!</span>
+    fetchTodos: create.<span class="fn">asyncThunk</span>(
+      <span class="kw">async</span> (_, thunkApi) =&gt; {
+        <span class="kw">const</span> r = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/todos'</span>)
+        <span class="kw">return</span> r.<span class="fn">json</span>()
+      },
+      {
+        pending:   (state) =&gt; { state.loading = <span class="kw">true</span> },
+        fulfilled: (state, action) =&gt; { state.items = action.payload },
+        rejected:  (state, action) =&gt; { state.error = action.error.message },
+        settled:   (state) =&gt; { state.loading = <span class="kw">false</span> },
+      }
+    ),
+  })
+})
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
+          <input id="text" type="text" placeholder="todo text" value="hello"
+                 style="flex: 1; min-width: 160px; padding: 8px 10px; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-primary); border-radius: var(--radius-sm); font-family: var(--font-mono);">
+          <button class="btn" id="add">addTodo()</button>
+          <button class="btn" id="fetch">fetchTodos() — async</button>
+          <button class="btn" id="fetch-fail">fetchTodos (fail) </button>
+          <button class="btn btn--secondary" id="clear-todos">clear</button>
+        </div>
+
+        <div class="crud-list" id="list">— нет элементов —</div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — reducer creators (RTK 2.x)</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «Alternatively, the <code>reducers</code> field can be a callback which receives a "create" object.
+          The main benefit of this is that you can create async thunks as part of your reducers.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSlice#the-reducers-creator-callback-notation" target="_blank">Reducers creator callback</a>
+        </div>
+        <div class="quote quote--ru">
+          «Альтернативно, поле <code>reducers</code> может быть callback'ом, который получает объект "create".
+          Главное преимущество — можно создавать async thunk'и как часть reducers.»
+        </div>
+
+        <h3>3 helper'а в create</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem;">
+          <thead style="background: var(--bg-panel); color: var(--accent);">
+            <tr>
+              <th style="padding: 8px 10px; text-align: left; font-family: var(--font-mono); border: 1px solid var(--border);">Helper</th>
+              <th style="padding: 8px 10px; text-align: left; border: 1px solid var(--border);">Эквивалент в старом API</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 8px 10px; font-family: var(--font-mono); color: var(--accent-cyan); border: 1px solid var(--border);">create.reducer&lt;P&gt;((s, a) =&gt; …)</td>
+              <td style="padding: 8px 10px; border: 1px solid var(--border);">обычная функция в reducers</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 10px; font-family: var(--font-mono); color: var(--accent-cyan); border: 1px solid var(--border);">create.preparedReducer(prepare, reducer)</td>
+              <td style="padding: 8px 10px; border: 1px solid var(--border);">{ reducer, prepare } object form</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 10px; font-family: var(--font-mono); color: var(--accent-cyan); border: 1px solid var(--border);">create.asyncThunk(payloadCreator, handlers)</td>
+              <td style="padding: 8px 10px; border: 1px solid var(--border);">createAsyncThunk + extraReducers</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>buildCreateSlice — почему отдельная фабрика</h3>
+        <div class="code-block">
+<span class="kw">import</span> { createSlice } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="cm">// Этот createSlice не знает про asyncThunk — bundle меньше</span>
+createSlice({
+  name: <span class="str">'x'</span>,
+  reducers: (create) =&gt; ({
+    fetchUser: create.<span class="fn">asyncThunk</span>(...)   <span class="cm">// ← Error! asyncThunk creator not configured</span>
+  })
+})
+
+<span class="cm">// Нужно собрать свой:</span>
+<span class="kw">import</span> { buildCreateSlice, asyncThunkCreator } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">export const</span> createAppSlice = <span class="fn">buildCreateSlice</span>({
+  creators: { asyncThunk: asyncThunkCreator }
+})
+
+<span class="cm">// Теперь работает</span>
+<span class="fn">createAppSlice</span>({
+  name: <span class="str">'x'</span>,
+  reducers: (create) =&gt; ({ fetchUser: create.<span class="fn">asyncThunk</span>(...) })
+})
+        </div>
+        <p>
+          Это паттерн "конфигурируй и используй". В большом приложении делаете один <code>createAppSlice</code>
+          на проект и используете везде вместо <code>createSlice</code>.
+        </p>
+
+        <h3>create.asyncThunk — handlers объект</h3>
+        <div class="code-block">
+create.<span class="fn">asyncThunk</span>(
+  payloadCreator,                 <span class="cm">// тот же что в createAsyncThunk</span>
+  {
+    pending:   (state, action) =&gt; { ... },
+    fulfilled: (state, action) =&gt; { ... },
+    rejected:  (state, action) =&gt; { ... },
+    settled:   (state, action) =&gt; { ... },   <span class="cm">// вызывается на fulfilled И rejected</span>
+
+    options: {
+      idGenerator: () =&gt; <span class="fn">customId</span>(),
+      condition: (arg, api) =&gt; { ... },
+      dispatchConditionRejection: <span class="kw">true</span>,
+    }
+  }
+)
+        </div>
+        <p>
+          <code>settled</code> — удобный helper, эквивалент addMatcher для обоих fulfilled+rejected.
+          Часто используется чтобы выключить loading-flag.
+        </p>
+
+        <h3>Доступ к thunk action creator</h3>
+        <div class="code-block">
+<span class="cm">// Slice автоматически экспортирует action creator вместе с pending/fulfilled/rejected</span>
+todosSlice.actions.<span class="fn">fetchTodos</span>            <span class="cm">// сам thunk</span>
+todosSlice.actions.fetchTodos.pending     <span class="cm">// pending action creator</span>
+todosSlice.actions.fetchTodos.fulfilled   <span class="cm">// fulfilled action creator</span>
+todosSlice.actions.fetchTodos.rejected    <span class="cm">// rejected action creator</span>
+
+<span class="cm">// В компоненте:</span>
+dispatch(todosSlice.actions.<span class="fn">fetchTodos</span>())
+        </div>
+
+        <h3>Подводный камень: типизация state в asyncThunk</h3>
+        <div class="warning">
+          Внутри payloadCreator <code>thunkApi.getState()</code> возвращает <code>unknown</code>, потому что
+          slice ещё не построен (циклическая типизация). Нужно делать ручной cast:
+          <code>const state = thunkApi.getState() as RootState</code>.
+        </div>
+
+        <h3>Когда использовать новый callback API</h3>
+        <ul>
+          <li><strong>Новые проекты RTK 2.x</strong> — да, рекомендуется.</li>
+          <li><strong>Перевод slice'а с asyncThunk внутри</strong> — да, удобнее (всё в одном месте).</li>
+          <li><strong>Простые slice без thunk</strong> — старый object-form тоже хорош. Дело вкуса.</li>
+          <li><strong>Тесты</strong> — новый API создаёт ту же структуру; тесты не меняются.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createSlice#the-reducers-creator-callback-notation" target="_blank">createSlice — Reducers creator callback</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createSlice.ts" target="_blank">createSlice.ts — реализация create</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

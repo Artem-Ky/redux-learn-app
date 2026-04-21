@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>37 — reducerPath ≠ name</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .compare-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin: 12px 0; }
+    .compare-table th, .compare-table td { padding: 8px 10px; border: 1px solid var(--border); text-align: left; font-family: var(--font-mono); font-size: .76rem; }
+    .compare-table th { background: var(--bg-panel); color: var(--accent); }
+    .compare-table td.label { color: var(--accent-orange); width: 35%; }
+    .compare-table td.val { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">37 / 106</span>reducerPath ≠ name — два разных поля</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../36-with-slice-typing/">← Назад</a>
+      <a href="../38-immer-quiz/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">name = action prefix, reducerPath = ключ в state</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В обычных slice'ах эти два поля совпадают (по умолчанию reducerPath = name). Различие
+          важно для: 1) RTK Query (всегда reducerPath='api'), 2) сложных приложений с переименованием
+          slice'ов без изменения action.type, 3) lazy-injection.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> usersSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'users'</span>,                    <span class="cm">// для action.type = 'users/add', 'users/remove'</span>
+  reducerPath: <span class="str">'data/users'</span>,         <span class="cm">// (опц.) ключ в state — state['data/users']</span>
+  initialState: { items: [] },
+  reducers: { ... }
+})
+
+<span class="kw">const</span> root = <span class="fn">combineSlices</span>(usersSlice)
+<span class="cm">// state['data/users'].items</span>
+
+<span class="cm">// Action.type всё ещё 'users/add' — независимо от reducerPath</span>
+        </div>
+
+        <div class="compare-table-wrapper">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>Поле</th>
+                <th>Что задаёт</th>
+                <th>Когда меняется отдельно</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="label">name</td>
+                <td>Префикс action.type: <code>${'`'}${'$'}{name}/${'$'}{reducerKey}${'`'}</code></td>
+                <td>Никогда (это идентификатор slice'а)</td>
+              </tr>
+              <tr>
+                <td class="label">reducerPath</td>
+                <td>Ключ в root state: <code>state[reducerPath]</code></td>
+                <td>RTK Query, переименование, sharing slice между несколькими store</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 14px 0;">
+          <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px;">
+            Текущий root state (3 slice'а с разной конфигурацией)
+          </h4>
+          <pre id="state-out" style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); margin: 0; overflow-x: auto; white-space: pre;">—</pre>
+        </div>
+
+        <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 14px 0;">
+          <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px;">
+            Информация о slice'ах
+          </h4>
+          <table class="compare-table">
+            <thead><tr><th>name</th><th>reducerPath</th><th>action.type prefix</th><th>state key</th></tr></thead>
+            <tbody id="slices-info"></tbody>
+          </table>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn" data-do="users-add">users.add</button>
+          <button class="btn" data-do="counter-inc">counter.increment</button>
+          <button class="btn" data-do="api-tag">apiSlice.invalidateTags</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — name vs reducerPath</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>reducerPath</code> defaults to <code>name</code>. Use it when you want the slice's state to be
+          stored under a different key from its action prefix. <code>combineSlices</code> uses
+          <code>reducerPath</code> to determine the state key.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSlice#reducerpath" target="_blank">createSlice — reducerPath</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>reducerPath</code> по умолчанию равен <code>name</code>. Используйте, если хотите хранить
+          state slice'а под другим ключом, отличным от префикса actions. <code>combineSlices</code>
+          использует <code>reducerPath</code> для определения ключа state.»
+        </div>
+
+        <h3>В RTK Query — обязательное использование</h3>
+        <div class="code-block">
+<span class="kw">const</span> apiSlice = <span class="fn">createApi</span>({
+  reducerPath: <span class="str">'api'</span>,           <span class="cm">// state.api</span>
+  baseQuery: <span class="fn">fetchBaseQuery</span>({ baseUrl: <span class="str">'/'</span> }),
+  endpoints: ...
+})
+
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer: {
+    [apiSlice.reducerPath]: apiSlice.reducer,    <span class="cm">// state.api = apiSlice.reducer</span>
+  },
+  middleware: (gdm) =&gt; gdm().<span class="fn">concat</span>(apiSlice.middleware)
+})
+
+<span class="cm">// Все RTK Query actions имеют префикс 'api/...':</span>
+<span class="cm">// 'api/executeQuery/pending'</span>
+<span class="cm">// 'api/executeMutation/fulfilled'</span>
+<span class="cm">// и т.д.</span>
+        </div>
+
+        <h3>Когда полезно разделять name и reducerPath</h3>
+        <ol>
+          <li><strong>Миграция</strong>: переименовали key в state, но не хотите менять action.type
+              (старые middleware на них завязаны).</li>
+          <li><strong>Несколько копий slice</strong>: один и тот же createSlice используется в разных
+              ветках state (но с разным reducerPath).</li>
+          <li><strong>RTK Query</strong>: <code>name</code> внутри createApi не настраивается, а
+              <code>reducerPath</code> — да, и это разные вещи.</li>
+        </ol>
+
+        <h3>Деривация типа RootState</h3>
+        <div class="code-block">
+<span class="kw">type</span> RootState = ReturnType&lt;<span class="kw">typeof</span> store.getState&gt;
+<span class="cm">// =&gt; { users: ..., counter: ..., 'data/users': ... }</span>
+<span class="cm">//                            ↑ ключи берутся из reducerPath</span>
+
+<span class="cm">// А action.type всё ещё:</span>
+usersSlice.actions.add.type   <span class="cm">// 'users/add' (от name)</span>
+        </div>
+
+        <h3>Подводный камень: ключ со слэшем</h3>
+        <div class="warning">
+          <code>reducerPath: 'data/users'</code> создаст ключ <code>state['data/users']</code> со слэшем
+          в имени. Это валидный ключ JS, но затрудняет работу — приходится использовать
+          <code>state['data/users']</code> вместо <code>state.dataUsers</code>. Лучше избегать спецсимволов.
+        </div>
+
+        <h3>Подводный камень: переопределение в configureStore</h3>
+        <div class="warning">
+          Если вы передаёте slice через объект-map в configureStore <em>с другим ключом</em>:
+          <code>configureStore({ reducer: { myKey: usersSlice.reducer } })</code> — это <strong>переопределит</strong>
+          reducerPath для целей state ключа, но <code>slice.selectors</code> и <code>slice.selectSlice</code>
+          всё равно будут смотреть в <code>state[reducerPath]</code> и сломаются. Используйте
+          <code>combineSlices</code> или <code>slice.getSelectors(rootSelector)</code>.
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createSlice#reducerpath" target="_blank">createSlice — reducerPath</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/createApi#reducerpath" target="_blank">createApi — reducerPath</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

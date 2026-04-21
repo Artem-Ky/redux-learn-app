@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>28 — Первая slice</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .slice-anatomy { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 14px 0; }
+    .slice-anatomy h4 { color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px; }
+    .slice-output { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                    padding: 10px 14px; font-family: var(--font-mono); font-size: .76rem;
+                    color: var(--accent-cyan); margin-top: 8px; white-space: pre; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">28 / 106</span>Первая slice — name + initialState + reducers</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../27-immer-pitfalls/">← Назад</a>
+      <a href="../29-slice-actions-types/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">createSlice — три обязательных поля</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>createSlice</code> объединяет actions + reducer + initialState в один объект.
+          Это <strong>главный API RTK</strong> для определения state-логики. 90% всего написанного на RTK
+          использует createSlice.
+        </p>
+
+        <div class="code-block">
+<span class="kw">import</span> { createSlice } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> counterSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'counter'</span>,                         <span class="cm">// 1. Префикс для всех action.type</span>
+  initialState: { value: <span class="num">0</span>, history: [] },    <span class="cm">// 2. Начальный state</span>
+  reducers: {                                <span class="cm">// 3. Map reducer-функций</span>
+    increment: (state) =&gt; { state.value++ },
+    decrement: (state) =&gt; { state.value--; state.history.<span class="fn">push</span>(<span class="str">'-'</span>) },
+    addBy:     (state, action) =&gt; { state.value += action.payload },
+    reset:     () =&gt; ({ value: <span class="num">0</span>, history: [] })   <span class="cm">// можно и return</span>
+  }
+})
+
+<span class="cm">// На выходе: объект с этими полями ↓</span>
+counterSlice.name              <span class="cm">// 'counter'</span>
+counterSlice.actions           <span class="cm">// { increment, decrement, addBy, reset }</span>
+counterSlice.reducer           <span class="cm">// (state, action) =&gt; newState</span>
+counterSlice.caseReducers      <span class="cm">// { increment: fn, decrement: fn, ... } — оригинальные функции</span>
+counterSlice.<span class="fn">getInitialState</span>()  <span class="cm">// { value: 0, history: [] }</span>
+        </div>
+
+        <div class="slice-anatomy">
+          <h4>Что лежит в counterSlice</h4>
+          <div class="slice-output" id="slice-anatomy">— загружается —</div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
+          <button class="btn" data-act="inc">dispatch(increment())</button>
+          <button class="btn" data-act="dec">dispatch(decrement())</button>
+          <button class="btn" data-act="add">dispatch(addBy(5))</button>
+          <button class="btn btn--secondary" data-act="reset">dispatch(reset())</button>
+        </div>
+
+        <div class="slice-anatomy">
+          <h4>Текущий state</h4>
+          <div class="slice-output" id="state-out">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — createSlice</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>createSlice</code> accepts an object of reducer functions, a slice name, and an initial state value,
+          and automatically generates a slice reducer with corresponding action creators and action types.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSlice" target="_blank">createSlice API</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>createSlice</code> принимает объект reducer-функций, имя slice'а и начальное состояние и
+          автоматически генерирует slice-reducer с соответствующими action creator'ами и action type'ами.»
+        </div>
+
+        <h3>Сигнатура (упрощённо)</h3>
+        <div class="code-block">
+<span class="kw">interface</span> CreateSliceOptions&lt;<span class="ts">S, R, N</span>&gt; {
+  name: <span class="ts">N</span>                                  <span class="cm">// уникальный префикс</span>
+  initialState: <span class="ts">S | (() =&gt; S)</span>                  <span class="cm">// state или lazy-функция</span>
+  reducers: <span class="ts">R</span>                                <span class="cm">// { [name]: caseReducer | { reducer, prepare } }</span>
+  extraReducers?: (builder) =&gt; <span class="ts">void</span>            <span class="cm">// слушать чужие actions (урок 31)</span>
+  selectors?: <span class="ts">{ [name]: (state) =&gt; T }</span>       <span class="cm">// встроенные селекторы (урок 33)</span>
+  reducerPath?: <span class="ts">string</span>                        <span class="cm">// для combineSlices (урок 37)</span>
+}
+        </div>
+
+        <h3>Что генерируется автоматически</h3>
+        <ol>
+          <li><strong>action.type</strong> = <code>${name}/${reducerKey}</code> (например <code>'counter/increment'</code>).</li>
+          <li><strong>action creator</strong> для каждого ключа в reducers (доступен в <code>slice.actions</code>).</li>
+          <li><strong>reducer</strong> — функция (state, action) =&gt; newState.</li>
+          <li><strong>caseReducers</strong> — оригинальные функции, не обёрнутые в Immer (для тестов).</li>
+          <li><strong>match</strong> на каждом action creator (как у createAction).</li>
+        </ol>
+
+        <h3>Внутри: createSlice ≈ createReducer + createAction[]</h3>
+        <div class="code-block">
+<span class="cm">// createSlice внутри делает примерно следующее (упрощённо):</span>
+<span class="kw">function</span> <span class="fn">createSlice</span>({ name, initialState, reducers }) {
+  <span class="kw">const</span> actions = {}
+  <span class="kw">const</span> caseReducers = {}
+
+  <span class="kw">for</span> (<span class="kw">const</span> [key, caseReducer] <span class="kw">of</span> Object.<span class="fn">entries</span>(reducers)) {
+    <span class="kw">const</span> type = <span class="str">`${name}/${key}`</span>
+    actions[key] = <span class="fn">createAction</span>(type)
+    caseReducers[key] = caseReducer
+  }
+
+  <span class="kw">const</span> reducer = <span class="fn">createReducer</span>(initialState, (b) =&gt; {
+    <span class="kw">for</span> (<span class="kw">const</span> [key, caseReducer] <span class="kw">of</span> Object.<span class="fn">entries</span>(caseReducers)) {
+      b.<span class="fn">addCase</span>(actions[key], caseReducer)
+    }
+  })
+
+  <span class="kw">return</span> { name, actions, reducer, caseReducers, getInitialState: () =&gt; initialState }
+}
+        </div>
+        <p>
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createSlice.ts" target="_blank">
+            createSlice.ts (полный исходник)
+          </a> — там около 600 строк, потому что есть extraReducers, selectors, lazy injection и куча TS-магии.
+        </p>
+
+        <h3>Подключение в store</h3>
+        <div class="code-block">
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer: {
+    counter: counterSlice.reducer,           <span class="cm">// ключ → state.counter</span>
+    user:    userSlice.reducer,              <span class="cm">// ключ → state.user</span>
+  }
+})
+
+<span class="cm">// Использование</span>
+<span class="kw">const</span> { increment, addBy } = counterSlice.actions
+store.<span class="fn">dispatch</span>(<span class="fn">increment</span>())
+store.<span class="fn">dispatch</span>(<span class="fn">addBy</span>(<span class="num">5</span>))
+        </div>
+
+        <h3>Подводный камень: name должен быть уникальным</h3>
+        <div class="warning">
+          <code>name</code> используется как префикс action.type. Если у двух slice'ов одинаковый name —
+          actions будут <strong>конфликтовать</strong>. Соглашение: <code>name</code> = ключ в store
+          (<code>'counter'</code> ↔ <code>state.counter</code>).
+        </div>
+
+        <h3>initialState может быть функцией</h3>
+        <div class="code-block">
+<span class="kw">const</span> slice = <span class="fn">createSlice</span>({
+  name: <span class="str">'session'</span>,
+  initialState: () =&gt; ({                      <span class="cm">// lazy</span>
+    sessionId: <span class="fn">nanoid</span>(),
+    startedAt: Date.<span class="fn">now</span>(),
+  }),
+  reducers: { ... }
+})
+        </div>
+        <p>
+          Функция вызывается один раз при первом <code>@@INIT</code>. Полезно если initialState
+          зависит от side-effects (timestamp, localStorage).
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

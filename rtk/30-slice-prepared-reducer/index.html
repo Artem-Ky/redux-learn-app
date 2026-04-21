@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>30 — Prepared reducer в slice</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .todo-list { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                 padding: 10px 14px; margin: 12px 0; min-height: 40px; }
+    .todo-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+                 padding: 6px 0; border-bottom: 1px dashed var(--border); font-family: var(--font-mono); font-size: .76rem; }
+    .todo-item:last-child { border-bottom: none; }
+    .todo-item__id { color: var(--text-muted); font-size: .7rem; }
+    .todo-item__meta { color: var(--accent-orange); font-size: .7rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">30 / 106</span>Prepared reducer внутри slice</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../29-slice-actions-types/">← Назад</a>
+      <a href="../31-extra-reducers/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">{ reducer, prepare } — кастомизация payload в createSlice</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Если reducer — простая функция, payload <strong>=</strong> аргумент action creator'а.
+          Если нужна логика подготовки (nanoid, timestamp, несколько аргументов) — передавайте
+          объект <code>{ reducer, prepare }</code>.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> todosSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'todos'</span>,
+  initialState: [] <span class="kw">as</span> <span class="ts">Todo[]</span>,
+  reducers: {
+    <span class="cm">// Обычный reducer — payload = аргумент</span>
+    toggleTodo: (state, action: <span class="ts">PayloadAction&lt;string&gt;</span>) =&gt; {
+      <span class="kw">const</span> t = state.<span class="fn">find</span>(x =&gt; x.id === action.payload)
+      <span class="kw">if</span> (t) t.done = !t.done
+    },
+
+    <span class="cm">// Prepared reducer — кастомизированный payload</span>
+    addTodo: {
+      <span class="fn">reducer</span>(state, action: <span class="ts">PayloadAction&lt;Todo&gt;</span>) {
+        state.<span class="fn">push</span>(action.payload)
+      },
+      <span class="fn">prepare</span>(text: <span class="ts">string</span>) {
+        <span class="kw">return</span> {
+          payload: {
+            id: <span class="fn">nanoid</span>(),         <span class="cm">// id ← в prepare, не в reducer</span>
+            text,
+            done: <span class="kw">false</span>,
+            createdAt: Date.<span class="fn">now</span>(),
+          }
+        }
+      }
+    },
+
+    <span class="cm">// Несколько аргументов через prepare</span>
+    addNote: {
+      <span class="fn">reducer</span>(state, action: <span class="ts">PayloadAction&lt;Note, string, { user: string }&gt;</span>) {
+        state.<span class="fn">push</span>({ ...action.payload, addedBy: action.meta.user })
+      },
+      <span class="fn">prepare</span>(text: <span class="ts">string</span>, user: <span class="ts">string</span>) {
+        <span class="kw">return</span> {
+          payload: { id: <span class="fn">nanoid</span>(), text },
+          meta: { user, ts: Date.<span class="fn">now</span>() }
+        }
+      }
+    }
+  }
+})
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
+          <input id="text" type="text" placeholder="текст todo" value="купить хлеб"
+                 style="flex: 1; min-width: 160px; padding: 8px 10px; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-primary); border-radius: var(--radius-sm); font-family: var(--font-mono);">
+          <button class="btn" id="add">addTodo(text)</button>
+          <button class="btn" id="add-note">addNote(text, 'Alice')</button>
+          <button class="btn btn--secondary" id="clear">clear</button>
+        </div>
+
+        <div class="todo-list" id="todo-list">— нет элементов —</div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — prepare в createSlice</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «If you want to customize the creation of the payload value, you may pass an object containing
+          two keys: <code>reducer</code> and <code>prepare</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSlice#customizing-generated-action-creators" target="_blank">createSlice — prepare</a>
+        </div>
+        <div class="quote quote--ru">
+          «Если хочется кастомизировать создание значения payload, можно передать объект с двумя ключами:
+          <code>reducer</code> и <code>prepare</code>.»
+        </div>
+
+        <h3>Когда нужен prepare</h3>
+        <ol>
+          <li><strong>Генерация id</strong> — <code>nanoid()</code> внутри prepare, не в reducer'е (reducer должен быть чистым).</li>
+          <li><strong>Несколько аргументов</strong> — actionCreator принимает много, payload собирает в один объект.</li>
+          <li><strong>meta-поля</strong> — timestamp, source, user (не входят в payload).</li>
+          <li><strong>error</strong> — флаг для FSA-ошибок.</li>
+          <li><strong>Нормализация входа</strong> — обрезка пробелов, lowercase, валидация.</li>
+        </ol>
+
+        <h3>Под капотом — то же, что createAction(type, prepare)</h3>
+        <div class="code-block">
+<span class="cm">// Это:</span>
+addTodo: {
+  reducer: (state, action) =&gt; { state.<span class="fn">push</span>(action.payload) },
+  prepare: (text) =&gt; ({ payload: { id: <span class="fn">nanoid</span>(), text } })
+}
+
+<span class="cm">// эквивалентно:</span>
+<span class="kw">const</span> addTodo = <span class="fn">createAction</span>(
+  <span class="str">'todos/addTodo'</span>,
+  (text) =&gt; ({ payload: { id: <span class="fn">nanoid</span>(), text } })
+)
+        </div>
+
+        <h3>Несколько аргументов</h3>
+        <div class="code-block">
+<span class="cm">// Action creator теперь принимает 2 аргумента</span>
+addNote: {
+  reducer: (state, action) =&gt; { state.<span class="fn">push</span>(action.payload) },
+  prepare: (text, user) =&gt; ({
+    payload: { id: <span class="fn">nanoid</span>(), text, addedBy: user }
+  })
+}
+
+<span class="cm">// Использование:</span>
+<span class="fn">dispatch</span>(<span class="fn">addNote</span>(<span class="str">'привет'</span>, <span class="str">'Alice'</span>))
+        </div>
+
+        <h3>meta-поле</h3>
+        <p>
+          <code>meta</code> — поле для <strong>метаданных</strong>, которые не относятся к payload, но могут
+          быть полезны для middleware/listener'ов: timestamp, source, requestId, analytics-теги.
+        </p>
+        <div class="code-block">
+prepare: (text, user) =&gt; ({
+  payload: { id: <span class="fn">nanoid</span>(), text },
+  meta:    { addedBy: user, timestamp: Date.<span class="fn">now</span>(), source: <span class="str">'manual'</span> },
+  error:   <span class="kw">false</span>     <span class="cm">// можно опционально</span>
+})
+
+<span class="cm">// В reducer'е:</span>
+reducer: (state, action) =&gt; {
+  state.<span class="fn">push</span>({ ...action.payload, addedBy: action.meta.addedBy })
+}
+        </div>
+
+        <h3>TypeScript: PayloadAction&lt;P, T, M, E&gt;</h3>
+        <div class="code-block">
+<span class="kw">type</span> PayloadAction&lt;
+  P = <span class="ts">void</span>,             <span class="cm">// payload</span>
+  T <span class="kw">extends</span> <span class="ts">string</span> = <span class="ts">string</span>,  <span class="cm">// type</span>
+  M = <span class="ts">never</span>,             <span class="cm">// meta</span>
+  E = <span class="ts">never</span>              <span class="cm">// error</span>
+&gt;
+
+<span class="cm">// Использование с meta:</span>
+reducer: (state, action: <span class="ts">PayloadAction&lt;Note, string, { user: string }&gt;</span>) =&gt; {
+  action.meta.user      <span class="cm">// типизирован</span>
+}
+        </div>
+
+        <h3>Подводный камень: prepare возвращает объект</h3>
+        <div class="warning">
+          prepare должен возвращать <strong>объект с полем payload</strong>, не само значение!
+          <br>✗ <code>prepare: (text) =&gt; { id: nanoid(), text }</code> — неправильно
+          <br>✓ <code>prepare: (text) =&gt; ({ payload: { id: nanoid(), text } })</code> — правильно
+        </div>
+
+        <h3>Подводный камень: prepare как ручка для side-effects</h3>
+        <div class="warning">
+          prepare вызывается <em>каждый раз</em>, когда вы вызываете actionCreator. Не делайте там
+          <code>fetch</code>, <code>console.error</code>, изменение DOM. Только <strong>чистая трансформация</strong>
+          входа. Для побочных эффектов — middleware/thunks/listener.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

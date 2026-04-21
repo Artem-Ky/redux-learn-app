@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>39 — Feature folder pattern</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .folder-tree { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                   padding: 14px 18px; font-family: var(--font-mono); font-size: .8rem; color: var(--text-primary);
+                   line-height: 1.7; white-space: pre; overflow-x: auto; margin: 12px 0; }
+    .folder-tree .dir { color: var(--accent); font-weight: 600; }
+    .folder-tree .file { color: var(--accent-cyan); }
+    .folder-tree .comment { color: var(--text-muted); font-style: italic; }
+    .pattern-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1100px) { .pattern-grid { grid-template-columns: 1fr; } }
+    .pattern-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .pattern-card--good { border-left: 3px solid var(--success); }
+    .pattern-card--bad  { border-left: 3px solid var(--accent-red); }
+    .pattern-card h4 { font-family: var(--font-mono); font-size: .82rem; margin-bottom: 6px; }
+    .pattern-card--good h4 { color: var(--success); }
+    .pattern-card--bad  h4 { color: var(--accent-red); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">39 / 106</span>Pattern: slice per feature — структура папок</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../38-immer-quiz/">← Назад</a>
+      <a href="../40-current-original-debug/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">«Redux Style Guide» — рекомендуемая структура</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Redux team рекомендует <strong>feature folders</strong> + <strong>"ducks" pattern</strong>.
+          Это значит: одна фича = одна папка, в которой лежат и UI, и slice, и selectors, и тесты.
+          Никаких папок типа <code>actions/</code>, <code>reducers/</code>, <code>selectors/</code>.
+        </p>
+
+        <h3 style="color: var(--success); margin-top: 14px;">✓ Рекомендуемая структура</h3>
+        <div class="folder-tree"><span class="dir">src/</span>
+├── <span class="dir">app/</span>
+│   ├── <span class="file">store.ts</span>           <span class="comment"># configureStore, RootState, AppDispatch</span>
+│   └── <span class="file">hooks.ts</span>           <span class="comment"># useAppDispatch, useAppSelector</span>
+│
+├── <span class="dir">features/</span>           <span class="comment"># КАЖДАЯ ФИЧА = СВОЯ ПАПКА</span>
+│   ├── <span class="dir">counter/</span>
+│   │   ├── <span class="file">counterSlice.ts</span>    <span class="comment"># slice + actions + selectors</span>
+│   │   ├── <span class="file">Counter.tsx</span>        <span class="comment"># UI компонент</span>
+│   │   ├── <span class="file">Counter.test.tsx</span>
+│   │   └── <span class="file">counterSlice.test.ts</span>
+│   │
+│   ├── <span class="dir">todos/</span>
+│   │   ├── <span class="file">todosSlice.ts</span>
+│   │   ├── <span class="file">TodoList.tsx</span>
+│   │   ├── <span class="file">TodoItem.tsx</span>
+│   │   ├── <span class="file">AddTodo.tsx</span>
+│   │   └── <span class="file">api.ts</span>             <span class="comment"># thunks / API calls</span>
+│   │
+│   └── <span class="dir">user/</span>
+│       ├── <span class="file">userSlice.ts</span>
+│       ├── <span class="file">LoginForm.tsx</span>
+│       ├── <span class="file">Profile.tsx</span>
+│       └── <span class="file">authThunks.ts</span>
+│
+├── <span class="dir">api/</span>                <span class="comment"># RTK Query (если используется)</span>
+│   ├── <span class="file">apiSlice.ts</span>
+│   └── <span class="file">endpoints/</span>
+│       ├── <span class="file">posts.ts</span>
+│       └── <span class="file">users.ts</span>
+│
+├── <span class="dir">shared/</span>             <span class="comment"># переиспользуемые компоненты</span>
+│   ├── <span class="dir">ui/</span>
+│   └── <span class="dir">utils/</span>
+│
+└── <span class="file">App.tsx</span></div>
+
+        <h3 style="color: var(--accent-red); margin-top: 14px;">✗ Антипаттерны</h3>
+        <div class="folder-tree"><span class="dir">src/</span>
+├── <span class="dir">actions/</span>           <span class="comment"># ✗ группировка по типу — устарело</span>
+│   ├── <span class="file">counterActions.ts</span>
+│   └── <span class="file">userActions.ts</span>
+├── <span class="dir">reducers/</span>          <span class="comment"># ✗ всё разбросано</span>
+│   ├── <span class="file">counterReducer.ts</span>
+│   └── <span class="file">userReducer.ts</span>
+├── <span class="dir">selectors/</span>         <span class="comment"># ✗ менять одну фичу = править 4 папки</span>
+└── <span class="dir">components/</span>        <span class="comment"># ✗ компоненты оторваны от логики</span></div>
+
+        <div class="pattern-grid">
+          <div class="pattern-card pattern-card--good">
+            <h4>✓ counterSlice.ts (модуль = "ducks" pattern)</h4>
+            <div class="code-block">
+<span class="kw">import</span> { createSlice, type PayloadAction } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">interface</span> CounterState { value: <span class="ts">number</span> }
+
+<span class="kw">const</span> initialState: <span class="ts">CounterState</span> = { value: <span class="num">0</span> }
+
+<span class="kw">const</span> counterSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'counter'</span>,
+  initialState,
+  reducers: {
+    increment: (s) =&gt; { s.value++ },
+    addBy: (s, a: <span class="ts">PayloadAction&lt;number&gt;</span>) =&gt; { s.value += a.payload },
+  },
+  selectors: {
+    selectValue: (s) =&gt; s.value,
+    selectIsEven: (s) =&gt; s.value % <span class="num">2</span> === <span class="num">0</span>,
+  },
+})
+
+<span class="cm">// Actions, selectors, reducer — ВСЁ из одного файла</span>
+<span class="kw">export const</span> { increment, addBy } = counterSlice.actions
+<span class="kw">export const</span> { selectValue, selectIsEven } = counterSlice.selectors
+<span class="kw">export default</span> counterSlice.reducer
+            </div>
+          </div>
+
+          <div class="pattern-card pattern-card--good">
+            <h4>✓ Counter.tsx (UI рядом со slice)</h4>
+            <div class="code-block">
+<span class="kw">import</span> { useAppDispatch, useAppSelector } <span class="kw">from</span> <span class="str">'@/app/hooks'</span>
+<span class="kw">import</span> { increment, selectValue, selectIsEven } <span class="kw">from</span> <span class="str">'./counterSlice'</span>
+
+<span class="kw">export function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> value = <span class="fn">useAppSelector</span>(selectValue)
+  <span class="kw">const</span> isEven = <span class="fn">useAppSelector</span>(selectIsEven)
+  <span class="kw">const</span> dispatch = <span class="fn">useAppDispatch</span>()
+
+  <span class="kw">return</span> (
+    &lt;<span class="ts">div</span>&gt;
+      &lt;<span class="ts">p</span>&gt;{value} ({isEven ? <span class="str">'even'</span> : <span class="str">'odd'</span>})&lt;/<span class="ts">p</span>&gt;
+      &lt;<span class="ts">button onClick</span>={() =&gt; dispatch(<span class="fn">increment</span>())}&gt;+&lt;/<span class="ts">button</span>&gt;
+    &lt;/<span class="ts">div</span>&gt;
+  )
+}
+            </div>
+          </div>
+
+          <div class="pattern-card pattern-card--good">
+            <h4>✓ store.ts</h4>
+            <div class="code-block">
+<span class="kw">import</span> { configureStore, combineSlices } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+<span class="kw">import</span> counterSlice <span class="kw">from</span> <span class="str">'@/features/counter/counterSlice'</span>
+<span class="kw">import</span> todosSlice <span class="kw">from</span> <span class="str">'@/features/todos/todosSlice'</span>
+<span class="kw">import</span> userSlice <span class="kw">from</span> <span class="str">'@/features/user/userSlice'</span>
+
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(counterSlice, todosSlice, userSlice)
+  .<span class="fn">withLazyLoadedSlices</span>&lt;<span class="ts">LazyState</span>&gt;()
+
+<span class="kw">export const</span> store = <span class="fn">configureStore</span>({ reducer: rootReducer })
+
+<span class="kw">export type</span> RootState = ReturnType&lt;<span class="kw">typeof</span> store.getState&gt;
+<span class="kw">export type</span> AppDispatch = <span class="kw">typeof</span> store.dispatch
+            </div>
+          </div>
+
+          <div class="pattern-card pattern-card--good">
+            <h4>✓ hooks.ts (типизированные)</h4>
+            <div class="code-block">
+<span class="kw">import</span> { useDispatch, useSelector } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import type</span> { RootState, AppDispatch } <span class="kw">from</span> <span class="str">'./store'</span>
+
+<span class="kw">export const</span> useAppDispatch = useDispatch.<span class="fn">withTypes</span>&lt;<span class="ts">AppDispatch</span>&gt;()
+<span class="kw">export const</span> useAppSelector = useSelector.<span class="fn">withTypes</span>&lt;<span class="ts">RootState</span>&gt;()
+            </div>
+          </div>
+        </div>
+
+        <h3 style="color: var(--accent); margin-top: 14px;">Реальный пример (модель файлов)</h3>
+        <div style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); white-space: pre; overflow-x: auto;" id="model-output">— загружается —</div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Redux Style Guide</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «Structure files as feature folders, with all logic for a given feature in a single folder. This includes
+          slices, components, selectors, and tests. Avoid <code>actions/</code>, <code>reducers/</code> folders.»
+          <br>— <a href="https://redux.js.org/style-guide/#structure-files-as-feature-folders-with-single-file-logic" target="_blank">Redux Style Guide</a>
+        </div>
+        <div class="quote quote--ru">
+          «Структурируйте файлы по feature-папкам, держа всю логику конкретной фичи в одной папке. Это включает
+          slice'ы, компоненты, селекторы и тесты. Избегайте папок <code>actions/</code>, <code>reducers/</code>.»
+        </div>
+
+        <h3>Преимущества feature-folder подхода</h3>
+        <ol>
+          <li><strong>Изменения локализованы</strong>: добавление поля state требует править 1 папку, не 4.</li>
+          <li><strong>Удобный code-split</strong>: <code>React.lazy(() =&gt; import('@/features/counter'))</code>
+              даст и UI, и reducer за один import.</li>
+          <li><strong>Тесты рядом</strong>: <code>counterSlice.test.ts</code> в той же папке — легко найти.</li>
+          <li><strong>Удаление фичи</strong>: rm -rf features/oldFeature — и всё, никаких хвостов.</li>
+        </ol>
+
+        <h3>Что класть в slice-файл</h3>
+        <ul>
+          <li>Сам <code>createSlice</code> + типы (<code>CounterState</code>).</li>
+          <li>Локальные thunks через <code>create.asyncThunk</code> или отдельный <code>createAsyncThunk</code>.</li>
+          <li>Селекторы — встроенные через <code>selectors</code> или отдельные <code>createSelector</code>.</li>
+          <li>Дефолтный экспорт — <code>slice.reducer</code>.</li>
+          <li>Named экспорты — actions и selectors.</li>
+        </ul>
+
+        <h3>Что НЕ класть в slice</h3>
+        <ul>
+          <li>UI-компоненты — отдельные файлы.</li>
+          <li>API-функции <code>fetch</code> — отдельный <code>api.ts</code>.</li>
+          <li>Утилиты, не относящиеся к state — в <code>shared/utils/</code>.</li>
+        </ul>
+
+        <h3>"Re-ducks" pattern для крупных фич</h3>
+        <p>
+          Если фича большая, можно разбить на под-файлы:
+        </p>
+        <div class="code-block">
+features/orders/
+├── <span class="comment"># index.ts — re-exports</span>
+├── ordersSlice.ts
+├── ordersSelectors.ts
+├── ordersThunks.ts
+├── orderTypes.ts
+├── OrderList.tsx
+├── OrderDetails.tsx
+└── api.ts
+        </div>
+
+        <h3>Когда отступить от паттерна</h3>
+        <ul>
+          <li><strong>Очень малая фича</strong> (2 reducer'а) — можно держать в одном файле без отдельной папки.</li>
+          <li><strong>Кросс-фичный slice</strong> — например, theme/notifications/modals — в <code>features/ui/</code>
+              или прямо в <code>app/</code>.</li>
+          <li><strong>RTK Query</strong> — отдельная папка <code>api/</code>, потому что endpoints — это
+              разные «фичи», но один <code>apiSlice</code>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux.js.org/style-guide" target="_blank">Redux Style Guide</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/tree/master/examples/publish-ci/cra4" target="_blank">RTK example projects (GitHub)</a></li>
+          <li><a href="https://redux.js.org/tutorials/essentials/part-2-app-structure" target="_blank">Redux Essentials — App Structure</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

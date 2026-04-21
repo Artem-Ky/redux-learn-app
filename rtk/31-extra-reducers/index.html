@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>31 — extraReducers</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .listen-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 14px 0; }
+    @media (max-width: 1100px) { .listen-grid { grid-template-columns: 1fr; } }
+    .listen-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+    .listen-card h4 { color: var(--accent); font-family: var(--font-mono); font-size: .8rem; margin-bottom: 6px; }
+    .state-display { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+                     padding: 8px 12px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan);
+                     white-space: pre; overflow-x: auto; min-height: 40px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">31 / 106</span>extraReducers — слушаем чужие actions</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../30-slice-prepared-reducer/">← Назад</a>
+      <a href="../32-reducer-creators/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">3 slice'а реагируют на одно событие userLoggedOut</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>reducers</code> — для <em>своих</em> actions slice'а.<br>
+          <code>extraReducers</code> — для <em>внешних</em> actions: action creator'ов из других slice'ов,
+          createAsyncThunk'ов, или произвольных createAction.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> userLoggedOut = <span class="fn">createAction</span>(<span class="str">'auth/userLoggedOut'</span>)   <span class="cm">// global event</span>
+
+<span class="kw">const</span> cartSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'cart'</span>,
+  initialState: { items: [] },
+  reducers: {
+    addItem: (s, a) =&gt; { s.items.<span class="fn">push</span>(a.payload) },
+  },
+  extraReducers: (builder) =&gt; {
+    builder.<span class="fn">addCase</span>(userLoggedOut, () =&gt; ({ items: [] }))   <span class="cm">// очищаем cart на logout</span>
+  }
+})
+
+<span class="kw">const</span> profileSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'profile'</span>,
+  initialState: { name: <span class="str">''</span>, avatar: <span class="str">''</span> },
+  reducers: { ... },
+  extraReducers: (builder) =&gt; {
+    builder.<span class="fn">addCase</span>(userLoggedOut, () =&gt; ({ name: <span class="str">''</span>, avatar: <span class="str">''</span> }))
+  }
+})
+
+<span class="cm">// Один dispatch(userLoggedOut()) → 3 slice'а сбрасываются одновременно</span>
+        </div>
+
+        <div class="listen-grid">
+          <div class="listen-card">
+            <h4>cart slice</h4>
+            <div class="state-display" id="cart-state">—</div>
+          </div>
+          <div class="listen-card">
+            <h4>profile slice</h4>
+            <div class="state-display" id="profile-state">—</div>
+          </div>
+          <div class="listen-card">
+            <h4>preferences slice</h4>
+            <div class="state-display" id="prefs-state">—</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
+          <button class="btn" id="add-item">cart.addItem('Apple')</button>
+          <button class="btn" id="set-name">profile.setName('Alice')</button>
+          <button class="btn" id="set-theme">prefs.setTheme('dark')</button>
+          <button class="btn" style="background: var(--accent-red); color: white;" id="logout">
+            dispatch(userLoggedOut())
+          </button>
+        </div>
+
+        <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 14px 0;">
+          <h4 style="color: var(--accent); font-family: var(--font-mono); font-size: .8rem; margin-bottom: 8px;">
+            События по slice'ам (audit log)
+          </h4>
+          <div class="state-display" id="event-log" style="max-height: 150px; overflow-y: auto;">— ещё нет событий —</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — extraReducers</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «<code>extraReducers</code> allows the slice to handle action types defined elsewhere in the application,
+          including other <code>createSlice</code>-generated actions, <code>createAsyncThunk</code> actions,
+          or actions from external libraries.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSlice#extrareducers" target="_blank">extraReducers API</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>extraReducers</code> позволяет slice'у обрабатывать типы actions, определённые где-то ещё
+          в приложении: включая actions из других <code>createSlice</code>, <code>createAsyncThunk</code>,
+          или из внешних библиотек.»
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+<span class="kw">const</span> slice = <span class="fn">createSlice</span>({
+  name: <span class="str">'feature'</span>,
+  initialState,
+  reducers: { ... },               <span class="cm">// СВОИ actions</span>
+  extraReducers: (builder) =&gt; {     <span class="cm">// ЧУЖИЕ actions</span>
+    builder
+      .<span class="fn">addCase</span>(externalAction, handler)
+      .<span class="fn">addCase</span>(<span class="str">'literal/string/type'</span>, handler)
+      .<span class="fn">addMatcher</span>(matcher, handler)
+      .<span class="fn">addDefaultCase</span>(handler)
+  }
+})
+        </div>
+        <p>
+          Builder тот же, что в <code>createReducer</code> (уроки 24-25).
+        </p>
+
+        <h3>Зачем extraReducers нужен</h3>
+        <ol>
+          <li><strong>Cross-slice events</strong>: <code>userLoggedOut</code> сбрасывает auth, cart, profile.</li>
+          <li><strong>createAsyncThunk integration</strong>: thunk имеет 3 actions (pending/fulfilled/rejected),
+              их слушаете в slice через extraReducers.</li>
+          <li><strong>Глобальные ошибки</strong>: <code>addMatcher(isRejected, handler)</code> — единое
+              место для error handling.</li>
+          <li><strong>Reset при init</strong>: action <code>'@@INIT'</code> или <code>'app/reset'</code>.</li>
+        </ol>
+
+        <h3>extraReducers vs reducers — сравнение</h3>
+        <div class="code-block">
+<span class="cm">// reducers — генерирует actions</span>
+reducers: {
+  add: (s, a) =&gt; { ... }
+}
+<span class="cm">// → создаётся slice.actions.add (creator) и type 'feature/add'</span>
+
+<span class="cm">// extraReducers — НЕ генерирует actions</span>
+extraReducers: (builder) =&gt; {
+  builder.<span class="fn">addCase</span>(externalAction, (s, a) =&gt; { ... })
+}
+<span class="cm">// → ничего не создаётся, slice только реагирует на externalAction</span>
+        </div>
+
+        <h3>Старая object-form deprecated</h3>
+        <div class="warning">
+          В RTK 1.x был старый синтаксис <code>extraReducers: { [actionType]: handler }</code>.
+          В RTK 2.x он удалён. Используйте только builder-callback.
+        </div>
+
+        <h3>Типичный паттерн с createAsyncThunk</h3>
+        <div class="code-block">
+<span class="kw">const</span> fetchUser = <span class="fn">createAsyncThunk</span>(<span class="str">'user/fetch'</span>, <span class="kw">async</span> (id) =&gt; {
+  <span class="kw">const</span> r = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api/users/${id}`</span>)
+  <span class="kw">return</span> r.<span class="fn">json</span>()
+})
+
+<span class="kw">const</span> userSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'user'</span>,
+  initialState: { data: <span class="kw">null</span>, loading: <span class="kw">false</span>, error: <span class="kw">null</span> },
+  reducers: {},
+  extraReducers: (builder) =&gt; {
+    builder
+      .<span class="fn">addCase</span>(fetchUser.pending,    (s) =&gt; { s.loading = <span class="kw">true</span>; s.error = <span class="kw">null</span> })
+      .<span class="fn">addCase</span>(fetchUser.fulfilled,  (s, a) =&gt; { s.loading = <span class="kw">false</span>; s.data = a.payload })
+      .<span class="fn">addCase</span>(fetchUser.rejected,   (s, a) =&gt; { s.loading = <span class="kw">false</span>; s.error = a.error.message })
+  }
+})
+        </div>
+
+        <h3>Что нельзя</h3>
+        <div class="warning">
+          В extraReducers нельзя ссылаться на <code>slice.actions.xxx</code> — slice ещё не построен!
+          Внешние actions должны быть определены ДО slice (или в другом файле).
+        </div>
+
+        <h3>extraReducers И reducers — порядок</h3>
+        <p>
+          createSlice сначала добавляет в builder addCase из <code>reducers</code>, потом из
+          <code>extraReducers</code>. Если у вас в обоих местах addCase для одного action.type — сработает
+          последний (extraReducers), но это <strong>невероятный сценарий</strong>: actions в reducers и
+          extraReducers всегда разные.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

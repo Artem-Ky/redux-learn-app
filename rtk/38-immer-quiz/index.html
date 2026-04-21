@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>38 — Immer reducer quiz</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .quiz-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 12px 0; border-left: 3px solid var(--text-muted); }
+    .quiz-card.passed { border-left-color: var(--success); }
+    .quiz-card.failed { border-left-color: var(--accent-red); }
+    .quiz-card.unknown { border-left-color: var(--text-muted); }
+    .quiz-card__title { font-family: var(--font-mono); font-size: .85rem; color: var(--accent); margin-bottom: 8px; }
+    .quiz-card__answer { display: flex; gap: 8px; margin: 8px 0; }
+    .quiz-card__answer .btn.selected-ok { background: rgba(76,175,80,.18); border-color: var(--success); color: var(--success); box-shadow: 0 0 0 1px var(--success) inset; }
+    .quiz-card__answer .btn.selected-fail { background: rgba(220,53,69,.18); border-color: var(--accent-red); color: var(--accent-red); box-shadow: 0 0 0 1px var(--accent-red) inset; }
+    .quiz-card__verdict { font-family: var(--font-mono); font-size: .8rem; padding: 6px 10px; border-radius: var(--radius-sm); margin-top: 8px; }
+    .quiz-card__verdict.ok { background: rgba(76,175,80,.1); color: var(--success); border: 1px solid var(--success); }
+    .quiz-card__verdict.wrong { background: rgba(220,53,69,.1); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .quiz-card__expl { font-size: .8rem; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">38 / 106</span>Immer reducer quiz — можно или нельзя?</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../37-reducer-path-vs-name/">← Назад</a>
+      <a href="../39-feature-folder-pattern/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">10 вопросов: что Immer разрешает в reducer'е?</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Для каждого фрагмента кода ответьте: <strong>работает корректно</strong> или <strong>ошибка/неожиданное поведение</strong>?
+          Затем нажмите «запустить» — увидите фактический результат и объяснение.
+        </p>
+
+        <div id="quiz-container"></div>
+
+        <div style="display: flex; gap: 8px; margin-top: 20px; padding: 12px 14px; background: var(--bg-tertiary); border-radius: var(--radius); border: 1px solid var(--border);">
+          <span style="color: var(--text-primary); font-family: var(--font-mono); font-size: .85rem;">
+            Счёт: <span id="score" style="color: var(--accent);">0/0</span>
+          </span>
+          <button class="btn btn--secondary" id="reset-quiz" style="margin-left: auto;">Начать заново</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Quick reference — правила Immer в RTK</div>
+      <div class="theory__body">
+        <h3>Что МОЖНО в reducer'ах createSlice/createReducer</h3>
+        <ul>
+          <li>Мутировать draft: <code>state.value++</code>, <code>state.list.push(x)</code>.</li>
+          <li>Мутировать вложенные объекты: <code>state.user.name = 'X'</code>.</li>
+          <li>Использовать <code>delete state.x</code>.</li>
+          <li>Возвращать новый объект (если хочется): <code>return {{ ...state, value: 1 }}</code>.</li>
+          <li>Использовать <code>Map</code> и <code>Set</code> (RTK включает enableMapSet).</li>
+        </ul>
+
+        <h3>Что НЕЛЬЗЯ</h3>
+        <ul>
+          <li>Смешивать мутацию И return: <code>state.x = 1; return state</code> или
+              <code>state.x = 1; return {{ ...state }}</code>.</li>
+          <li>Сохранять draft вне reducer'а (revoked proxy).</li>
+          <li>Использовать <code>Date.now()</code>, <code>Math.random()</code>, <code>nanoid()</code>
+              (reducer должен быть чистым).</li>
+          <li><code>console.log(state)</code> — выводит Proxy. Используйте <code>current(state)</code>.</li>
+          <li>Хранить классы с приватными полями (Immer не сможет клонировать).</li>
+          <li>Создавать циклические ссылки в state.</li>
+        </ul>
+
+        <h3>Что ЗАВИСИТ от случая</h3>
+        <ul>
+          <li><code>state = newValue</code> — НЕ работает. <code>state.field = newValue</code> — работает.
+              <code>return newValue</code> — работает.</li>
+          <li>Сохранение ссылки на под-объект: <code>const obj = state.x; ... ; obj.value = 1</code>
+              — работает (obj — тоже draft Proxy).</li>
+          <li><code>state.list = state.list.filter(...)</code> — работает (присваивание новому массиву OK).</li>
+        </ul>
+
+        <h3>Полезные импорты</h3>
+        <div class="code-block">
+<span class="kw">import</span> {
+  current,         <span class="cm">// snapshot draft → plain object</span>
+  original,        <span class="cm">// исходный объект до изменений</span>
+  isDraft,         <span class="cm">// проверка Proxy</span>
+} <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/usage/immer-reducers" target="_blank">Writing Reducers with Immer</a></li>
+          <li><a href="https://immerjs.github.io/immer/pitfalls" target="_blank">Immer Pitfalls (official)</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

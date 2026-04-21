@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>32a — reducers: object vs callback · bundle size</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .col-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 14px;
+    }
+    .col-card h4 {
+      font-family: var(--font-mono); color: var(--accent); font-size: .82rem; margin-bottom: 8px;
+    }
+    .col-card__tag {
+      display: inline-block; font-size: .65rem; padding: 1px 6px; border-radius: 4px;
+      margin-left: 6px; font-family: var(--font-mono); letter-spacing: .3px;
+    }
+    .col-card__tag--std { background: rgba(76,175,80,.15); color: var(--success); }
+    .col-card__tag--new { background: rgba(86,156,214,.15); color: var(--accent-cyan); }
+
+    /* ── Mode tabs ── */
+    .mode-tabs {
+      display: flex; gap: 6px; margin: 12px 0 6px; flex-wrap: wrap;
+    }
+    .mode-tab {
+      flex: 1; min-width: 180px;
+      background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-secondary);
+      padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer;
+      font-family: var(--font-mono); font-size: .76rem; text-align: left;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .mode-tab:hover { background: var(--bg-hover); color: var(--text-bright); }
+    .mode-tab.active {
+      border-color: var(--accent); background: rgba(86,156,214,.08); color: var(--text-bright);
+    }
+    .mode-tab__id { color: var(--accent); font-weight: 700; margin-right: 6px; }
+    .mode-tab__hint { display: block; font-size: .68rem; color: var(--text-muted); margin-top: 3px; font-family: var(--font-sans, inherit); }
+
+    /* ── Dependency graph ── */
+    .graph-wrap {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px; margin: 10px 0;
+    }
+    .graph-wrap__head {
+      display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .graph-wrap__title { font-family: var(--font-mono); color: var(--accent-cyan); font-size: .82rem; }
+    .graph-wrap__size {
+      font-family: var(--font-mono); font-size: .78rem; color: var(--text-muted);
+    }
+    .graph-wrap__size strong { color: var(--accent-orange); }
+
+    .graph {
+      display: grid;
+      grid-template-columns: minmax(160px, 1fr) 28px minmax(160px, 1fr);
+      row-gap: 6px; align-items: center; font-family: var(--font-mono); font-size: .76rem;
+    }
+    .graph__node {
+      padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--bg-tertiary); transition: opacity .2s, border-color .2s, background .2s;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .graph__node--root {
+      grid-column: 1 / -1; text-align: center;
+      background: rgba(118,74,188,.10); border-color: #764abc; color: var(--text-bright);
+      justify-content: center;
+    }
+    .graph__node--in { border-color: var(--accent); background: rgba(86,156,214,.08); color: var(--text-bright); }
+    .graph__node--in .graph__size { color: var(--accent-orange); }
+    .graph__node--out { opacity: .30; }
+    .graph__node--out .graph__size { text-decoration: line-through; }
+    .graph__name { color: var(--text-bright); }
+    .graph__size { color: var(--text-muted); font-size: .7rem; white-space: nowrap; }
+    .graph__arrow {
+      text-align: center; color: var(--text-muted); font-size: 1rem;
+      transition: opacity .2s, color .2s;
+    }
+    .graph__arrow--on { color: var(--accent); opacity: 1; }
+    .graph__arrow--off { opacity: .2; }
+    .graph__status {
+      font-size: .65rem; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: .4px;
+    }
+    .graph__status--in { background: rgba(76,175,80,.15); color: var(--success); }
+    .graph__status--out { background: rgba(244,67,54,.12); color: var(--accent-red); }
+
+    .graph-legend {
+      display: flex; gap: 14px; font-size: .72rem; color: var(--text-muted); margin-top: 12px; flex-wrap: wrap;
+    }
+    .graph-legend__sw {
+      display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+      border: 1px solid var(--border); margin-right: 4px; vertical-align: middle;
+    }
+    .graph-legend__sw--in { background: rgba(86,156,214,.40); border-color: var(--accent); }
+    .graph-legend__sw--out { background: var(--bg-tertiary); opacity: .4; }
+
+    /* ── Decision table ── */
+    .decision-table {
+      width: 100%; border-collapse: collapse; font-size: .78rem; margin-top: 8px;
+    }
+    .decision-table th, .decision-table td {
+      border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top;
+    }
+    .decision-table thead { background: var(--bg-panel); color: var(--accent); }
+    .decision-table code { color: var(--accent-cyan); font-family: var(--font-mono); font-size: .74rem; }
+
+    /* ── ASCII diagram ── */
+    .ascii-box {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 12px 14px; font-family: var(--font-mono); font-size: .74rem; white-space: pre; color: var(--text-secondary);
+      overflow-x: auto; margin: 10px 0;
+    }
+    .ascii-box .ac { color: var(--accent-cyan); }
+    .ascii-box .aw { color: var(--accent-orange); }
+    .ascii-box .ag { color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">32a / 106</span>reducers: object vs callback — bundle size</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../32-reducer-creators/">← Назад</a>
+      <a href="../33-slice-selectors/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+
+    <!-- ──────── ВВОДНЫЙ БЛОК ──────── -->
+    <div class="demo-section">
+      <div class="demo-section__header">Два равноправных способа, разная цена в бандле</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В RTK 2.x <code>createSlice</code> принимает <code>reducers</code> в двух формах. Они дают
+          один и тот же рантайм, но по-разному влияют на <em>размер production-бандла</em> и работу
+          <em>tree-shaking</em>. Урок отвечает на три вопроса: в чём разница по коду, почему
+          <code>asyncThunk</code> вынесен в отдельный creator через <code>buildCreateSlice</code>,
+          и что выбирать в новом проекте.
+        </p>
+        <div class="quote">
+          «Using the new callback syntax is entirely optional (the object syntax is still standard).»
+          <br>— <a href="https://redux-toolkit.js.org/usage/migrating-rtk-2" target="_blank">RTK 2.0 migration guide</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── SIDE-BY-SIDE ──────── -->
+    <div class="demo-section">
+      <div class="demo-section__header">Side-by-side: один и тот же slice</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Один и тот же слайс, без асинхронщины. По runtime-поведению абсолютно эквивалентны:
+          те же <code>actions</code>, те же <code>type</code>-строки <code>'todos/addTodo'</code>,
+          тот же reducer. Отличается только синтаксис описания.
+        </p>
+
+        <div class="grid-2">
+          <div class="col-card">
+            <h4>A. Object-syntax <span class="col-card__tag col-card__tag--std">стандарт</span></h4>
+            <div class="code-block" style="font-size: .72rem;">
+<span class="kw">import</span> { createSlice, nanoid } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> todosSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'todos'</span>,
+  initialState: { items: [] },
+  reducers: {
+    <span class="cm">// простой reducer</span>
+    deleteTodo: (state, action) =&gt; {
+      state.items = state.items.<span class="fn">filter</span>(
+        t =&gt; t.id !== action.payload
+      )
+    },
+    <span class="cm">// prepared reducer — объектная форма</span>
+    addTodo: {
+      prepare: (text) =&gt; ({
+        payload: { id: <span class="fn">nanoid</span>(), text, done: <span class="kw">false</span> }
+      }),
+      reducer: (state, action) =&gt; {
+        state.items.<span class="fn">push</span>(action.payload)
+      },
+    },
+  },
+})
+            </div>
+          </div>
+
+          <div class="col-card">
+            <h4>B. Callback-syntax <span class="col-card__tag col-card__tag--new">RTK 2.x</span></h4>
+            <div class="code-block" style="font-size: .72rem;">
+<span class="kw">import</span> { createSlice, nanoid } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> todosSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'todos'</span>,
+  initialState: { items: [] },
+  reducers: (create) =&gt; ({
+    <span class="cm">// обёрнут в create.reducer</span>
+    deleteTodo: create.<span class="fn">reducer</span>((state, action) =&gt; {
+      state.items = state.items.<span class="fn">filter</span>(
+        t =&gt; t.id !== action.payload
+      )
+    }),
+    <span class="cm">// prepared — через create.preparedReducer</span>
+    addTodo: create.<span class="fn">preparedReducer</span>(
+      (text) =&gt; ({
+        payload: { id: <span class="fn">nanoid</span>(), text, done: <span class="kw">false</span> }
+      }),
+      (state, action) =&gt; {
+        state.items.<span class="fn">push</span>(action.payload)
+      },
+    ),
+  }),
+})
+            </div>
+          </div>
+        </div>
+
+        <div class="warning" style="margin-top: 10px;">
+          <strong>Рантайм идентичен.</strong> <code>todosSlice.actions.addTodo.type === 'todos/addTodo'</code>
+          в обеих версиях. Callback-версия чуть дороже по синтаксису (обёртки <code>create.reducer</code>),
+          но ничего не платит в бандле, пока вы <em>не</em> используете <code>create.asyncThunk</code>.
+          Это ключевой момент — разбираем дальше.
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────── ИНТЕРАКТИВНЫЙ ГРАФ ──────── -->
+    <div class="demo-section">
+      <div class="demo-section__header">Dependency graph — что попадает в production bundle</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Выбери один из трёх способов использования <code>createSlice</code>. Узлы зависимостей
+          подсветятся accent-цветом если они попадают в итоговый бандл, и потускнеют если
+          tree-shaker их выкинул. Справа — ориентировочный прирост веса в min+gzip.
+        </p>
+
+        <div class="mode-tabs" id="mode-tabs">
+          <button class="mode-tab active" data-mode="A">
+            <span><span class="mode-tab__id">A.</span> createSlice + object</span>
+            <span class="mode-tab__hint">синхронный slice, thunks отсутствуют</span>
+          </button>
+          <button class="mode-tab" data-mode="B">
+            <span><span class="mode-tab__id">B.</span> createSlice + callback (без asyncThunk)</span>
+            <span class="mode-tab__hint">callback-синтаксис, только create.reducer / preparedReducer</span>
+          </button>
+          <button class="mode-tab" data-mode="C">
+            <span><span class="mode-tab__id">C.</span> createAppSlice + asyncThunkCreator</span>
+            <span class="mode-tab__hint">buildCreateSlice + create.asyncThunk</span>
+          </button>
+        </div>
+
+        <div class="graph-wrap">
+          <div class="graph-wrap__head">
+            <span class="graph-wrap__title" id="graph-title">A · createSlice + object-syntax</span>
+            <span class="graph-wrap__size">в bundle (min+gzip): <strong id="graph-size">~9 KB</strong></span>
+          </div>
+
+          <div class="graph" id="graph">
+            <!-- рендерится из main.tsx -->
+          </div>
+
+          <div class="graph-legend">
+            <span><span class="graph-legend__sw graph-legend__sw--in"></span> включён в bundle</span>
+            <span><span class="graph-legend__sw graph-legend__sw--out"></span> tree-shake удалил</span>
+            <span style="margin-left: auto;">
+              Цифры ориентировочные, см. <a href="https://bundlephobia.com/package/@reduxjs/toolkit" target="_blank" style="color: var(--accent-blue-bright);">bundlephobia</a> для актуальных значений.
+            </span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+          <button class="btn" id="btn-dispatch">dispatch addTodo в активном режиме</button>
+          <button class="btn btn--secondary" id="btn-try-error">попробовать create.asyncThunk в обычном createSlice</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <!-- ──────── ТЕОРИЯ ──────── -->
+    <div class="theory">
+      <div class="theory__header">Теория — почему callback-API потребовал buildCreateSlice</div>
+      <div class="theory__body">
+
+        <h3>Корневая проблема: ESM и условные импорты</h3>
+        <div class="quote">
+          «You can't do synchronous conditional imports in ES modules, and there's no good way to
+          make the <code>createAsyncThunk</code> import optional. Either <code>createSlice</code>
+          always depends on it (and adds that to the bundle size), or it can't use
+          <code>createAsyncThunk</code> at all.»
+          <br>— <a href="https://redux-toolkit.js.org/usage/migrating-rtk-2" target="_blank">RTK 2.0 migration guide</a>
+        </div>
+
+        <p>
+          Если бы <code>createSlice</code> напрямую умел <code>create.asyncThunk</code>, ему пришлось
+          бы статически импортировать <code>createAsyncThunk</code>. Bundler (Vite/webpack/rollup)
+          тогда обязан положить его в бандл у всех, включая тех, кому async thunk не нужен вообще.
+          Tree-shaking тут не помогает: импорт безусловный.
+        </p>
+
+        <div class="ascii-box">
+<span class="aw">── Если бы сделали «в лоб» ──</span>
+createSlice.ts ──<span class="ac">import</span>──▶ createAsyncThunk.ts
+                              │
+                              └──▶ <span class="aw">всегда в bundle (даже если вы не звали asyncThunk)</span>
+
+<span class="ag">── Как сделано в RTK 2.x ──</span>
+createSlice.ts (ядро)          asyncThunkCreator.ts
+       │                              │
+       │  &lt;── НЕТ прямого импорта ──&gt;  │
+       │                              │
+       └── <span class="ac">buildCreateSlice({ creators: { asyncThunk } })</span> ──┐
+                                                                  │
+                          вы САМИ собираете createAppSlice ───────┘
+                          только тогда asyncThunk попадает в bundle
+        </div>
+
+        <h3>Три сценария — три разных bundle</h3>
+        <table class="decision-table">
+          <thead>
+            <tr>
+              <th>Сценарий</th>
+              <th>Попадает в bundle</th>
+              <th>Ориентир. прирост (min+gzip)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>A.</strong> <code>createSlice</code> + object-syntax</td>
+              <td><code>createSlice</code>, <code>createReducer</code>, <code>createAction</code>, <code>immer</code>, <code>redux-thunk</code> (как дефолтный middleware <code>configureStore</code>)</td>
+              <td>~9 KB (ядро RTK)</td>
+            </tr>
+            <tr>
+              <td><strong>B.</strong> <code>createSlice</code> + callback, только sync reducers</td>
+              <td>то же, что A. <em>Ничего дополнительного</em>.</td>
+              <td>~9 KB (как A, разница в байтах)</td>
+            </tr>
+            <tr>
+              <td><strong>C.</strong> <code>createAppSlice</code> + <code>asyncThunkCreator</code></td>
+              <td>A + <code>createAsyncThunk</code> + <code>asyncThunkCreator</code></td>
+              <td>~10–11 KB (+1–2 KB)</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="color: var(--text-muted); font-size: .76rem; margin-top: 6px;">
+          Цифры ориентировочные, на момент <code>@reduxjs/toolkit 2.5+</code>. Актуальные значения —
+          на <a href="https://bundlephobia.com/package/@reduxjs/toolkit" target="_blank">bundlephobia</a>,
+          а измерить в своём проекте проще всего через <code>source-map-explorer</code> или
+          <code>rollup-plugin-visualizer</code>.
+        </p>
+
+        <h3>Почему всё-таки <code>createAsyncThunk</code> сам по себе tree-shakable</h3>
+        <p>
+          RTK публикует ESM-пакет с <code>sideEffects: false</code> в <code>package.json</code>. Когда вы
+          <code>import { createAsyncThunk } from '@reduxjs/toolkit'</code>, но не используете его —
+          bundler его уберёт. Ключевое отличие: в сценарии <strong>C</strong> вы вызываете
+          <code>buildCreateSlice({ creators: { asyncThunk: asyncThunkCreator } })</code> — это <em>использование</em>,
+          после которого бандлер больше не имеет права удалять <code>asyncThunkCreator</code>,
+          а тот тащит <code>createAsyncThunk</code>.
+        </p>
+
+        <div class="warning">
+          <strong>Вывод.</strong> «Цена» callback-синтаксиса — <em>не в самом синтаксисе</em>, а в том,
+          сколько creators вы подключили при <code>buildCreateSlice</code>. Callback-syntax + только
+          <code>create.reducer</code>/<code>create.preparedReducer</code> — <em>не стоит ничего лишнего</em>
+          в бандле.
+        </div>
+
+        <h3>Попробовать <code>create.asyncThunk</code> в обычном <code>createSlice</code></h3>
+        <div class="code-block">
+<span class="kw">import</span> { createSlice } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="fn">createSlice</span>({
+  name: <span class="str">'x'</span>,
+  initialState: {},
+  reducers: (create) =&gt; ({
+    fetchUser: create.<span class="fn">asyncThunk</span>(...)   <span class="cm">// ⚠ throw: cannot use `create.asyncThunk` in this `createSlice`</span>
+  })
+})
+        </div>
+        <p>
+          Цитата из доки: «The version of <code>createSlice</code> exported from RTK will throw an error
+          if <code>create.asyncThunk</code> is called.» Проверь в демо кнопкой «попробовать
+          create.asyncThunk в обычном createSlice» — ошибка уйдёт в ConsolePanel.
+        </p>
+
+        <h3>Decision matrix — что выбирать</h3>
+        <table class="decision-table">
+          <thead>
+            <tr>
+              <th>Сценарий проекта</th>
+              <th>Рекомендация</th>
+              <th>Почему</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Синхронный slice без thunks</td>
+              <td><code>reducers: { … }</code> (object)</td>
+              <td>Минимальный bundle, меньше церемоний</td>
+            </tr>
+            <tr>
+              <td>Slice с 1–2 <code>createAsyncThunk</code> в <code>extraReducers</code></td>
+              <td><code>reducers: { … }</code> + отдельный <code>createAsyncThunk</code></td>
+              <td>Явно, легче тестировать, один способ на проект</td>
+            </tr>
+            <tr>
+              <td>Thunk логически <em>принадлежит</em> slice'у</td>
+              <td><code>createAppSlice</code> + <code>create.asyncThunk</code></td>
+              <td>Всё в одном файле, handlers рядом с thunk</td>
+            </tr>
+            <tr>
+              <td>Приложение с десятками slices и thunks</td>
+              <td>Один <code>createAppSlice</code> в <code>app/createAppSlice.ts</code></td>
+              <td>Bundle-cost платим один раз, API единый</td>
+            </tr>
+            <tr>
+              <td>Библиотека / npm-пакет со slice'ом</td>
+              <td><code>reducers: { … }</code> (object)</td>
+              <td>Не навязывайте <code>createAsyncThunk</code> чужому бандлу</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Практика — как мерить у себя</h3>
+        <ul>
+          <li><a href="https://bundlephobia.com/package/@reduxjs/toolkit" target="_blank">bundlephobia.com/package/@reduxjs/toolkit</a> — веса отдельных модулей пакета.</li>
+          <li><code>npm i -D source-map-explorer</code>, затем <code>source-map-explorer dist/assets/*.js</code> — покажет, что именно попало в ваш прод-бандл.</li>
+          <li><code>rollup-plugin-visualizer</code> (для Vite/Rollup) — интерактивная treemap-диаграмма.</li>
+          <li>Урок <a href="../05-installation-bundle-size/">05 — Установка и bundle size</a> — базовая теория про tree-shaking и RTK.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createSlice#the-reducers-creator-callback-notation" target="_blank">createSlice — Reducers creator callback</a></li>
+          <li><a href="https://redux-toolkit.js.org/api/createSlice#setup" target="_blank">createSlice — Setup (buildCreateSlice)</a></li>
+          <li><a href="https://redux-toolkit.js.org/usage/migrating-rtk-2" target="_blank">Migrating to RTK 2.0 — callback syntax</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createSlice.ts" target="_blank">createSlice.ts — реализация buildCreateSlice</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ──────── ФИНАЛЬНЫЙ БЛОК: СТАРЫЙ ПУТЬ vs НОВЫЙ ПУТЬ ──────── -->
+    <div class="demo-section">
+      <div class="demo-section__header">Финал: createAsyncThunk + extraReducers vs create.asyncThunk</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          До RTK 2.x был один канонический путь подключить async thunk к slice'у: вынести
+          <code>createAsyncThunk</code> в отдельный файл и слушать его life-cycle через
+          <code>extraReducers</code>. В RTK 2.x появился «новый» путь — <code>create.asyncThunk</code>
+          прямо внутри <code>reducers</code>. Разберём оба по весу бандла, tree-shaking,
+          переиспользованию и DX — чтобы было понятно, что выбирать.
+        </p>
+
+        <div class="grid-2">
+          <div class="col-card">
+            <h4>Старый путь · thunk в отдельном файле <span class="col-card__tag col-card__tag--std">RTK 1.x+</span></h4>
+            <div class="code-block" style="font-size: .7rem;">
+<span class="cm">// features/todos/fetchTodos.ts</span>
+<span class="kw">import</span> { createAsyncThunk } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">export const</span> fetchTodos = <span class="fn">createAsyncThunk</span>(
+  <span class="str">'todos/fetchTodos'</span>,
+  <span class="kw">async</span> () =&gt; {
+    <span class="kw">const</span> r = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/todos'</span>)
+    <span class="kw">return</span> r.<span class="fn">json</span>()
+  },
+)
+
+<span class="cm">// features/todos/todosSlice.ts</span>
+<span class="kw">import</span> { createSlice } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+<span class="kw">import</span> { fetchTodos } <span class="kw">from</span> <span class="str">'./fetchTodos'</span>
+
+<span class="kw">const</span> todosSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'todos'</span>,
+  initialState: { items: [], loading: <span class="kw">false</span> },
+  reducers: {
+    deleteTodo: (state, action) =&gt; {
+      state.items = state.items.<span class="fn">filter</span>(
+        t =&gt; t.id !== action.payload
+      )
+    },
+  },
+  extraReducers: (builder) =&gt; {
+    builder
+      .<span class="fn">addCase</span>(fetchTodos.pending,   (s) =&gt; { s.loading = <span class="kw">true</span> })
+      .<span class="fn">addCase</span>(fetchTodos.fulfilled, (s, a) =&gt; {
+        s.items = a.payload; s.loading = <span class="kw">false</span>
+      })
+      .<span class="fn">addCase</span>(fetchTodos.rejected,  (s) =&gt; { s.loading = <span class="kw">false</span> })
+  },
+})
+            </div>
+          </div>
+
+          <div class="col-card">
+            <h4>Новый путь · thunk в create.asyncThunk <span class="col-card__tag col-card__tag--new">RTK 2.x</span></h4>
+            <div class="code-block" style="font-size: .7rem;">
+<span class="cm">// app/createAppSlice.ts — ОДИН раз на проект</span>
+<span class="kw">import</span> { buildCreateSlice, asyncThunkCreator } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+<span class="kw">export const</span> createAppSlice = <span class="fn">buildCreateSlice</span>({
+  creators: { asyncThunk: asyncThunkCreator },
+})
+
+<span class="cm">// features/todos/todosSlice.ts</span>
+<span class="kw">import</span> { createAppSlice } <span class="kw">from</span> <span class="str">'../../app/createAppSlice'</span>
+
+<span class="kw">const</span> todosSlice = <span class="fn">createAppSlice</span>({
+  name: <span class="str">'todos'</span>,
+  initialState: { items: [], loading: <span class="kw">false</span> },
+  reducers: (create) =&gt; ({
+    deleteTodo: create.<span class="fn">reducer</span>((state, action) =&gt; {
+      state.items = state.items.<span class="fn">filter</span>(
+        t =&gt; t.id !== action.payload
+      )
+    }),
+    fetchTodos: create.<span class="fn">asyncThunk</span>(
+      <span class="kw">async</span> () =&gt; {
+        <span class="kw">const</span> r = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/todos'</span>)
+        <span class="kw">return</span> r.<span class="fn">json</span>()
+      },
+      {
+        pending:   (s) =&gt; { s.loading = <span class="kw">true</span> },
+        fulfilled: (s, a) =&gt; { s.items = a.payload; s.loading = <span class="kw">false</span> },
+        rejected:  (s) =&gt; { s.loading = <span class="kw">false</span> },
+      },
+    ),
+  }),
+})
+
+<span class="cm">// thunk доступен как todosSlice.actions.fetchTodos</span>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 16px; color: var(--accent); font-family: var(--font-mono); font-size: .95rem;">Сравнение по весу бандла</h3>
+
+        <div class="ascii-box">
+<span class="aw">── Старый путь ──</span>
+configureStore (~3 KB)
+  + createSlice   (~3 KB)
+  + createReducer (&lt;1 KB)                   &nbsp;╮
+  + createAction  (&lt;1 KB)                   &nbsp;│  тянется даже без asyncThunk —
+  + immer         (~3 KB)                   &nbsp;│  вы всё равно используете createSlice
+  + redux-thunk   (&lt;1 KB, default mw)        ╯
+  + createAsyncThunk (~1–2 KB)              &nbsp;&nbsp;← импорт в файле thunk'а
+  ──────────────────────
+  <span class="ag">≈ 10–11 KB min+gzip</span>
+
+<span class="aw">── Новый путь (createAppSlice + create.asyncThunk) ──</span>
+configureStore (~3 KB)
+  + createSlice   (~3 KB)
+  + createReducer (&lt;1 KB)
+  + createAction  (&lt;1 KB)
+  + immer         (~3 KB)
+  + redux-thunk   (&lt;1 KB)
+  + buildCreateSlice  (&lt;0.2 KB)             &nbsp;&nbsp;← фабрика, крохотная
+  + asyncThunkCreator (&lt;0.3 KB)             &nbsp;&nbsp;← адаптер
+  + createAsyncThunk (~1–2 KB)              &nbsp;&nbsp;← тащится через asyncThunkCreator
+  ──────────────────────
+  <span class="ag">≈ 10–11 KB min+gzip (+~0.3–0.5 KB поверх старого)</span>
+        </div>
+
+        <p style="color: var(--text-secondary); font-size: .84rem;">
+          <strong>Ключевой факт:</strong> оба подхода тянут один и тот же <code>createAsyncThunk</code>.
+          Основная «цена» thunk'ов — это сам <code>createAsyncThunk</code> (~1–2 KB gzip), и он
+          присутствует в <em>обоих</em> вариантах. Новый путь добавляет поверх тонкий адаптер
+          <code>asyncThunkCreator</code> + фабрику <code>buildCreateSlice</code> — это буквально
+          ~300–500 байт min+gzip. В рамках typical-прода (сотни KB JS) разница <em>не заметна</em>.
+        </p>
+
+        <h3 style="margin-top: 16px; color: var(--accent); font-family: var(--font-mono); font-size: .95rem;">Таблица сравнения</h3>
+
+        <table class="decision-table">
+          <thead>
+            <tr>
+              <th>Критерий</th>
+              <th>Старый путь (отдельный <code>createAsyncThunk</code> + <code>extraReducers</code>)</th>
+              <th>Новый путь (<code>create.asyncThunk</code>)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Размер bundle (min+gzip)</td>
+              <td>~10–11 KB</td>
+              <td>~10–11 KB (+~0.3–0.5 KB на адаптер)</td>
+            </tr>
+            <tr>
+              <td>Tree-shaking асинхронного кода</td>
+              <td>Работает: если thunk не импортирован — он не в bundle</td>
+              <td>Работает так же: если slice не импортирован — adapter тоже не тянется</td>
+            </tr>
+            <tr>
+              <td>Code-splitting по фичам</td>
+              <td>⭐ Лучше: thunk и slice — разные модули, удобно <code>React.lazy</code> и <code>injectEndpoints</code>-паттерны</td>
+              <td>Slice + thunk в одном chunk'е. Менее гранулярно, но проще</td>
+            </tr>
+            <tr>
+              <td>Переиспользование thunk'а несколькими slice'ами</td>
+              <td>⭐ Легко: один <code>createAsyncThunk</code> слушают <code>extraReducers</code> у N slice'ов</td>
+              <td>Thunk принадлежит slice'у. Для шеринга придётся вынести в отдельный <code>createAsyncThunk</code> (т.е. вернуться к старому пути)</td>
+            </tr>
+            <tr>
+              <td>Тестируемость thunk-логики</td>
+              <td>⭐ Импорт <code>fetchTodos</code> из своего файла — чистый unit-тест</td>
+              <td>Thunk достаётся через <code>todosSlice.actions.fetchTodos</code> — тесты выглядят чуть тяжелее</td>
+            </tr>
+            <tr>
+              <td>DX / читаемость</td>
+              <td>Больше файлов, <code>extraReducers(builder)</code> boilerplate, <code>.pending/.fulfilled/.rejected</code> в addCase</td>
+              <td>⭐ Всё в одном файле, handlers прямо рядом с payload creator'ом, короче на ~30–40% строк</td>
+            </tr>
+            <tr>
+              <td>Типизация</td>
+              <td>Явная: <code>PayloadAction&lt;T&gt;</code> в handlers, thunk типизирован генериками</td>
+              <td>Выводится автоматически. Подводный камень: <code>thunkApi.getState()</code> возвращает <code>unknown</code> (см. урок 32)</td>
+            </tr>
+            <tr>
+              <td>Зависимость от других slice'ов</td>
+              <td>⭐ Thunk легко импортирует action'ы и селекторы из <em>чужих</em> slice'ов без циклов</td>
+              <td>Thunk внутри slice — риск циклического импорта, если тянет чужие slice'ы</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 style="margin-top: 16px; color: var(--accent); font-family: var(--font-mono); font-size: .95rem;">Что выгоднее использовать — финальный вердикт</h3>
+
+        <div class="warning">
+          <strong>По bundle size — ничья.</strong> Разница ~300–500 байт min+gzip. В прод-приложении,
+          где JS обычно 100+ KB, это не тот критерий, по которому стоит выбирать.
+        </div>
+
+        <p style="color: var(--text-secondary); font-size: .85rem; margin-top: 10px;">
+          Выбирайте по <strong>архитектурным</strong> соображениям, а не по «экономии байтов»:
+        </p>
+
+        <ul style="font-size: .84rem;">
+          <li>
+            <strong>Берите новый путь</strong> (<code>create.asyncThunk</code>), если:
+            <ul>
+              <li>Thunk принадлежит <em>одному</em> slice'у — где описан, там и используется</li>
+              <li>Вы хотите минимум файлов и boilerplate</li>
+              <li>Проект новый, на RTK 2.x — это идиома последней версии</li>
+              <li>Все handlers (pending/fulfilled/rejected/settled) логически группируются с thunk'ом</li>
+            </ul>
+          </li>
+          <li style="margin-top: 6px;">
+            <strong>Берите старый путь</strong> (отдельный <code>createAsyncThunk</code> + <code>extraReducers</code>), если:
+            <ul>
+              <li>Thunk слушают <em>несколько</em> slice'ов — переиспользование важнее компактности</li>
+              <li>Вы делаете агрессивный code-splitting по фичам (<code>React.lazy</code>, lazy slices через <code>injectReducer</code>)</li>
+              <li>Проект ещё на RTK 1.x или вы пишете npm-пакет со slice'ами (не навязывайте чужому бандлу <code>asyncThunkCreator</code>)</li>
+              <li>Thunk тянет чужие slice'ы — меньше риск циклов</li>
+            </ul>
+          </li>
+          <li style="margin-top: 6px;">
+            <strong>Смешанный подход</strong> в крупном приложении — норма. Один <code>createAppSlice</code>
+            на проект, «приватные» slice-specific thunks через <code>create.asyncThunk</code>,
+            «общие» thunks — отдельными файлами и слушаете через <code>extraReducers</code>.
+          </li>
+        </ul>
+
+        <p style="color: var(--text-muted); font-size: .78rem; margin-top: 12px;">
+          Официальная документация RTK не даёт однозначной рекомендации в пользу нового пути —
+          в migration-guide явно сказано: <em>«using the new callback syntax is entirely optional
+          (the object syntax is still standard)»</em>. То есть старый путь остаётся каноничным;
+          новый — удобная опция для кейсов, где thunk неотделим от slice'а.
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

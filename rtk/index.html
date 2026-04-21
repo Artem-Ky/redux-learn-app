@@ -223,19 +223,21 @@
     <!-- ============ SECTION D ============ -->
     <div class="section-title">D. createSlice глубоко <span class="section-title__count">13 уроков</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">28</div><div class="index-card__title">Первая slice</div><div class="index-card__desc">name + initialState + reducers</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">29</div><div class="index-card__title">Auto-генерация типов</div><div class="index-card__desc">${name}/${reducerKey}</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">30</div><div class="index-card__title">Prepared reducer в slice</div><div class="index-card__desc">{ reducer, prepare }</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">31</div><div class="index-card__title">extraReducers (builder)</div><div class="index-card__desc">Слушаем чужие actions</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">32</div><div class="index-card__title">Reducers как callback</div><div class="index-card__desc">create.reducer/preparedReducer/asyncThunk</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">33</div><div class="index-card__title">slice.selectors</div><div class="index-card__desc">getSelectors, прибинденные селекторы</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">34</div><div class="index-card__title">combineSlices</div><div class="index-card__desc">Замена combineReducers</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">35</div><div class="index-card__title">Lazy injection slices</div><div class="index-card__desc">.inject() для code-splitting</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">36</div><div class="index-card__title">slice.injectInto, WithSlice</div><div class="index-card__desc">Типизация injected state</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">37</div><div class="index-card__title">reducerPath ≠ name</div><div class="index-card__desc">Разница имени и пути</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">38</div><div class="index-card__title">Правила Immer-reducer</div><div class="index-card__desc">Quiz: можно/нельзя</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">39</div><div class="index-card__title">Pattern: slice per feature</div><div class="index-card__desc">Структура папок</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">40</div><div class="index-card__title">current() и original()</div><div class="index-card__desc">Дебаг draft state</div></a>
+      <a href="./28-slice-basic/" class="index-card"><div class="index-card__num">28</div><div class="index-card__title">Первая slice</div><div class="index-card__desc">name + initialState + reducers</div></a>
+      <a href="./29-slice-actions-types/" class="index-card"><div class="index-card__num">29</div><div class="index-card__title">Auto-генерация actions</div><div class="index-card__desc">${name}/${reducerKey}, slice.actions, slice.actions.x.match</div></a>
+      <a href="./30-slice-prepared-reducer/" class="index-card"><div class="index-card__num">30</div><div class="index-card__title">Prepared reducer в slice</div><div class="index-card__desc">{ reducer, prepare }</div></a>
+      <a href="./31-extra-reducers/" class="index-card"><div class="index-card__num">31</div><div class="index-card__title">extraReducers (builder)</div><div class="index-card__desc">Слушаем чужие actions, addMatcher</div></a>
+      <a href="./32-reducer-creators/" class="index-card"><div class="index-card__num">32</div><div class="index-card__title">Reducers как callback (RTK 2)</div><div class="index-card__desc">create.reducer / preparedReducer / asyncThunk</div></a>
+      <a href="./32a-reducers-syntax-bundle/" class="index-card"><div class="index-card__num">32a</div><div class="index-card__title">Object vs callback — bundle size</div><div class="index-card__desc">Tree-shaking, buildCreateSlice, что попадает в prod</div></a>
+      <a href="./33-slice-selectors/" class="index-card"><div class="index-card__num">33</div><div class="index-card__title">slice.selectors</div><div class="index-card__desc">getSelectors, привязка к state.path</div></a>
+      <a href="./34-combine-slices/" class="index-card"><div class="index-card__num">34</div><div class="index-card__title">combineSlices</div><div class="index-card__desc">Замена combineReducers (RTK 2)</div></a>
+      <a href="./35-lazy-injection/" class="index-card"><div class="index-card__num">35</div><div class="index-card__title">Lazy injection slices</div><div class="index-card__desc">.inject() для code-splitting</div></a>
+      <a href="./35a-lazy-loading-real/" class="index-card"><div class="index-card__num">35a</div><div class="index-card__title">Lazy loading — реальный пример</div><div class="index-card__desc">dynamic import, chunks, React.lazy</div></a>
+      <a href="./36-with-slice-typing/" class="index-card"><div class="index-card__num">36</div><div class="index-card__title">WithSlice — типизация</div><div class="index-card__desc">withLazyLoadedSlices, опциональные поля</div></a>
+      <a href="./37-reducer-path-vs-name/" class="index-card"><div class="index-card__num">37</div><div class="index-card__title">reducerPath ≠ name</div><div class="index-card__desc">Разница имени и пути</div></a>
+      <a href="./38-immer-quiz/" class="index-card"><div class="index-card__num">38</div><div class="index-card__title">Правила Immer-reducer</div><div class="index-card__desc">Quiz: можно/нельзя</div></a>
+      <a href="./39-feature-folder-pattern/" class="index-card"><div class="index-card__num">39</div><div class="index-card__title">Pattern: slice per feature</div><div class="index-card__desc">Структура папок и organisation</div></a>
+      <a href="./40-current-original-debug/" class="index-card"><div class="index-card__num">40</div><div class="index-card__title">current() в дебаге slice</div><div class="index-card__desc">Логи snapshot'ов в reducer'е</div></a>
     </div>
 
     <!-- ============ SECTION E ============ -->

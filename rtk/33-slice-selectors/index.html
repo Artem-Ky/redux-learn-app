@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>33 — slice.selectors</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .sel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    @media (max-width: 1000px) { .sel-grid { grid-template-columns: 1fr; } }
+    .sel-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .sel-card h4 { color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px; }
+    .sel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 5px 0; font-family: var(--font-mono); font-size: .76rem; border-bottom: 1px dashed var(--border); }
+    .sel-row:last-child { border-bottom: none; }
+    .sel-row__k { color: var(--accent-orange); }
+    .sel-row__v { color: var(--accent-cyan); text-align: right; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">33 / 106</span>slice.selectors — встроенные селекторы</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../32a-reducers-syntax-bundle/">← Назад</a>
+      <a href="../34-combine-slices/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">selectors внутри createSlice</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В RTK 2.x появилось поле <code>selectors</code> в createSlice. Селекторы получают <strong>state slice'а</strong>
+          (не root state!), а наружу экспортируются как обычные селекторы от root state.
+          RTK сам прокидывает state[name] под капотом.
+        </p>
+
+        <div class="code-block">
+<span class="kw">const</span> counterSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'counter'</span>,
+  initialState: { value: <span class="num">0</span>, history: [] },
+  reducers: { ... },
+  selectors: {                                <span class="cm">// state — это slice state, НЕ root</span>
+    selectValue: (state) =&gt; state.value,
+    selectIsEven: (state) =&gt; state.value % <span class="num">2</span> === <span class="num">0</span>,
+    selectHistoryLength: (state) =&gt; state.history.length,
+    selectHistoryItem: (state, index: <span class="ts">number</span>) =&gt; state.history[index],   <span class="cm">// с аргументом</span>
+  }
+})
+
+<span class="cm">// Использование — селекторы автоматически работают на ROOT state:</span>
+counterSlice.selectors.<span class="fn">selectValue</span>(rootState)         <span class="cm">// rootState.counter.value</span>
+counterSlice.selectors.<span class="fn">selectIsEven</span>(rootState)        <span class="cm">// true / false</span>
+counterSlice.selectors.<span class="fn">selectHistoryItem</span>(rootState, <span class="num">0</span>)  <span class="cm">// первая запись</span>
+        </div>
+
+        <div class="sel-grid">
+          <div class="sel-card">
+            <h4>Текущий root state</h4>
+            <pre id="state-out" style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-family: var(--font-mono); font-size: .74rem; color: var(--accent-cyan); margin: 0; overflow-x: auto; white-space: pre;">—</pre>
+          </div>
+          <div class="sel-card">
+            <h4>Результаты селекторов</h4>
+            <div id="selectors-out"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
+          <button class="btn" data-act="inc">increment</button>
+          <button class="btn" data-act="dec">decrement</button>
+          <button class="btn" data-act="add5">addBy(5)</button>
+          <button class="btn btn--secondary" data-act="reset">reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — slice.selectors</div>
+      <div class="theory__body">
+        <h3>Из доки</h3>
+        <div class="quote">
+          «You can pass an object of selectors to <code>createSlice</code>. The selectors will be defined as
+          accepting the slice's state, but exported in <code>slice.selectors</code> as accepting the root state.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSlice#selectors" target="_blank">createSlice — selectors</a>
+        </div>
+        <div class="quote quote--ru">
+          «Можно передать в <code>createSlice</code> объект селекторов. Селекторы определяются как принимающие
+          state slice'а, но в <code>slice.selectors</code> экспортируются как принимающие root state.»
+        </div>
+
+        <h3>Как RTK преобразует селекторы</h3>
+        <div class="code-block">
+<span class="cm">// Внутри createSlice примерно так:</span>
+<span class="kw">const</span> wrappedSelectors = {}
+<span class="kw">for</span> (<span class="kw">const</span> [name, sel] <span class="kw">of</span> Object.<span class="fn">entries</span>(opts.selectors)) {
+  wrappedSelectors[name] = (rootState, ...args) =&gt; <span class="fn">sel</span>(rootState[opts.name], ...args)
+}
+<span class="cm">// rootState[opts.name] — берётся ключ из reducerPath или name</span>
+        </div>
+
+        <h3>selectSlice — built-in helper</h3>
+        <p>
+          У каждого slice автоматически есть <code>slice.selectSlice</code> — селектор, возвращающий <em>весь</em>
+          state slice'а:
+        </p>
+        <div class="code-block">
+counterSlice.<span class="fn">selectSlice</span>(rootState)   <span class="cm">// rootState.counter</span>
+
+<span class="cm">// Если кастомизировать reducerPath, это учитывается:</span>
+<span class="kw">const</span> slice = <span class="fn">createSlice</span>({
+  name: <span class="str">'counter'</span>,
+  reducerPath: <span class="str">'features.counter'</span>,    <span class="cm">// (на самом деле это плоский ключ; вложенность через combineSlices)</span>
+  ...
+})
+        </div>
+
+        <h3>getSelectors() — для гибкости</h3>
+        <p>
+          Если slice не знает, где он будет лежать в root (например, lazy-injected), используйте
+          <code>slice.getSelectors(stateSelector)</code>. Это «фабрика», которая возвращает селекторы,
+          получающие state через ваш <code>stateSelector</code>:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> { selectValue, selectIsEven } = counterSlice.<span class="fn">getSelectors</span>(
+  (rootState: <span class="ts">RootState</span>) =&gt; rootState.someDeeplyNested.counter
+)
+
+<span class="fn">selectValue</span>(rootState)     <span class="cm">// rootState.someDeeplyNested.counter.value</span>
+        </div>
+
+        <h3>Селекторы с аргументами</h3>
+        <div class="code-block">
+selectors: {
+  selectTodoById: (state, id: <span class="ts">string</span>) =&gt; state.byId[id],
+  selectByCategory: (state, cat: <span class="ts">string</span>) =&gt; state.items.<span class="fn">filter</span>(t =&gt; t.cat === cat),
+}
+
+<span class="cm">// Использование:</span>
+slice.selectors.<span class="fn">selectTodoById</span>(rootState, <span class="str">'abc'</span>)
+        </div>
+
+        <h3>Memoization</h3>
+        <div class="warning">
+          slice.selectors <strong>не</strong> мемоизированы. Если селектор делает дорогую трансформацию
+          (filter / map / reduce / sort), оборачивайте его в <code>createSelector</code> из reselect
+          (детально в секции E).
+        </div>
+        <div class="code-block">
+<span class="kw">import</span> { createSelector } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+selectors: {
+  selectVisibleTodos: <span class="fn">createSelector</span>(
+    (state: <span class="ts">TodoState</span>) =&gt; state.items,
+    (state: <span class="ts">TodoState</span>) =&gt; state.filter,
+    (items, filter) =&gt; items.<span class="fn">filter</span>(<span class="fn">getFilterFn</span>(filter))
+  ),
+}
+        </div>
+
+        <h3>Использование в React-Redux</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> value = <span class="fn">useAppSelector</span>(counterSlice.selectors.selectValue)
+  <span class="kw">const</span> isEven = <span class="fn">useAppSelector</span>(counterSlice.selectors.selectIsEven)
+  <span class="kw">return</span> ...
+}
+        </div>
+        <p>
+          Селектор передаётся в <code>useSelector</code> как обычный getter — никакой магии.
+        </p>
+
+        <h3>Подводный камень: reducerPath не равен пути в state</h3>
+        <div class="warning">
+          slice.selectors берёт state через <code>state[slice.reducerPath]</code>. Если в configureStore
+          вы записали slice под другим ключом, селекторы НЕ будут работать. Используйте
+          <code>slice.getSelectors(rootSelector)</code> в этом случае.
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createSlice#selectors" target="_blank">selectors API</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createSlice.ts" target="_blank">createSlice.ts — getSelectors implementation</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>
