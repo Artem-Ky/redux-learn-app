@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>40a — Structural sharing и reference equality в RTK</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .tree-row {
+      display: grid; grid-template-columns: 26px 140px 1fr 130px 80px;
+      gap: 10px; align-items: center;
+      padding: 10px 12px; border-radius: var(--radius-sm);
+      background: var(--bg-panel); border: 1px solid var(--border);
+      font-family: var(--font-mono); font-size: .78rem;
+      margin: 4px 0;
+    }
+    .tree-row--same { border-left: 3px solid var(--success); }
+    .tree-row--new  { border-left: 3px solid var(--danger); background: rgba(244, 71, 71, 0.06); }
+    .tree-row__glyph { font-size: 1.1rem; color: var(--text-muted); }
+    .tree-row__key   { color: var(--accent-cyan); font-weight: 600; }
+    .tree-row__preview { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tree-row__refid {
+      font-size: .68rem; color: var(--text-muted);
+      background: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px;
+    }
+    .tree-row__tag {
+      text-align: center; font-size: .7rem; padding: 3px 6px; border-radius: 3px;
+      font-weight: 600;
+    }
+    .tag--same { background: rgba(76,175,80,.15); color: #7bd37e; }
+    .tag--new  { background: rgba(244,71,71,.15); color: #f98080; }
+
+    .tree-root {
+      display: grid; grid-template-columns: 26px 1fr 130px 80px;
+      gap: 10px; align-items: center;
+      padding: 10px 12px; border-radius: var(--radius-sm);
+      background: var(--bg-tertiary); border: 1px solid var(--accent);
+      font-family: var(--font-mono); font-size: .82rem;
+      margin-bottom: 8px;
+    }
+    .tree-root__key { color: var(--accent); font-weight: 700; }
+
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px; margin: 14px 0;
+    }
+    .stat-box {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 12px;
+    }
+    .stat-box__label { color: var(--text-muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; }
+    .stat-box__value { color: var(--accent-cyan); font-size: 1.4rem; font-family: var(--font-mono); font-weight: 700; }
+    .stat-box__value--warn { color: var(--accent-orange); }
+    .stat-box__value--success { color: var(--success); }
+
+    .flash-new {
+      animation: flash-new 0.7s ease-out;
+    }
+    @keyframes flash-new {
+      0% { background: rgba(244, 71, 71, 0.35); }
+      100% { background: rgba(244, 71, 71, 0.06); }
+    }
+
+    .tree-svg { display: block; margin: 10px auto; max-width: 640px; }
+    .tree-svg text { font-family: var(--font-mono); font-size: 11px; fill: #ccc; }
+    .tree-svg .lbl { fill: #888; font-size: 10px; }
+
+    .microtable {
+      width: 100%; border-collapse: collapse; font-size: .78rem; margin-top: 8px;
+    }
+    .microtable th, .microtable td {
+      border: 1px solid var(--border); padding: 6px 10px; text-align: left;
+      font-family: var(--font-mono);
+    }
+    .microtable th { background: var(--bg-tertiary); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">40a / 106</span>Structural sharing и reference equality — база кеширования в RTK</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../40c-quiz-d/">← Quiz D</a>
+      <a href="../40b-memoization-why/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">State Tree Inspector — какие ветки сохраняют ссылку после dispatch</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 12px;">
+          Store из трёх slice: <code>user</code>, <code>posts</code>, <code>theme</code>. После каждого
+          <code>dispatch</code> мы сравниваем <code>prev.slice</code> и <code>next.slice</code> через <code>===</code>.
+          Ветки, которых reducer не коснулся — <strong>та же ссылка</strong> (structural sharing от Immer).
+          Это и есть «кеш» на уровне slice.
+        </p>
+
+        <div class="tree-root">
+          <div class="tree-row__glyph">▼</div>
+          <div><span class="tree-root__key">state</span> <span class="tree-row__preview" id="root-preview"></span></div>
+          <div class="tree-row__refid" id="root-refid">id: —</div>
+          <div class="tree-row__tag" id="root-tag">—</div>
+        </div>
+
+        <div id="user-row" class="tree-row tree-row--same">
+          <div class="tree-row__glyph">├─</div>
+          <div class="tree-row__key">user</div>
+          <div class="tree-row__preview" id="user-preview"></div>
+          <div class="tree-row__refid" id="user-refid">id: —</div>
+          <div class="tree-row__tag tag--same" id="user-tag">same</div>
+        </div>
+
+        <div id="posts-row" class="tree-row tree-row--same">
+          <div class="tree-row__glyph">├─</div>
+          <div class="tree-row__key">posts</div>
+          <div class="tree-row__preview" id="posts-preview"></div>
+          <div class="tree-row__refid" id="posts-refid">id: —</div>
+          <div class="tree-row__tag tag--same" id="posts-tag">same</div>
+        </div>
+
+        <div id="theme-row" class="tree-row tree-row--same">
+          <div class="tree-row__glyph">└─</div>
+          <div class="tree-row__key">theme</div>
+          <div class="tree-row__preview" id="theme-preview"></div>
+          <div class="tree-row__refid" id="theme-refid">id: —</div>
+          <div class="tree-row__tag tag--same" id="theme-tag">same</div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-box__label">Всего dispatch</div>
+            <div class="stat-box__value" id="stat-total">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box__label">root ссылка менялась</div>
+            <div class="stat-box__value stat-box__value--warn" id="stat-root">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box__label">user сохранял ссылку</div>
+            <div class="stat-box__value stat-box__value--success" id="stat-user">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box__label">posts сохранял ссылку</div>
+            <div class="stat-box__value stat-box__value--success" id="stat-posts">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box__label">theme сохранял ссылку</div>
+            <div class="stat-box__value stat-box__value--success" id="stat-theme">0</div>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn" data-act="theme">theme/toggle</button>
+          <button class="btn" data-act="user">user/setName (new name)</button>
+          <button class="btn btn--accent" data-act="user-same">user/setName (SAME name)</button>
+          <button class="btn" data-act="add">posts/addPost</button>
+          <button class="btn" data-act="edit-first">posts/editFirstTitle</button>
+          <button class="btn btn--danger" data-act="bulk">posts/replaceAll</button>
+          <button class="btn" data-act="noop">dispatch NOOP</button>
+        </div>
+
+        <div class="tip" style="margin-top: 14px;">
+          Нажми <strong>«theme/toggle»</strong> несколько раз — только строка <code>theme</code> мигает как «new».
+          Строки <code>user</code> и <code>posts</code> остаются «same» → их ссылки <strong>буквально те же</strong>,
+          что были до dispatch. Именно на этом базируется вся оптимизация react-redux / createSelector / entityAdapter.
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 40a. Что такое «кеш» в RTK slice на уровне ссылок</div>
+      <div class="theory__body">
+
+        <h3>Почему это вообще работает</h3>
+        <p>
+          Redux-store хранит state как <em>один объект</em>. При каждом <code>dispatch</code> корневой reducer
+          (<code>combineSlices</code>/<code>combineReducers</code>) вызывает slice-reducers поочерёдно. Если slice
+          ничего не сделал — он возвращает <strong>ту же ссылку</strong>. Redux тогда знает, что state-дерево в этой
+          ветке не поменялось. А благодаря <code>Immer.produce</code> это бесплатно даже для сложных вложенных
+          объектов.
+        </p>
+
+        <h3>Цитата: документация Immer</h3>
+        <div class="quote">
+          «Immer produces immutable state by creating the <strong>next immutable state tree</strong>. The next tree
+          is structurally shared with the previous tree, so no unnecessary copying occurs: only the paths that have
+          changed are written to; the rest are reused.»
+          <br>— <a href="https://immerjs.github.io/immer/" target="_blank">immerjs.github.io/immer</a>
+        </div>
+        <div class="quote quote--ru">
+          «Immer создаёт <strong>следующее неизменяемое дерево состояния</strong>. Новое дерево разделяет структуру
+          с предыдущим: ничего лишнего не копируется — перезаписываются только изменённые пути, остальное
+          переиспользуется.»
+        </div>
+
+        <h3>Цитата: документация Redux</h3>
+        <div class="quote">
+          «Reducers must always return a new state value if the state has changed. If no changes are needed, return
+          the existing state object as-is. Returning the same reference is how we tell Redux ‟nothing changed”.»
+          <br>— <a href="https://redux.js.org/style-guide/#reducers-must-not-have-side-effects" target="_blank">redux.js.org/style-guide</a>
+        </div>
+        <div class="quote quote--ru">
+          «Reducer должен вернуть <em>новое</em> state-значение, только если state действительно изменился. Если
+          изменений нет — верни существующий объект как есть. Возврат той же ссылки — это сигнал Redux'у «ничего
+          не поменялось».»
+        </div>
+
+        <h3>Исходник RTK: createReducer → createNextState (Immer)</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/createReducer.ts (строки 180–216)</span>
+<span class="cm">// https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createReducer.ts</span>
+<span class="kw">return</span> caseReducers.<span class="fn">reduce</span>((previousState, caseReducer): S =&gt; {
+  <span class="kw">if</span> (caseReducer) {
+    <span class="kw">if</span> (<span class="fn">isDraft</span>(previousState)) {
+      <span class="cm">// already a draft — просто мутируем</span>
+      <span class="kw">const</span> draft = previousState <span class="kw">as</span> Draft&lt;S&gt;
+      <span class="kw">const</span> result = <span class="fn">caseReducer</span>(draft, action)
+      <span class="kw">if</span> (result === <span class="kw">undefined</span>) <span class="kw">return</span> previousState
+      <span class="kw">return</span> result <span class="kw">as</span> S
+    } <span class="kw">else if</span> (!<span class="fn">isDraftable</span>(previousState)) {
+      <span class="cm">// примитив (0, "", false) — обходим Immer</span>
+      <span class="kw">const</span> result = <span class="fn">caseReducer</span>(previousState, action)
+      <span class="kw">if</span> (result === <span class="kw">undefined</span>) <span class="kw">return</span> previousState
+      <span class="kw">return</span> result <span class="kw">as</span> S
+    } <span class="kw">else</span> {
+      <span class="cm">// 👀 главный случай: оборачиваем caseReducer в Immer.produce</span>
+      <span class="kw">return</span> <span class="fn">createNextState</span>(previousState, (draft: Draft&lt;S&gt;) =&gt; {
+        <span class="kw">return</span> <span class="fn">caseReducer</span>(draft, action)
+      })
+    }
+  }
+  <span class="kw">return</span> previousState
+}, state)
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          <code>createNextState</code> — это псевдоним для <code>immer.produce</code>. Ключевое свойство: если
+          внутри <code>caseReducer</code> draft не модифицировался — <code>produce</code> возвращает
+          <strong>ту же ссылку</strong>, что была на входе. Именно поэтому «noop reducer» → same ref.
+        </p>
+
+        <h3>Исходник react-redux: useSelector использует === по умолчанию</h3>
+        <div class="code-block">
+<span class="cm">// react-redux/src/hooks/useSelector.ts (строка 119)</span>
+<span class="cm">// https://github.com/reduxjs/react-redux/blob/master/src/hooks/useSelector.ts</span>
+<span class="kw">const</span> refEquality: EqualityFn&lt;<span class="kw">any</span>&gt; = (a, b) =&gt; a === b
+
+<span class="kw">const</span> useSelector = &lt;TState, Selected&gt;(
+  selector: (state: TState) =&gt; Selected,
+  equalityFnOrOptions = {},
+): Selected =&gt; {
+  <span class="kw">const</span> { equalityFn = refEquality } =    <span class="cm">// 👀 default: простое ===</span>
+    <span class="kw">typeof</span> equalityFnOrOptions === <span class="str">'function'</span>
+      ? { equalityFn: equalityFnOrOptions }
+      : equalityFnOrOptions
+  <span class="cm">// ...</span>
+  <span class="kw">const</span> selectedState = <span class="fn">useSyncExternalStoreWithSelector</span>(
+    subscription.addNestedSub,
+    store.getState,
+    getServerState || store.getState,
+    wrappedSelector,
+    equalityFn,                               <span class="cm">// 👀 сюда попадает refEquality</span>
+  )
+}
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          <strong>Вся экономия ре-рендеров держится на <code>===</code></strong>. Если твой селектор возвращает
+          <em>тот же объект</em>, что в прошлый раз — React-Redux не перерендерит компонент. Всё остальное
+          (<code>createSelector</code>, <code>weakMapMemoize</code>, <code>shallowEqual</code>) — надстройки,
+          которые помогают этому <code>===</code> чаще давать <code>true</code>.
+        </p>
+
+        <h3>Схема structural sharing</h3>
+        <svg class="tree-svg" viewBox="0 0 660 280" xmlns="http://www.w3.org/2000/svg">
+          <!-- BEFORE -->
+          <text x="160" y="18" text-anchor="middle" class="lbl">prev state</text>
+          <rect x="110" y="30" width="100" height="36" rx="4" fill="#1e1e1e" stroke="#569cd6"/>
+          <text x="160" y="52" text-anchor="middle">root (#A)</text>
+
+          <line x1="140" y1="66" x2="50" y2="110" stroke="#666" marker-end="url(#arr40a)"/>
+          <line x1="160" y1="66" x2="160" y2="110" stroke="#666" marker-end="url(#arr40a)"/>
+          <line x1="180" y1="66" x2="270" y2="110" stroke="#666" marker-end="url(#arr40a)"/>
+
+          <rect x="10" y="110" width="80" height="30" rx="3" fill="#252526" stroke="#4ec9b0"/>
+          <text x="50" y="129" text-anchor="middle">user #1</text>
+          <rect x="120" y="110" width="80" height="30" rx="3" fill="#252526" stroke="#4ec9b0"/>
+          <text x="160" y="129" text-anchor="middle">posts #2</text>
+          <rect x="230" y="110" width="80" height="30" rx="3" fill="#252526" stroke="#4ec9b0"/>
+          <text x="270" y="129" text-anchor="middle">theme #3</text>
+
+          <!-- AFTER (dispatch theme/toggle) -->
+          <text x="500" y="18" text-anchor="middle" class="lbl">next state (after theme/toggle)</text>
+          <rect x="450" y="30" width="100" height="36" rx="4" fill="#1e1e1e" stroke="#f44747"/>
+          <text x="500" y="52" text-anchor="middle">root (#B) new</text>
+
+          <!-- reuse pointers -->
+          <path d="M 480 66 Q 220 90 90 110" fill="none" stroke="#4caf50" stroke-dasharray="4,3"/>
+          <path d="M 490 66 Q 340 90 200 110" fill="none" stroke="#4caf50" stroke-dasharray="4,3"/>
+          <!-- new theme -->
+          <line x1="530" y1="66" x2="540" y2="110" stroke="#f44747" stroke-width="1.5" marker-end="url(#arr40a-red)"/>
+          <rect x="490" y="110" width="100" height="30" rx="3" fill="#2a1717" stroke="#f44747"/>
+          <text x="540" y="129" text-anchor="middle">theme #4 new</text>
+
+          <text x="330" y="180" text-anchor="middle" style="fill:#7bd37e; font-size: 10px">
+            user и posts — те же ссылки (#1, #2), переиспользуются
+          </text>
+          <text x="330" y="200" text-anchor="middle" style="fill:#f98080; font-size: 10px">
+            только root и theme — новые объекты (#B, #4)
+          </text>
+          <text x="330" y="230" text-anchor="middle" class="lbl">
+            structural sharing: новые ветки — только на пути от корня до точки изменения
+          </text>
+
+          <defs>
+            <marker id="arr40a" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="#aaa"/>
+            </marker>
+            <marker id="arr40a-red" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="#f44747"/>
+            </marker>
+          </defs>
+        </svg>
+
+        <h3>Что это даёт на практике</h3>
+        <table class="microtable">
+          <thead>
+            <tr><th>Уровень</th><th>Механизм</th><th>На чём держится</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>reducer</code></td>
+              <td>Immer сохраняет ссылки неизменённых веток</td>
+              <td><code>produce(prev, draft =&gt; ...)</code></td>
+            </tr>
+            <tr>
+              <td><code>store</code></td>
+              <td>subscribers дёргаются всегда, но они могут сами сравнить <code>prev === next</code></td>
+              <td>нет авто-оптимизации на уровне Redux core</td>
+            </tr>
+            <tr>
+              <td><code>useSelector</code></td>
+              <td>skip re-render, если <code>selector(state)</code> равен <code>===</code></td>
+              <td><code>refEquality</code> по умолчанию</td>
+            </tr>
+            <tr>
+              <td><code>createSelector</code></td>
+              <td>skip пересчёт combiner, если все <em>входы</em> равны <code>===</code></td>
+              <td><code>lruMemoize(1)</code> + ссылки из Immer</td>
+            </tr>
+            <tr>
+              <td><code>entityAdapter</code></td>
+              <td>selectAll закешировал массив, пока не добавили/удалили сущность</td>
+              <td><code>createDraftSafeSelector</code> над <code>ids</code> и <code>entities</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Что происходит при dispatch: 3 маршрута</h3>
+        <div class="code-block">
+<span class="cm">// 1. reducer не match'ится ни одним case → slice возвращает prev as-is</span>
+<span class="kw">case</span> <span class="str">'UNKNOWN_ACTION'</span>: <span class="kw">return</span> state                <span class="cm">// same ref</span>
+
+<span class="cm">// 2. case match, но Immer draft не изменён → produce вернёт same ref</span>
+<span class="fn">createNextState</span>(prev, (draft) =&gt; {
+  <span class="kw">if</span> (!action.payload) <span class="kw">return</span>                    <span class="cm">// noop path</span>
+  draft.name = action.payload                          <span class="cm">// но если payload === prev.name,</span>
+                                                       <span class="cm">// Immer заметит «writes equal reads»</span>
+                                                       <span class="cm">// и вернёт prev (same ref)</span>
+})
+
+<span class="cm">// 3. draft был реально изменён → новый объект на пути от корня</span>
+<span class="fn">createNextState</span>(prev, (draft) =&gt; { draft.name = <span class="str">'Alice'</span> })   <span class="cm">// → new ref</span>
+        </div>
+
+        <h3>Подводные камни</h3>
+
+        <div class="warning">
+          <strong>1. Ручной return без Immer ломает structural sharing.</strong>
+          Если ты пишешь <code>return { ...state, user: { ...state.user, name: 'x' } }</code> в reducer без Immer
+          и меняешь только <code>user</code>, ты <em>всё равно</em> получишь новый <code>state</code> (это ожидаемо),
+          и новый <code>state.user</code> (тоже ок). Но если случайно напишешь <code>return { ...state, posts: [...state.posts] }</code> — создашь <strong>новый массив posts, хотя не менял его</strong>.
+          <br><em>Почему это плохо:</em> все селекторы на <code>state.posts</code> получат cache miss и пересчитают.
+          <em>Решение:</em> не трогай то, что не меняешь. С <code>createSlice</code>/Immer это бесплатно.
+        </div>
+
+        <div class="warning">
+          <strong>2. Присваивание того же значения — Immer может заметить, а может и нет.</strong>
+          <code>state.name = action.payload</code> где <code>payload === state.name</code> — Immer обнаружит
+          «write equals read» и вернёт ту же ссылку <strong>только для примитивов</strong>. Для объектов
+          (<code>state.user = { name: 'Alice' }</code>) Immer видит новый объект и создаёт новый draft.
+          <br><em>Почему так:</em> Immer не делает deep equality — это было бы медленно. <em>Решение:</em>
+          проверяй сам перед присваиванием: <code>if (state.user.name !== payload) state.user.name = payload</code>.
+        </div>
+
+        <div class="warning">
+          <strong>3. Subscribe дёргается на КАЖДЫЙ dispatch, даже NOOP.</strong>
+          Redux core не фильтрует подписчиков: <code>store.subscribe(fn)</code> вызовет <code>fn</code> после
+          любого action, даже если state — та же ссылка. Фильтрация — ответственность подписчика.
+          <br><em>Почему:</em> Redux не знает, чем интересуется подписчик, — может, он следит не за state, а за
+          числом dispatch'ей. <em>Решение:</em> <code>useSelector</code> делает <code>===</code> на <em>результат
+          селектора</em>, а не на state; <code>autoBatchEnhancer</code> батчит много dispatch'ей в один тик.
+        </div>
+
+        <div class="warning">
+          <strong>4. Идентичный selector output, но по ссылке — разный.</strong>
+          <code>state =&gt; state.user</code> — хорошо (ссылка та же, пока user не меняется).
+          <code>state =&gt; ({ name: state.user.name })</code> — плохо: <em>каждый вызов</em> даёт новый объект,
+          react-redux видит <code>!==</code>, перерисовывает компонент.
+          <br><em>Почему:</em> ссылочное сравнение не смотрит содержимое. <em>Решение:</em> <code>shallowEqual</code>
+          вторым аргументом <code>useSelector</code>, либо <code>createSelector</code> с combiner'ом.
+        </div>
+
+        <div class="warning">
+          <strong>5. Extra reducers на <code>slice</code> не видят Immer-draft родителя.</strong>
+          Если ты делаешь <code>extraReducers(builder =&gt; builder.addCase(other.action, (state, action) =&gt; ...))</code>,
+          твой <code>state</code> — это draft <em>только этого slice</em>. Менять <code>state</code> — OK (Immer знает).
+          Но не пытайся вернуть из reducer'а ссылку из другого slice — она в другом draft-tree.
+          <br><em>Почему:</em> <code>combineSlices</code> вызывает <code>produce</code> per-slice, не глобально.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../26-immer-inside/">26 — Immer под капотом RTK</a></li>
+          <li><a href="../27-immer-pitfalls/">27 — 7 правил Immer</a></li>
+          <li><a href="../40-current-original-debug/">40 — current()/original() для дебага</a></li>
+          <li><a href="../40b-memoization-why/">40b — зачем нужна мемоизация поверх всего этого</a></li>
+          <li><a href="../41-createselector-from-rtk/">41 — createSelector + reselect</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://immerjs.github.io/immer/" target="_blank">Immer docs — introduction</a></li>
+          <li><a href="https://redux.js.org/style-guide/" target="_blank">Redux style guide — reducers</a></li>
+          <li><a href="https://redux.js.org/understanding/thinking-in-redux/three-principles" target="_blank">Redux — Three Principles (immutability)</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createReducer.ts" target="_blank">RTK src — createReducer.ts</a></li>
+          <li><a href="https://github.com/reduxjs/react-redux/blob/master/src/hooks/useSelector.ts" target="_blank">react-redux src — useSelector.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

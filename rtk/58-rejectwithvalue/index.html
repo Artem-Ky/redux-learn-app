@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>58 — rejectWithValue: типизированные ошибки</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .pane { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-top: 10px; }
+    .pane h4 { color: var(--accent); font-family: var(--font-mono); font-size: .78rem; margin-bottom: 6px; }
+    .state-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); white-space: pre; overflow: auto; max-height: 280px; }
+    .two-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 900px) { .two-cols { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">58 / 106</span>rejectWithValue</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../57-thunkapi-basics/">← Назад</a>
+      <a href="../59-asyncthunk-condition/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Один thunk <code>login(creds)</code> возвращает две разные ошибки:
+        </p>
+        <ul style="color: var(--text-secondary); font-size: .85rem;">
+          <li><strong>Кнопка «throw Error»</strong> → обычное исключение. В reducer'е <code>action.payload = undefined</code>, <code>action.error = SerializedError</code>;</li>
+          <li><strong>Кнопка «rejectWithValue»</strong> → <code>return rejectWithValue({ code: 401, message: 'Bad password' })</code>. В reducer'е <code>action.payload = { code, message }</code> (типизирован), <code>action.error = { message: 'Rejected' }</code>.</li>
+        </ul>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin: 12px 0;">
+          <button class="btn btn--accent" id="login-ok">Login OK</button>
+          <button class="btn btn--danger" id="login-throw">Login → throw Error</button>
+          <button class="btn btn--danger" id="login-rwv">Login → rejectWithValue</button>
+          <button class="btn" id="login-unwrap">Login + .unwrap() + try/catch</button>
+        </div>
+
+        <div class="two-cols">
+          <div class="pane">
+            <h4>store.getState()</h4>
+            <div class="state-out" id="state-out">—</div>
+          </div>
+          <div class="pane">
+            <h4>Последний rejected action</h4>
+            <div class="state-out" id="last-rejected">— нажмите ошибочный login —</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 58. rejectWithValue vs throw</div>
+      <div class="theory__body">
+        <h3>Цитата</h3>
+        <div class="quote">
+          «If you need to customize the contents of the <code>rejected</code> action, you should catch any
+          errors yourself, and then <code>return</code> a new value using the <code>thunkAPI.rejectWithValue</code>
+          utility. Doing <code>return rejectWithValue(errorPayload)</code> will cause the <code>rejected</code>
+          action to use that value as <code>action.payload</code>.»<br>
+          — <a href="https://redux-toolkit.js.org/api/createAsyncThunk#handling-thunk-errors" target="_blank">createAsyncThunk — Handling Thunk Errors</a>
+        </div>
+        <div class="quote quote--ru">
+          «Если нужно кастомизировать содержимое <code>rejected</code> action'а — ловите ошибки сами
+          и <code>return</code>-ьте новое значение через <code>thunkAPI.rejectWithValue</code>.
+          <code>return rejectWithValue(errorPayload)</code> заставит <code>rejected</code> использовать этот
+          объект как <code>action.payload</code>.»
+        </div>
+
+        <h3>Два класса под капотом</h3>
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строки 64–86</span>
+<span class="kw">class</span> <span class="type">RejectWithValue</span>&lt;Payload, RejectedMeta&gt; {
+  <span class="kw">private readonly</span> _type!: <span class="str">'RejectWithValue'</span>
+  <span class="fn">constructor</span>(
+    <span class="kw">public readonly</span> payload: Payload,
+    <span class="kw">public readonly</span> meta: RejectedMeta,
+  ) {}
+}
+
+<span class="kw">class</span> <span class="type">FulfillWithMeta</span>&lt;Payload, FulfilledMeta&gt; {
+  <span class="kw">private readonly</span> _type!: <span class="str">'FulfillWithMeta'</span>
+  <span class="fn">constructor</span>(
+    <span class="kw">public readonly</span> payload: Payload,
+    <span class="kw">public readonly</span> meta: FulfilledMeta,
+  ) {}
+}</div>
+
+        <h3>Как RTK их различает</h3>
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строки 688–702</span>
+.<span class="fn">then</span>((result) =&gt; {
+  <span class="kw">if</span> (result <span class="kw">instanceof</span> <span class="type">RejectWithValue</span>) {
+    <span class="kw">throw</span> result              <span class="cm">// ← rejectWithValue → throw (но не настоящая ошибка)</span>
+  }
+  <span class="kw">if</span> (result <span class="kw">instanceof</span> <span class="type">FulfillWithMeta</span>) {
+    <span class="kw">return</span> <span class="fn">fulfilled</span>(result.payload, requestId, arg, result.meta)
+  }
+  <span class="kw">return</span> <span class="fn">fulfilled</span>(result <span class="kw">as any</span>, requestId, arg)
+})
+<span class="cm">// ...</span>
+} <span class="kw">catch</span> (err) {
+  finalAction =
+    err <span class="kw">instanceof</span> <span class="type">RejectWithValue</span>
+      ? <span class="fn">rejected</span>(<span class="kw">null</span>, requestId, arg, err.payload, err.meta)   <span class="cm">// ← payload/meta выставлены</span>
+      : <span class="fn">rejected</span>(err <span class="kw">as any</span>, requestId, arg)                  <span class="cm">// ← payload undefined, error = serialized(err)</span>
+}</div>
+        <p style="font-size:.78rem;"><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L688" target="_blank">createAsyncThunk.ts#L688</a></p>
+
+        <h3>Флаг <code>meta.rejectedWithValue</code></h3>
+        <div class="code-block"><span class="cm">// rejected creator, строки 589–597</span>
+meta: {
+  ...(meta || {}), arg, requestId,
+  rejectedWithValue: !!payload,                   <span class="cm">// ← true, если был rejectWithValue</span>
+  requestStatus: <span class="str">'rejected'</span>,
+  aborted: error?.name === <span class="str">'AbortError'</span>,
+  condition: error?.name === <span class="str">'ConditionError'</span>,
+}</div>
+
+        <h3>Типизация</h3>
+        <div class="code-block"><span class="kw">interface</span> LoginError { code: <span class="type">number</span>; message: <span class="type">string</span> }
+
+<span class="kw">const</span> login = <span class="fn">createAsyncThunk</span>&lt;
+  <span class="type">User</span>,                          <span class="cm">// Returned</span>
+  { email: <span class="type">string</span>; password: <span class="type">string</span> }, <span class="cm">// ThunkArg</span>
+  { rejectValue: <span class="type">LoginError</span> }       <span class="cm">// ThunkApiConfig</span>
+&gt;(<span class="str">'auth/login'</span>, <span class="kw">async</span> (creds, { rejectWithValue }) =&gt; {
+  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">api</span>(creds)
+  <span class="kw">if</span> (!res.ok) <span class="kw">return</span> <span class="fn">rejectWithValue</span>({ code: res.status, message: res.statusText })
+  <span class="kw">return</span> res.user
+})
+
+<span class="cm">// В reducer'е — action.payload уже LoginError | undefined</span>
+b.<span class="fn">addCase</span>(login.rejected, (s, a) =&gt; {
+  <span class="kw">if</span> (a.payload) { s.error = a.payload.message + <span class="str">' ('</span> + a.payload.code + <span class="str">')'</span> }
+  <span class="kw">else</span> { s.error = a.error.message ?? <span class="str">'unknown'</span> }
+})</div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. <code>rejectWithValue</code> — это <code>return</code>, не <code>throw</code>!</strong>
+          <code>throw rejectWithValue(...)</code> тоже работает (в catch сработает <code>instanceof</code> проверка),
+          но канонично — <code>return rejectWithValue(...)</code>.<br>
+          <strong>2. <code>throw new Error('X')</code> → <code>action.payload === undefined</code>.</strong>
+          Если reducer пишет <code>s.error = action.payload.message</code> — получите <em>crash</em> на
+          обычных ошибках. Всегда проверяйте: <code>a.payload?.message ?? a.error.message</code>.<br>
+          <strong>3. <code>.unwrap()</code> различает их.</strong>
+          При <code>rejectedWithValue: true</code> — <code>throw action.payload</code> (ваш объект).
+          Иначе — <code>throw action.error</code> (SerializedError). Смотрите <code>unwrapResult</code> в исходнике.<br>
+          <strong>4. Error в payload-creator'е → мимо try/catch.</strong>
+          Если <code>payloadCreator</code> кидает <em>неожиданное</em> исключение (TypeError, ReferenceError…) —
+          RTK ловит его <code>try/catch</code>'ем и делает <code>rejected(err, …)</code>. То есть это <strong>не</strong> попадёт в catch, окружающий <code>await dispatch(thunk())</code>. Только <code>.unwrap()</code> их перебрасывает.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../55-asyncthunk-basic/">55 — базовый createAsyncThunk (про .unwrap)</a></li>
+          <li><a href="../57-thunkapi-basics/">57 — thunkAPI</a></li>
+          <li><a href="../62-asyncthunk-meta-extras/">62 — fulfillWithValue + custom meta</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

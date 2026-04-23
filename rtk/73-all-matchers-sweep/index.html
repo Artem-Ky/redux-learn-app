@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>73 — Все matchers сводно</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .matcher-hits {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px; margin: 12px 0;
+    }
+    .hit-card {
+      background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 12px;
+      transition: border-color .2s, background .2s;
+    }
+    .hit-card__name { color: var(--accent-cyan); font-family: var(--font-mono); font-size: .78rem; font-weight: 600; }
+    .hit-card__hits { font-family: var(--font-mono); font-size: 1.4rem; margin-top: 4px; color: var(--accent-yellow); }
+    .hit-card__hint { color: var(--text-muted); font-size: .7rem; margin-top: 2px; }
+    .hit-card.flash { border-color: var(--accent); background: rgba(86,156,214,.08); }
+
+    .status-bar {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 14px; margin: 10px 0;
+      font-family: var(--font-mono); font-size: .82rem;
+    }
+    .status-pill {
+      padding: 4px 8px; border-radius: 10px;
+      background: var(--bg-panel); border: 1px solid var(--border);
+    }
+    .status-pill.loading { color: var(--warning); border-color: var(--warning); }
+    .status-pill.err { color: var(--accent-red); border-color: var(--accent-red); }
+    .status-pill.ok { color: var(--success); border-color: var(--success); }
+
+    .mtable { width: 100%; border-collapse: collapse; font-size: .82rem; margin: 10px 0; }
+    .mtable th, .mtable td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+    .mtable th { background: var(--bg-panel); color: var(--accent); }
+    .mtable .mono { font-family: var(--font-mono); font-size: .78rem; }
+    .mtable tr.sect td { background: var(--bg-panel); color: var(--accent-yellow); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">73 / 106</span>Все matchers сводно — isAnyOf, isAllOf, isPending/Fulfilled/Rejected, isAsyncThunkAction</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../72-isplainobject-isaction-utils/">← Назад</a>
+      <a href="../74-async-thunk-patterns/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Один reducer — 7 addMatcher-цепочек. Смотрим, кто какой action ловит.</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Два async thunk'а (<code>fetchA</code>, <code>fetchB</code>) и два plain action'а (<code>inc</code>, <code>dec</code>).
+          Reducer через <code>extraReducers: builder =&gt; builder.addMatcher(...)</code> подписан на все
+          matchers. В карточках ниже — счётчики попаданий; в консоли — полный лог.
+        </p>
+
+        <div class="status-bar" id="status-bar">
+          <span class="status-pill" id="p-loading">loading: false</span>
+          <span class="status-pill" id="p-err">lastError: —</span>
+          <span class="status-pill" id="p-ok">fulfilled total: 0</span>
+          <span class="status-pill" id="p-cnt">inc/dec counter: 0</span>
+          <span class="status-pill" id="p-thunk">thunk actions total: 0</span>
+        </div>
+
+        <div class="matcher-hits" id="hits-grid">
+          <div class="hit-card" data-m="isPending">
+            <div class="hit-card__name">isPending(fetchA, fetchB)</div>
+            <div class="hit-card__hits" id="h-isPending">0</div>
+            <div class="hit-card__hint">glob loading flag</div>
+          </div>
+          <div class="hit-card" data-m="isFulfilled">
+            <div class="hit-card__name">isFulfilled(fetchA, fetchB)</div>
+            <div class="hit-card__hits" id="h-isFulfilled">0</div>
+            <div class="hit-card__hint">любой успешный thunk</div>
+          </div>
+          <div class="hit-card" data-m="isRejected">
+            <div class="hit-card__name">isRejected(fetchA, fetchB)</div>
+            <div class="hit-card__hits" id="h-isRejected">0</div>
+            <div class="hit-card__hint">reject ИЛИ throw</div>
+          </div>
+          <div class="hit-card" data-m="isRejectedWithValue">
+            <div class="hit-card__name">isRejectedWithValue(fetchA, fetchB)</div>
+            <div class="hit-card__hits" id="h-isRejectedWithValue">0</div>
+            <div class="hit-card__hint">только явный rejectWithValue</div>
+          </div>
+          <div class="hit-card" data-m="isAsyncThunkAction">
+            <div class="hit-card__name">isAsyncThunkAction(fetchA, fetchB)</div>
+            <div class="hit-card__hits" id="h-isAsyncThunkAction">0</div>
+            <div class="hit-card__hint">pending/fulfilled/rejected — любой</div>
+          </div>
+          <div class="hit-card" data-m="isAnyOf">
+            <div class="hit-card__name">isAnyOf(inc, dec)</div>
+            <div class="hit-card__hits" id="h-isAnyOf">0</div>
+            <div class="hit-card__hint">plain-action counter</div>
+          </div>
+          <div class="hit-card" data-m="isAllOf">
+            <div class="hit-card__name">isAllOf(isFulfilled(), hasUserId)</div>
+            <div class="hit-card__hits" id="h-isAllOf">0</div>
+            <div class="hit-card__hint">ВСЕ предикаты должны сработать</div>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn--success" data-act="fetchA-ok">Fetch A (ok)</button>
+          <button class="btn btn--danger" data-act="fetchA-fail">Fetch A (fail: throw)</button>
+          <button class="btn btn--danger" data-act="fetchA-reject">Fetch A (fail: rejectWithValue)</button>
+          <button class="btn btn--success" data-act="fetchB-ok">Fetch B (ok)</button>
+          <button class="btn" data-act="inc">inc</button>
+          <button class="btn" data-act="dec">dec</button>
+          <button class="btn btn--accent" data-act="reset">reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 73. Все matchers за один присест</div>
+      <div class="theory__body">
+
+        <h3>Цитата из доки</h3>
+        <div class="quote">
+          «Redux Toolkit exports several utility functions that can be used as matchers. Each of these matchers either accepts a list of matchers / action creators and returns a combined matcher, or returns a matcher by itself.»
+          <br>— <a href="https://redux-toolkit.js.org/api/matching-utilities" target="_blank">redux-toolkit.js.org/api/matching-utilities</a>
+        </div>
+        <div class="quote quote--ru">
+          «RTK экспортирует несколько утилит-matcher'ов: либо комбинируют переданные, либо сами являются matcher'ом. Применяются в <code>builder.addMatcher</code> и <code>listenerMiddleware</code>.»
+        </div>
+
+        <h3>Сравнительная таблица</h3>
+        <table class="mtable">
+          <thead>
+            <tr>
+              <th>matcher</th>
+              <th>Принимает</th>
+              <th>Возвращает</th>
+              <th>Когда использовать</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="sect"><td colspan="4">КОМБИНАТОРЫ</td></tr>
+            <tr>
+              <td class="mono">isAnyOf(...m)</td>
+              <td>action creators или matchers (≥ 2)</td>
+              <td>action is A | B | C | ...</td>
+              <td>несколько разных экшенов с общей логикой</td>
+            </tr>
+            <tr>
+              <td class="mono">isAllOf(...m)</td>
+              <td>matchers (≥ 2)</td>
+              <td>action is A &amp; B &amp; C (intersection)</td>
+              <td>фильтр по нескольким критериям одновременно</td>
+            </tr>
+            <tr class="sect"><td colspan="4">ДЛЯ ASYNC THUNK</td></tr>
+            <tr>
+              <td class="mono">isPending()</td>
+              <td>—</td>
+              <td>action is UnknownAsyncThunkPendingAction</td>
+              <td>глобальный loading для <em>любого</em> thunk'а</td>
+            </tr>
+            <tr>
+              <td class="mono">isPending(t1, t2, …)</td>
+              <td>thunk(ы)</td>
+              <td>union pending-action типов</td>
+              <td>loading только для указанных thunk'ов</td>
+            </tr>
+            <tr>
+              <td class="mono">isFulfilled(...t)</td>
+              <td>thunk(ы) или ничего</td>
+              <td>union fulfilled-action</td>
+              <td>glob handler на успешные результаты</td>
+            </tr>
+            <tr>
+              <td class="mono">isRejected(...t)</td>
+              <td>thunk(ы) или ничего</td>
+              <td>union rejected-action</td>
+              <td>общий error-handler. Ловит и throw, и rejectWithValue</td>
+            </tr>
+            <tr>
+              <td class="mono">isRejectedWithValue(...t)</td>
+              <td>thunk(ы) или ничего</td>
+              <td>union rejected с payload</td>
+              <td>только <em>явные</em> rejectWithValue (не throw)</td>
+            </tr>
+            <tr>
+              <td class="mono">isAsyncThunkAction(...t)</td>
+              <td>thunk(ы) или ничего</td>
+              <td>union pending|fulfilled|rejected</td>
+              <td>универсальный «лог всех thunk-экшенов»</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Исходник — <code>isAnyOf</code> и <code>isAllOf</code></h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/matchers.ts, строки 22-62</span>
+<span class="kw">const</span> <span class="fn">matches</span> = (matcher: <span class="type">Matcher</span>&lt;<span class="kw">any</span>&gt;, action: <span class="kw">any</span>) =&gt; {
+  <span class="kw">if</span> (<span class="fn">hasMatchFunction</span>(matcher)) {
+    <span class="kw">return</span> matcher.<span class="fn">match</span>(action)           <span class="cm">// action creator имеет .match</span>
+  } <span class="kw">else</span> {
+    <span class="kw">return</span> <span class="fn">matcher</span>(action)                  <span class="cm">// иначе — просто функция-предикат</span>
+  }
+}
+
+<span class="kw">export function</span> <span class="fn">isAnyOf</span>&lt;Matchers <span class="kw">extends</span> <span class="type">Matcher</span>&lt;<span class="kw">any</span>&gt;[]&gt;(
+  ...matchers: Matchers
+) {
+  <span class="kw">return</span> (action: <span class="kw">any</span>): action <span class="kw">is</span> <span class="type">ActionMatchingAnyOf</span>&lt;Matchers&gt; =&gt; {
+    <span class="kw">return</span> matchers.<span class="fn">some</span>((matcher) =&gt; <span class="fn">matches</span>(matcher, action))
+  }
+}
+
+<span class="kw">export function</span> <span class="fn">isAllOf</span>&lt;Matchers <span class="kw">extends</span> <span class="type">Matcher</span>&lt;<span class="kw">any</span>&gt;[]&gt;(
+  ...matchers: Matchers
+) {
+  <span class="kw">return</span> (action: <span class="kw">any</span>): action <span class="kw">is</span> <span class="type">ActionMatchingAllOf</span>&lt;Matchers&gt; =&gt; {
+    <span class="kw">return</span> matchers.<span class="fn">every</span>((matcher) =&gt; <span class="fn">matches</span>(matcher, action))
+  }
+}
+        </div>
+
+        <h3>Исходник — <code>isPending</code></h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/matchers.ts, строки 128-140</span>
+<span class="kw">export function</span> <span class="fn">isPending</span>&lt;AsyncThunks&gt;(...asyncThunks: AsyncThunks | [<span class="kw">any</span>]) {
+  <span class="kw">if</span> (asyncThunks.length === <span class="num">0</span>) {
+    <span class="cm">// ни одного thunk'а — смотрим по meta.requestStatus === 'pending'</span>
+    <span class="kw">return</span> (action: <span class="kw">any</span>) =&gt; <span class="fn">hasExpectedRequestMetadata</span>(action, [<span class="str">'pending'</span>])
+  }
+
+  <span class="kw">if</span> (!<span class="fn">isAsyncThunkArray</span>(asyncThunks)) {
+    <span class="cm">// 1 аргумент и это не thunk — значит тебе передали прямо action</span>
+    <span class="kw">return</span> <span class="fn">isPending</span>()(asyncThunks[<span class="num">0</span>])
+  }
+
+  <span class="cm">// Здесь asyncThunks — это [thunk1, thunk2, …]. Берём у каждого .pending и объединяем в isAnyOf.</span>
+  <span class="kw">return</span> <span class="fn">isAnyOf</span>(...asyncThunks.<span class="fn">map</span>((asyncThunk) =&gt; asyncThunk.pending))
+}
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          То есть <code>isPending(fetchA, fetchB)</code> ≡ <code>isAnyOf(fetchA.pending, fetchB.pending)</code>.
+          <code>isFulfilled</code>, <code>isRejected</code> устроены точно так же — у них та же
+          «три ветки» логика.
+        </p>
+
+        <h3>Исходник — <code>hasExpectedRequestMetadata</code></h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/matchers.ts, строки 70-81</span>
+<span class="kw">export function</span> <span class="fn">hasExpectedRequestMetadata</span>(
+  action: <span class="kw">any</span>,
+  validStatus: <span class="kw">readonly</span> <span class="kw">string</span>[],
+) {
+  <span class="kw">if</span> (!action || !action.meta) <span class="kw">return</span> <span class="kw">false</span>
+
+  <span class="kw">const</span> hasValidRequestId = <span class="kw">typeof</span> action.meta.requestId === <span class="str">'string'</span>
+  <span class="kw">const</span> hasValidRequestStatus =
+    validStatus.<span class="fn">indexOf</span>(action.meta.requestStatus) &gt; -<span class="num">1</span>
+
+  <span class="kw">return</span> hasValidRequestId &amp;&amp; hasValidRequestStatus
+}
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Именно поэтому «thunk action» опознаётся даже без ссылки на сам thunk — любой action с
+          <code>meta.requestId: string</code> и <code>meta.requestStatus: 'pending'|'fulfilled'|'rejected'</code>
+          считается thunk-action'ом. Если ты вручную соберёшь такой action, matchers его поймают — <em>feature</em>.
+        </p>
+
+        <h3>isRejectedWithValue — тонкость</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/matchers.ts, строки 237-253</span>
+<span class="kw">export function</span> <span class="fn">isRejectedWithValue</span>(...asyncThunks) {
+  <span class="kw">const</span> <span class="fn">hasFlag</span> = (action: <span class="kw">any</span>) =&gt; {
+    <span class="kw">return</span> action &amp;&amp; action.meta &amp;&amp; action.meta.rejectedWithValue    <span class="cm">// 🔑 специальный флаг</span>
+  }
+
+  <span class="kw">if</span> (asyncThunks.length === <span class="num">0</span>) {
+    <span class="kw">return</span> <span class="fn">isAllOf</span>(<span class="fn">isRejected</span>(...asyncThunks), hasFlag)
+  }
+  <span class="kw">if</span> (!<span class="fn">isAsyncThunkArray</span>(asyncThunks)) {
+    <span class="kw">return</span> <span class="fn">isRejectedWithValue</span>()(asyncThunks[<span class="num">0</span>])
+  }
+  <span class="kw">return</span> <span class="fn">isAllOf</span>(<span class="fn">isRejected</span>(...asyncThunks), hasFlag)
+}
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          <code>rejectWithValue(...)</code> проставляет <code>meta.rejectedWithValue = true</code>.
+          Это позволяет отличить «thunk решил вернуть ошибку с payload» от «throw Error в payload-creator'е».
+          Последний не помечается флагом — значит <code>isRejectedWithValue</code> его не поймает.
+        </p>
+
+        <div class="warning">
+          <strong>Подводные камни matchers:</strong>
+          <ul>
+            <li><strong><code>isAllOf</code> для одного action срабатывает редко.</strong> Он требует, чтобы <em>все</em> предикаты приняли один и тот же action. <code>isAllOf(fetchA.pending, fetchB.pending)</code> никогда не вернёт true — action может быть либо <code>A.pending</code>, либо <code>B.pending</code>, но не обоими сразу. <code>isAllOf</code> оправдан только для ортогональных предикатов: <code>isAllOf(isFulfilled(), (a) =&gt; a.payload.userId === 42)</code>.</li>
+            <li><strong><code>isPending()</code> без аргументов ловит любой pending от любого thunk'а.</strong> Удобно для глобального loading'а — но также ловит thunk'и, которые ты не хотел тут обрабатывать. Если в проекте 30 thunk'ов и ты хочешь «мой локальный loader» только на 2 — пиши <code>isPending(thunk1, thunk2)</code>.</li>
+            <li><strong><code>isRejected</code> ловит и throw, и rejectWithValue.</strong> Если тебе нужен именно «контролируемый reject» (с payload, типизированный) — <code>isRejectedWithValue</code>. Обычный <code>isRejected</code> ловит <em>оба</em> случая, но payload/error-поля у них разные: throw → <code>action.error.message</code>, rejectWithValue → <code>action.payload</code>.</li>
+            <li><strong>Порядок <code>addMatcher</code> важен.</strong> Reducer проходит matchers <em>по порядку</em>. Если <code>isAsyncThunkAction()</code> поставить первым, он перехватит <em>все</em> thunk-экшены — следующие <code>isFulfilled/isPending</code> тоже сработают (не эксклюзивно!), но если там мутации state'а перекрывают друг друга — получишь неожиданный результат. Ставь «широкие» matchers <em>последними</em>.</li>
+            <li><strong>Matchers через <code>.match</code> vs функция-предикат.</strong> RTK распознаёт matcher по наличию <code>.match</code> (это свойство action creator'а) через <code>hasMatchFunction</code>. <em>Поэтому</em> в <code>isAnyOf</code> можно смешивать: <code>isAnyOf(fetchA.pending, myCustomPredicate, inc)</code>. Но самописный предикат теряет типизацию payload'а — результирующий тип будет <code>any</code>.</li>
+          </ul>
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../23-matchers-utilities/">23 — matchers базово</a></li>
+          <li><a href="../23a-matchers-deep/">23a — matchers deep</a></li>
+          <li><a href="../25-add-matcher-default/">25 — addMatcher и порядок в builder</a></li>
+          <li><a href="../31-extra-reducers/">31 — extraReducers с matchers</a></li>
+          <li><a href="../58-rejectwithvalue/">58 — rejectWithValue (для понимания isRejectedWithValue)</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

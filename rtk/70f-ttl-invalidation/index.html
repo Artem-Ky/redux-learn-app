@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>70f — TTL cache и invalidation в slice</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .cache-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 12px 0; }
+    .cache-entry { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; position: relative; }
+    .cache-entry__id { font-family: var(--font-mono); color: var(--accent); font-size: .78rem; font-weight: 700; }
+    .cache-entry__field { font-family: var(--font-mono); font-size: .74rem; color: var(--text-secondary); margin-top: 6px; }
+    .cache-entry__ttl { font-family: var(--font-mono); font-size: .8rem; margin-top: 6px; }
+    .cache-entry__ttl--fresh { color: var(--success); }
+    .cache-entry__ttl--stale { color: var(--warning); }
+    .cache-entry__ttl--expired { color: var(--accent-red); }
+    .cache-entry__bar { height: 4px; background: var(--bg-panel); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+    .cache-entry__bar-fill { height: 100%; background: var(--success); transition: width .2s linear, background .3s; }
+
+    .ctrls { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
+    .ctrls label { font-family: var(--font-mono); font-size: .78rem; color: var(--text-secondary); }
+    .ctrls input[type=number] { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); padding: 4px 8px; border-radius: 3px; width: 80px; font-family: var(--font-mono); }
+
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
+    .stats-row .stat { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; text-align: center; }
+    .stats-row .stat__lbl { color: var(--text-muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; }
+    .stats-row .stat__val { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 700; margin-top: 2px; }
+    .stats-row .stat--hit .stat__val { color: var(--success); }
+    .stats-row .stat--miss .stat__val { color: var(--warning); }
+    .stats-row .stat--net .stat__val { color: var(--accent-red); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">70f / 106</span>TTL cache и invalidation — кэш на уровне времени жизни</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../70e-request-dedup/">← Назад</a>
+      <a href="../70g-quiz-caching/">Далее (квиз) →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">fetchedAt + condition = самый простой «expiring cache»</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Идея: для каждой записи храним <code>fetchedAt: timestamp</code>. В <code>condition</code>
+          проверяем <code>Date.now() - fetchedAt &lt; TTL</code>. Если свежо — skip (кэш-хит). Если протухло —
+          новый fetch. <code>invalidate</code> — просто reducer, который чистит cache или помечает
+          записи как просроченные.
+        </p>
+
+        <div class="ctrls">
+          <label>TTL: <input type="number" id="ttl-ms" value="5000" min="500" step="500"> ms</label>
+          <button class="btn btn--accent" id="btn-fetch-1">Fetch #1</button>
+          <button class="btn btn--accent" id="btn-fetch-2">Fetch #2</button>
+          <button class="btn btn--accent" id="btn-fetch-3">Fetch #3</button>
+          <button class="btn" id="btn-fetch-all">Fetch all (parallel)</button>
+          <button class="btn btn--secondary" id="btn-invalidate-1">Invalidate #1</button>
+          <button class="btn btn--secondary" id="btn-invalidate-all">Invalidate all</button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat"><div class="stat__lbl">Попыток</div><div class="stat__val" id="s-attempts">0</div></div>
+          <div class="stat stat--hit"><div class="stat__lbl">Cache hits (fresh)</div><div class="stat__val" id="s-hits">0</div></div>
+          <div class="stat stat--miss"><div class="stat__lbl">Cache miss (stale)</div><div class="stat__val" id="s-miss">0</div></div>
+          <div class="stat stat--net"><div class="stat__lbl">Real network</div><div class="stat__val" id="s-net">0</div></div>
+        </div>
+
+        <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem; margin:12px 0 6px;">Кэш (обновляется в реальном времени)</h4>
+        <div class="cache-grid" id="cache-grid">
+          <div style="color: var(--text-muted); font-size: .82rem; grid-column: 1 / -1;">Кэш пуст. Нажмите «Fetch #N».</div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 70f. Что такое «invalidation» своими руками</div>
+      <div class="theory__body">
+        <h3>Паттерн «fetchedAt в entity»</h3>
+        <div class="code-block"><span class="kw">interface</span> Product {
+  id: <span class="kw">number</span>
+  title: <span class="kw">string</span>
+  price: <span class="kw">number</span>
+  fetchedAt: <span class="kw">number</span>        <span class="cm">// ← ключевое поле</span>
+}
+
+<span class="kw">const</span> TTL_MS = 10_000
+
+<span class="kw">const</span> fetchProduct = <span class="fn">createAsyncThunk</span>&lt;Product, <span class="kw">number</span>, { state: RootState }&gt;(
+  <span class="str">'products/fetch'</span>,
+  <span class="kw">async</span> (id) =&gt; {
+    <span class="kw">const</span> data = <span class="kw">await</span> api.<span class="fn">getProduct</span>(id)
+    <span class="kw">return</span> { ...data, fetchedAt: Date.<span class="fn">now</span>() }
+  },
+  {
+    condition: (id, { getState }) =&gt; {
+      <span class="kw">const</span> cached = getState().products.byId[id]
+      <span class="kw">if</span> (!cached) <span class="kw">return</span> <span class="kw">true</span>                     <span class="cm">// cache miss → fetch</span>
+      <span class="kw">return</span> Date.<span class="fn">now</span>() - cached.fetchedAt &gt; TTL_MS  <span class="cm">// stale → fetch</span>
+    },
+  },
+)</div>
+
+        <h3>Стратегии invalidation</h3>
+        <table style="width:100%; border-collapse: collapse; font-size: .82rem; margin: 10px 0;">
+          <thead>
+            <tr style="background: var(--bg-tertiary);">
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">Стратегия</th>
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">Что делает</th>
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">Когда</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><strong>Hard delete</strong></td><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>removeOne(id)</code> — строки нет, следующий запрос ни о чём не знает</td><td style="padding:8px 10px; border-top:1px solid var(--border);">запись удалена на сервере</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><strong>Reset fetchedAt</strong></td><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>updateOne({ id, changes: { fetchedAt: 0 } })</code> — condition сразу скажет stale</td><td style="padding:8px 10px; border-top:1px solid var(--border);">пользователь нажал Refresh</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><strong>Mark stale flag</strong></td><td style="padding:8px 10px; border-top:1px solid var(--border);">отдельное поле <code>stale: true</code>, данные ещё показываем, но фонов re-fetch</td><td style="padding:8px 10px; border-top:1px solid var(--border);">stale-while-revalidate UX</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><strong>Full reset</strong></td><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>removeAll()</code> — всё заново</td><td style="padding:8px 10px; border-top:1px solid var(--border);">logout / смена пользователя</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><strong>Tag-based</strong></td><td style="padding:8px 10px; border-top:1px solid var(--border);">храним <code>tags: string[]</code> в entity, сбрасываем все c данным тегом</td><td style="padding:8px 10px; border-top:1px solid var(--border);">mutation инвалидирует группу</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Reducer для invalidate</h3>
+        <div class="code-block"><span class="kw">const</span> productsSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'products'</span>,
+  initialState: productsAdapter.<span class="fn">getInitialState</span>(),
+  reducers: {
+    invalidateOne: (state, action: PayloadAction&lt;<span class="kw">number</span>&gt;) =&gt; {
+      productsAdapter.<span class="fn">updateOne</span>(state, { id: action.payload, changes: { fetchedAt: 0 } })
+    },
+    invalidateAll: (state) =&gt; {
+      <span class="kw">for</span> (<span class="kw">const</span> id <span class="kw">of</span> state.ids) {
+        state.entities[id]!.fetchedAt = 0
+      }
+    },
+    clearCache: (state) =&gt; {
+      productsAdapter.<span class="fn">removeAll</span>(state)
+    },
+  },
+  extraReducers: (b) =&gt; {
+    b.<span class="fn">addCase</span>(fetchProduct.fulfilled, (state, action) =&gt; {
+      productsAdapter.<span class="fn">upsertOne</span>(state, action.payload)
+    })
+  },
+})</div>
+
+        <h3>Три уровня свежести</h3>
+        <div class="code-block"><span class="cm">// Разделение на fresh / stale / expired — полезно для UX stale-while-revalidate</span>
+
+<span class="kw">const</span> FRESH_MS = 5_000
+<span class="kw">const</span> EXPIRE_MS = 30_000
+
+<span class="kw">function</span> <span class="fn">freshness</span>(fetchedAt: <span class="kw">number</span>): <span class="str">'fresh'</span> | <span class="str">'stale'</span> | <span class="str">'expired'</span> {
+  <span class="kw">const</span> age = Date.<span class="fn">now</span>() - fetchedAt
+  <span class="kw">if</span> (age &lt; FRESH_MS) <span class="kw">return</span> <span class="str">'fresh'</span>       <span class="cm">// вообще не fetch</span>
+  <span class="kw">if</span> (age &lt; EXPIRE_MS) <span class="kw">return</span> <span class="str">'stale'</span>     <span class="cm">// показать старое + fetch в фоне</span>
+  <span class="kw">return</span> <span class="str">'expired'</span>                     <span class="cm">// ждать fetch, старое не показывать</span>
+}</div>
+
+        <h3>Per-id vs global invalidation</h3>
+        <div class="tip">
+          <strong>Per-id</strong> — invalidate one. Типовой случай: пользователь отредактировал товар,
+          нужно перезапросить ИМЕННО этот товар. <code>updateOne({ id, changes: { fetchedAt: 0 } })</code>.<br>
+          <strong>Global</strong> — invalidate all. Типовой случай: logout, смена языка, смена тенанта.
+          <code>removeAll()</code> или пометить все как stale.<br>
+          <strong>Tag-group</strong> — invalidate tag. Типовой случай: создали новый пост — инвалидируем
+          список <code>posts.list</code>, но не трогаем <code>posts.byId</code>. Имитируется через
+          отдельное поле <code>lastListFetchedAt</code> или <code>tags: string[]</code>.
+        </div>
+
+        <h3>Когда condition срабатывает</h3>
+        <div class="code-block"><span class="cm">// dispatch(fetchProduct(1))  → условие true/false вычисляется до pending</span>
+<span class="cm">//                               ↓</span>
+<span class="cm">//   true → pending → payloadCreator → fulfilled/rejected   (сеть была)</span>
+<span class="cm">//   false → rejected c meta.condition=true                 (pending НЕ диспатчится)</span>
+
+<span class="kw">const</span> result = <span class="kw">await</span> store.<span class="fn">dispatch</span>(<span class="fn">fetchProduct</span>(1))
+<span class="kw">if</span> (fetchProduct.rejected.<span class="fn">match</span>(result) &amp;&amp; result.meta.condition) {
+  console.<span class="fn">log</span>(<span class="str">'cache hit — никаких побочных эффектов не случилось'</span>)
+}</div>
+
+        <h3>Параллельный запрос одного id (in-flight dedup)</h3>
+        <div class="code-block"><span class="cm">// Проблема: 10 компонентов одновременно монтируются → 10 параллельных fetch того же товара.</span>
+<span class="cm">// condition по fetchedAt не спасёт — все 10 увидят entity=undefined и все пойдут в сеть.</span>
+
+<span class="kw">interface</span> ProductsState <span class="kw">extends</span> EntityState&lt;Product, <span class="kw">number</span>&gt; {
+  inflight: Record&lt;<span class="kw">number</span>, <span class="kw">boolean</span>&gt;
+}
+
+condition: (id, { getState }) =&gt; {
+  <span class="kw">const</span> s = getState().products
+  <span class="kw">if</span> (s.inflight[id]) <span class="kw">return</span> <span class="kw">false</span>            <span class="cm">// уже летит → не дублируем</span>
+  <span class="kw">const</span> cached = s.entities[id]
+  <span class="kw">if</span> (!cached) <span class="kw">return</span> <span class="kw">true</span>
+  <span class="kw">return</span> Date.<span class="fn">now</span>() - cached.fetchedAt &gt; TTL_MS
+}
+
+<span class="cm">// В extraReducers: pending → inflight[id]=true, fulfilled/rejected → delete inflight[id]</span></div>
+
+        <h3>Что нельзя класть в store</h3>
+        <div class="tip" style="border-left-color: var(--accent-red);">
+          <strong>❌ setTimeout / интервалы.</strong> Timer id — не сериализуемо, reducer perish.
+          Таймеры держите ВНЕ store: в listener middleware или в usePoll hook.<br>
+          <strong>❌ Promise / AbortController.</strong> Они не сериализуются, DevTools сломается.
+          Храните только скаляры: <code>fetchedAt</code>, <code>status</code>, <code>error</code>.<br>
+          <strong>❌ Date object.</strong> Immer не любит неплоские типы с методами. <code>Date.now()</code>
+          возвращает <code>number</code> — это и кладите.
+        </div>
+
+        <h3>RTKQ analog</h3>
+        <p style="color: var(--text-secondary);">
+          В RTKQ TTL называется <code>keepUnusedDataFor</code> (по умолчанию 60s) — это НЕ TTL свежести,
+          а сколько держать данные после того, как последний подписчик отписался. Свежесть в RTKQ — это
+          <code>refetchOnMountOrArgChange: number | true</code> + <code>refetchOnFocus</code> +
+          <code>refetchOnReconnect</code>. Invalidation — через <code>tagTypes</code> + <code>providesTags</code> /
+          <code>invalidatesTags</code>. Всё то, что мы сейчас собираем руками через <code>fetchedAt</code> и
+          <code>invalidateAll</code>, RTKQ делает декларативно.
+        </p>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../59-asyncthunk-condition/">59 — condition callback</a></li>
+          <li><a href="../70d-entity-as-cache-table/">70d — EntityAdapter как cache-таблица</a></li>
+          <li><a href="../70e-request-dedup/">70e — dedup через condition</a></li>
+          <li><a href="../70g-quiz-caching/">70g — Квиз по всему блоку</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

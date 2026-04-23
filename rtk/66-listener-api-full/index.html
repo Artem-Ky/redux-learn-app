@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>66 — listenerApi полный</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .api-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin: 10px 0; }
+    .api-btn {
+      background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary);
+      padding: 10px 12px; border-radius: var(--radius); cursor: pointer; text-align: left;
+      transition: border-color .15s, background .15s; font-family: var(--font-sans);
+    }
+    .api-btn:hover { border-color: var(--accent); background: var(--bg-hover); }
+    .api-btn__name { color: var(--accent-cyan); font-family: var(--font-mono); font-size: .82rem; font-weight: 600; }
+    .api-btn__desc { color: var(--text-muted); font-size: .74rem; margin-top: 4px; line-height: 1.4; }
+    .api-map { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: .82rem; margin: 10px 0; }
+    .api-map code { font-size: .78rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">66 / 106</span>listenerApi — полный справочник методов effect</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../65-listener-setup-predicates/">← Назад</a>
+      <a href="../67-listener-fork/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">8 кнопок — 8 методов listenerApi</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Каждая кнопка диспатчит action, внутри listener'а вызывается соответствующий метод.
+          Следите за консолью — там подробная последовательность вызовов.
+        </p>
+
+        <div class="state-display">
+          <div class="state-display__label">state.demo</div>
+          <div class="state-display__value" id="state-out">—</div>
+        </div>
+
+        <div class="api-grid">
+          <button class="api-btn" data-cmd="get-state">
+            <div class="api-btn__name">1. getState()</div>
+            <div class="api-btn__desc">логируем state после reducer'а</div>
+          </button>
+          <button class="api-btn" data-cmd="get-original">
+            <div class="api-btn__name">2. getOriginalState()</div>
+            <div class="api-btn__desc">state до reducer'а (sync only!)</div>
+          </button>
+          <button class="api-btn" data-cmd="dispatch">
+            <div class="api-btn__name">3. dispatch(...)</div>
+            <div class="api-btn__desc">изнутри effect вызываем другой action</div>
+          </button>
+          <button class="api-btn" data-cmd="cancel-active">
+            <div class="api-btn__name">4. cancelActiveListeners()</div>
+            <div class="api-btn__desc">takeLatest — отменяем другие инстансы</div>
+          </button>
+          <button class="api-btn" data-cmd="pause">
+            <div class="api-btn__name">5. pause(promise)</div>
+            <div class="api-btn__desc">обёртка над await с cancellation</div>
+          </button>
+          <button class="api-btn" data-cmd="delay">
+            <div class="api-btn__name">6. delay(ms)</div>
+            <div class="api-btn__desc">abort-aware setTimeout</div>
+          </button>
+          <button class="api-btn" data-cmd="unsub-sub">
+            <div class="api-btn__name">7. unsubscribe() / subscribe()</div>
+            <div class="api-btn__desc">временно глушим listener</div>
+          </button>
+          <button class="api-btn" data-cmd="take">
+            <div class="api-btn__name">8. take(predicate, timeout?)</div>
+            <div class="api-btn__desc">ждём следующий action (с таймаутом)</div>
+          </button>
+          <button class="api-btn" data-cmd="condition">
+            <div class="api-btn__name">9. condition(predicate)</div>
+            <div class="api-btn__desc">take, но возвращает boolean</div>
+          </button>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn--danger" id="reset">reset state</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 66. listenerApi = MiddlewareAPI + эффекты</div>
+      <div class="theory__body">
+
+        <h3>Что такое listenerApi</h3>
+        <div class="quote">
+          «The <code>listenerApi</code> object is the second argument to each listener callback. It contains several utility functions that may be called anywhere inside the listener's logic.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createListenerMiddleware#listener-api" target="_blank">RTK docs — listener api</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>listenerApi</code> — второй аргумент коллбека. Набор утилит: <code>dispatch/getState</code> как у MiddlewareAPI плюс <code>getOriginalState</code>, <code>condition</code>, <code>take</code>, <code>delay</code>, <code>pause</code>, <code>fork</code>, <code>signal</code>, <code>cancelActiveListeners</code>, <code>cancel</code>, <code>subscribe/unsubscribe</code>, <code>throwIfCancelled</code>, <code>extra</code>.»
+        </div>
+
+        <h3>Состав объекта (в порядке, как в <code>notifyListener</code>)</h3>
+        <div class="api-map">
+          <code>dispatch / getState</code><div>унаследованы из <code>MiddlewareAPI</code></div>
+          <code>getOriginalState()</code><div>снапшот до <code>next(action)</code>. <strong>Sync only</strong></div>
+          <code>condition(p, ms?)</code><div>Promise&lt;boolean&gt; — ждёт, пока predicate станет true</div>
+          <code>take(p, ms?)</code><div>Promise&lt;[action, cur, prev] | null&gt; — возвращает тройку</div>
+          <code>delay(ms)</code><div>abort-aware setTimeout</div>
+          <code>pause(promise)</code><div>abort-aware await: кинет <code>TaskAbortError</code> при cancel</div>
+          <code>extra</code><div>аргумент из <code>createListenerMiddleware({ extra })</code></div>
+          <code>signal</code><div>AbortSignal этой конкретной итерации effect'а</div>
+          <code>fork(exec, opts?)</code><div>параллельная задача (урок 67)</div>
+          <code>subscribe() / unsubscribe()</code><div>unsubscribe — снять entry, subscribe — добавить обратно</div>
+          <code>cancelActiveListeners()</code><div>отменить все прочие pending-инстансы этого entry</div>
+          <code>cancel()</code><div>отменить текущую итерацию</div>
+          <code>throwIfCancelled()</code><div>бросить <code>TaskAbortError</code> если signal.aborted</div>
+        </div>
+
+        <h3>Исходник — createTakePattern</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/listenerMiddleware/index.ts, createTakePattern</span>
+<span class="kw">const</span> <span class="fn">createTakePattern</span> = &lt;S&gt;(
+  startListening: AddListenerOverloads&lt;UnsubscribeListener, S, Dispatch&gt;,
+  signal: AbortSignal,
+): TakePattern&lt;S&gt; =&gt; {
+  <span class="kw">const</span> <span class="fn">take</span> = <span class="kw">async</span> &lt;P <span class="kw">extends</span> AnyListenerPredicate&lt;S&gt;&gt;(
+    predicate: P,
+    timeout: number | <span class="kw">undefined</span>,
+  ) =&gt; {
+    <span class="fn">validateActive</span>(signal)
+
+    <span class="kw">let</span> unsubscribe: UnsubscribeListener = () =&gt; {}
+
+    <span class="cm">// one-shot listener внутри promise — как только predicate вернёт true,</span>
+    <span class="cm">// listener сам себя unsubscribe'ит и резолвит кортеж</span>
+    <span class="kw">const</span> tuplePromise = <span class="kw">new</span> <span class="fn">Promise</span>&lt;[Action, S, S]&gt;((resolve, reject) =&gt; {
+      <span class="kw">let</span> stopListening = <span class="fn">startListening</span>({
+        predicate: predicate <span class="kw">as any</span>,
+        effect: (action, listenerApi) =&gt; {
+          listenerApi.<span class="fn">unsubscribe</span>()                 <span class="cm">// одноразовый</span>
+          <span class="fn">resolve</span>([action, listenerApi.<span class="fn">getState</span>(), listenerApi.<span class="fn">getOriginalState</span>()])
+        },
+      })
+      unsubscribe = () =&gt; { <span class="fn">stopListening</span>(); <span class="fn">reject</span>() }
+    })
+
+    <span class="kw">const</span> promises = [tuplePromise]
+    <span class="kw">if</span> (timeout != <span class="kw">null</span>) {
+      <span class="cm">// гонка с таймаутом — если не успели, резолв null</span>
+      promises.<span class="fn">push</span>(<span class="kw">new</span> <span class="fn">Promise</span>&lt;<span class="kw">null</span>&gt;((r) =&gt; <span class="fn">setTimeout</span>(r, timeout, <span class="kw">null</span>)))
+    }
+
+    <span class="kw">try</span> {
+      <span class="cm">// raceWithSignal — гонка промиса с AbortSignal родителя</span>
+      <span class="kw">const</span> output = <span class="kw">await</span> <span class="fn">raceWithSignal</span>(signal, <span class="fn">Promise</span>.<span class="fn">race</span>(promises))
+      <span class="fn">validateActive</span>(signal)
+      <span class="kw">return</span> output
+    } <span class="kw">finally</span> {
+      <span class="fn">unsubscribe</span>()                                  <span class="cm">// всегда снимаем listener</span>
+    }
+  }
+
+  <span class="kw">return</span> ((p, t) =&gt; <span class="fn">catchRejection</span>(<span class="fn">take</span>(p, t))) <span class="kw">as</span> TakePattern&lt;S&gt;
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/index.ts#L128-L190" target="_blank">github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/index.ts#L128-L190</a>
+        </p>
+
+        <h3>Как устроен внутренний AbortSignal (<code>notifyListener</code>)</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/listenerMiddleware/index.ts, notifyListener (фрагмент)</span>
+<span class="kw">const</span> internalTaskController = <span class="kw">new</span> <span class="fn">AbortController</span>()
+entry.pending.<span class="fn">add</span>(internalTaskController)
+
+<span class="kw">await</span> entry.<span class="fn">effect</span>(
+  action,
+  <span class="fn">assign</span>({}, api, {
+    getOriginalState,
+    condition: (p, t) =&gt; <span class="fn">take</span>(p, t).<span class="fn">then</span>(<span class="fn">Boolean</span>),   <span class="cm">// condition = take + Boolean</span>
+    take,
+    delay: <span class="fn">createDelay</span>(internalTaskController.signal),
+    pause: <span class="fn">createPause</span>(internalTaskController.signal),
+    extra,
+    signal: internalTaskController.signal,
+    fork: <span class="fn">createFork</span>(internalTaskController.signal, autoJoinPromises),
+    unsubscribe: entry.unsubscribe,
+    subscribe: () =&gt; { listenerMap.<span class="fn">set</span>(entry.id, entry) },
+    cancelActiveListeners: () =&gt; {
+      entry.pending.<span class="fn">forEach</span>((c, _, set) =&gt; {
+        <span class="kw">if</span> (c !== internalTaskController) {
+          c.<span class="fn">abort</span>(listenerCancelled); set.<span class="fn">delete</span>(c)
+        }
+      })
+    },
+    cancel: () =&gt; {
+      internalTaskController.<span class="fn">abort</span>(listenerCancelled)
+      entry.pending.<span class="fn">delete</span>(internalTaskController)
+    },
+    throwIfCancelled: () =&gt; <span class="fn">validateActive</span>(internalTaskController.signal),
+  }),
+)
+        </div>
+
+        <div class="warning">
+          <strong>Подводные камни listenerApi:</strong>
+          <ul>
+            <li><strong><code>getOriginalState()</code> работает только синхронно.</strong> Middleware обнуляет свой внутренний токен после прогона reducer'а (<code>originalState = INTERNAL_NIL_TOKEN</code> в <code>finally</code>). Любой вызов после <code>await</code> кинет Error: <code>«listenerMiddleware: getOriginalState can only be called synchronously»</code>.</li>
+            <li><strong><code>cancelActiveListeners()</code> не отменяет fork'и текущего effect'а.</strong> Метод проходит по <code>entry.pending</code> и пропускает текущий <code>internalTaskController</code> — то есть отменяет «других меня», а не собственные побочные задачи. Чтобы уронить fork — держите <code>ForkedTask</code> в closure и зовите <code>.cancel()</code>.</li>
+          </ul>
+        </div>
+
+        <h3>condition vs take</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem;">
+          <thead style="background: var(--bg-panel);">
+            <tr>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); text-align: left; color: var(--accent);">API</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Что возвращает</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Когда</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">take(pred)</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">[action, current, previous]</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">нужны данные action'а/state'а</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">take(pred, ms)</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">[action, cur, prev] | <code>null</code></td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">с таймаутом — null если не дождались</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">condition(pred)</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">boolean</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">нужен только факт «произошло/нет»</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../58-thunk-api/">58 — thunkAPI (аналогичная структура у thunk)</a></li>
+          <li><a href="../67-listener-fork/">67 — fork() и ForkedTaskAPI</a></li>
+          <li><a href="../68-listener-cancellation/">68 — TaskAbortError и takeLatest</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>71 — autoBatchEnhancer и prepareAutoBatched</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .queue-select {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px; margin: 10px 0;
+    }
+    .queue-select label {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: var(--radius-sm);
+      background: var(--bg-panel); border: 1px solid var(--border);
+      cursor: pointer; font-family: var(--font-mono); font-size: .8rem;
+      transition: background .15s, border-color .15s;
+    }
+    .queue-select label:hover { background: var(--bg-hover); }
+    .queue-select input[type="radio"] { accent-color: var(--accent); }
+    .queue-select label.active {
+      border-color: var(--accent); background: rgba(86,156,214,.08);
+    }
+    .queue-select .q-hint { color: var(--text-muted); font-size: .72rem; }
+
+    .metrics-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px; margin: 14px 0;
+    }
+    .metric {
+      background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 12px;
+    }
+    .metric__label { color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; }
+    .metric__value { font-family: var(--font-mono); font-size: 1.6rem; color: var(--accent-cyan); margin-top: 4px; }
+    .metric--bad .metric__value { color: var(--accent-red); }
+    .metric--good .metric__value { color: var(--success); }
+    .metric__hint { color: var(--text-muted); font-size: .7rem; margin-top: 2px; }
+
+    .flash-count { animation: flash-bg .4s ease-out; }
+    @keyframes flash-bg {
+      0% { background: rgba(86,156,214,.25); }
+      100% { background: transparent; }
+    }
+
+    .prio-table {
+      width: 100%; border-collapse: collapse; font-size: .82rem; margin: 10px 0;
+    }
+    .prio-table th, .prio-table td {
+      padding: 6px 10px; border: 1px solid var(--border); text-align: left;
+    }
+    .prio-table th { background: var(--bg-panel); color: var(--accent); }
+    .prio-table td.mono { font-family: var(--font-mono); font-size: .78rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">71 / 106</span>autoBatchEnhancer и prepareAutoBatched — отложенные уведомления</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../70g-quiz-caching/">← Назад</a>
+      <a href="../72-isplainobject-isaction-utils/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">100 × dispatch — сколько уведомлений получит <code>store.subscribe</code>?</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>autoBatchEnhancer</code> группирует «low-priority» экшены (с флагом <code>meta[SHOULD_AUTOBATCH]: true</code>) и уведомляет
+          подписчиков <strong>один раз</strong> на пачку. В RTK 2.x этот enhancer <strong>включён по умолчанию</strong> —
+          достаточно проставить флаг через <code>prepareAutoBatched</code> (или руками) и батчинг работает.
+        </p>
+
+        <div class="queue-select" id="queue-select">
+          <div class="q-hint" style="width: 100%;">Тип очереди (<code>AutoBatchOptions.type</code>):</div>
+          <label data-type="raf"><input type="radio" name="queue" value="raf" checked> raf <span class="q-hint">(requestAnimationFrame, ~16 мс)</span></label>
+          <label data-type="tick"><input type="radio" name="queue" value="tick"> tick <span class="q-hint">(queueMicrotask)</span></label>
+          <label data-type="timer"><input type="radio" name="queue" value="timer"> timer <span class="q-hint">(setTimeout 0)</span></label>
+          <label data-type="callback"><input type="radio" name="queue" value="callback"> callback <span class="q-hint">(ручная функция)</span></label>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric metric--bad">
+            <div class="metric__label">dispatch total</div>
+            <div class="metric__value" id="m-dispatches">0</div>
+            <div class="metric__hint">сколько экшенов ушло в reducer</div>
+          </div>
+          <div class="metric" id="m-sub-wrap">
+            <div class="metric__label">subscribe notifications</div>
+            <div class="metric__value" id="m-subs">0</div>
+            <div class="metric__hint">сколько раз вызван listener</div>
+          </div>
+          <div class="metric metric--good">
+            <div class="metric__label">ratio dispatches / notifs</div>
+            <div class="metric__value" id="m-ratio">—</div>
+            <div class="metric__hint">цель: &gt;1 (батчинг работает)</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">state.counter</div>
+            <div class="metric__value" id="m-state" style="color: var(--accent-yellow)">0</div>
+            <div class="metric__hint">финальное значение</div>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn--danger" id="btn-normal">Dispatch 100 normal actions</button>
+          <button class="btn btn--success" id="btn-batched">Dispatch 100 auto-batched</button>
+          <button class="btn btn--accent" id="btn-mixed">50 batched → 1 normal (flush!)</button>
+          <button class="btn" id="btn-reset">reset metrics</button>
+        </div>
+
+        <p style="color: var(--text-muted); font-size: .78rem; margin-top: 10px;">
+          Обратите внимание на <strong>третью кнопку</strong>: после 50 «отложенных» экшенов мы диспатчим один
+          обычный — enhancer <em>синхронно</em> flush'ит накопленное уведомление перед ним.
+        </p>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 71. autoBatchEnhancer: приоритизация уведомлений</div>
+      <div class="theory__body">
+
+        <h3>Цитата из исходника</h3>
+        <div class="quote">
+          «Watches for any actions with a specific <code>action.meta[SHOULD_AUTOBATCH]: true</code> field… If some low-pri actions have been dispatched and a notification microtask is queued, then a normal priority action is dispatched, the enhancer will go ahead and notify all subscribers synchronously.»
+          <br>— <a href="https://redux-toolkit.js.org/api/autoBatchEnhancer" target="_blank">redux-toolkit.js.org/api/autoBatchEnhancer</a>
+        </div>
+        <div class="quote quote--ru">
+          «Следит за экшенами с <code>meta[SHOULD_AUTOBATCH]: true</code>. Если накоплена очередь low-priority экшенов и пришёл обычный экшен — enhancer <strong>синхронно</strong> уведомит подписчиков перед обработкой этого обычного экшена.»
+        </div>
+
+        <h3>В RTK 2.x enhancer включён по умолчанию</h3>
+        <p>
+          Достаточно просто <code>configureStore({ reducer })</code> — <code>getDefaultEnhancers()</code>
+          сам добавит <code>autoBatchEnhancer({ type: 'raf' })</code>. Руками его подключать не нужно; нужно только
+          <strong>проставить флаг</strong> в тех экшенах, которые хочешь батчить.
+        </p>
+
+        <h3>Исходник — <code>getDefaultEnhancers</code></h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/getDefaultEnhancers.ts</span>
+<span class="kw">export const</span> <span class="fn">buildGetDefaultEnhancers</span> = &lt;M <span class="kw">extends</span> <span class="type">Middlewares</span>&lt;<span class="kw">any</span>&gt;&gt;(
+  middlewareEnhancer: <span class="type">StoreEnhancer</span>,
+): <span class="type">GetDefaultEnhancers</span>&lt;M&gt; =&gt;
+  <span class="kw">function</span> <span class="fn">getDefaultEnhancers</span>(options) {
+    <span class="kw">const</span> { autoBatch = <span class="kw">true</span> } = options ?? {}     <span class="cm">// 👀 default: true</span>
+
+    <span class="kw">let</span> enhancerArray = <span class="kw">new</span> <span class="fn">Tuple</span>&lt;<span class="type">StoreEnhancer</span>[]&gt;(middlewareEnhancer)
+    <span class="kw">if</span> (autoBatch) {
+      enhancerArray.<span class="fn">push</span>(
+        <span class="fn">autoBatchEnhancer</span>(
+          <span class="kw">typeof</span> autoBatch === <span class="str">'object'</span> ? autoBatch : <span class="kw">undefined</span>,   <span class="cm">// можно передать { type: 'tick' } через autoBatch: {...}</span>
+        ),
+      )
+    }
+    <span class="kw">return</span> enhancerArray <span class="kw">as any</span>
+  }
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/getDefaultEnhancers.ts" target="_blank">github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/getDefaultEnhancers.ts</a>
+        </p>
+
+        <h3>Исходник — сердце <code>autoBatchEnhancer.dispatch</code></h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/autoBatchEnhancer.ts — строки ~46-128 (сокращено)</span>
+<span class="kw">export const</span> <span class="fn">autoBatchEnhancer</span> =
+  (options: <span class="type">AutoBatchOptions</span> = { type: <span class="str">'raf'</span> }): <span class="type">StoreEnhancer</span> =&gt;
+  (next) =&gt;
+  (...args) =&gt; {
+    <span class="kw">const</span> store = <span class="fn">next</span>(...args)
+
+    <span class="kw">let</span> notifying = <span class="kw">true</span>                     <span class="cm">// флаг: пропускаем оригинальные listener'ы?</span>
+    <span class="kw">let</span> shouldNotifyAtEndOfTick = <span class="kw">false</span>      <span class="cm">// накопилась ли очередь</span>
+    <span class="kw">let</span> notificationQueued = <span class="kw">false</span>           <span class="cm">// уже запланирована микро-задача</span>
+
+    <span class="kw">const</span> listeners = <span class="kw">new</span> <span class="type">Set</span>&lt;() =&gt; <span class="kw">void</span>&gt;()
+
+    <span class="kw">const</span> queueCallback =
+      options.type === <span class="str">'tick'</span>   ? <span class="fn">queueMicrotask</span>
+      : options.type === <span class="str">'raf'</span>  ? window.<span class="fn">requestAnimationFrame</span>
+      : options.type === <span class="str">'callback'</span> ? options.queueNotification
+      : <span class="fn">createQueueWithTimer</span>(options.timeout)
+
+    <span class="kw">const</span> <span class="fn">notifyListeners</span> = () =&gt; {
+      notificationQueued = <span class="kw">false</span>
+      <span class="kw">if</span> (shouldNotifyAtEndOfTick) {
+        shouldNotifyAtEndOfTick = <span class="kw">false</span>
+        listeners.<span class="fn">forEach</span>((l) =&gt; <span class="fn">l</span>())     <span class="cm">// ← ОДИН вызов на всю пачку</span>
+      }
+    }
+
+    <span class="kw">return</span> <span class="type">Object</span>.<span class="fn">assign</span>({}, store, {
+      <span class="fn">subscribe</span>(listener) {
+        <span class="cm">// обёртка: listener срабатывает ТОЛЬКО если notifying === true</span>
+        <span class="kw">const</span> <span class="fn">wrappedListener</span> = () =&gt; notifying &amp;&amp; <span class="fn">listener</span>()
+        <span class="kw">const</span> unsubscribe = store.<span class="fn">subscribe</span>(wrappedListener)
+        listeners.<span class="fn">add</span>(listener)
+        <span class="kw">return</span> () =&gt; { <span class="fn">unsubscribe</span>(); listeners.<span class="fn">delete</span>(listener) }
+      },
+      <span class="fn">dispatch</span>(action) {
+        <span class="kw">try</span> {
+          <span class="cm">// 1) нет флага SHOULD_AUTOBATCH — notifying=true → listener'ы сработают как обычно</span>
+          notifying = !action?.meta?.[SHOULD_AUTOBATCH]
+          shouldNotifyAtEndOfTick = !notifying
+          <span class="kw">if</span> (shouldNotifyAtEndOfTick) {
+            <span class="kw">if</span> (!notificationQueued) {
+              notificationQueued = <span class="kw">true</span>
+              <span class="fn">queueCallback</span>(notifyListeners)      <span class="cm">// ставим задачу один раз на тик</span>
+            }
+          }
+          <span class="kw">return</span> store.<span class="fn">dispatch</span>(action)
+        } <span class="kw">finally</span> {
+          notifying = <span class="kw">true</span>                        <span class="cm">// возвращаемся в нормальный режим</span>
+        }
+      },
+    })
+  }
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/autoBatchEnhancer.ts#L46-L128" target="_blank">github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/autoBatchEnhancer.ts#L46-L128</a>
+        </p>
+
+        <h3>prepareAutoBatched — однострочник</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/autoBatchEnhancer.ts, строки 5-10</span>
+<span class="kw">export const</span> <span class="fn">prepareAutoBatched</span> =
+  &lt;T&gt;() =&gt;
+  (payload: T): { payload: T; meta: <span class="kw">unknown</span> } =&gt; ({
+    payload,
+    meta: { [SHOULD_AUTOBATCH]: <span class="kw">true</span> },   <span class="cm">// SHOULD_AUTOBATCH === 'RTK_autoBatch'</span>
+  })
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Использование: <code>createSlice.reducers.tick = { reducer, prepare: prepareAutoBatched&lt;void&gt;() }</code>.
+          Или вручную: <code>{ type: 'feed/append', meta: { RTK_autoBatch: true }, payload }</code>.
+        </p>
+
+        <h3>Как фокус с «синхронным flush» реализован</h3>
+        <p>
+          Когда приходит <strong>обычный</strong> экшен и в очереди уже ждёт <code>notifyListeners</code>:
+        </p>
+        <ul>
+          <li>внутри <code>store.dispatch(action)</code> <em>оригинальный</em> redux store пробегается по своим listener'ам — это обёртки;</li>
+          <li>перед этим мы уже выставили <code>notifying = true</code> — значит wrappers <em>вызовут</em> реальные listener'ы;</li>
+          <li>накопленное «low-priority» уведомление <em>отдаётся синхронно</em>, потому что мы всё равно уже в середине dispatch;</li>
+          <li>запланированная задача (raf/tick) когда-нибудь выполнит <code>notifyListeners</code>, но <code>shouldNotifyAtEndOfTick</code> уже <code>false</code> — будет no-op.</li>
+        </ul>
+
+        <h3>4 типа очереди — когда что выбирать</h3>
+        <table class="prio-table">
+          <thead>
+            <tr>
+              <th>type</th>
+              <th>Как реализован</th>
+              <th>Когда выбрать</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">raf</td>
+              <td class="mono">requestAnimationFrame</td>
+              <td>UI-обновления (~60fps). Default для RTK. Синхронизирует с рендером браузера.</td>
+            </tr>
+            <tr>
+              <td class="mono">tick</td>
+              <td class="mono">queueMicrotask</td>
+              <td>Хочешь flush как можно скорее — в конце текущего цикла микро-задач (до paint). Нативный Promise.resolve().then() работает так же.</td>
+            </tr>
+            <tr>
+              <td class="mono">timer</td>
+              <td class="mono">setTimeout(cb, timeout)</td>
+              <td>Фон/логи/аналитика — можно отложить в macrotask. Задержка настраивается.</td>
+            </tr>
+            <tr>
+              <td class="mono">callback</td>
+              <td class="mono">твоя функция</td>
+              <td>Custom scheduler (React's <code>unstable_scheduleCallback</code>, idle callback, etc).</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="warning">
+          <strong>Подводные камни autoBatch:</strong>
+          <ul>
+            <li><strong>Flush на первый «обычный» экшен может быть неожиданным.</strong> Если у тебя есть дорогой подписчик (ре-рендер большого дерева), и ты диспатчишь 1000 батчед + затем 1 обычный — этот обычный <em>заставит</em> ре-рендер синхронно со всеми 1000 изменениями. Это <em>нормально</em> (цель enhancer'а), но если ожидаешь «один setTimeout(0) → один render» — учти, что любой не-батчед action прерывает паузу.</li>
+            <li><strong>raf не тикает в фоновых вкладках.</strong> Если вкладка неактивна — <code>requestAnimationFrame</code> останавливается. Batched-уведомления копятся, пока пользователь не вернётся. Для приложений, которые должны работать в фоне (например, data-feed), используй <code>{ type: 'timer', timeout: 16 }</code> — setTimeout работает всегда.</li>
+            <li><strong><code>queueMicrotask</code> (tick) может отложиться, если стек глубокий.</strong> Микро-задачи выполняются в конце <em>текущей</em> JS-задачи. Если dispatch лежит внутри <code>await</code> → <code>await</code> → dispatch chain, микро-задача flush'нется между ними. Для визуальных группировок лучше <code>raf</code>.</li>
+            <li><strong>Tuple порядка enhancer'ов важен.</strong> <code>autoBatchEnhancer</code> должен быть <em>после</em> middlewareEnhancer — именно поэтому в <code>getDefaultEnhancers</code> он <code>push</code>'ится в конец. Иначе middleware видел бы обёртки.</li>
+          </ul>
+        </div>
+
+        <h3>Когда НЕ использовать autoBatch</h3>
+        <ul>
+          <li><strong>Один dispatch — одна анимация.</strong> Если у тебя по клику диспатчится один экшен и UI реагирует на него — батчить нечего.</li>
+          <li><strong>Тесты с <code>store.subscribe</code> expectations.</strong> Если тест ждёт <code>expect(listener).toHaveBeenCalledTimes(100)</code>, батчинг сломает это. Либо снимай флаг, либо <code>configureStore({ enhancers: (g) =&gt; g({ autoBatch: false }) })</code>.</li>
+          <li><strong>react-redux уже имеет свой батчинг.</strong> <code>useSelector</code> с shallowEqual + React 18 automatic batching часто закрывают задачу. <code>autoBatchEnhancer</code> — для прямых подписчиков (через <code>store.subscribe</code>) и для очень частых экшенов (websocket feed, scroll events).</li>
+        </ul>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../15-enhancers-autobatch/">15 — enhancers + autoBatch (обзор)</a></li>
+          <li><a href="../22-prepare-callback/">22 — prepare callback (как работает вторая половина reducer: {reducer, prepare})</a></li>
+          <li><a href="../16-tuple-typing/">16 — Tuple enhancer'ов и их порядок</a></li>
+          <li><a href="../70e-request-dedup/">70e — дедупликация запросов (похожая идея «группируем похожие эффекты»)</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

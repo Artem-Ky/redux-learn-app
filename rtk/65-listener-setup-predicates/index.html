@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>65 — Подключение и 4 формы startListening</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .hit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin: 10px 0; }
+    .hit-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 12px; transition: border-color .3s, background .3s;
+    }
+    .hit-card.fired { border-color: var(--accent); background: rgba(86,156,214,.08); }
+    .hit-card__label { color: var(--accent); font-family: var(--font-mono); font-size: .78rem; font-weight: 600; }
+    .hit-card__code { color: var(--text-muted); font-family: var(--font-mono); font-size: .72rem; margin-top: 4px; line-height: 1.4; }
+    .hit-card__hits {
+      display: inline-block; background: var(--bg-panel); color: var(--accent-cyan);
+      font-family: var(--font-mono); padding: 2px 8px; border-radius: 10px; font-size: .72rem; margin-top: 6px;
+    }
+    .svg-wrap { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 12px 0; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">65 / 106</span>Подключение и 4 формы предиката startListening</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../64-listener-why/">← Назад</a>
+      <a href="../66-listener-api-full/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">4 listener'а слушают counter — каждый по-своему</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Один и тот же action может быть «пойман» четырьмя разными способами.
+          Нажимайте кнопки — карточки ниже подсвечиваются когда срабатывает их listener.
+          Обратите внимание, что при <code>incrementBy(5)</code> срабатывают не все четыре.
+        </p>
+
+        <div class="counter" style="margin: 14px 0;">
+          <div class="counter__value" id="count-out">0</div>
+        </div>
+
+        <div class="btn-group" style="flex-wrap: wrap;">
+          <button class="btn btn--accent" id="inc">+1 increment</button>
+          <button class="btn" id="dec">-1 decrement</button>
+          <button class="btn" id="inc-by-5">+5 incrementBy(5)</button>
+          <button class="btn" id="noise">unrelated dispatch</button>
+          <button class="btn btn--danger" id="reset">reset</button>
+        </div>
+
+        <div class="hit-grid">
+          <div class="hit-card" data-listener="a">
+            <div class="hit-card__label">1. actionCreator</div>
+            <div class="hit-card__code">{ actionCreator: increment }</div>
+            <div class="hit-card__hits">hits: <span data-count="a">0</span></div>
+          </div>
+          <div class="hit-card" data-listener="b">
+            <div class="hit-card__label">2. type (string)</div>
+            <div class="hit-card__code">{ type: 'counter/decrement' }</div>
+            <div class="hit-card__hits">hits: <span data-count="b">0</span></div>
+          </div>
+          <div class="hit-card" data-listener="c">
+            <div class="hit-card__label">3. matcher</div>
+            <div class="hit-card__code">{ matcher: isAnyOf(inc, dec) }</div>
+            <div class="hit-card__hits">hits: <span data-count="c">0</span></div>
+          </div>
+          <div class="hit-card" data-listener="d">
+            <div class="hit-card__label">4. predicate</div>
+            <div class="hit-card__code">
+              (action, cur, prev) =&gt;<br>&nbsp;&nbsp;cur.counter.value &gt;= 10 &amp;&amp;<br>&nbsp;&nbsp;prev.counter.value &lt; 10
+            </div>
+            <div class="hit-card__hits">hits: <span data-count="d">0</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 65. Как подключить и какие predicate'ы бывают</div>
+      <div class="theory__body">
+
+        <h3>Подключение к store</h3>
+        <div class="quote">
+          «The listener middleware should be added to the Redux store using the <code>configureStore</code>'s <code>middleware</code> parameter. It's recommended to prepend the listener middleware so that it runs before the default middleware like <code>redux-thunk</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createListenerMiddleware#basic-usage" target="_blank">RTK docs — basic usage</a>
+        </div>
+        <div class="quote quote--ru">
+          «Listener middleware следует добавлять через параметр <code>middleware</code> у <code>configureStore</code>. Рекомендуется именно <code>.prepend()</code> — чтобы listener шёл раньше thunk и успевал увидеть action до того, как thunk его преобразует.»
+        </div>
+
+        <div class="code-block">
+<span class="kw">import</span> { configureStore, createListenerMiddleware } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> listenerMiddleware = <span class="fn">createListenerMiddleware</span>()
+
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer: rootReducer,
+  middleware: (getDefault) =&gt; <span class="fn">getDefault</span>()
+    .<span class="fn">prepend</span>(listenerMiddleware.middleware),  <span class="cm">// именно prepend, не concat</span>
+})
+        </div>
+
+        <h3>4 формы <code>startListening</code></h3>
+        <div class="code-block">
+<span class="cm">// 1. actionCreator — самый популярный, типы action'а вывозятся из RTK action creator</span>
+listener.<span class="fn">startListening</span>({ actionCreator: increment, effect: (action, api) =&gt; { ... } })
+
+<span class="cm">// 2. type — строка, когда action создан не через createAction</span>
+listener.<span class="fn">startListening</span>({ type: <span class="str">'counter/decrement'</span>, effect: (action, api) =&gt; { ... } })
+
+<span class="cm">// 3. matcher — проверка принадлежности к группе (isAnyOf, isAllOf, thunk.fulfilled)</span>
+listener.<span class="fn">startListening</span>({ matcher: <span class="fn">isAnyOf</span>(increment, decrement), effect: ... })
+
+<span class="cm">// 4. predicate — полный доступ к action + currentState + originalState</span>
+listener.<span class="fn">startListening</span>({
+  predicate: (action, currentState, originalState) =&gt;
+    (currentState <span class="kw">as</span> RootState).counter.value &gt;= 10 &amp;&amp;
+    (originalState <span class="kw">as</span> RootState).counter.value &lt; 10,
+  effect: ...
+})
+        </div>
+
+        <h3>Исходник — компиляция всех форм в единый predicate</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/listenerMiddleware/index.ts, getListenerEntryPropsFrom</span>
+<span class="kw">const</span> <span class="fn">getListenerEntryPropsFrom</span> = (options: FallbackAddListenerOptions) =&gt; {
+  <span class="kw">let</span> { type, actionCreator, matcher, predicate, effect } = options
+
+  <span class="kw">if</span> (type) {
+    <span class="cm">// форма 2 → predicate = createAction(type).match</span>
+    predicate = <span class="fn">createAction</span>(type).match
+  } <span class="kw">else if</span> (actionCreator) {
+    <span class="cm">// форма 1 → сам action creator уже содержит .match</span>
+    type = actionCreator!.type
+    predicate = actionCreator.match
+  } <span class="kw">else if</span> (matcher) {
+    <span class="cm">// форма 3 → matcher сам по себе type-guard</span>
+    predicate = matcher
+  } <span class="kw">else if</span> (predicate) {
+    <span class="cm">// форма 4 → ничего не делаем</span>
+  } <span class="kw">else</span> {
+    <span class="kw">throw new</span> <span class="fn">Error</span>(
+      <span class="str">'Creating or removing a listener requires one of the known fields for matching an action'</span>
+    )
+  }
+
+  <span class="fn">assertFunction</span>(effect, <span class="str">'options.listener'</span>)
+
+  <span class="kw">return</span> { predicate, type, effect }
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/index.ts#L192-L213" target="_blank">github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/index.ts#L192-L213</a>
+        </p>
+
+        <h3>Сигнатура predicate и что он видит</h3>
+        <div class="svg-wrap">
+          <svg viewBox="0 0 780 180" width="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arr65" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#569cd6"/>
+              </marker>
+            </defs>
+
+            <rect x="10" y="20" width="130" height="50" rx="6" fill="#1b1b1b" stroke="#333"/>
+            <text x="75" y="40" text-anchor="middle" fill="#c586c0" font-size="11" font-family="JetBrains Mono">dispatch(action)</text>
+            <text x="75" y="58" text-anchor="middle" fill="#999" font-size="10">entry point</text>
+
+            <rect x="160" y="20" width="130" height="50" rx="6" fill="#1b1b1b" stroke="#333"/>
+            <text x="225" y="40" text-anchor="middle" fill="#ce9178" font-size="11" font-family="JetBrains Mono">originalState</text>
+            <text x="225" y="58" text-anchor="middle" fill="#999" font-size="10">снапшот ДО reducer</text>
+
+            <rect x="310" y="20" width="130" height="50" rx="6" fill="#1b1b1b" stroke="#333"/>
+            <text x="375" y="40" text-anchor="middle" fill="#4ec9b0" font-size="11" font-family="JetBrains Mono">next(action)</text>
+            <text x="375" y="58" text-anchor="middle" fill="#999" font-size="10">reducer прогоняется</text>
+
+            <rect x="460" y="20" width="130" height="50" rx="6" fill="#1b1b1b" stroke="#333"/>
+            <text x="525" y="40" text-anchor="middle" fill="#ce9178" font-size="11" font-family="JetBrains Mono">currentState</text>
+            <text x="525" y="58" text-anchor="middle" fill="#999" font-size="10">после reducer</text>
+
+            <rect x="610" y="20" width="160" height="50" rx="6" fill="#1b1b1b" stroke="#569cd6"/>
+            <text x="690" y="40" text-anchor="middle" fill="#569cd6" font-size="11" font-family="JetBrains Mono">predicate(a, c, o)</text>
+            <text x="690" y="58" text-anchor="middle" fill="#999" font-size="10">true → run effect</text>
+
+            <line x1="140" y1="45" x2="160" y2="45" stroke="#569cd6" stroke-width="2" marker-end="url(#arr65)"/>
+            <line x1="290" y1="45" x2="310" y2="45" stroke="#569cd6" stroke-width="2" marker-end="url(#arr65)"/>
+            <line x1="440" y1="45" x2="460" y2="45" stroke="#569cd6" stroke-width="2" marker-end="url(#arr65)"/>
+            <line x1="590" y1="45" x2="610" y2="45" stroke="#569cd6" stroke-width="2" marker-end="url(#arr65)"/>
+
+            <rect x="100" y="110" width="580" height="60" rx="6" fill="#1b1b1b" stroke="#333"/>
+            <text x="120" y="132" fill="#cdcdcd" font-size="12" font-family="JetBrains Mono">predicate(action, currentState, originalState) =&gt; boolean</text>
+            <text x="120" y="152" fill="#999" font-size="11">currentState — уже после reducer'а; originalState — снапшот, который бы вернул getState() ДО next()</text>
+          </svg>
+        </div>
+
+        <div class="warning">
+          <strong>Два подводных камня подключения и predicate:</strong>
+          <ul>
+            <li><strong>Именно <code>.prepend()</code>, а не <code>.concat()</code>.</strong> Если сделать <code>.concat(listener.middleware)</code>, listener увидит thunk'и уже преобразованными в функции, и результат будет непредсказуемым. <code>prepend</code> ставит его первым в цепочке <code>[listener, thunk, immutable, serializable]</code>.</li>
+            <li><strong><code>currentState</code> и <code>originalState</code> могут совпадать по ссылке.</strong> Если reducer вернул тот же объект (например, <code>incrementBy(0)</code> при <code>return state</code>), <code>currentState === originalState</code>. Сравнивайте по <strong>значению</strong> нужного поля, а не по ссылкам root-объекта.</li>
+          </ul>
+        </div>
+
+        <h3>Как типизировать форму-4 (predicate) сразу</h3>
+        <div class="code-block">
+<span class="cm">// без predicate TS не знает тип action</span>
+listener.<span class="fn">startListening</span>({
+  predicate: (action, currentState: RootState, previousState: RootState) =&gt;
+    currentState.counter.value &gt;= 10 &amp;&amp; previousState.counter.value &lt; 10,
+  effect: (action, api) =&gt; {
+    <span class="cm">// action: UnknownAction — нет type guard'а</span>
+    <span class="cm">// api.getState(): RootState — типизировано благодаря withTypes (урок 70)</span>
+  }
+})
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../11-default-middleware/">11 — default middleware (куда вставляется prepend)</a></li>
+          <li><a href="../23-matchers-utilities/">23 — isAnyOf / isAllOf (matcher-форма)</a></li>
+          <li><a href="../66-listener-api-full/">66 — listenerApi: getOriginalState, take, condition</a></li>
+          <li><a href="../70-listener-typed/">70 — withTypes для строгой типизации</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

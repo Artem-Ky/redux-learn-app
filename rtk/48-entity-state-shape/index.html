@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>48 — EntityState&lt;T&gt; внутри</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .shape-viewer {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .pane {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      min-height: 260px;
+    }
+    .pane__title {
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-size: .78rem;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .pane__title .cnt { color: var(--text-muted); }
+
+    .ids-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .id-pill {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      color: var(--accent-cyan);
+      transition: all .5s cubic-bezier(.2,.9,.3,1);
+      transform-origin: center;
+    }
+    .id-pill.flash {
+      background: #204a2a;
+      border-color: var(--success);
+      color: #fff;
+      transform: scale(1.2);
+      box-shadow: 0 0 10px rgba(76,175,80,.4);
+    }
+    .id-pill.flash-remove {
+      background: #4a2020;
+      border-color: var(--error);
+      color: #fff;
+      opacity: 0;
+      transform: scale(.3);
+    }
+
+    .entities-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+    }
+    .entity-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      line-height: 1.4;
+      transition: all .5s cubic-bezier(.2,.9,.3,1);
+      transform-origin: center;
+    }
+    .entity-card.flash {
+      background: #204a2a;
+      border-color: var(--success);
+      transform: scale(1.05);
+      box-shadow: 0 0 10px rgba(76,175,80,.4);
+    }
+    .entity-card.flash-remove {
+      background: #4a2020;
+      border-color: var(--error);
+      opacity: 0;
+      transform: scale(.3);
+    }
+    .entity-card__key {
+      color: var(--accent-purple);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .entity-card__field { color: var(--text-secondary); }
+    .entity-card__field b { color: var(--accent-cyan); font-weight: 500; }
+
+    .key-coerce {
+      background: var(--bg-panel);
+      border-left: 3px solid var(--warning);
+      padding: 10px 14px;
+      margin: 12px 0;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+    }
+    .key-coerce b { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">48 / 106</span>EntityState&lt;T&gt; — два поля, синхронно</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../47-entityadapter-basics/">← Назад</a>
+      <a href="../49-add-set-upsert/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Анимация: ids и entities всегда меняются в паре</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Слева — <code>ids[]</code> (порядок). Справа — <code>entities</code> (<code>Record&lt;id, T&gt;</code>).
+          При любом CRUD-действии оба поля обновляются <strong>атомарно</strong> (это и есть инвариант
+          нормализации). Нажимай кнопки и смотри, как pill'ы и карточки вспыхивают одновременно.
+        </p>
+
+        <div class="btn-group" style="margin: 14px 0;">
+          <button class="btn btn--accent" id="add-one">addOne (random)</button>
+          <button class="btn" id="add-numeric">addOne id=42 (number → string)</button>
+          <button class="btn" id="update-one">updateOne (последний)</button>
+          <button class="btn btn--danger" id="remove-one">removeOne (случайный)</button>
+          <button class="btn btn--danger" id="reset">reset</button>
+        </div>
+
+        <div class="shape-viewer">
+          <div class="pane">
+            <div class="pane__title">
+              <span>state.users.ids: string[]</span>
+              <span class="cnt" id="ids-cnt">0</span>
+            </div>
+            <div class="ids-list" id="ids-list"></div>
+          </div>
+          <div class="pane">
+            <div class="pane__title">
+              <span>state.users.entities: Record&lt;string, User&gt;</span>
+              <span class="cnt" id="ent-cnt">0</span>
+            </div>
+            <div class="entities-grid" id="ent-grid"></div>
+          </div>
+        </div>
+
+        <div class="key-coerce" id="coerce-note"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 48. Форма EntityState&lt;T, Id&gt;</div>
+      <div class="theory__body">
+        <h3>Тип из <code>packages/toolkit/src/entities/models.ts</code></h3>
+        <div class="code-block">
+<span class="cm">// https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/models.ts</span>
+<span class="kw">export type</span> <span class="type">EntityId</span> = <span class="type">number</span> | <span class="type">string</span>
+
+<span class="kw">export type</span> <span class="type">Comparer</span>&lt;<span class="type">T</span>&gt; = (a: <span class="type">T</span>, b: <span class="type">T</span>) =&gt; <span class="type">number</span>
+
+<span class="kw">export type</span> <span class="type">IdSelector</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt; = (model: <span class="type">T</span>) =&gt; <span class="type">Id</span>
+
+<span class="kw">export type</span> <span class="type">Update</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt; = { id: <span class="type">Id</span>; changes: <span class="type">Partial</span>&lt;<span class="type">T</span>&gt; }
+
+<span class="kw">export interface</span> <span class="type">EntityState</span>&lt;<span class="type">T</span>, <span class="type">Id</span> <span class="kw">extends</span> <span class="type">EntityId</span>&gt; {
+  ids: <span class="type">Id</span>[]
+  entities: <span class="type">Record</span>&lt;<span class="type">Id</span>, <span class="type">T</span>&gt;
+}
+        </div>
+
+        <h3>Инициализация — <code>entity_state.ts</code></h3>
+        <div class="code-block">
+<span class="kw">export function</span> <span class="fn">getInitialEntityState</span>&lt;<span class="type">T</span>, <span class="type">Id</span> <span class="kw">extends</span> <span class="type">EntityId</span>&gt;(): <span class="type">EntityState</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt; {
+  <span class="kw">return</span> {
+    ids: [],
+    entities: {} <span class="kw">as</span> <span class="type">Record</span>&lt;<span class="type">Id</span>, <span class="type">T</span>&gt;,
+  }
+}
+        </div>
+        <p>
+          GitHub: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/entity_state.ts" target="_blank">entities/entity_state.ts</a>
+        </p>
+
+        <h3>Инвариант</h3>
+        <ul>
+          <li><code>ids.length === Object.keys(entities).length</code> — всегда равны после CRUD.</li>
+          <li>Порядок в <code>ids</code> определяет, в каком порядке <code>selectAll</code> возвращает массив.</li>
+          <li>Для любого <code>id</code> из <code>ids</code> гарантированно есть <code>entities[id]</code>.</li>
+        </ul>
+
+        <h3>Цитата — Redux docs (Normalizing State Shape)</h3>
+        <div class="quote">
+          «Our state now has an ‘entities’ slice that contains the actual data, with the individual items
+          stored by ID, and an <strong>‘ids’ array</strong> that represents the ‘current’ set of items.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/normalizing-state-shape#designing-a-normalized-state" target="_blank">Designing a Normalized State</a>
+        </div>
+        <div class="quote quote--ru">
+          «Наш state теперь содержит срез <code>entities</code> с самими данными по id и массив
+          <code>ids</code>, который представляет <strong>текущий порядок/набор</strong> элементов.»
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. <code>entities</code> — это <code>Record</code>, а не <code>Map</code>.</strong>
+          <br>RTK использует plain object. Это значит: ключи будут <strong>строками</strong> (JavaScript
+          coerce), даже если вы передали <code>number</code>. В типах Id может быть <code>number</code>,
+          но внутри: <code>entities['42'] === entities[42]</code>. Из-за этого <em>нельзя</em> использовать
+          в качестве id объекты или символы — только <code>string | number</code> (<code>type EntityId
+          = number | string</code>).
+          <br><br>
+          <strong>2. Branded id (nominal types).</strong> Если вы хотите type-safe id вроде
+          <code>type BookId = string &amp; { __brand: 'BookId' }</code> — используйте <strong>второй
+          generic</strong>:
+          <div class="code-block" style="margin: 8px 0;">
+<span class="kw">type</span> <span class="type">BookId</span> = <span class="type">string</span> &amp; { readonly __brand: <span class="str">'BookId'</span> }
+
+<span class="kw">const</span> booksAdapter = <span class="fn">createEntityAdapter</span>&lt;<span class="type">Book</span>, <span class="type">BookId</span>&gt;({
+  selectId: (b) =&gt; b.isbn <span class="kw">as</span> <span class="type">BookId</span>,  <span class="cm">// selectId ОБЯЗАТЕЛЕН при 2-м generic'е</span>
+})
+          </div>
+          Первая перегрузка <code>createEntityAdapter&lt;T, Id&gt;</code> делает <code>selectId</code>
+          required, вторая (только <code>&lt;T&gt;</code>) — нет, но требует <code>T extends { id: EntityId }</code>.
+          <br><br>
+          <strong>3. Не мутируйте <code>entities</code> вручную.</strong> Если забыть и добавить ключ
+          в <code>entities</code>, не добавив в <code>ids</code> — <code>selectAll</code> не увидит новую
+          запись (он итерирует <code>ids</code>). Всегда используйте adapter-методы.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../47-entityadapter-basics/">47 — CRUD базово</a></li>
+          <li><a href="../50-entity-update-shallow/">50 — updateOne shallow</a></li>
+          <li><a href="../51-selectid-sortcomparer/">51 — selectId + sortComparer</a></li>
+          <li><a href="../53-getinitialstate-extra/">53 — getInitialState({ extra })</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createEntityAdapter#entity-state-shape" target="_blank">RTK · Entity State Shape</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/models.ts" target="_blank">models.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

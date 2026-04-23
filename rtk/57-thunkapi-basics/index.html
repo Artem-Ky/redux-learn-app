@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>57 — thunkAPI: dispatch, getState, extra</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .state-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; }
+    .state-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); white-space: pre; overflow: auto; max-height: 260px; }
+    .cache-ind { display:inline-block; padding:2px 8px; border-radius:10px; font-family:var(--font-mono); font-size:.7rem; margin-left:6px; border:1px solid var(--border); background: var(--bg-panel); color: var(--text-muted); }
+    .cache-ind.hit { color:#4caf50; border-color:#4caf50; background:rgba(76,175,80,.12); }
+    .cache-ind.miss { color:#ff9800; border-color:#ff9800; background:rgba(255,152,0,.12); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">57 / 106</span>thunkAPI: dispatch, getState, extra</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../56-asyncthunk-action-creators/">← Назад</a>
+      <a href="../58-rejectwithvalue/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Один thunk <code>fetchProduct(id)</code> использует <strong>всё сразу</strong>:
+        </p>
+        <ul style="color: var(--text-secondary); font-size: .85rem;">
+          <li><code>thunkAPI.getState()</code> — если товар уже есть в cache и свежий, <em>не идём в сеть</em>;</li>
+          <li><code>thunkAPI.dispatch(...)</code> — side-action <code>analytics/productViewed</code> шлёт в отдельный slice;</li>
+          <li><code>thunkAPI.extra</code> — <code>apiClient</code>, подключённый через <code>configureStore({middleware: gdm =&gt; gdm({thunk:{extraArgument: apiClient}})})</code>.</li>
+        </ul>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin: 12px 0;">
+          <button class="btn btn--accent" id="fetch-1">Fetch product #1</button>
+          <button class="btn btn--accent" id="fetch-2">Fetch product #2</button>
+          <button class="btn" id="fetch-1-again">Fetch product #1 (кэш должен сработать)</button>
+          <button class="btn btn--secondary" id="invalidate">Invalidate cache</button>
+        </div>
+
+        <div class="state-card">
+          <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem;">
+            store.getState() <span class="cache-ind" id="cache-ind">—</span>
+          </h4>
+          <div class="state-out" id="state-out">—</div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 57. BaseThunkAPI: что лежит во 2-м параметре</div>
+      <div class="theory__body">
+        <h3>Цитата</h3>
+        <div class="quote">
+          «The <code>payloadCreator</code> function will be called with two arguments: the first is the argument
+          provided to the action creator, and the second is a <code>thunkAPI</code> object. It exposes
+          <code>dispatch</code>, <code>getState</code>, <code>extra</code>, <code>requestId</code>, <code>signal</code>,
+          <code>abort</code>, <code>rejectWithValue</code>, and <code>fulfillWithValue</code>.»<br>
+          — <a href="https://redux-toolkit.js.org/api/createAsyncThunk#payloadcreator" target="_blank">createAsyncThunk — payloadCreator</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>payloadCreator</code> получает два аргумента: первый — это то, что передали в сам action creator,
+          второй — объект <code>thunkAPI</code> с полями <code>dispatch</code>, <code>getState</code>, <code>extra</code>,
+          <code>requestId</code>, <code>signal</code>, <code>abort</code>, <code>rejectWithValue</code>, <code>fulfillWithValue</code>.»
+        </div>
+
+        <h3>Исходник — тип <code>BaseThunkAPI</code></h3>
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строки 15–45</span>
+<span class="kw">export type</span> BaseThunkAPI&lt;
+  S, E,
+  D <span class="kw">extends</span> <span class="type">Dispatch</span> = <span class="type">Dispatch</span>,
+  RejectedValue = <span class="type">unknown</span>,
+  RejectedMeta = <span class="type">unknown</span>,
+  FulfilledMeta = <span class="type">unknown</span>,
+&gt; = {
+  dispatch: D                                   <span class="cm">// store.dispatch (с ThunkDispatch-сигнатурой)</span>
+  getState: () =&gt; S                             <span class="cm">// актуальный RootState</span>
+  extra: E                                      <span class="cm">// extraArgument из thunk-middleware</span>
+  requestId: <span class="type">string</span>                          <span class="cm">// nanoid, совпадает с meta.requestId</span>
+  signal: <span class="type">AbortSignal</span>                         <span class="cm">// signal от встроенного AbortController'а</span>
+  abort: (reason?: <span class="type">string</span>) =&gt; <span class="kw">void</span>             <span class="cm">// отменить этот запрос</span>
+  rejectWithValue:  <span class="cm">/* см. урок 58 */</span>
+  fulfillWithValue: <span class="cm">/* см. урок 62 */</span>
+}</div>
+        <p style="font-size:.78rem;"><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L15" target="_blank">createAsyncThunk.ts#L15</a></p>
+
+        <h3>Как прокинуть <code>extra</code> — extraArgument</h3>
+        <div class="code-block"><span class="kw">const</span> apiClient = { <span class="fn">get</span>: (url) =&gt; <span class="cm">/* fetch wrapper */</span> }
+
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer: rootReducer,
+  middleware: (getDefaultMiddleware) =&gt;
+    <span class="fn">getDefaultMiddleware</span>({
+      thunk: { extraArgument: apiClient },    <span class="cm">// ← вот сюда</span>
+    }),
+})
+
+<span class="cm">// теперь в thunk'е:</span>
+<span class="kw">const</span> fetchUser = <span class="fn">createAsyncThunk</span>&lt;
+  <span class="type">User</span>, <span class="type">number</span>,
+  { extra: <span class="kw">typeof</span> apiClient }       <span class="cm">// ← типизация extra</span>
+&gt;(<span class="str">'user/fetch'</span>, <span class="kw">async</span> (id, { extra }) =&gt; {
+  <span class="kw">return await</span> extra.<span class="fn">get</span>(<span class="str">`/api/users/</span><span class="op">$</span>{id}<span class="str">`</span>)
+})</div>
+
+        <h3>getState() — cache check</h3>
+        <div class="code-block"><span class="kw">const</span> fetchProduct = <span class="fn">createAsyncThunk</span>(
+  <span class="str">'products/fetch'</span>,
+  <span class="kw">async</span> (id, { getState, extra, dispatch }) =&gt; {
+    <span class="kw">const</span> root = <span class="fn">getState</span>() <span class="kw">as</span> <span class="type">RootState</span>
+    <span class="kw">const</span> cached = root.products.byId[id]
+
+    <span class="kw">if</span> (cached &amp;&amp; Date.<span class="fn">now</span>() - cached.fetchedAt &lt; 10_000) {
+      <span class="kw">return</span> cached   <span class="cm">// ← не ходим в сеть</span>
+    }
+
+    dispatch(<span class="fn">analyticsEvent</span>({ kind: <span class="str">'product-view'</span>, id }))  <span class="cm">// side-action</span>
+    <span class="kw">return await</span> extra.apiClient.<span class="fn">get</span>(<span class="str">`/api/products/</span><span class="op">$</span>{id}<span class="str">`</span>)
+  },
+)</div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. <code>getState()</code> возвращает АКТУАЛЬНОЕ состояние, не snapshot старта thunk'а.</strong>
+          Между <code>dispatch(pending)</code> и resolve'ом промиса другой thunk/reducer мог всё изменить.
+          Если нужен snapshot — сохраните в <code>const before = getState()</code> на входе.<br>
+          <strong>2. <code>extra</code> типизируется ТОЛЬКО через <code>ThunkApiConfig</code>.</strong>
+          Если не указать <code>{ extra: typeof apiClient }</code> — получите <code>extra: unknown</code>.
+          Есть ещё <code>createAsyncThunk.withTypes&lt;{ extra: ApiClient; state: RootState }&gt;()</code> для «curried»-формы.<br>
+          <strong>3. <code>dispatch(thunkB())</code> изнутри thunk'а — работает.</strong>
+          Но: если внутри thunk'а <code>await</code>-ить другой thunk — получаете action-объект, а не payload.
+          Для payload'а — <code>await dispatch(thunkB()).unwrap()</code>.<br>
+          <strong>4. extraArgument — один объект на весь store.</strong>
+          Если нужны разные клиенты (dev/prod, mocked), заведите «container»: <code>extraArgument: { api, history, logger }</code>.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../11-default-middleware/">11 — getDefaultMiddleware</a></li>
+          <li><a href="../55-asyncthunk-basic/">55 — базовый createAsyncThunk</a></li>
+          <li><a href="../58-rejectwithvalue/">58 — rejectWithValue</a></li>
+          <li><a href="../59-asyncthunk-condition/">59 — condition: альтернативный способ пропустить запрос</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

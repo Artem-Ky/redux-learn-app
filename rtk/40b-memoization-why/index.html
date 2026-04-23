@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>40b — Что такое мемоизация в Redux и зачем она</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .col3 {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    }
+    @media (max-width: 900px) { .col3 { grid-template-columns: 1fr; } }
+
+    .sel-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .sel-card__title {
+      font-family: var(--font-mono); font-size: .82rem;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .sel-card__code {
+      font-family: var(--font-mono); font-size: .72rem;
+      background: var(--bg-panel); padding: 8px 10px; border-radius: 4px;
+      color: var(--text-secondary); white-space: pre; overflow-x: auto;
+    }
+    .sel-card__meters {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+      font-family: var(--font-mono); font-size: .72rem;
+    }
+    .meter-cell { background: var(--bg-panel); border-radius: 3px; padding: 6px 8px; }
+    .meter-cell__label { color: var(--text-muted); font-size: .65rem; text-transform: uppercase; }
+    .meter-cell__value { color: var(--accent-cyan); font-size: 1rem; font-weight: 700; }
+    .meter-cell__value--warn { color: var(--accent-orange); }
+    .meter-cell__value--success { color: var(--success); }
+
+    .cache-viz {
+      min-height: 44px; display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+      padding: 8px; background: var(--bg-panel); border-radius: 4px; font-family: var(--font-mono); font-size: .7rem;
+    }
+    .cache-bubble {
+      padding: 3px 8px; border-radius: 10px; font-size: .7rem;
+      animation: bubble-in .4s ease-out;
+    }
+    .cache-bubble--hit  { background: rgba(76,175,80,.18); color: #7bd37e; border: 1px solid #3a6a3c; }
+    .cache-bubble--miss { background: rgba(244,71,71,.18); color: #f98080; border: 1px solid #6a2a2a; }
+    @keyframes bubble-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .anim-svg { display: block; margin: 12px auto; max-width: 680px; }
+    .anim-svg text { font-family: var(--font-mono); font-size: 11px; fill: #ccc; }
+    .anim-svg .lbl { fill: #888; font-size: 10px; }
+    .anim-svg .hit { fill: #7bd37e; }
+    .anim-svg .miss { fill: #f98080; }
+
+    .compare-table { width: 100%; border-collapse: collapse; font-size: .78rem; margin-top: 10px; }
+    .compare-table th, .compare-table td {
+      border: 1px solid var(--border); padding: 8px 10px; text-align: left; font-family: var(--font-mono);
+      vertical-align: top;
+    }
+    .compare-table th { background: var(--bg-tertiary); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">40b / 106</span>Что такое мемоизация в Redux и зачем она — подводка к createSelector</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../40a-slice-caching-refs/">← Назад</a>
+      <a href="../41-createselector-from-rtk/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Три селектора над одним store — кто сколько раз пересчитал combiner</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px;">
+          Одна и та же задача: <strong>вернуть только <em>опубликованные</em> посты</strong>. Три реализации:
+          без кеша, с ручной однослотной мемо-обёрткой, и — превью — <code>createSelector</code>. Смотри на
+          счётчики: сколько раз реально вызван combiner vs сколько dispatch'ей прошло.
+        </p>
+
+        <div class="col3">
+          <!-- NO MEMO -->
+          <div class="sel-card">
+            <div class="sel-card__title">
+              <span class="tag tag--bad">no memo</span>
+              <code>s =&gt; s.posts.items.filter(...)</code>
+            </div>
+            <div class="sel-card__code">const selectPublished = (s) =&gt;
+  s.posts.items.filter(p =&gt; p.published)</div>
+            <div class="sel-card__meters">
+              <div class="meter-cell"><div class="meter-cell__label">Calls</div>
+                <div class="meter-cell__value meter-cell__value--warn" id="naive-calls">0</div></div>
+              <div class="meter-cell"><div class="meter-cell__label">Hits</div>
+                <div class="meter-cell__value" id="naive-hits">0</div></div>
+              <div class="meter-cell"><div class="meter-cell__label">Misses</div>
+                <div class="meter-cell__value meter-cell__value--warn" id="naive-miss">0</div></div>
+            </div>
+            <div class="cache-viz" id="naive-viz"></div>
+          </div>
+
+          <!-- MANUAL MEMO -->
+          <div class="sel-card">
+            <div class="sel-card__title">
+              <span class="tag tag--info">manual memo</span>
+              <code>memoize1(s.posts.items, fn)</code>
+            </div>
+            <div class="sel-card__code">let lastArg, lastResult
+const selectPublishedM = (s) =&gt; {
+  if (s.posts.items === lastArg) return lastResult
+  lastArg = s.posts.items
+  lastResult = lastArg.filter(p =&gt; p.published)
+  return lastResult
+}</div>
+            <div class="sel-card__meters">
+              <div class="meter-cell"><div class="meter-cell__label">Calls</div>
+                <div class="meter-cell__value" id="manual-calls">0</div></div>
+              <div class="meter-cell"><div class="meter-cell__label">Hits</div>
+                <div class="meter-cell__value meter-cell__value--success" id="manual-hits">0</div></div>
+              <div class="meter-cell"><div class="meter-cell__label">Misses</div>
+                <div class="meter-cell__value" id="manual-miss">0</div></div>
+            </div>
+            <div class="cache-viz" id="manual-viz"></div>
+          </div>
+
+          <!-- CREATE SELECTOR (preview) -->
+          <div class="sel-card">
+            <div class="sel-card__title">
+              <span class="tag tag--good">createSelector</span>
+              <code>[s.posts.items], (items) =&gt; ...</code>
+            </div>
+            <div class="sel-card__code">const selectPublishedCS = createSelector(
+  [s =&gt; s.posts.items],
+  (items) =&gt; items.filter(p =&gt; p.published),
+)</div>
+            <div class="sel-card__meters">
+              <div class="meter-cell"><div class="meter-cell__label">Calls</div>
+                <div class="meter-cell__value" id="cs-calls">0</div></div>
+              <div class="meter-cell"><div class="meter-cell__label">Hits</div>
+                <div class="meter-cell__value meter-cell__value--success" id="cs-hits">0</div></div>
+              <div class="meter-cell"><div class="meter-cell__label">Misses</div>
+                <div class="meter-cell__value" id="cs-miss">0</div></div>
+            </div>
+            <div class="cache-viz" id="cs-viz"></div>
+          </div>
+        </div>
+
+        <div class="btn-group" style="margin-top: 16px;">
+          <button class="btn" data-act="toggle-theme">theme/toggle (не трогает posts)</button>
+          <button class="btn" data-act="add">posts/addPost</button>
+          <button class="btn" data-act="toggle-first">posts/togglePublished (posts #1)</button>
+          <button class="btn btn--danger" data-act="reset-counters">Reset counters</button>
+        </div>
+
+        <div class="tip" style="margin-top: 14px;">
+          Нажми <strong>theme/toggle</strong> 5 раз. <code>no memo</code> пересчитал combiner 5 раз зря.
+          <code>manual memo</code> и <code>createSelector</code> заметили: <code>state.posts.items</code> — та же ссылка,
+          вернули кеш. Это и есть суть мемоизации в Redux.
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 40b. Мемоизация как паттерн и почему Redux её любит</div>
+      <div class="theory__body">
+
+        <h3>Что значит «мемоизация»</h3>
+        <p>
+          Мемоизация — это кеширование <strong>результата чистой функции</strong> по её аргументам. Если функцию
+          вызывают повторно с теми же аргументами — возвращается сохранённый результат, без повторного вычисления.
+          В Redux это обычно означает: «пока <em>вход</em> селектора не менялся по ссылке — не пересчитывай
+          производные данные (filter/map/sort/reduce)».
+        </p>
+
+        <h3>Цитата: Redux docs — Deriving Data with Selectors</h3>
+        <div class="quote">
+          «Selectors are typically used as <strong>memoized functions</strong>. A memoized function caches the last
+          input arguments and result value. If called again with the same inputs, it returns the cached result
+          instead of recalculating. This is important for performance when selectors do expensive operations like
+          filtering or transforming arrays.»
+          <br>— <a href="https://redux.js.org/usage/deriving-data-selectors" target="_blank">redux.js.org/usage/deriving-data-selectors</a>
+        </div>
+        <div class="quote quote--ru">
+          «Селекторы обычно реализуют как <strong>мемоизированные функции</strong>. Такая функция помнит последние
+          входные аргументы и результат. При повторном вызове с теми же аргументами она возвращает кеш вместо
+          пересчёта. Это важно для производительности, когда селектор делает тяжёлые операции — фильтрацию или
+          трансформацию массивов.»
+        </div>
+
+        <h3>Наивная мемоизация одного аргумента — 10 строк</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">memoize1</span>&lt;A, R&gt;(fn: (a: A) =&gt; R): (a: A) =&gt; R {
+  <span class="kw">let</span> lastArg: A | <span class="kw">undefined</span>
+  <span class="kw">let</span> lastResult: R
+  <span class="kw">let</span> hasCache = <span class="kw">false</span>
+  <span class="kw">return</span> (arg) =&gt; {
+    <span class="kw">if</span> (hasCache &amp;&amp; arg === lastArg) {   <span class="cm">// 👀 === по ссылке — как reselect</span>
+      <span class="kw">return</span> lastResult                    <span class="cm">// cache hit: пересчёта нет</span>
+    }
+    lastArg = arg
+    lastResult = <span class="fn">fn</span>(arg)                      <span class="cm">// cache miss: вызываем настоящую функцию</span>
+    hasCache = <span class="kw">true</span>
+    <span class="kw">return</span> lastResult
+  }
+}
+
+<span class="cm">// Использование:</span>
+<span class="kw">const</span> selectPublished = <span class="fn">memoize1</span>((items: Post[]) =&gt;
+  items.<span class="fn">filter</span>((p) =&gt; p.published),
+)
+          </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Это и есть «кеш размером 1» (LRU cache size = 1). Reselect делает <em>то же самое</em>, только для
+          нескольких входов + оборачивает всё в createSelector.
+        </p>
+
+        <h3>Как reselect обобщает это на несколько входов</h3>
+        <div class="code-block">
+<span class="cm">// Упрощённый createSelector</span>
+<span class="kw">function</span> <span class="fn">createSelector</span>(inputSelectors, resultFunc) {
+  <span class="kw">let</span> lastInputs: <span class="kw">unknown</span>[] | <span class="kw">undefined</span>
+  <span class="kw">let</span> lastResult: <span class="kw">unknown</span>
+
+  <span class="kw">return</span> (state) =&gt; {
+    <span class="kw">const</span> inputs = inputSelectors.<span class="fn">map</span>((sel) =&gt; <span class="fn">sel</span>(state))
+    <span class="kw">const</span> hit =
+      lastInputs !== <span class="kw">undefined</span> &amp;&amp;
+      inputs.<span class="fn">every</span>((v, i) =&gt; v === lastInputs![i])   <span class="cm">// 👀 ссылочное сравнение каждого входа</span>
+    <span class="kw">if</span> (hit) <span class="kw">return</span> lastResult
+    lastInputs = inputs
+    lastResult = <span class="fn">resultFunc</span>(...inputs)
+    <span class="kw">return</span> lastResult
+  }
+}
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Настоящая reselect ещё сложнее: кастомные <code>equalityFn</code>, <code>argsMemoize</code>,
+          <code>resultEqualityCheck</code>, LRU/WeakMap стратегии, devmode warnings. Но ядро — именно это.
+        </p>
+
+        <h3>Жизненный цикл одного вызова селектора</h3>
+        <svg class="anim-svg" viewBox="0 0 680 220" xmlns="http://www.w3.org/2000/svg">
+          <!-- state -->
+          <rect x="10" y="90" width="70" height="40" rx="4" fill="#252526" stroke="#569cd6"/>
+          <text x="45" y="114" text-anchor="middle">state</text>
+
+          <line x1="80" y1="110" x2="140" y2="60" stroke="#666" marker-end="url(#arr40b)"/>
+          <line x1="80" y1="110" x2="140" y2="110" stroke="#666" marker-end="url(#arr40b)"/>
+          <line x1="80" y1="110" x2="140" y2="160" stroke="#666" marker-end="url(#arr40b)"/>
+
+          <!-- input selectors -->
+          <rect x="140" y="40" width="130" height="40" rx="4" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="205" y="64" text-anchor="middle">s.posts.items</text>
+          <rect x="140" y="90" width="130" height="40" rx="4" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="205" y="114" text-anchor="middle">s.filter</text>
+          <rect x="140" y="140" width="130" height="40" rx="4" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="205" y="164" text-anchor="middle">s.sortBy</text>
+
+          <!-- compare -->
+          <rect x="300" y="70" width="130" height="80" rx="4" fill="#2a2d2e" stroke="#c586c0" stroke-dasharray="3,3"/>
+          <text x="365" y="96" text-anchor="middle" style="fill:#c586c0">each === last?</text>
+          <text x="365" y="116" text-anchor="middle" class="lbl">для всех входов</text>
+          <text x="365" y="136" text-anchor="middle" class="lbl">reference check</text>
+
+          <line x1="270" y1="60"  x2="300" y2="90"  stroke="#666" marker-end="url(#arr40b)"/>
+          <line x1="270" y1="110" x2="300" y2="110" stroke="#666" marker-end="url(#arr40b)"/>
+          <line x1="270" y1="160" x2="300" y2="130" stroke="#666" marker-end="url(#arr40b)"/>
+
+          <!-- HIT path -->
+          <path d="M 430 90 Q 530 60 600 90" fill="none" stroke="#4caf50" stroke-width="1.5" marker-end="url(#arr40b-green)"/>
+          <text x="520" y="52" text-anchor="middle" class="hit">HIT → return cached</text>
+          <rect x="520" y="85" width="140" height="40" rx="4" fill="#1a2a1a" stroke="#4caf50"/>
+          <text x="590" y="109" text-anchor="middle">lastResult</text>
+
+          <!-- MISS path -->
+          <path d="M 430 130 Q 530 170 600 150" fill="none" stroke="#f44747" stroke-width="1.5" marker-end="url(#arr40b-red)"/>
+          <text x="525" y="200" text-anchor="middle" class="miss">MISS → run resultFunc</text>
+          <rect x="520" y="140" width="140" height="40" rx="4" fill="#2a1717" stroke="#f44747"/>
+          <text x="590" y="164" text-anchor="middle">combiner(...)</text>
+
+          <defs>
+            <marker id="arr40b" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="#aaa"/>
+            </marker>
+            <marker id="arr40b-green" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="#4caf50"/>
+            </marker>
+            <marker id="arr40b-red" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="#f44747"/>
+            </marker>
+          </defs>
+        </svg>
+
+        <h3>Исходник react-redux: почему он жалуется на «returned a different result»</h3>
+        <div class="code-block">
+<span class="cm">// react-redux/src/hooks/useSelector.ts (строки ~186–212, dev-режим)</span>
+<span class="cm">// https://github.com/reduxjs/react-redux/blob/master/src/hooks/useSelector.ts</span>
+<span class="kw">if</span> (
+  finalStabilityCheck === <span class="str">'always'</span> ||
+  (finalStabilityCheck === <span class="str">'once'</span> &amp;&amp; firstRun.current)
+) {
+  <span class="kw">const</span> toCompare = <span class="fn">selector</span>(state)              <span class="cm">// вызывает селектор второй раз с тем же state</span>
+  <span class="kw">if</span> (!<span class="fn">equalityFn</span>(selected, toCompare)) {
+    <span class="fn">console.warn</span>(
+      <span class="str">'Selector '</span> + (selector.name || <span class="str">'unknown'</span>) +
+      <span class="str">' returned a different result when called with the same parameters. '</span> +
+      <span class="str">'This can lead to unnecessary rerenders.'</span> +
+      <span class="str">'\nSelectors that return a new reference (such as an object or an array) '</span> +
+      <span class="str">'should be memoized: https://redux.js.org/usage/deriving-data-selectors#optimizing-selectors-with-memoization'</span>,
+      { state, selected, selected2: toCompare, stack },
+    )
+  }
+}
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          <strong>stabilityCheck</strong> в dev-моде: react-redux сам вызывает твой селектор <em>дважды</em> и
+          сравнивает результаты. Если даже на одинаковом <code>state</code> селектор возвращает новый объект —
+          warning в консоли с ссылкой на официальный гайд по мемоизации. Это прямое подтверждение, что
+          мемоизация = must-have для селекторов, возвращающих производные данные.
+        </p>
+
+        <h3>Что мемоизация ≠</h3>
+        <table class="compare-table">
+          <thead>
+            <tr><th>Это мемо</th><th>Это НЕ мемо</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Кеш по <strong>ссылке аргумента</strong> (<code>===</code>)</td>
+              <td>HTTP-кеш по URL / TTL</td>
+            </tr>
+            <tr>
+              <td>Живёт в замыкании функции, <em>lifecycle = lifecycle замыкания</em></td>
+              <td>Долговременный кеш (IndexedDB, Service Worker)</td>
+            </tr>
+            <tr>
+              <td>Работает на чистых функциях (pure)</td>
+              <td>Мемоизация side-effect функций (<code>fetch</code>) — это <em>другой</em> паттерн (каширование запроса)</td>
+            </tr>
+            <tr>
+              <td>Обычно cache size = 1 в reselect</td>
+              <td>LRU/LFU с несколькими слотами (<code>weakMapMemoize</code>, <code>lruMemoize(N)</code>)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Когда мемо <em>не даёт</em> выигрыша</h3>
+        <p>Если твой селектор — простое поле <code>state =&gt; state.user.name</code>, то:</p>
+        <ul>
+          <li>Input — та же ссылка, что в Redux-store (ничего не создаём).</li>
+          <li><code>===</code> работает из коробки (благодаря structural sharing из урока 40a).</li>
+          <li><code>createSelector</code> здесь — <strong>лишний</strong>: та же скорость, но с overhead на проверку.</li>
+        </ul>
+        <p>Мемо нужна, только когда <em>в селекторе создаётся новый объект/массив</em>. Красивый ориентир:</p>
+        <div class="tip">
+          Посмотри на тело селектора: есть <code>filter/map/slice/sort/Object.values/spread</code> — нужна
+          <code>createSelector</code>. Нет — не нужна. Это не правило, но почти всегда так.
+        </div>
+
+        <h3>Подводные камни</h3>
+
+        <div class="warning">
+          <strong>1. Cache size = 1: параметризованный селектор убивает кеш.</strong>
+          <code>selectPostById(state, postId)</code>: вызови его с <code>id=1</code>, затем с <code>id=2</code> — второй
+          вызов <em>вытеснит</em> кеш первого. В <code>Array.map(post =&gt; selectById(state, post.id))</code>
+          реальный hit-rate = 0%. <em>Почему так:</em> сделано для предсказуемости и минимума памяти. <em>Решение:</em>
+          <code>weakMapMemoize</code> (урок 43) или <code>createSelector.withCache</code>.
+        </div>
+
+        <div class="warning">
+          <strong>2. Мемо живёт в замыкании — создание селектора внутри render = каждый render новый кеш.</strong>
+          <code>const sel = useSelector(createSelector(...))</code> — <em>каждый render компонента</em> создаёт новый
+          createSelector, у которого новый пустой кеш. Hit-rate = 0%. <em>Почему:</em> кеш = <code>let lastArg</code>
+          в замыкании, которое пересоздаётся. <em>Решение:</em> вынеси <code>createSelector</code> в модуль-scope или
+          в <code>useMemo(() =&gt; createSelector(...), [])</code>.
+        </div>
+
+        <div class="warning">
+          <strong>3. Input-селектор возвращает новый объект → мемо бесполезна.</strong>
+          <code>createSelector([s =&gt; s.posts.items.filter(...)], ...)</code> — input-селектор <em>сам</em> делает
+          <code>.filter()</code>, каждый раз новый массив. <code>===</code> между старым и новым массивом всегда
+          <code>false</code> → combiner пересчитывает каждый раз. <em>Почему:</em> reselect сравнивает
+          <em>вход</em> к combiner по <code>===</code>, и новые массивы всегда разные. <em>Правило:</em>
+          <strong>input-selector = cheap pluck ссылки из state</strong>, трансформации — только в combiner.
+        </div>
+
+        <div class="warning">
+          <strong>4. Мемо не заменяет иммутабельность — она её требует.</strong>
+          Если reducer мутирует state напрямую (<code>state.posts.items.push(x)</code> без Immer), новый
+          <code>items</code> — это та же ссылка, что и старый. Селектор увидит «items не менялись» → cache hit →
+          UI не обновится. <em>Почему:</em> мемо доверяет <code>===</code>. <em>Решение:</em> всегда пиши reducer
+          через createSlice или Immer; никогда не мутируй состояние вне draft.
+        </div>
+
+        <div class="warning">
+          <strong>5. «Мемоизация» в нашем смысле не равна React.memo.</strong>
+          <code>React.memo</code> — обёртка компонента, которая сравнивает <em>props</em> shallow'ом.
+          Мемоизация селекторов — кеш <em>функции</em>. Оба полезны, но для разного:
+          <code>createSelector</code> — чтобы селектор вернул <em>ту же ссылку</em> (чтобы <code>React.memo</code>
+          сработал). Без мемо-селектора <code>React.memo</code> часто бесполезен: props — новые объекты каждый раз.
+        </div>
+
+        <h3>Что будет в следующих уроках</h3>
+        <table class="compare-table">
+          <thead>
+            <tr><th>Урок</th><th>Что добавит поверх</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><a href="../41-createselector-from-rtk/">41</a></td>
+                <td><code>createSelector</code> из RTK (re-export reselect), правильные input-selectors, <code>.resultFunc</code></td></tr>
+            <tr><td><a href="../42-createdraftsafeselector/">42</a></td>
+                <td><code>createDraftSafeSelector</code> — для селекторов внутри reducer'а (draft-aware)</td></tr>
+            <tr><td><a href="../43-weakmap-memoize/">43</a></td>
+                <td><code>weakMapMemoize</code> — решение cache-size-1 для параметризованных селекторов</td></tr>
+            <tr><td><a href="../44-slice-selectors-memoized/">44</a></td>
+                <td>мемо-селекторы внутри <code>createSlice({ selectors: { ... } })</code></td></tr>
+            <tr><td><a href="../45-typed-selectors-hooks/">45</a></td>
+                <td><code>withTypes</code>, <code>useAppSelector</code>, <code>useAppDispatch</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../33-slice-selectors/">33 — slice.selectors (базовый, без мемо)</a></li>
+          <li><a href="../40-current-original-debug/">40 — current()/original() в дебаге slice</a></li>
+          <li><a href="../40a-slice-caching-refs/">40a — structural sharing: база всего кеша</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux.js.org/usage/deriving-data-selectors" target="_blank">Redux — Deriving Data with Selectors</a></li>
+          <li><a href="https://redux.js.org/usage/deriving-data-selectors#optimizing-selectors-with-memoization" target="_blank">Redux — Optimizing Selectors with Memoization</a></li>
+          <li><a href="https://reselect.js.org/introduction/getting-started/" target="_blank">Reselect — Getting Started</a></li>
+          <li><a href="https://reselect.js.org/introduction/how-does-reselect-work" target="_blank">Reselect — How Reselect Works</a></li>
+          <li><a href="https://github.com/reduxjs/react-redux/blob/master/src/hooks/useSelector.ts" target="_blank">react-redux src — useSelector.ts (stabilityCheck)</a></li>
+          <li><a href="https://redux-toolkit.js.org/api/createSelector" target="_blank">RTK — createSelector</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

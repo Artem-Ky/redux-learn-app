@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>42 — createDraftSafeSelector: селекторы внутри reducer'а</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .probe-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      margin: 14px 0 8px;
+    }
+    .probe-table th, .probe-table td {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      text-align: center;
+      vertical-align: middle;
+    }
+    .probe-table th {
+      background: var(--bg-panel);
+      color: var(--accent);
+      font-weight: 600;
+      font-size: .78rem;
+      letter-spacing: .3px;
+    }
+    .probe-table th.col--unsafe { color: var(--error); }
+    .probe-table th.col--safe   { color: var(--success); }
+    .probe-table th.col--truth  { color: var(--accent-cyan); }
+    .probe-table td.phase {
+      text-align: left;
+      color: var(--text-secondary);
+      font-size: .78rem;
+      background: var(--bg-panel);
+      max-width: 220px;
+    }
+    .probe-table td.phase small { display: block; color: var(--text-muted); font-size: .7rem; margin-top: 2px; }
+    .probe-table td.mut-cell {
+      background: rgba(237, 153, 48, 0.08);
+      color: var(--accent-orange);
+      font-size: .78rem;
+      text-align: left;
+    }
+    .probe-table td.cell { font-size: 1.15rem; color: var(--text-bright); }
+    .probe-table td.cell--truth { color: var(--accent-cyan); }
+    .probe-table td.stale {
+      color: var(--error);
+      background: rgba(244,71,71,.1);
+      animation: pulse-red 1.4s ease-in-out 2;
+    }
+    .probe-table td.fresh {
+      color: var(--success);
+      background: rgba(76,175,80,.08);
+    }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: inset 0 0 0 0 rgba(244,71,71,.0); }
+      50%      { box-shadow: inset 0 0 12px 2px rgba(244,71,71,.35); }
+    }
+
+    .verdict-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .verdict {
+      padding: 10px 12px; border-radius: 3px; font-size: .8rem;
+      font-family: var(--font-mono); text-align: center;
+      background: var(--bg-panel); color: var(--text-muted); border: 1px solid var(--border);
+    }
+    .verdict--good { color: var(--success); border-color: rgba(76,175,80,.35); }
+    .verdict--bad  { color: var(--error);   border-color: rgba(244,71,71,.35); }
+
+    .stats-line {
+      display: flex; justify-content: space-between; gap: 20px;
+      padding: 10px 14px; margin: 10px 0 4px;
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 3px;
+      font-family: var(--font-mono); font-size: .78rem;
+    }
+    .stats-line span { color: var(--text-muted); }
+    .stats-line b { color: var(--accent); font-weight: 400; }
+
+    .ref-line { color: var(--text-muted); font-size: .78rem; font-family: var(--font-mono); padding: 6px 10px; }
+    .ref-line--ok { color: var(--accent-orange); }
+
+    .book-row {
+      display: flex; gap: 10px; align-items: center;
+      background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: 3px; padding: 6px 10px; font-size: .8rem; font-family: var(--font-mono);
+    }
+    .book-row__title { flex: 1; color: var(--text-bright); }
+    .book-row__price { color: var(--accent-orange); min-width: 60px; text-align: right; }
+
+    .draft-svg { display: block; margin: 14px auto; max-width: 720px; }
+    .draft-svg text { font-family: var(--font-mono); font-size: 11px; fill: #ccc; }
+    .draft-svg .lbl { fill: #888; font-size: 10px; }
+
+    .timeline-svg { display: block; margin: 14px auto; max-width: 720px; }
+    .timeline-svg text { font-family: var(--font-mono); fill: #ccc; }
+    .timeline-svg .lbl { fill: #888; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">42 / 106</span>createDraftSafeSelector — stale cache от Immer-draft'а</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../41-createselector-from-rtk/">← Назад</a>
+      <a href="../43-weakmap-memoize/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Probe: snapshot → мутация → snapshot — в ОДНОМ reducer'е</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px;">
+          Один reducer <code>runProbe</code> делает три действия подряд <em>в одной Immer-транзакции</em>:
+          <strong>(1)</strong> вызывает <code>selectAvgPriceUnsafe</code> / <code>selectAvgPriceSafe</code> и сохраняет результаты;
+          <strong>(2)</strong> мутирует каждую цену <code>+100 ₽</code>;
+          <strong>(3)</strong> снова вызывает оба селектора.
+          Между шагами <code>state.items</code> — <u>тот же самый Proxy</u> (Immer не меняет ссылку при мутации элементов).
+          Вот здесь обычный <code>createSelector</code> и ловит cache hit → отдаёт <strong>stale</strong>.
+        </p>
+
+        <table class="probe-table">
+          <thead>
+            <tr>
+              <th style="min-width: 220px;"></th>
+              <th class="col--unsafe">createSelector<br><span style="font-weight:400; font-size: .7rem; color: var(--text-muted);">lruMemoize (default)</span></th>
+              <th class="col--safe">createDraftSafeSelector<br><span style="font-weight:400; font-size: .7rem; color: var(--text-muted);">weakMapMemoize + current()</span></th>
+              <th class="col--truth">Правда<br><span style="font-weight:400; font-size: .7rem; color: var(--text-muted);">прямой reduce</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="phase">t₀ — <code>selector(state)</code><small>вызов до мутации, cache пуст</small></td>
+              <td id="u-before" class="cell">—</td>
+              <td id="s-before" class="cell">—</td>
+              <td id="t-before" class="cell cell--truth">—</td>
+            </tr>
+            <tr>
+              <td class="phase">t₁ — <code>state.items.forEach(b =&gt; b.price += 100)</code><small>мутация, <u>ссылка items не меняется</u></small></td>
+              <td colspan="3" class="mut-cell">мутация каждой книги +100 ₽ (items === тот же Proxy)</td>
+            </tr>
+            <tr>
+              <td class="phase">t₂ — <code>selector(state)</code><small>повторный вызов на том же state</small></td>
+              <td id="u-after" class="cell">—</td>
+              <td id="s-after" class="cell">—</td>
+              <td id="t-after" class="cell cell--truth">—</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="verdict-row">
+          <div id="u-verdict" class="verdict">— запустите probe —</div>
+          <div id="s-verdict" class="verdict">— запустите probe —</div>
+        </div>
+
+        <div class="stats-line">
+          <span>пересчётов у <b>createSelector</b>: <span id="u-count">0</span> раз</span>
+          <span>пересчётов у <b>createDraftSafeSelector</b>: <span id="s-count">0</span> раз</span>
+        </div>
+
+        <div id="items-ref" class="ref-line">—</div>
+
+        <div class="btn-group" style="margin-top: 14px;">
+          <button class="btn btn--accent" data-act="probe">Запустить probe</button>
+          <button class="btn" data-act="add">+ книга (random price)</button>
+          <button class="btn btn--danger" data-act="reset">Reset</button>
+        </div>
+
+        <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);">
+          <div style="font-size: .78rem; color: var(--text-muted); margin-bottom: 6px;">Текущие книги (после всех мутаций):</div>
+          <div id="books-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 42. createDraftSafeSelector и Immer drafts</div>
+      <div class="theory__body">
+
+        <h3>Цитата из доки RTK</h3>
+        <div class="quote">
+          «If an <code>immer</code>-drafted object is passed into the resulting selector's first argument,
+          the selector will act on the current draft value, instead of returning a cached value
+          that might be possibly outdated if the draft has been modified since.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSelector#createdraftsafeselector" target="_blank">RTK docs — createDraftSafeSelector</a>
+        </div>
+        <div class="quote quote--ru">
+          «Если в селектор передан объект-draft от Immer, селектор будет работать с <strong>текущим</strong>
+          значением draft'а, а не возвращать закешированный результат, который мог устареть, если draft уже
+          был изменён.»
+        </div>
+
+        <h3>Сценарий, в котором обычный createSelector ломается</h3>
+        <p>
+          Важная деталь: баг <strong>не в «повторных dispatch'ах»</strong>. Между dispatch'ами Immer создаёт
+          новый draft → ссылки другие → cache miss → пересчёт <em>корректный</em>. Баг возникает, когда
+          селектор вызывается <strong>несколько раз внутри одного reducer'а</strong>, а между вызовами
+          происходит мутация.
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> selectAvgPrice = <span class="fn">createSelector</span>(
+  [(s) =&gt; s.items],
+  (items) =&gt; items.<span class="fn">reduce</span>((acc, b) =&gt; acc + b.price, <span class="num">0</span>) / items.length,
+)
+
+reducers: {
+  <span class="fn">runProbe</span>: (state) =&gt; {
+    <span class="kw">const</span> before = <span class="fn">selectAvgPrice</span>(state)   <span class="cm">// miss → кладём в кеш [itemsProxy → X]</span>
+    state.items.<span class="fn">forEach</span>(b =&gt; { b.price += <span class="num">100</span> })   <span class="cm">// 👀 items Proxy — тот же</span>
+    <span class="kw">const</span> after = <span class="fn">selectAvgPrice</span>(state)    <span class="cm">// HIT → вернёт X (STALE)</span>
+  }
+}
+        </div>
+
+        <h3>Почему cache hit на том же Proxy</h3>
+        <ol>
+          <li>Input selector <code>(s) =&gt; s.items</code> возвращает <strong>один и тот же Proxy</strong>
+            для <code>state.items</code> в пределах одной Immer-транзакции. Мутация элементов
+            (<code>b.price += 100</code>) не создаёт новый массив — только помечает proxy как «изменённый».</li>
+          <li><code>lruMemoize(1)</code> в обычном <code>createSelector</code> сравнивает аргументы по
+            <code>===</code>. Второй вызов → <code>prevArgs[0] === curArgs[0]</code> → HIT.</li>
+          <li>Возвращается закешированный результат, вычисленный <em>до</em> мутации. То самое stale.</li>
+        </ol>
+
+        <h3>Как это чинит createDraftSafeSelector — исходник целиком</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/createDraftSafeSelector.ts (весь файл, ~30 строк)</span>
+<span class="cm">// https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createDraftSafeSelector.ts</span>
+
+<span class="kw">import</span> { current, isDraft } <span class="kw">from</span> <span class="str">'./immerImports'</span>
+<span class="kw">import</span> { createSelectorCreator, weakMapMemoize } <span class="kw">from</span> <span class="str">'./reselectImports'</span>
+
+<span class="kw">export const</span> createDraftSafeSelectorCreator: <span class="kw">typeof</span> createSelectorCreator = (
+  ...args: <span class="type">unknown</span>[]
+) =&gt; {
+  <span class="kw">const</span> createSelector = (createSelectorCreator <span class="kw">as any</span>)(...args)
+
+  <span class="kw">const</span> createDraftSafeSelector = <span class="fn">Object</span>.<span class="fn">assign</span>(
+    (...args: <span class="type">unknown</span>[]) =&gt; {
+      <span class="kw">const</span> selector = <span class="fn">createSelector</span>(...args)
+
+      <span class="kw">const</span> wrappedSelector = (value: <span class="type">unknown</span>, ...rest: <span class="type">unknown</span>[]) =&gt;
+        <span class="fn">selector</span>(<span class="fn">isDraft</span>(value) ? <span class="fn">current</span>(value) : value, ...rest)
+        <span class="cm">// 👀 каждый вызов на draft → current() → НОВЫЙ plain snapshot → новая ссылка → cache miss</span>
+
+      <span class="fn">Object</span>.<span class="fn">assign</span>(wrappedSelector, selector)
+      <span class="kw">return</span> wrappedSelector <span class="kw">as any</span>
+    },
+    { withTypes: () =&gt; createDraftSafeSelector },
+  )
+  <span class="kw">return</span> createDraftSafeSelector
+}
+
+<span class="kw">export const</span> createDraftSafeSelector =
+  <span class="cm">/* @__PURE__ */</span>
+  <span class="fn">createDraftSafeSelectorCreator</span>(weakMapMemoize)
+  <span class="cm">// 👀 default memoize = weakMapMemoize, НЕ lruMemoize</span>
+        </div>
+
+        <h3>Визуально: во что превращается вход у двух селекторов</h3>
+        <svg class="timeline-svg" viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg">
+          <!-- two rows: unsafe / safe -->
+          <!-- vertical timeline divisions -->
+          <line x1="60" y1="20" x2="60" y2="240" stroke="#333" stroke-dasharray="3 3"/>
+          <line x1="280" y1="20" x2="280" y2="240" stroke="#333" stroke-dasharray="3 3"/>
+          <line x1="500" y1="20" x2="500" y2="240" stroke="#333" stroke-dasharray="3 3"/>
+
+          <text x="60" y="15" text-anchor="middle" class="lbl">t₀ snapshot</text>
+          <text x="280" y="15" text-anchor="middle" class="lbl">t₁ mutate (+100)</text>
+          <text x="500" y="15" text-anchor="middle" class="lbl">t₂ snapshot</text>
+
+          <!-- UNSAFE row -->
+          <text x="0" y="55" style="fill:#f44747; font-size: 10px;">createSelector:</text>
+          <rect x="30" y="60" width="60" height="32" rx="3" fill="#2a1b1b" stroke="#f44747"/>
+          <text x="60" y="80" text-anchor="middle" style="fill:#ccc; font-size: 10px;">items@1</text>
+          <text x="60" y="112" text-anchor="middle" style="fill:#f44747; font-size: 9px;">MISS → compute</text>
+
+          <rect x="250" y="60" width="60" height="32" rx="3" fill="#2a1b1b" stroke="#f44747"/>
+          <text x="280" y="80" text-anchor="middle" style="fill:#ccc; font-size: 10px;">items@1</text>
+          <text x="280" y="112" text-anchor="middle" style="fill:#f44747; font-size: 9px;">(же Proxy)</text>
+
+          <rect x="470" y="60" width="60" height="32" rx="3" fill="#2a1b1b" stroke="#f44747"/>
+          <text x="500" y="80" text-anchor="middle" style="fill:#ccc; font-size: 10px;">items@1</text>
+          <text x="500" y="112" text-anchor="middle" style="fill:#f44747; font-size: 9px;">HIT → STALE ❌</text>
+
+          <line x1="90" y1="76" x2="250" y2="76" stroke="#f44747" stroke-dasharray="2 3"/>
+          <line x1="310" y1="76" x2="470" y2="76" stroke="#f44747" stroke-dasharray="2 3"/>
+
+          <!-- SAFE row -->
+          <text x="0" y="175" style="fill:#4caf50; font-size: 10px;">DraftSafe:</text>
+          <rect x="30" y="180" width="60" height="32" rx="3" fill="#1b2a1b" stroke="#4caf50"/>
+          <text x="60" y="196" text-anchor="middle" style="fill:#ccc; font-size: 9px;">current()</text>
+          <text x="60" y="208" text-anchor="middle" style="fill:#ccc; font-size: 9px;">snap_A</text>
+          <text x="60" y="232" text-anchor="middle" style="fill:#4caf50; font-size: 9px;">MISS → compute</text>
+
+          <rect x="250" y="180" width="60" height="32" rx="3" fill="#1b2a1b" stroke="#4caf50"/>
+          <text x="280" y="196" text-anchor="middle" style="fill:#ccc; font-size: 9px;">(мутация)</text>
+          <text x="280" y="208" text-anchor="middle" style="fill:#ccc; font-size: 9px;">draft ↑</text>
+
+          <rect x="470" y="180" width="60" height="32" rx="3" fill="#1b2a1b" stroke="#4caf50"/>
+          <text x="500" y="196" text-anchor="middle" style="fill:#ccc; font-size: 9px;">current()</text>
+          <text x="500" y="208" text-anchor="middle" style="fill:#ccc; font-size: 9px;">snap_B</text>
+          <text x="500" y="232" text-anchor="middle" style="fill:#4caf50; font-size: 9px;">MISS → recompute ✔</text>
+
+          <!-- annotations -->
+          <text x="360" y="255" text-anchor="middle" style="fill:#888; font-size: 10px;">snap_A !== snap_B  →  новая ссылка на каждом вызове  →  cache miss</text>
+        </svg>
+
+        <h3>Почему дефолтный memoize здесь — weakMapMemoize, а не lruMemoize</h3>
+        <p>Обратите внимание на последнюю строку исходника:</p>
+        <div class="code-block">
+createDraftSafeSelectorCreator(<strong>weakMapMemoize</strong>)
+<span class="cm">// vs</span>
+createSelector = createSelectorCreator(<strong>lruMemoize</strong>)  <span class="cm">// дефолт у обычного</span>
+        </div>
+        <p>
+          <code>weakMapMemoize</code> хранит дерево <code>WeakMap</code> по идентичности аргументов.
+          Старые snapshot'ы живут, пока их кто-то держит (например, time-travel в DevTools или
+          компонент, который ещё не размонтировался). Размер «кеша» не фиксирован 1 — удобно, когда
+          селектор применяют к разным snapshot'ам параллельно.
+        </p>
+
+        <h3>Схема: как работает unwrap</h3>
+        <svg class="draft-svg" viewBox="0 0 680 220" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="80" width="90" height="50" rx="4" fill="#2a2d2e" stroke="#c586c0"/>
+          <text x="55" y="100" text-anchor="middle">Proxy</text>
+          <text x="55" y="120" text-anchor="middle" class="lbl">(draft)</text>
+
+          <polygon points="130,105 180,80 230,105 180,130" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="180" y="110" text-anchor="middle">isDraft?</text>
+
+          <line x1="100" y1="105" x2="130" y2="105" stroke="#666" stroke-width="1" marker-end="url(#ar2)"/>
+
+          <rect x="260" y="30" width="120" height="50" rx="4" fill="#1b1b1b" stroke="#4caf50"/>
+          <text x="320" y="50" text-anchor="middle" style="fill:#4caf50">current(draft)</text>
+          <text x="320" y="68" text-anchor="middle" class="lbl">→ fresh plain copy</text>
+
+          <line x1="205" y1="90" x2="260" y2="55" stroke="#4caf50" stroke-width="1.5" marker-end="url(#ar2)"/>
+          <text x="225" y="70" style="fill:#4caf50; font-size: 10px;">true</text>
+
+          <rect x="260" y="140" width="120" height="50" rx="4" fill="#1b1b1b" stroke="#569cd6"/>
+          <text x="320" y="160" text-anchor="middle" style="fill:#569cd6">value (as-is)</text>
+          <text x="320" y="178" text-anchor="middle" class="lbl">→ plain object</text>
+
+          <line x1="205" y1="125" x2="260" y2="165" stroke="#569cd6" stroke-width="1.5" marker-end="url(#ar2)"/>
+          <text x="225" y="148" style="fill:#569cd6; font-size: 10px;">false</text>
+
+          <line x1="380" y1="55" x2="440" y2="100" stroke="#666" stroke-width="1" marker-end="url(#ar2)"/>
+          <line x1="380" y1="165" x2="440" y2="120" stroke="#666" stroke-width="1" marker-end="url(#ar2)"/>
+
+          <rect x="440" y="80" width="140" height="50" rx="4" fill="#1b1b1b" stroke="#4ec9b0"/>
+          <text x="510" y="100" text-anchor="middle" style="fill:#4ec9b0">weakMapMemoize</text>
+          <text x="510" y="118" text-anchor="middle" class="lbl">inner createSelector</text>
+
+          <line x1="580" y1="105" x2="630" y2="105" stroke="#666" stroke-width="1" marker-end="url(#ar2)"/>
+          <rect x="630" y="80" width="40" height="50" rx="4" fill="#252526" stroke="#dcdcaa"/>
+          <text x="650" y="110" text-anchor="middle">result</text>
+
+          <defs>
+            <marker id="ar2" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="#aaa"/>
+            </marker>
+          </defs>
+        </svg>
+
+        <h3>Подводные камни</h3>
+
+        <div class="warning">
+          <strong>1. Селектор в reducer'е — это code smell.</strong>
+          Reducer — чистая функция, делает минимум. Производные значения (<code>avgPrice</code>,
+          <code>sortedBy</code>, <code>activeCount</code>) — обычно задача <em>селектора компонента</em>, а не reducer'а.
+          <em>Почему:</em> кладя пересчитанное поле в state, вы дублируете источник истины и рискуете рассинхроном.
+          Исключение: если результат нужен другому reducer'у или в <code>extraReducers</code>.
+        </div>
+
+        <div class="warning">
+          <strong>2. current() — O(structure), каждый вызов.</strong>
+          <code>current(draft)</code> рекурсивно обходит весь subtree и делает plain copy. Для slice с 10k todo
+          это заметно, особенно если селектор вызывается в цикле. <em>Почему:</em> Immer хранит только diffs
+          (structural sharing), и для plain snapshot'а их надо «склеить» с оригиналом. Сузьте scope:
+          <code>current(state.items)</code> вместо <code>current(state)</code>.
+        </div>
+
+        <div class="warning">
+          <strong>3. isDraft проверяет только первый аргумент.</strong>
+          Wrapper делает <code>isDraft(value) ? current(value) : value</code> <em>только для
+          <code>args[0]</code></em>. Если селектор принимает несколько state-ссылок
+          (<code>selectJoin(stateA, stateB)</code>) — второй не распакуется. <em>Почему:</em> RTK предполагает,
+          что в Redux первый аргумент — всегда root/slice state, а остальные — параметры (id, фильтр и т. п.).
+        </div>
+
+        <div class="warning">
+          <strong>4. Нет мемоизации «между» вызовами в reducer'е.</strong>
+          Каждый вызов <code>createDraftSafeSelector</code> на draft'е делает <em>новый</em> <code>current()</code> →
+          новая ссылка → cache miss → всегда пересчёт. <em>Почему:</em> плата за свежесть. Если селектор дорогой и
+          вызывается часто в одном reducer'е — сохраните результат в локальную переменную вручную, мемоизация
+          тут не помогает.
+        </div>
+
+        <div class="warning">
+          <strong>5. Один селектор — одна память кеша.</strong>
+          Если снаружи (в компоненте) вы зовёте <code>selectAvgPrice(plainState)</code>, а внутри reducer'а
+          <code>selectAvgPriceSafe(state)</code> — это <em>два разных</em> селектора с разными кешами. Они не
+          шарят результаты. Правильно: одна <code>createDraftSafeSelector</code>-инстанция на оба места.
+        </div>
+
+        <h3>Правильная стратегия</h3>
+        <div class="code-block">
+<span class="cm">// selectors.ts</span>
+<span class="kw">import</span> { createDraftSafeSelector } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">export const</span> selectAvgPrice = <span class="fn">createDraftSafeSelector</span>(
+  [(s: <span class="type">BooksState</span>) =&gt; s.items],
+  (items) =&gt; items.<span class="fn">reduce</span>((a, b) =&gt; a + b.price, <span class="num">0</span>) / (items.length || <span class="num">1</span>),
+)
+
+<span class="cm">// booksSlice.ts — безопасно вызывать и в reducer'е, и в компоненте</span>
+reducers: {
+  <span class="fn">runProbe</span>: (state) =&gt; {
+    <span class="kw">const</span> before = <span class="fn">selectAvgPrice</span>(state)     <span class="cm">// ✅ current() распакует draft</span>
+    state.items.<span class="fn">forEach</span>(b =&gt; b.price += <span class="num">100</span>)
+    <span class="kw">const</span> after = <span class="fn">selectAvgPrice</span>(state)      <span class="cm">// ✅ новый snapshot → пересчёт</span>
+  }
+}
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../26-immer-inside/">26 — Immer внутри createReducer</a></li>
+          <li><a href="../27-immer-pitfalls/">27 — Подводные камни Immer</a></li>
+          <li><a href="../40-current-original-debug/">40 — current() / original()</a></li>
+          <li><a href="../40a-slice-caching-refs/">40a — Structural sharing + ===</a></li>
+          <li><a href="../41-createselector-from-rtk/">41 — createSelector (базовый)</a></li>
+          <li><a href="../43-weakmap-memoize/">43 — weakMapMemoize deep dive</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createSelector#createdraftsafeselector" target="_blank">RTK docs — createDraftSafeSelector</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createDraftSafeSelector.ts" target="_blank">GitHub — createDraftSafeSelector.ts</a></li>
+          <li><a href="https://immerjs.github.io/immer/current/" target="_blank">Immer current()</a></li>
+          <li><a href="https://immerjs.github.io/immer/api/#isdraft" target="_blank">Immer isDraft()</a></li>
+          <li><a href="https://reselect.js.org/api/weakmapmemoize" target="_blank">Reselect — weakMapMemoize</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>59 — condition: когда не запускать thunk</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .state-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; }
+    .state-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); white-space: pre; overflow: auto; max-height: 260px; }
+    .counter { display:flex; gap:24px; margin: 10px 0; font-family: var(--font-mono); font-size: .9rem; }
+    .counter .cnt { color: var(--accent-cyan); font-weight: 700; }
+    .counter .lbl { color: var(--text-muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; }
+    .toggle { display: inline-flex; gap: 6px; align-items: center; font-family: var(--font-mono); font-size: .78rem; color: var(--text-secondary); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">59 / 106</span>condition</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../58-rejectwithvalue/">← Назад</a>
+      <a href="../60-asyncthunk-cancellation/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Кнопка «Fetch posts» — spam-кликабельная. Внутри thunk есть <code>condition: (arg, api) =&gt;
+          api.getState().posts.loading !== 'pending'</code>: если запрос уже в полёте, thunk <strong>не
+          запускается</strong> (ни pending, ни fulfilled — <em>ничего</em>). Счётчик «реальных запросов»
+          показывает настоящий рейт. Тоггл <code>dispatchConditionRejection</code> включает побочную фичу —
+          rejected-action с <code>meta.condition === true</code>.
+        </p>
+
+        <div class="counter">
+          <div><span class="lbl">Нажатий:</span> <span class="cnt" id="cnt-clicks">0</span></div>
+          <div><span class="lbl">Реальных fetch:</span> <span class="cnt" id="cnt-fetches">0</span></div>
+          <div><span class="lbl">Пропущено condition'ом:</span> <span class="cnt" id="cnt-skipped">0</span></div>
+        </div>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap; margin: 12px 0; align-items: center;">
+          <button class="btn btn--accent" id="fetch-spam">Fetch posts (спамьте!)</button>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-dcr">
+            dispatchConditionRejection (диспатчить rejected с meta.condition=true)
+          </label>
+          <button class="btn btn--secondary" id="reset">Reset</button>
+        </div>
+
+        <div class="state-card">
+          <div class="state-out" id="state-out">—</div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 59. condition и ConditionError</div>
+      <div class="theory__body">
+        <h3>Цитата</h3>
+        <div class="quote">
+          «A callback that will receive <code>arg</code> as its first argument, and the <code>thunkAPI</code> object
+          as its second argument. This callback can be used to skip execution of the payload creator and all action
+          dispatches, if desired. […] Returning <code>false</code> will cancel the thunk execution before the
+          <code>pending</code> action is dispatched.»<br>
+          — <a href="https://redux-toolkit.js.org/api/createAsyncThunk#canceling-before-execution" target="_blank">createAsyncThunk — Canceling Before Execution</a>
+        </div>
+        <div class="quote quote--ru">
+          «Callback, получающий <code>arg</code> и <code>thunkAPI</code>. Позволяет пропустить выполнение
+          payload creator'а и все dispatch'и. Возврат <code>false</code> отменяет thunk <strong>до</strong>
+          dispatch'а <code>pending</code>.»
+        </div>
+
+        <h3>Фрагмент исходника</h3>
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строки 634–645 + 713–721</span>
+<span class="kw">try</span> {
+  <span class="kw">let</span> conditionResult = options?.<span class="fn">condition</span>?.(arg, { getState, extra })
+  <span class="kw">if</span> (<span class="fn">isThenable</span>(conditionResult)) {
+    conditionResult = <span class="kw">await</span> conditionResult   <span class="cm">// ← condition может быть async!</span>
+  }
+
+  <span class="kw">if</span> (conditionResult === <span class="kw">false</span> || abortController.signal.aborted) {
+    <span class="kw">throw</span> {
+      name: <span class="str">'ConditionError'</span>,
+      message: <span class="str">'Aborted due to condition callback returning false.'</span>,
+    }
+  }
+  <span class="cm">// ... dispatch(pending) дальше ...</span>
+} <span class="kw">catch</span> (err) { <span class="cm">/* … */</span> }
+
+<span class="cm">// Ниже — skipDispatch (строки 713–721):</span>
+<span class="kw">const</span> skipDispatch =
+  options &amp;&amp;
+  !options.dispatchConditionRejection &amp;&amp;
+  rejected.<span class="fn">match</span>(finalAction) &amp;&amp;
+  finalAction.meta.condition                       <span class="cm">// ← true только если ConditionError</span>
+
+<span class="kw">if</span> (!skipDispatch) {
+  <span class="fn">dispatch</span>(finalAction <span class="kw">as any</span>)                  <span class="cm">// по умолчанию пропускаем!</span>
+}</div>
+        <p style="font-size:.78rem;"><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L634" target="_blank">createAsyncThunk.ts#L634</a></p>
+
+        <h3>Типичные сценарии</h3>
+
+        <h4>1. Дедупликация — не запускать второй параллельный запрос</h4>
+        <p style="font-size:.82rem; color: var(--text-secondary);">
+          Классика: пользователь нажимает кнопку несколько раз подряд. Пока первый запрос в полёте,
+          condition возвращает <code>false</code> — дубли не улетают в сеть.
+        </p>
+        <div class="code-block"><span class="kw">const</span> fetchPosts = <span class="fn">createAsyncThunk</span>&lt;<span class="type">Post</span>[], <span class="kw">void</span>, { state: <span class="type">RootState</span> }&gt;(
+  <span class="str">'posts/fetch'</span>,
+  <span class="kw">async</span> (_, { extra }) =&gt; (extra <span class="kw">as</span> <span class="type">Api</span>).<span class="fn">getPosts</span>(),
+  {
+    condition: (_arg, { getState }) =&gt; {
+      <span class="kw">const</span> { loading } = <span class="fn">getState</span>().posts
+      <span class="kw">return</span> loading !== <span class="str">'pending'</span>    <span class="cm">// уже грузится ⇒ пропускаем</span>
+    },
+  },
+)</div>
+
+        <h4>2. Кэш по id — skip, если объект уже в store</h4>
+        <p style="font-size:.82rem; color: var(--text-secondary);">
+          Entity-lookup: не идём в сеть за тем, что уже загружено. Аргумент <code>id</code> доступен первым параметром.
+        </p>
+        <div class="code-block"><span class="kw">const</span> fetchProduct = <span class="fn">createAsyncThunk</span>&lt;<span class="type">Product</span>, <span class="type">number</span>, { state: <span class="type">RootState</span> }&gt;(
+  <span class="str">'products/fetchById'</span>,
+  <span class="kw">async</span> (id, { extra }) =&gt; (extra <span class="kw">as</span> <span class="type">Api</span>).<span class="fn">getProduct</span>(id),
+  {
+    condition: (id, { getState }) =&gt; {
+      <span class="kw">const</span> cached = <span class="fn">getState</span>().products.byId[id]
+      <span class="kw">return</span> !cached                  <span class="cm">// есть — skip</span>
+    },
+  },
+)</div>
+
+        <h4>3. Кэш с TTL — skip, пока данные свежие</h4>
+        <p style="font-size:.82rem; color: var(--text-secondary);">
+          Тот же кэш, но с временем жизни. Повторный fetch не уйдёт, пока запись моложе 10 секунд.
+        </p>
+        <div class="code-block"><span class="kw">const</span> CACHE_MS = 10_000
+
+<span class="kw">const</span> fetchProfile = <span class="fn">createAsyncThunk</span>&lt;<span class="type">Profile</span>, <span class="type">string</span>, { state: <span class="type">RootState</span> }&gt;(
+  <span class="str">'profile/fetch'</span>,
+  <span class="kw">async</span> (userId, { extra }) =&gt; (extra <span class="kw">as</span> <span class="type">Api</span>).<span class="fn">getProfile</span>(userId),
+  {
+    condition: (userId, { getState }) =&gt; {
+      <span class="kw">const</span> rec = <span class="fn">getState</span>().profiles.byId[userId]
+      <span class="kw">if</span> (!rec) <span class="kw">return</span> <span class="kw">true</span>             <span class="cm">// нет — грузим</span>
+      <span class="kw">return</span> Date.<span class="fn">now</span>() - rec.fetchedAt &gt; CACHE_MS
+    },
+  },
+)</div>
+
+        <h4>4. Фичефлаг — не дёргать API, если фича выключена</h4>
+        <p style="font-size:.82rem; color: var(--text-secondary);">
+          Код call-site'ов остаётся чистым: <code>dispatch(loadAnalytics())</code>. Включение/выключение
+          фичи живёт рядом с thunk'ом, а не в каждом компоненте.
+        </p>
+        <div class="code-block"><span class="kw">const</span> loadAnalytics = <span class="fn">createAsyncThunk</span>&lt;<span class="type">Stats</span>, <span class="kw">void</span>, { extra: <span class="type">Api</span> }&gt;(
+  <span class="str">'analytics/load'</span>,
+  <span class="kw">async</span> (_, { extra }) =&gt; extra.<span class="fn">getAnalytics</span>(),
+  {
+    condition: () =&gt; featureFlags.<span class="fn">isEnabled</span>(<span class="str">'analytics-v2'</span>),
+  },
+)</div>
+
+        <h4>5. Async condition — ждать готовности внешней системы</h4>
+        <p style="font-size:.82rem; color: var(--text-secondary);">
+          Condition может быть <code>async</code>. Полезно когда нужен auth-токен, WebSocket, или фичефлаги с сервера.
+          Возврат <code>true</code> ⇒ pending диспатчится; <code>false</code> ⇒ skip.
+        </p>
+        <div class="code-block"><span class="kw">const</span> fetchMe = <span class="fn">createAsyncThunk</span>&lt;<span class="type">Me</span>, <span class="kw">void</span>, { extra: <span class="type">Container</span> }&gt;(
+  <span class="str">'me/fetch'</span>,
+  <span class="kw">async</span> (_, { extra }) =&gt; extra.api.<span class="fn">getMe</span>(),
+  {
+    condition: <span class="kw">async</span> (_, { extra }) =&gt; {
+      <span class="kw">const</span> ok = <span class="kw">await</span> extra.auth.<span class="fn">ready</span>()     <span class="cm">// Promise&lt;boolean&gt;</span>
+      <span class="kw">return</span> ok
+    },
+  },
+)</div>
+
+        <h4>6. Валидация аргумента — skip для некорректных id</h4>
+        <p style="font-size:.82rem; color: var(--text-secondary);">
+          Если аргумент заведомо невалиден — не гоняем сеть. Альтернатива <code>rejectWithValue</code>
+          из урока 58: там вы хотите ошибку в state, тут — молча пропустить.
+        </p>
+        <div class="code-block"><span class="kw">const</span> fetchUser = <span class="fn">createAsyncThunk</span>&lt;<span class="type">User</span>, <span class="type">number</span>&gt;(
+  <span class="str">'users/fetch'</span>,
+  <span class="kw">async</span> (id) =&gt; api.<span class="fn">getUser</span>(id),
+  {
+    condition: (id) =&gt; Number.<span class="fn">isInteger</span>(id) &amp;&amp; id &gt; 0,
+  },
+)</div>
+
+        <h4>7. Polling с back-pressure — не накапливать хвост</h4>
+        <p style="font-size:.82rem; color: var(--text-secondary);">
+          Таймер раз в секунду дёргает thunk, но если сеть тормозит — condition не даст запросам
+          наложиться друг на друга. Комбо «interval + condition» ≈ дешёвый throttle.
+        </p>
+        <div class="code-block"><span class="kw">const</span> pollOrders = <span class="fn">createAsyncThunk</span>&lt;<span class="type">Order</span>[], <span class="kw">void</span>, { state: <span class="type">RootState</span> }&gt;(
+  <span class="str">'orders/poll'</span>,
+  <span class="kw">async</span> (_, { extra }) =&gt; (extra <span class="kw">as</span> <span class="type">Api</span>).<span class="fn">getOrders</span>(),
+  {
+    condition: (_, { getState }) =&gt; getState().orders.inflight === <span class="kw">false</span>,
+  },
+)
+
+<span class="fn">setInterval</span>(() =&gt; store.<span class="fn">dispatch</span>(<span class="fn">pollOrders</span>()), 1000)</div>
+
+        <h4>8. Обработка skip на caller'е — .unwrap() + ConditionError</h4>
+        <p style="font-size:.82rem; color: var(--text-secondary);">
+          Если нужно реагировать на «пропустили» в компоненте — матчим rejected по <code>meta.condition</code>
+          или ловим <code>ConditionError</code> от <code>.unwrap()</code>.
+        </p>
+        <div class="code-block"><span class="cm">// Вариант А: без throw — анализируем результат action-объекта</span>
+<span class="kw">const</span> res = <span class="kw">await</span> store.<span class="fn">dispatch</span>(<span class="fn">fetchPosts</span>())
+<span class="kw">if</span> (fetchPosts.rejected.<span class="fn">match</span>(res) &amp;&amp; res.meta.condition) {
+  <span class="fn">toast</span>(<span class="str">'Запрос уже в полёте — подождите'</span>)
+}
+
+<span class="cm">// Вариант Б: с .unwrap() — throw + catch</span>
+<span class="kw">try</span> {
+  <span class="kw">const</span> posts = <span class="kw">await</span> store.<span class="fn">dispatch</span>(<span class="fn">fetchPosts</span>()).<span class="fn">unwrap</span>()
+} <span class="kw">catch</span> (err) {
+  <span class="kw">const</span> e = err <span class="kw">as</span> { name?: <span class="type">string</span>; message?: <span class="type">string</span> }
+  <span class="kw">if</span> (e.name === <span class="str">'ConditionError'</span>) <span class="cm">/* skip */</span>
+  <span class="kw">else</span> <span class="cm">/* настоящая ошибка сети */</span>
+}</div>
+
+        <h3>Что вы получаете от thunk'а, пропущенного condition</h3>
+        <div class="code-block"><span class="kw">const</span> res = <span class="kw">await</span> store.<span class="fn">dispatch</span>(<span class="fn">fetchPosts</span>())
+
+<span class="cm">// Когда condition вернул false:</span>
+res.type          === <span class="str">'posts/fetch/rejected'</span>        <span class="cm">// ← rejected-action ВЕРНУТ (даже если не задиспатчен)</span>
+res.meta.condition === <span class="kw">true</span>                        <span class="cm">// ← наш флаг</span>
+res.meta.aborted   === <span class="kw">false</span>
+res.payload        === <span class="kw">undefined</span>
+res.error.name    === <span class="str">'ConditionError'</span>
+res.error.message === <span class="str">'Aborted due to condition callback returning false.'</span></div>
+
+        <h3><code>dispatchConditionRejection</code></h3>
+        <p>По умолчанию (если <code>dispatchConditionRejection: false</code>) RTK <strong>не диспатчит</strong>
+          rejected-action при condition-отказе. Это хорошо: DevTools не замусоривается.
+          Если включить — получите <em>rejected</em>-action в логе с <code>meta.condition === true</code>.
+          Удобно, если reducer хочет сбросить флаг или залогировать попытку.</p>
+
+        <h3>Почему <code>condition</code> ≠ <code>if</code> до dispatch'а</h3>
+        <div class="tip">
+          Внешне «<code>if (!state.x.loading) dispatch(thunk())</code>» выглядит так же. Разница:<br>
+          1. <strong>condition живёт вместе с thunk'ом.</strong> Все компоненты, дёргающие <code>dispatch(thunk())</code>, автоматически защищены.<br>
+          2. <strong>condition async.</strong> Можно <code>await</code>-ить внутри (fetch'ить фичефлаг, ждать ready-сигнал).<br>
+          3. <strong>Caller всё равно получает promise.</strong> С <code>.unwrap()</code> — корректный <code>ConditionError</code>, можно красиво обработать.
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. condition может быть async.</strong> Если вернёте <code>Promise&lt;boolean&gt;</code>,
+          RTK <code>await</code>-ит его. Значит — <em>между</em> <code>dispatch(thunk())</code> и <code>pending</code>
+          может быть «пустой» промежуток, в течение которого второй <code>dispatch(thunk())</code> тоже пройдёт condition. Это настоящий race condition.<br>
+          <strong>2. <code>dispatchConditionRejection</code> — false по умолчанию.</strong>
+          Если ваш reducer завязан на <em>обязательный</em> rejected — включайте явно.<br>
+          <strong>3. <code>options.condition</code> получает только <code>getState</code> и <code>extra</code></strong>
+          (не <code>dispatch</code>, не <code>signal</code>). Нельзя диспатчить из condition — это <em>pre-condition</em>, а не часть thunk'а.<br>
+          <strong>4. Resolved promise от condition'а ≠ fulfilled.</strong>
+          Если condition вернул <code>false</code> — результат thunk'а <em>всё равно</em> rejected (с
+          <code>meta.condition=true</code>). <code>.unwrap()</code> бросит <code>ConditionError</code>. Обрабатывайте отдельно.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../57-thunkapi-basics/">57 — thunkAPI.getState — альтернативный cache-check</a></li>
+          <li><a href="../60-asyncthunk-cancellation/">60 — cancellation через signal/abort</a></li>
+          <li><a href="../61-requestid-race/">61 — race condition и requestId</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

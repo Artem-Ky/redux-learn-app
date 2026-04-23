@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>68 — Cancellation, TaskAbortError, takeLatest</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .search-row {
+      display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin: 10px 0;
+    }
+    .search-input {
+      background: var(--bg-input); border: 1px solid var(--border); color: var(--text-bright);
+      font-family: var(--font-mono); font-size: .9rem; padding: 10px 12px; border-radius: var(--radius);
+    }
+    .search-input:focus { outline: none; border-color: var(--accent); }
+    .results {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 14px; min-height: 80px; font-family: var(--font-mono); font-size: .82rem; color: var(--text-secondary);
+    }
+    .results b { color: var(--accent-cyan); }
+    .metrics {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0;
+    }
+    .metric {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 14px;
+    }
+    .metric__label { color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; }
+    .metric__value { color: var(--accent-cyan); font-family: var(--font-mono); font-size: 1.4rem; margin-top: 4px; }
+    .metric.err .metric__value { color: var(--warning); }
+    .metric.ok .metric__value { color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">68 / 106</span>Cancellation: TaskAbortError и takeLatest для поиска</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../67-listener-fork/">← Назад</a>
+      <a href="../69-listener-patterns/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Debounced search — вводите быстро, видите только последний fetch</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          На каждый <code>searchTermChanged</code> listener отменяет предыдущие инстансы (<code>cancelActiveListeners</code>),
+          ждёт 300мс (<code>delay</code>), затем делает fake-fetch (с <code>signal</code> для abort'а).
+          Быстрый ввод → cancelled; пауза 300мс → completed.
+        </p>
+
+        <div class="search-row">
+          <input class="search-input" id="q" type="text" placeholder="Введите запрос (например: redux)" autocomplete="off"/>
+          <button class="btn btn--danger" id="reset">Reset</button>
+        </div>
+
+        <div class="metrics">
+          <div class="metric ok">
+            <div class="metric__label">completed</div>
+            <div class="metric__value" id="m-ok">0</div>
+          </div>
+          <div class="metric err">
+            <div class="metric__label">cancelled</div>
+            <div class="metric__value" id="m-cancel">0</div>
+          </div>
+          <div class="metric">
+            <div class="metric__label">current term</div>
+            <div class="metric__value" id="m-term" style="font-size: 1rem;">—</div>
+          </div>
+        </div>
+
+        <div class="results" id="results">Результаты появятся здесь после 300мс паузы в вводе…</div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 68. TaskAbortError, runTask и takeLatest</div>
+      <div class="theory__body">
+
+        <h3>TaskAbortError как единый объект отмены</h3>
+        <div class="quote">
+          «Listeners may fork long-running tasks. These tasks may be cancelled by the user or by the parent listener. <code>TaskAbortError</code> is thrown to signal the cancellation. Any <code>await</code>ed <code>delay</code>, <code>pause</code>, or <code>take</code> will throw this error.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createListenerMiddleware#cancellation-and-task-management" target="_blank">RTK docs — cancellation</a>
+        </div>
+        <div class="quote quote--ru">
+          «Listener'ы могут форкать долгие задачи. Они отменяются пользователем или самим родителем. <code>TaskAbortError</code> сигнализирует об отмене — любой <code>await</code> на <code>delay/pause/take</code> получит именно этот объект.»
+        </div>
+
+        <h3>Исходник — TaskAbortError и runTask (статусы ok / cancelled / rejected)</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/listenerMiddleware/exceptions.ts</span>
+<span class="kw">export const</span> taskCancelled     = <span class="str">`task-cancelled`</span>     <span class="kw">as const</span>
+<span class="kw">export const</span> taskCompleted     = <span class="str">`task-completed`</span>     <span class="kw">as const</span>
+<span class="kw">export const</span> listenerCancelled = <span class="str">`listener-cancelled`</span> <span class="kw">as const</span>
+<span class="kw">export const</span> listenerCompleted = <span class="str">`listener-completed`</span> <span class="kw">as const</span>
+
+<span class="kw">export class</span> <span class="type">TaskAbortError</span> <span class="kw">implements</span> <span class="type">SerializedError</span> {
+  name = <span class="str">'TaskAbortError'</span>
+  message: <span class="type">string</span>
+  <span class="fn">constructor</span>(<span class="kw">public</span> code: <span class="type">string</span> | <span class="kw">undefined</span>) {
+    <span class="kw">this</span>.message = <span class="str">`task cancelled (reason: ${code})`</span>
+  }
+}
+        </div>
+
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/listenerMiddleware/task.ts — runTask</span>
+<span class="kw">export const</span> <span class="fn">runTask</span> = <span class="kw">async</span> &lt;T&gt;(
+  task: () =&gt; <span class="type">Promise</span>&lt;T&gt;,
+  cleanUp?: () =&gt; <span class="kw">void</span>,
+): <span class="type">Promise</span>&lt;TaskResult&lt;T&gt;&gt; =&gt; {
+  <span class="kw">try</span> {
+    <span class="kw">await</span> <span class="type">Promise</span>.<span class="fn">resolve</span>()              <span class="cm">// следующий microtask</span>
+    <span class="kw">const</span> value = <span class="kw">await</span> <span class="fn">task</span>()
+    <span class="kw">return</span> { status: <span class="str">'ok'</span>, value }          <span class="cm">// ← нормально завершилась</span>
+  } <span class="kw">catch</span> (error: <span class="kw">any</span>) {
+    <span class="kw">return</span> {
+      status: error <span class="kw">instanceof</span> <span class="type">TaskAbortError</span>
+        ? <span class="str">'cancelled'</span>                        <span class="cm">// ← именно отмена</span>
+        : <span class="str">'rejected'</span>,                        <span class="cm">// ← любая другая ошибка</span>
+      error,
+    }
+  } <span class="kw">finally</span> {
+    cleanUp?.()
+  }
+}
+
+<span class="cm">// raceWithSignal: гонка promise'а c AbortSignal — кинет TaskAbortError при abort</span>
+<span class="kw">export function</span> <span class="fn">raceWithSignal</span>&lt;T&gt;(signal: <span class="type">AbortSignal</span>, promise: <span class="type">Promise</span>&lt;T&gt;): <span class="type">Promise</span>&lt;T&gt; {
+  <span class="kw">return new</span> <span class="fn">Promise</span>&lt;T&gt;((resolve, reject) =&gt; {
+    <span class="kw">const</span> <span class="fn">notifyRejection</span> = () =&gt; <span class="fn">reject</span>(<span class="kw">new</span> <span class="fn">TaskAbortError</span>(signal.reason))
+    <span class="kw">if</span> (signal.aborted) { <span class="fn">notifyRejection</span>(); <span class="kw">return</span> }
+    <span class="kw">const</span> cleanup = <span class="fn">addAbortSignalListener</span>(signal, notifyRejection)
+    promise.<span class="fn">finally</span>(() =&gt; <span class="fn">cleanup</span>()).<span class="fn">then</span>(resolve, reject)
+  })
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/exceptions.ts" target="_blank">exceptions.ts</a> ·
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/task.ts#L22-L69" target="_blank">task.ts#L22-L69</a>
+        </p>
+
+        <h3>Рецепт debounce+takeLatest для поиска</h3>
+        <div class="code-block">
+listener.<span class="fn">startListening</span>({
+  actionCreator: searchTermChanged,
+  effect: <span class="kw">async</span> (action, api) =&gt; {
+    api.<span class="fn">cancelActiveListeners</span>()                          <span class="cm">// 1. убираем предыдущих</span>
+    <span class="kw">await</span> api.<span class="fn">delay</span>(<span class="num">300</span>)                              <span class="cm">// 2. debounce: ждём 300мс</span>
+                                                          <span class="cm">//    если за это время пришёл новый ввод — cancelActive</span>
+                                                          <span class="cm">//    нас уже уронил через TaskAbortError</span>
+    <span class="kw">try</span> {
+      <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api?q=${action.payload}`</span>, {
+        signal: api.signal,                             <span class="cm">// 3. abort'им сам fetch</span>
+      })
+      <span class="kw">const</span> json = <span class="kw">await</span> res.<span class="fn">json</span>()
+      api.dispatch(<span class="fn">searchResults</span>(json))
+    } <span class="kw">finally</span> {
+      <span class="cm">// 4. finally, не catch! TaskAbortError должен пропагироваться.</span>
+      <span class="cm">//    catch-нутый error сломает поток — тихо проглотит отмену.</span>
+    }
+  },
+})
+        </div>
+
+        <div class="warning">
+          <strong>Два коварных подводных камня cancellation:</strong>
+          <ul>
+            <li><strong>Fetch сам по себе не отменяется.</strong> <code>api.delay(300)</code> бросит <code>TaskAbortError</code>, но если вы уже дошли до <code>await fetch(...)</code> — запрос уйдёт. Передавайте <code>signal: api.signal</code> в options: <code>fetch(url, { signal: api.signal })</code>. AbortController сам прервёт network и бросит <code>DOMException AbortError</code>.</li>
+            <li><strong><code>try/catch</code> вместо <code>try/finally</code> проглатывает <code>TaskAbortError</code>.</strong> Если после <code>catch</code> вы делаете <code>dispatch(searchResults(...))</code>, то отменённый запрос всё равно обновит state — race condition. Используйте <code>finally</code>, а результат ловите отдельно; если нужен catch — явно пробрасывайте: <code>if (e instanceof TaskAbortError) throw e</code>.</li>
+          </ul>
+        </div>
+
+        <h3>Жизненный цикл отменённого listener'а</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem;">
+          <thead style="background: var(--bg-panel);">
+            <tr>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); text-align: left; color: var(--accent);">Фаза</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Что происходит</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">1</td><td style="padding: 6px 10px; border: 1px solid var(--border);"><code>dispatch(searchTermChanged)</code> #N</td><td style="padding: 6px 10px; border: 1px solid var(--border);">—</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">2</td><td style="padding: 6px 10px; border: 1px solid var(--border);"><code>cancelActiveListeners</code> → каждому <code>pending.controller.abort(listenerCancelled)</code></td><td style="padding: 6px 10px; border: 1px solid var(--border);">listener-cancelled</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">3</td><td style="padding: 6px 10px; border: 1px solid var(--border);">В старых listener'ах <code>await api.delay(300)</code> резолвится reject'ом <code>TaskAbortError</code></td><td style="padding: 6px 10px; border: 1px solid var(--border);">listener-cancelled</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">4</td><td style="padding: 6px 10px; border: 1px solid var(--border);"><code>notifyListener</code>'s <code>catch</code> узнаёт <code>TaskAbortError</code> — не зовёт <code>onError</code></td><td style="padding: 6px 10px; border: 1px solid var(--border);">—</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border);">5</td><td style="padding: 6px 10px; border: 1px solid var(--border);">finally: <code>abort(listenerCompleted)</code>, <code>entry.pending.delete</code></td><td style="padding: 6px 10px; border: 1px solid var(--border);">listener-completed</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../61-thunk-cancellation/">61 — cancellation в thunk через signal</a></li>
+          <li><a href="../66-listener-api-full/">66 — cancelActiveListeners в listenerApi</a></li>
+          <li><a href="../69-listener-patterns/">69 — takeLatest / throttle / debounce паттерны</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>44 — slice.selectors с createSelector: 3 сценария привязки</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .scenario-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .scenario-card h4 {
+      font-family: var(--font-mono); font-size: .82rem;
+      color: var(--accent); margin: 0;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .scenario-out {
+      background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 12px;
+      font-family: var(--font-mono); font-size: .78rem;
+      color: var(--accent-cyan); min-height: 60px;
+      white-space: pre-wrap; overflow-x: auto;
+    }
+    .scenario-out.error { color: var(--error); border-color: var(--error); background: rgba(244,71,71,.06); }
+    .scenario-path {
+      color: var(--text-muted); font-family: var(--font-mono); font-size: .74rem;
+    }
+    .scenario-path code { font-size: .74rem; }
+
+    .user-list {
+      display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto;
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px;
+    }
+    .user-row {
+      display: flex; gap: 8px; align-items: center; padding: 4px 6px;
+      font-family: var(--font-mono); font-size: .76rem; border-radius: 3px;
+    }
+    .user-row.active { background: rgba(76,175,80,.08); border-left: 2px solid var(--success); }
+    .user-row.inactive { opacity: .55; }
+    .user-row__name { flex: 1; color: var(--text-bright); }
+    .user-row__tag { font-size: .68rem; padding: 1px 6px; border-radius: 8px; }
+    .user-row__tag.active { background: rgba(76,175,80,.2); color: var(--success); }
+    .user-row__tag.inactive { background: rgba(244,71,71,.15); color: var(--error); }
+
+    .call-count {
+      display: inline-block; background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: 10px; padding: 2px 10px; font-family: var(--font-mono);
+      font-size: .72rem; color: var(--accent-yellow);
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">44 / 106</span>slice.selectors + createSelector — 3 сценария привязки к state</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../43-weakmap-memoize/">← Назад</a>
+      <a href="../45-typed-selectors-hooks/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">usersSlice с 3 разными способами подключения селекторов</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px;">
+          Одна slice <code>usersSlice</code> с 5 пользователями и мемоизированным
+          <code>selectActive</code>. Три кнопки демонстрируют три способа вызова: через
+          автопривязку <code>slice.selectors</code>, через <code>slice.getSelectors(selectState)</code>
+          и сценарий, когда shape state'а не совпадает (ошибка).
+        </p>
+
+        <div class="user-list" id="user-list" style="margin-bottom: 16px;"></div>
+
+        <div class="btn-group">
+          <button class="btn" data-act="toggle-random">Переключить random user</button>
+          <button class="btn" data-act="add">Добавить user</button>
+          <button class="btn btn--danger" data-act="reset">Reset</button>
+        </div>
+
+        <div class="two-col" style="margin-top: 18px;">
+          <!-- Scenario 1: slice.selectors -->
+          <div class="scenario-card">
+            <h4><span class="tag tag--good">Кейс 1</span> slice.selectors.selectActive(rootState)</h4>
+            <div class="scenario-path">reducer на <code>state.users</code>, авто-привязка через <code>selectSlice</code></div>
+            <button class="btn btn--accent" data-sc="1">Вызвать selectActive(rootState)</button>
+            <div class="scenario-out" id="sc1-out">— нажмите кнопку —</div>
+            <div>Вызовов combiner: <span class="call-count" id="sc1-calls">0</span></div>
+          </div>
+
+          <!-- Scenario 2: getSelectors(custom) -->
+          <div class="scenario-card">
+            <h4><span class="tag tag--good">Кейс 2</span> slice.getSelectors(s =&gt; s.admin.users)</h4>
+            <div class="scenario-path">reducer на <code>state.admin.users</code>, ручной <code>selectState</code></div>
+            <button class="btn btn--accent" data-sc="2">Вызвать через getSelectors(custom)</button>
+            <div class="scenario-out" id="sc2-out">— нажмите кнопку —</div>
+            <div>Вызовов combiner: <span class="call-count" id="sc2-calls">0</span></div>
+          </div>
+        </div>
+
+        <div class="two-col" style="margin-top: 18px;">
+          <!-- Scenario 3: broken shape -->
+          <div class="scenario-card" style="grid-column: 1 / -1;">
+            <h4><span class="tag tag--bad">Кейс 3</span> slice.getSelectors(s =&gt; s.wrongPath) — неверный shape</h4>
+            <div class="scenario-path">selectState возвращает <code>undefined</code> → warning / error</div>
+            <button class="btn btn--danger" data-sc="3">Вызвать с битым путём</button>
+            <div class="scenario-out" id="sc3-out">— нажмите кнопку —</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 44. slice.selectors, getSelectors и мемоизация</div>
+      <div class="theory__body">
+
+        <h3>Цитата из доки RTK</h3>
+        <div class="quote">
+          «<code>slice.selectors</code> is a pre-built object containing the defined selectors, each already
+          bound to the slice's state path… Each selector automatically receives the slice state as its first
+          argument.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSlice#selectors" target="_blank">RTK docs — createSlice selectors</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>slice.selectors</code> — преднастроенный объект, где каждый селектор уже привязан к пути
+          slice внутри root state. Каждый селектор автоматически получает state слайса первым аргументом.»
+        </div>
+
+        <h3>Вариант 1: автопривязка через selectSlice</h3>
+        <p>
+          Если вы передали <code>reducer: { users: usersSlice.reducer }</code> в
+          <code>configureStore</code>, то <code>slice.selectors.xxx</code> сам возьмёт state из
+          <code>rootState[slice.reducerPath]</code>. <code>reducerPath</code> по умолчанию = <code>name</code>.
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> usersSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'users'</span>,
+  initialState: [] <span class="kw">as</span> <span class="type">User</span>[],
+  reducers: { <span class="cm">/* ... */</span> },
+  selectors: {
+    selectCount: (state) =&gt; state.length,                        <span class="cm">// НЕ мемоизирован</span>
+    selectActive: <span class="fn">createSelector</span>(                           <span class="cm">// мемоизирован</span>
+      [(state: <span class="type">User</span>[]) =&gt; state],
+      (users) =&gt; users.<span class="fn">filter</span>((u) =&gt; u.active),
+    ),
+  },
+})
+
+<span class="cm">// В компоненте:</span>
+<span class="kw">const</span> active = usersSlice.selectors.<span class="fn">selectActive</span>(rootState)
+<span class="cm">//                                    ^^ rootState, НЕ state.users — магия</span>
+        </div>
+
+        <h3>Как это работает внутри — фрагмент исходника</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/createSlice.ts — фрагмент (~30 строк)</span>
+<span class="cm">// https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createSlice.ts</span>
+
+<span class="kw">function</span> <span class="fn">makeSelectorProps</span>(reducerPath, injected = <span class="kw">false</span>) {
+
+  <span class="kw">function</span> <span class="fn">selectSlice</span>(state) {
+    <span class="kw">let</span> sliceState = state[reducerPath]
+    <span class="kw">if</span> (<span class="kw">typeof</span> sliceState === <span class="str">'undefined'</span>) {
+      <span class="kw">if</span> (injected) {
+        sliceState = <span class="fn">getOrInsertComputed</span>(                     <span class="cm">// инъекция → initial state</span>
+          injectedStateCache, selectSlice, getInitialState,
+        )
+      } <span class="kw">else if</span> (process.env.NODE_ENV !== <span class="str">'production'</span>) {
+        <span class="kw">throw new</span> <span class="fn">Error</span>(
+          <span class="str">'selectSlice returned undefined for an uninjected slice reducer'</span>,
+        )                                                       <span class="cm">// 👀 кейс 3: вот оно</span>
+      }
+    }
+    <span class="kw">return</span> sliceState
+  }
+
+  <span class="kw">function</span> <span class="fn">getSelectors</span>(selectState = selectSelf) {
+    <span class="kw">return</span> <span class="fn">getOrInsertComputed</span>(selectorCache, selectState, () =&gt; {
+      <span class="kw">const</span> map = {}
+      <span class="kw">for</span> (<span class="kw">const</span> [name, selector] <span class="kw">of</span> <span class="fn">Object</span>.<span class="fn">entries</span>(options.selectors ?? {})) {
+        map[name] = <span class="fn">wrapSelector</span>(selector, selectState, <span class="cm">/*...*/</span>)
+        <span class="cm">// 👀 каждый selector оборачивается, чтобы получать slice state</span>
+      }
+      <span class="kw">return</span> map
+    })
+  }
+
+  <span class="kw">return</span> {
+    reducerPath,
+    getSelectors,
+    <span class="kw">get</span> selectors() { <span class="kw">return</span> <span class="fn">getSelectors</span>(selectSlice) },  <span class="cm">// 👀 geter → ленивая привязка</span>
+    selectSlice,
+  }
+}
+        </div>
+
+        <h3>Вариант 2: getSelectors с кастомным путём</h3>
+        <p>Если state положен глубже (например, <code>state.admin.users</code>), а не по имени slice:</p>
+        <div class="code-block">
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({
+  reducer: {
+    admin: <span class="fn">combineReducers</span>({ users: usersSlice.reducer }),
+  },
+})
+
+<span class="cm">// slice.selectors.selectActive(state) — упадёт: state.users === undefined</span>
+<span class="cm">// Делаем так:</span>
+<span class="kw">const</span> adminUsersSelectors = usersSlice.<span class="fn">getSelectors</span>(
+  (s: <span class="type">RootState</span>) =&gt; s.admin.users,
+)
+<span class="fn">adminUsersSelectors</span>.<span class="fn">selectActive</span>(rootState)   <span class="cm">// ✅ работает</span>
+        </div>
+
+        <h3>Вариант 3: неверный shape — ошибка в dev, undefined в prod</h3>
+        <div class="code-block">
+<span class="cm">// В development:</span>
+<span class="kw">throw new</span> <span class="fn">Error</span>(<span class="str">'selectState returned undefined for an uninjected slice reducer'</span>)
+
+<span class="cm">// В production (NODE_ENV === 'production'):</span>
+<span class="cm">// ошибки НЕТ, sliceState === undefined передаётся дальше → селектор упадёт</span>
+<span class="cm">// при первой попытке прочитать .filter / .length, но сообщение будет уже неинформативным.</span>
+        </div>
+
+        <h3>Ключевой нюанс: инлайновая функция в <code>selectors:</code> не мемоизирована</h3>
+        <div class="code-block">
+selectors: {
+  selectActive: (state) =&gt; state.<span class="fn">filter</span>((u) =&gt; u.active),
+  <span class="cm">// ☝ НЕ мемоизирован! Вызовется при каждом dispatch, вернёт новый массив.</span>
+
+  selectActiveMemo: <span class="fn">createSelector</span>(
+    [(state) =&gt; state],
+    (state) =&gt; state.<span class="fn">filter</span>((u) =&gt; u.active),
+  ),
+  <span class="cm">// ✅ мемоизирован — combiner пересчитается только если state изменился.</span>
+}
+        </div>
+
+        <h3>Когда использовать getSelectors (а не slice.selectors)</h3>
+        <ul>
+          <li><strong>state лежит не по slice.reducerPath.</strong> Например, вложен в combineReducers.</li>
+          <li><strong>Тесты.</strong> В юнит-тесте state обычно mock-нутый без корневого shape-а.</li>
+          <li><strong>Несколько инстансов одной slice.</strong> <code>createModalSlice</code> с разными ключами.</li>
+          <li><strong>Server components / SSR.</strong> Когда state приходит из getServerSideProps.</li>
+        </ul>
+
+        <h3>combineSlices и .inject() — важный кейс</h3>
+        <div class="code-block">
+<span class="kw">import</span> { combineSlices } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> rootReducer = <span class="fn">combineSlices</span>(usersSlice).<span class="fn">withLazyLoadedSlices</span>&lt;{ posts?: <span class="type">PostsState</span> }&gt;()
+<span class="kw">const</span> store = <span class="fn">configureStore</span>({ reducer: rootReducer })
+
+<span class="cm">// Позже — инжектим posts:</span>
+<span class="kw">const</span> injectedSlice = postsSlice.<span class="fn">injectInto</span>(rootReducer)
+<span class="cm">// После инжекта: injectedSlice.selectors — новые обёртки, с fallback на getInitialState()</span>
+<span class="cm">// Если state ещё не инициализирован (reducer не зарегистрирован до первого селекта):</span>
+<span class="fn">injectedSlice</span>.selectors.<span class="fn">selectAll</span>(rootState)   <span class="cm">// вернёт initialState, НЕ undefined</span>
+        </div>
+
+        <h3>Подводные камни</h3>
+
+        <div class="warning">
+          <strong>1. Инлайн-функции в <code>selectors:</code> НЕ мемоизированы.</strong>
+          Это просто присвоение: <code>map[name] = wrapSelector(selector, selectState, ...)</code>.
+          wrapSelector не оборачивает в createSelector. <em>Почему:</em> RTK следует принципу «explicit is better».
+          Если хочешь memo — оберни явно в <code>createSelector</code>.
+        </div>
+
+        <div class="warning">
+          <strong>2. selectSlice() бросает в dev, молчит в prod.</strong>
+          Это сделано для bundle size. <em>Почему:</em> <code>process.env.NODE_ENV !== 'production'</code>
+          выпиливается минификатором. В prod вы получите silent failure при неверном shape.
+          <em>Решение:</em> покрывать тестами и использовать <code>reducerPath</code> явно.
+        </div>
+
+        <div class="warning">
+          <strong>3. slice.selectors — getter, но кешируется.</strong>
+          В исходнике: <code>get selectors() { return getSelectors(selectSlice) }</code>. getter, но
+          <code>getOrInsertComputed</code> кеширует результат по ключу <code>selectState</code>. Значит
+          повторное чтение <code>slice.selectors</code> не создаёт новые обёртки. <em>Почему это важно:</em> если бы
+          не кешировалось, мемоизация сломалась бы — у каждого доступа свой замыкающий кеш.
+        </div>
+
+        <div class="warning">
+          <strong>4. После combineSlices.inject() state может быть undefined.</strong>
+          До того, как хоть один reducer отработал, <code>rootState.posts</code> === undefined.
+          injected-селекторы используют <code>getInitialState()</code> как fallback —
+          <strong>но только если slice действительно был инжектирован</strong> через
+          <code>.injectInto()</code>. Селекторы, полученные из обычной slice (не инжектированной),
+          fallback'а не имеют и упадут.
+        </div>
+
+        <div class="warning">
+          <strong>5. Стабильность ссылок между инстансами slice.selectors.</strong>
+          <code>slice.getSelectors(fnA)</code> и <code>slice.getSelectors(fnB)</code> — разные объекты с
+          разными мемо-кешами. Если вы случайно используете оба в разных компонентах — cache не
+          переиспользуется. Обычно достаточно одного.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../33-slice-selectors/">33 — Базовые slice.selectors (без memo)</a></li>
+          <li><a href="../34-combine-slices/">34 — combineSlices</a></li>
+          <li><a href="../35-lazy-injection/">35 — Lazy injection</a></li>
+          <li><a href="../37-reducer-path-vs-name/">37 — reducerPath ≠ name</a></li>
+          <li><a href="../41-createselector-from-rtk/">41 — createSelector базовый</a></li>
+          <li><a href="../45-typed-selectors-hooks/">45 — withTypes для типизации</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createSlice#selectors" target="_blank">RTK docs — createSlice selectors</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createSlice.ts" target="_blank">createSlice.ts (makeSelectorProps)</a></li>
+          <li><a href="https://redux-toolkit.js.org/api/combineSlices" target="_blank">combineSlices API</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

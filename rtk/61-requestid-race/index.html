@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>61 — meta.requestId и last-wins</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+    @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+    .pane { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+    .pane h4 { color: var(--accent); font-family: var(--font-mono); font-size: .76rem; margin-bottom: 6px; }
+    .pane.bad { border-color: #f44747; }
+    .pane.good { border-color: #4caf50; }
+    .state-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .74rem; color: var(--accent-cyan); white-space: pre; overflow: auto; max-height: 180px; }
+    .result { background: #0d0d0d; border: 1px solid #333; border-radius: 4px; padding: 8px 12px; font-family: var(--font-mono); font-size: .8rem; margin-top: 6px; min-height: 2em; }
+    .result strong { color: var(--accent-yellow); }
+    .req-list { font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted); margin-top: 8px; }
+    .req-list .rid { padding: 1px 6px; background: var(--bg-panel); border-radius: 3px; margin-right: 4px; }
+    .req-list .rid.stale { color: #f44747; text-decoration: line-through; }
+    .req-list .rid.current { color: #4caf50; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">61 / 106</span>meta.requestId &amp; last-wins</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../60-asyncthunk-cancellation/">← Назад</a>
+      <a href="../62-asyncthunk-meta-extras/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Поле поиска. При каждом вводе диспатчим thunk <code>search(query)</code> со <strong>случайной задержкой</strong>
+          (400–1800 мс) — имитирует «server returns in wrong order». Левая колонка — <strong>без защиты</strong>
+          (каждый fulfilled перезаписывает результат): увидите «зависший» старый ответ.
+          Правая — <strong>с защитой</strong>: в state хранится <code>currentRequestId</code>, в reducer
+          принимаем только actions с актуальным ID.
+        </p>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; align-items: center;">
+          <input id="query" type="text" placeholder="Введите 3 разных буквы быстро…"
+            style="flex:1; min-width: 220px; padding: 8px; background: var(--bg-input); color: var(--text-bright); border: 1px solid var(--border); border-radius: 4px; font-family: var(--font-mono);"/>
+          <button class="btn btn--secondary" id="clear-all">Очистить</button>
+          <button class="btn" id="demo-race">Авто-демо (3 запроса подряд)</button>
+        </div>
+
+        <div class="two-col">
+          <div class="pane bad">
+            <h4>БЕЗ защиты — last-fulfilled wins</h4>
+            <div class="result" id="naive-result">—</div>
+            <div class="req-list" id="naive-reqs">—</div>
+            <div class="state-out" id="naive-state" style="margin-top: 8px;">—</div>
+          </div>
+          <div class="pane good">
+            <h4>С currentRequestId — last-dispatched wins</h4>
+            <div class="result" id="guarded-result">—</div>
+            <div class="req-list" id="guarded-reqs">—</div>
+            <div class="state-out" id="guarded-state" style="margin-top: 8px;">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 61. requestId и защита от race condition</div>
+      <div class="theory__body">
+        <h3>Цитата</h3>
+        <div class="quote">
+          «A unique ID generated for this particular dispatch. This allows you to correlate the life-cycle
+          actions that belong to the same thunk dispatch. […] You can use this in your reducer to ensure you
+          handle only the latest request.»<br>
+          — <a href="https://redux-toolkit.js.org/api/createAsyncThunk#payloadcreator" target="_blank">createAsyncThunk — requestId</a>
+        </div>
+        <div class="quote quote--ru">
+          «Уникальный ID, сгенерированный для данного конкретного dispatch'а. Позволяет связать life-cycle actions,
+          принадлежащие <em>одному</em> запуску thunk'а. В reducer можно использовать для гарантии обработки
+          только самого свежего запроса.»
+        </div>
+
+        <h3>Как генерится requestId</h3>
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строка 606–608</span>
+<span class="kw">const</span> requestId = options?.idGenerator
+  ? options.<span class="fn">idGenerator</span>(arg)
+  : <span class="fn">nanoid</span>()
+
+<span class="cm">// nanoid.ts — весь файл:</span>
+<span class="kw">let</span> urlAlphabet = <span class="str">'ModuleSymbhasOwnPr-0123456789ABCDEFGHNRVfgctiUvz_KqYTJkLxpZXIjQW'</span>
+<span class="kw">export let</span> nanoid = (size = <span class="num">21</span>) =&gt; {
+  <span class="kw">let</span> id = <span class="str">''</span>
+  <span class="kw">let</span> i = size
+  <span class="kw">while</span> (i--) {
+    id += urlAlphabet[(<span class="fn">Math</span>.<span class="fn">random</span>() * <span class="num">64</span>) | <span class="num">0</span>]
+  }
+  <span class="kw">return</span> id
+}</div>
+        <p style="font-size: .78rem;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/nanoid.ts" target="_blank">nanoid.ts</a>
+        </p>
+
+        <h3>Паттерн last-wins</h3>
+        <div class="code-block">interface <span class="type">SearchState</span> {
+  currentRequestId: <span class="type">string</span> | <span class="kw">null</span>
+  results: <span class="type">Post</span>[]
+}
+
+extraReducers: (b) =&gt; {
+  b.<span class="fn">addCase</span>(search.pending, (s, a) =&gt; {
+    s.currentRequestId = a.meta.requestId        <span class="cm">// ← записали свежий</span>
+  })
+  b.<span class="fn">addCase</span>(search.fulfilled, (s, a) =&gt; {
+    <span class="kw">if</span> (a.meta.requestId !== s.currentRequestId) {
+      <span class="kw">return</span>                                     <span class="cm">// ← это УСТАРЕВШИЙ ответ</span>
+    }
+    s.results = a.payload
+  })
+  b.<span class="fn">addCase</span>(search.rejected, (s, a) =&gt; {
+    <span class="kw">if</span> (a.meta.requestId === s.currentRequestId) {
+      s.currentRequestId = <span class="kw">null</span>
+    }
+  })
+}</div>
+
+        <h3>Альтернатива: abort() предыдущего</h3>
+        <div class="code-block"><span class="kw">let</span> lastPromise: <span class="type">ReturnType</span>&lt;<span class="kw">typeof</span> search&gt; | <span class="kw">null</span> = <span class="kw">null</span>
+
+<span class="kw">function</span> <span class="fn">onInput</span>(query: <span class="type">string</span>) {
+  lastPromise?.<span class="fn">abort</span>()                        <span class="cm">// cancel предыдущий</span>
+  lastPromise = store.<span class="fn">dispatch</span>(<span class="fn">search</span>(query))
+}</div>
+        <p style="color: var(--text-muted); font-size: .82rem;">
+          <code>abort()</code> экономит трафик (сеть тоже прерывается, если вы пробросили <code>signal</code>),
+          <code>requestId</code> — дешевле, но сеть продолжает работать впустую.
+        </p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. nanoid — 21 символ, НЕ стабилен между сессиями.</strong>
+          Если вы пишете тесты на <code>expect(action.meta.requestId).toBe('abc123')</code> — получите flaky.
+          Для тестов передавайте <code>idGenerator: () =&gt; 'fixed-id'</code> в опции.<br>
+          <strong>2. Одинаковый <code>arg</code> → РАЗНЫЕ requestId.</strong>
+          <code>createAsyncThunk</code> не дедуплицирует по аргументу. Два <code>dispatch(fetchUser(1))</code>
+          подряд создадут <em>два</em> независимых запроса. Если нужна дедупликация —
+          <a href="../59-asyncthunk-condition/"><code>condition</code></a>.<br>
+          <strong>3. requestId в nanoid — 21 символ</strong> (в некоторых статьях пишут 7 — это старые версии).
+          Убедитесь, смотря в исходник выше: <code>nanoid(size = 21)</code>.<br>
+          <strong>4. requestId одинаков для pending / fulfilled / rejected одного dispatch'а.</strong>
+          Но <em>разный</em> — для разных dispatch'ей, даже с одним arg. Это гарантия RTK.<br>
+          <strong>5. Правильная реализация — обновлять <code>currentRequestId</code> в pending, проверять в fulfilled и rejected.</strong>
+          Иногда забывают про rejected — и «зависший» error от старого запроса перебивает успех свежего.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../59-asyncthunk-condition/">59 — condition (альтернатива для дедупликации)</a></li>
+          <li><a href="../60-asyncthunk-cancellation/">60 — cancellation (альтернатива last-wins)</a></li>
+          <li><a href="../62-asyncthunk-meta-extras/">62 — idGenerator (фиксированный requestId)</a></li>
+          <li><a href="../23-matchers-utilities/">23 — nanoid сам по себе</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>52 — adapter.getSelectors()</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .panel-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      margin: 10px 0;
+    }
+    .panel-box h4 { color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 8px; }
+    .panel-box .out { font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); white-space: pre-wrap; }
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 14px 0;
+    }
+    .call-log {
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      color: var(--accent-yellow);
+      margin-top: 6px;
+    }
+    .move-banner {
+      background: rgba(255, 152, 0, .1);
+      border-left: 3px solid var(--warning);
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      margin: 12px 0;
+    }
+    .move-banner code { background: transparent; color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">52 / 106</span>adapter.getSelectors — local vs globalized</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../51-selectid-sortcomparer/">← Назад</a>
+      <a href="../53-getinitialstate-extra/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Две формы: getSelectors() vs getSelectors(s =&gt; s.books)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>getSelectors()</code> без аргумента — ждёт, что ему передадут <em>ровно</em>
+          <code>EntityState</code>. <code>getSelectors(s =&gt; s.books)</code> знает путь —
+          принимает <code>RootState</code> и сам извлекает подстейт.
+        </p>
+
+        <div class="btn-group" style="margin: 14px 0;">
+          <button class="btn btn--accent" id="call-local">① local: entitySelectors.selectAll(state.books)</button>
+          <button class="btn btn--accent" id="call-global">② global: globalSelectors.selectAll(state)</button>
+          <button class="btn" id="call-by-id">selectById(state, 'b2')</button>
+          <button class="btn" id="call-total">selectTotal</button>
+          <button class="btn" id="stress">💥 selectById для 3 разных id (cache size=1)</button>
+        </div>
+
+        <div class="result-grid">
+          <div class="panel-box">
+            <h4>① local getSelectors()</h4>
+            <div class="out" id="out-local">—</div>
+          </div>
+          <div class="panel-box">
+            <h4>② globalized getSelectors(s =&gt; s.books)</h4>
+            <div class="out" id="out-global">—</div>
+          </div>
+        </div>
+
+        <div class="call-log" id="call-log">—</div>
+
+        <h4 style="margin-top: 24px; color: var(--text-bright); font-size: .95rem;">Переместим slice в вложенный путь</h4>
+        <div class="move-banner" id="move-banner">
+          Текущий путь: <code id="current-path">state.books</code>
+        </div>
+        <div class="btn-group">
+          <button class="btn" id="move-flat">flat: state.books</button>
+          <button class="btn" id="move-nested">nested: state.library.books</button>
+        </div>
+
+        <p style="margin-top: 12px; color: var(--text-secondary); font-size: .82rem;">
+          После перемещения <strong>local</strong> селекторы продолжают работать (если вручную дать им
+          правильный подстейт), а <strong>globalized</strong> ломаются и их надо пересоздать с новым
+          путём.
+        </p>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 52. getSelectors() и createDraftSafeSelector</div>
+      <div class="theory__body">
+        <h3>Что возвращает <code>adapter.getSelectors()</code></h3>
+        <div class="code-block">
+<span class="cm">// EntitySelectors&lt;T, V, IdType&gt;</span>
+{
+  selectIds:      (state: V) =&gt; <span class="type">Id</span>[]
+  selectEntities: (state: V) =&gt; <span class="type">Record</span>&lt;<span class="type">Id</span>, <span class="type">T</span>&gt;
+  selectAll:      (state: V) =&gt; <span class="type">T</span>[]
+  selectTotal:    (state: V) =&gt; <span class="type">number</span>
+  selectById:     (state: V, id: <span class="type">Id</span>) =&gt; <span class="type">T</span> | <span class="type">undefined</span>
+}
+        </div>
+
+        <h3>Две перегрузки</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 8px;">
+          <thead style="background: var(--bg-panel);">
+            <tr>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); text-align: left; color: var(--accent);">Вызов</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); text-align: left;">Принимает</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); text-align: left;">Когда использовать</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">getSelectors()</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">EntityState напрямую</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">Unit-тесты, self-contained slice, когда пользователь сам вытаскивает подстейт</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">getSelectors(selector)</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">RootState целиком</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">Компоненты через <code>useSelector</code> — всегда передают RootState</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Исходник — <code>state_selectors.ts</code></h3>
+        <div class="code-block">
+<span class="kw">export function</span> <span class="fn">createSelectorsFactory</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt;() {
+  <span class="kw">function</span> <span class="fn">getSelectors</span>(selectState?, options = {}) {
+    <span class="kw">const</span> {
+      createSelector = createDraftSafeSelector <span class="kw">as</span> <span class="type">AnyCreateSelectorFunction</span>,  <span class="cm">// ← дефолт!</span>
+    } = options
+
+    <span class="kw">const</span> selectIds      = (state) =&gt; state.ids
+    <span class="kw">const</span> selectEntities = (state) =&gt; state.entities
+
+    <span class="kw">const</span> selectAll = <span class="fn">createSelector</span>(
+      selectIds, selectEntities,
+      (ids, entities) =&gt; ids.<span class="fn">map</span>((id) =&gt; entities[id]!),
+    )
+
+    <span class="kw">const</span> selectId = (_, id) =&gt; id
+    <span class="kw">const</span> selectById = (entities, id) =&gt; entities[id]
+
+    <span class="kw">const</span> selectTotal = <span class="fn">createSelector</span>(selectIds, (ids) =&gt; ids.length)
+
+    <span class="kw">if</span> (!selectState) {
+      <span class="kw">return</span> {
+        selectIds, selectEntities, selectAll, selectTotal,
+        selectById: <span class="fn">createSelector</span>(selectEntities, selectId, selectById),
+      }
+    }
+
+    <span class="cm">// globalized: оборачиваем в ещё один createSelector</span>
+    <span class="kw">const</span> selectGlobalizedEntities = <span class="fn">createSelector</span>(selectState, selectEntities)
+    <span class="kw">return</span> {
+      selectIds:      <span class="fn">createSelector</span>(selectState, selectIds),
+      selectEntities: selectGlobalizedEntities,
+      selectAll:      <span class="fn">createSelector</span>(selectState, selectAll),
+      selectTotal:    <span class="fn">createSelector</span>(selectState, selectTotal),
+      selectById:     <span class="fn">createSelector</span>(selectGlobalizedEntities, selectId, selectById),
+    }
+  }
+  <span class="kw">return</span> { getSelectors }
+}
+        </div>
+        <p>
+          GitHub: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/state_selectors.ts" target="_blank">state_selectors.ts</a>
+        </p>
+
+        <h3>Зачем createDraftSafeSelector</h3>
+        <p>
+          Обычный <code>reselect.createSelector</code> кэширует по строгому <code>===</code> ссылки.
+          Внутри reducer'а state — Immer draft, и после commit'а ссылка меняется; кэш всегда мимо.
+          <code>createDraftSafeSelector</code> детектит draft и правильно переключает кэш.
+          Дефолт <code>getSelectors</code> безопасный для draft'ов.
+        </p>
+        <p>Ссылка: <a href="https://redux-toolkit.js.org/api/createSelector#createdraftsafeselector" target="_blank">RTK · createDraftSafeSelector</a></p>
+
+        <h3>Цитата — RTK docs</h3>
+        <div class="quote">
+          «If the selector function is not provided, it returns selectors that assume their <em>input</em>
+          is already an <code>EntityState</code>. If a selector function is provided, it returns selectors
+          that accept the top-level state and will internally call your function to find the right slice.»
+        </div>
+        <div class="quote quote--ru">
+          «Без аргумента <code>getSelectors()</code> отдаёт селекторы, которые ждут на входе
+          <em>EntityState</em>. Если передать функцию — селекторы принимают <code>RootState</code> и
+          сами достают нужный подстейт.»
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. <code>selectById(state, id)</code> — cache размером 1.</strong>
+          <br>Дефолтный <code>createDraftSafeSelector</code> — это <code>lruMemoize({ maxSize: 1 })</code>.
+          Если вызываешь <code>selectById(state, 'a')</code>, затем <code>selectById(state, 'b')</code>,
+          затем снова <code>selectById(state, 'a')</code> — кэш каждый раз инвалидируется (последний аргумент
+          разный), и селектор пересчитывается на каждом вызове. Для списка компонентов, каждый из которых
+          делает <code>selectById(state, props.id)</code> — это cache thrashing.
+          <br>
+          <strong>Решение</strong>: передать в options <code>createSelector</code> с
+          <code>weakMapMemoize</code>:
+          <div class="code-block" style="margin: 8px 0;">
+<span class="kw">import</span> { createSelectorCreator, weakMapMemoize } <span class="kw">from</span> <span class="str">'reselect'</span>
+
+<span class="kw">const</span> wmSelector = <span class="fn">createSelectorCreator</span>(weakMapMemoize)
+
+<span class="kw">const</span> sel = booksAdapter.<span class="fn">getSelectors</span>(
+  (s) =&gt; s.books,
+  { createSelector: wmSelector <span class="kw">as</span> <span class="type">any</span> }
+)
+          </div>
+          <code>weakMapMemoize</code> — кэш по каждому аргументу отдельно, «бесконечный» (WeakMap).
+          <br><br>
+          <strong>2. Globalized селекторы привязаны к пути.</strong>
+          Если ты перенёс slice в <code>state.features.books</code>, а старые селекторы строились от
+          <code>s.books</code> — они вернут <code>undefined.ids</code> и упадут с TypeError. Всегда
+          пересоздавай globalized селекторы при рефакторе store.
+          <br><br>
+          <strong>3. Разделяй instance-ы селекторов.</strong>
+          Если один и тот же <code>selectById</code> используется в 10 компонентах — они <em>делят</em>
+          cache size=1. По одному <code>.get(id)</code> с разным id — ничего не кэшируется. Это reselect
+          поведение, не RTK.
+          <br><br>
+          <strong>4. selectAll возвращает новый массив при каждом <code>ids.map</code>.</strong>
+          Он мемоизирован по <code>ids</code> + <code>entities</code>. Если хоть одно изменилось —
+          новый массив. Значит <code>useSelector(selectAll)</code> в React каждый раз rerenders ровно когда
+          нужно, но не чаще. (С draft safe — тоже.)
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../33-slice-selectors/">33 — slice.selectors (другой уровень)</a></li>
+          <li><a href="../51-selectid-sortcomparer/">51 — selectAll вернёт отсортированное</a></li>
+          <li>42 — createDraftSafeSelector (секция E)</li>
+          <li>43 — weakMapMemoize (секция E)</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createEntityAdapter#selector-functions" target="_blank">RTK · Selector Functions</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/state_selectors.ts" target="_blank">state_selectors.ts</a></li>
+          <li><a href="https://reselect.js.org/api/weakmapmemoize" target="_blank">reselect · weakMapMemoize</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

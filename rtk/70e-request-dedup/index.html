@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>70e — Request dedup: condition и takeLatest</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0; }
+    .counter { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; text-align: center; }
+    .counter__label { font-size: .7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+    .counter__val { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; margin-top: 4px; }
+    .counter--clicks .counter__val { color: var(--text-primary); }
+    .counter--fetches .counter__val { color: var(--warning); }
+    .counter--skipped .counter__val { color: var(--success); }
+    .counter--cancelled .counter__val { color: var(--accent-cyan); }
+    .kind-toggle { display: inline-flex; gap: 4px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px; }
+    .kind-toggle button { background: transparent; color: var(--text-secondary); border: none; padding: 6px 12px; border-radius: 3px; font-family: var(--font-mono); font-size: .78rem; cursor: pointer; }
+    .kind-toggle button.active { background: var(--accent); color: white; }
+    .search-box { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); padding: 8px 12px; border-radius: 3px; width: 280px; font-family: var(--font-mono); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">70e / 106</span>Request dedup руками — condition + takeLatest</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../70d-entity-as-cache-table/">← Назад</a>
+      <a href="../70f-ttl-invalidation/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Два сценария дедупликации, которые RTKQ закроет одной строкой</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Есть два разных типа дубликатов в запросах:<br>
+          <strong>① Идемпотентные дубли</strong> — один и тот же запрос улетает два раза параллельно (кнопка дважды).
+          Правильный ответ — <em>второй не запускать</em>. Это <code>condition</code>.<br>
+          <strong>② Последовательные разные</strong> — пользователь печатает в search. Прошлый запрос больше
+          не нужен. Правильный ответ — <em>отменить старый, запустить новый</em>. Это <code>takeLatest</code>.
+        </p>
+
+        <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem; margin:18px 0 6px;">① condition: спам-клики Fetch</h4>
+        <p style="color: var(--text-secondary); font-size: .82rem;">
+          Нажмите кнопку быстро несколько раз. <code>condition</code> проверяет
+          <code>getState().loading === 'pending'</code> — пока запрос в полёте, новые отсекаются.
+        </p>
+        <div style="display:flex; gap:8px; margin: 8px 0;">
+          <button class="btn btn--accent" id="btn-spam">Fetch posts (спамьте!)</button>
+          <button class="btn btn--secondary" id="btn-reset-1">Reset</button>
+        </div>
+        <div class="counters">
+          <div class="counter counter--clicks"><div class="counter__label">Нажатий</div><div class="counter__val" id="c1-clicks">0</div></div>
+          <div class="counter counter--fetches"><div class="counter__label">Real fetch</div><div class="counter__val" id="c1-fetches">0</div></div>
+          <div class="counter counter--skipped"><div class="counter__label">Skipped (condition)</div><div class="counter__val" id="c1-skipped">0</div></div>
+        </div>
+
+        <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem; margin:18px 0 6px;">② takeLatest: поиск с отменой</h4>
+        <p style="color: var(--text-secondary); font-size: .82rem;">
+          Печатайте в поле — каждый keystroke запускает thunk. Listener с <code>cancelActiveListeners()</code>
+          отменяет прошлый запрос через <code>signal</code>. До сервера доходит только последний.
+        </p>
+        <input class="search-box" type="text" id="search-input" placeholder="Начни печатать...">
+        <div class="counters">
+          <div class="counter counter--clicks"><div class="counter__label">Keystrokes</div><div class="counter__val" id="c2-keys">0</div></div>
+          <div class="counter counter--fetches"><div class="counter__label">Real fetch</div><div class="counter__val" id="c2-fetches">0</div></div>
+          <div class="counter counter--cancelled"><div class="counter__label">Cancelled</div><div class="counter__val" id="c2-cancelled">0</div></div>
+          <div class="counter counter--skipped"><div class="counter__label">Completed</div><div class="counter__val" id="c2-completed">0</div></div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 70e. Dedup на уровне запросов</div>
+      <div class="theory__body">
+        <h3>Вариант 1 — condition (идемпотентные дубли)</h3>
+        <div class="code-block"><span class="kw">const</span> fetchPosts = <span class="fn">createAsyncThunk</span>&lt;Post[], <span class="kw">void</span>, { state: RootState }&gt;(
+  <span class="str">'posts/fetch'</span>,
+  <span class="kw">async</span> () =&gt; api.<span class="fn">getPosts</span>(),
+  {
+    condition: (_, { getState }) =&gt;
+      getState().posts.loading !== <span class="str">'pending'</span>,    <span class="cm">// кэш по статусу</span>
+  },
+)
+
+<span class="cm">// Пока первый pending — все последующие dispatch(fetchPosts()) возвращают</span>
+<span class="cm">// rejected action с meta.condition=true и БЕЗ pending-диспатча.</span></div>
+
+        <h3>Вариант 2 — takeLatest через listener</h3>
+        <div class="code-block"><span class="kw">import</span> { <span class="fn">createListenerMiddleware</span> } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> listener = <span class="fn">createListenerMiddleware</span>()
+
+listener.<span class="fn">startListening</span>({
+  actionCreator: searchQueryChanged,
+  effect: <span class="kw">async</span> (action, api) =&gt; {
+    <span class="cm">// ① Отменить все ПРЕДЫДУЩИЕ активные эффекты этого listener'а</span>
+    api.<span class="fn">cancelActiveListeners</span>()
+
+    <span class="cm">// ② Debounce — ждём 200ms тишины</span>
+    <span class="kw">await</span> api.<span class="fn">delay</span>(200)
+
+    <span class="cm">// ③ Запускаем fetch. signal привязан к этому эффекту —</span>
+    <span class="cm">// если придёт следующий keystroke → cancelActiveListeners убьёт этот await</span>
+    <span class="kw">const</span> result = <span class="kw">await</span> api.<span class="fn">dispatch</span>(<span class="fn">fetchSearch</span>(action.payload)).<span class="fn">unwrap</span>()
+    <span class="cm">// (опционально) обновить UI через dispatch</span>
+  },
+})</div>
+
+        <h3>Когда какой</h3>
+        <table style="width:100%; border-collapse: collapse; font-size: .82rem; margin: 10px 0;">
+          <thead>
+            <tr style="background: var(--bg-tertiary);">
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">Сценарий</th>
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">Инструмент</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Одна и та же кнопка дважды нажата</td><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>condition</code></td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Запросы с РАЗНЫМ аргументом, но последовательно</td><td style="padding:8px 10px; border-top:1px solid var(--border);">listener + <code>cancelActiveListeners</code></td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Два компонента запрашивают одно и то же одновременно</td><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>condition</code> + inflight-flag per-id</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Polling + сеть тормозит</td><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>condition</code> (back-pressure)</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Search-as-you-type</td><td style="padding:8px 10px; border-top:1px solid var(--border);">listener + <code>delay</code> + cancel</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Per-id inflight flag (когда condition не хватает)</h3>
+        <div class="code-block"><span class="cm">// Если у вас fetchProduct(id) — condition по loading:'pending' ломает параллельность:</span>
+<span class="cm">// fetch(1) в полёте, fetch(2) тоже отсечётся. Исправление — inflight per id.</span>
+
+<span class="kw">interface</span> ProductsState {
+  byId: Record&lt;<span class="kw">number</span>, Product&gt;
+  inflight: Record&lt;<span class="kw">number</span>, <span class="kw">boolean</span>&gt;   <span class="cm">// ← новый флаг</span>
+}
+
+<span class="kw">const</span> fetchProduct = <span class="fn">createAsyncThunk</span>&lt;Product, <span class="kw">number</span>, { state: RootState }&gt;(
+  <span class="str">'products/fetch'</span>,
+  <span class="kw">async</span> (id) =&gt; api.<span class="fn">getProduct</span>(id),
+  {
+    condition: (id, { getState }) =&gt; !getState().products.inflight[id],
+  },
+)
+
+<span class="cm">// В slice reducer'ах: pending → inflight[id] = true, fulfilled/rejected → delete inflight[id]</span></div>
+
+        <h3>В RTKQ</h3>
+        <p style="color: var(--text-secondary);">
+          RTKQ делает ОБА варианта автоматически:<br>
+          • <strong>Dedup по cacheKey:</strong> если <code>useGetPostsQuery()</code> вызывается из двух
+          компонентов одновременно — сеть бьётся один раз. Кэш-ключ = <code>endpoint + serializedArg</code>.<br>
+          • <strong>AbortController:</strong> unmount компонента или change аргумента — отменяет fetch.<br>
+          Это то, что мы собираем руками через <code>condition</code> + listener.
+        </p>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../59-asyncthunk-condition/">59 — condition (8 кейсов)</a></li>
+          <li><a href="../60-asyncthunk-cancellation/">60 — AbortSignal в thunk</a></li>
+          <li><a href="../68-listener-cancellation/">68 — cancelActiveListeners</a></li>
+          <li><a href="../69-listener-patterns/">69 — takeLatest / takeEvery / takeLeading</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

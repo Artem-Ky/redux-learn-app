@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>70d — EntityAdapter как O(1) кэш-таблица</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .bench { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+    .bench-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+    .bench-card h4 { color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 6px; }
+    .bench-card .val { font-family: var(--font-mono); font-size: 1.6rem; font-weight: 700; margin: 6px 0; }
+    .bench-card--array .val { color: var(--warning); }
+    .bench-card--table .val { color: var(--success); }
+    .bench-card .sub { color: var(--text-muted); font-size: .72rem; }
+    .ratio { text-align: center; margin: 10px 0; font-family: var(--font-mono); font-size: .95rem; color: var(--accent-cyan); }
+    .opts { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+    .opts label { font-family: var(--font-mono); font-size: .78rem; color: var(--text-secondary); }
+    .opts input[type=number] { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border);
+                               padding: 4px 8px; border-radius: 3px; width: 80px; font-family: var(--font-mono); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">70d / 106</span>EntityAdapter — O(1) кэш-таблица</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../70c-selector-cache/">← Назад</a>
+      <a href="../70e-request-dedup/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Bench: array.find (O(n)) vs entities[id] (O(1))</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>createEntityAdapter</code> — это не просто «удобный CRUD». Это <strong>in-memory
+          cache-таблица</strong>: шейп <code>{ ids, entities }</code> превращает state в хеш-карту,
+          где <code>selectById(s, id) = entities[id]</code> — это cache-hit за константное время.
+        </p>
+
+        <div class="opts">
+          <label>N записей: <input type="number" id="n-records" value="10000" step="1000" min="100"></label>
+          <label>Ключей для lookup: <input type="number" id="n-lookups" value="5000" step="500" min="10"></label>
+          <button class="btn btn--accent" id="btn-run">Прогнать bench</button>
+          <button class="btn btn--secondary" id="btn-clear">Очистить</button>
+        </div>
+
+        <div class="bench">
+          <div class="bench-card bench-card--array">
+            <h4>① Массив — items.find(x =&gt; x.id === id)</h4>
+            <div class="val" id="val-array">— ms</div>
+            <div class="sub">O(n) на каждый lookup. Каждый раз проходит весь массив.</div>
+          </div>
+          <div class="bench-card bench-card--table">
+            <h4>② EntityState — entities[id]</h4>
+            <div class="val" id="val-table">— ms</div>
+            <div class="sub">O(1) lookup. Plain object как хеш-таблица.</div>
+          </div>
+        </div>
+        <div class="ratio" id="ratio">—</div>
+
+        <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem; margin:16px 0 6px;">Живой store с adapter'ом</h4>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin: 10px 0;">
+          <button class="btn btn--accent" id="btn-add">Add product (nanoid)</button>
+          <button class="btn btn--accent" id="btn-upsert-1">Upsert #1 (partial price)</button>
+          <button class="btn btn--accent" id="btn-get-1">Get #1 (O(1) по ключу)</button>
+          <button class="btn btn--secondary" id="btn-clear-store">Clear store</button>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: .78rem; color: var(--accent-cyan); background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; white-space: pre; overflow: auto; max-height: 200px;" id="state-out">—</div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 70d. Почему adapter — это кэш</h3>
+      <div class="theory__body">
+        <h3>Ментальная модель</h3>
+        <p style="color: var(--text-secondary);">
+          Обычный массив <code>items: Todo[]</code> — это «лента». Чтобы найти запись по id, нужно
+          обойти всю ленту. EntityAdapter добавляет <strong>индекс по id</strong>:
+        </p>
+
+        <div class="code-block"><span class="cm">// ❌ Массив — cache бесполезен: Array.find = O(n)</span>
+<span class="kw">interface</span> TodosState { items: Todo[] }
+<span class="kw">const</span> found = state.items.<span class="fn">find</span>(t =&gt; t.id === targetId)
+
+<span class="cm">// ✅ EntityState — встроенный O(1) cache</span>
+<span class="kw">interface</span> TodosState {
+  ids: <span class="kw">string</span>[]
+  entities: Record&lt;<span class="kw">string</span>, Todo&gt;
+}
+<span class="kw">const</span> found = state.entities[targetId]   <span class="cm">// O(1) — сразу из хеш-таблицы</span>
+<span class="kw">const</span> exists = targetId <span class="kw">in</span> state.entities
+<span class="kw">const</span> count = state.ids.length</div>
+
+        <h3>В каких операциях это важно</h3>
+        <table style="width:100%; border-collapse: collapse; font-size: .82rem; margin: 10px 0;">
+          <thead>
+            <tr style="background: var(--bg-tertiary);">
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">Операция</th>
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">Массив</th>
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">EntityState</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Поиск по id</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(n)</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(1)</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Существует ли?</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(n)</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(1)</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Добавить</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(1) amortized</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(1)</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Удалить по id</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(n)</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(1) + O(n) на ids.filter</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Обновить по id</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(n)</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(1)</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Перебрать все</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(n)</td><td style="padding:8px 10px; border-top:1px solid var(--border);">O(n) — по ids</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);">Дедупликация по id</td><td style="padding:8px 10px; border-top:1px solid var(--border);">вручную O(n)</td><td style="padding:8px 10px; border-top:1px solid var(--border);">бесплатно</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Сцепка с другими слоями</h3>
+        <div class="tip">
+          <strong>Layer 3 (adapter) + Layer 2 (memo):</strong> параметризованный селектор
+          <code>selectById</code> у adapter'а — это <code>lruMemoize size 1</code>. В списке из 100 компонентов
+          с разными id — промах в 99 из 100. Берите <code>weakMapMemoize</code> (Layer 2+3 вместе).<br>
+          <strong>Layer 3 + Layer 5 (TTL):</strong> храните <code>fetchedAt</code> прямо в entity. Тогда
+          <code>condition</code> проверяет свежесть по id за O(1).<br>
+          <strong>Layer 3 + Layer 4 (dedup):</strong> <code>loading: Record&lt;id, 'pending' | 'idle'&gt;</code> —
+          inflight-flag per id. Дедуп параметризованный, без коллизий.
+        </div>
+
+        <h3>Upsert vs set — mental model кэша</h3>
+        <div class="code-block"><span class="cm">// upsertOne — "обновить запись в кэше, если она есть; добавить, если нет"</span>
+<span class="cm">// Это именно cache-update семантика. После ответа от сервера → upsertOne.</span>
+<span class="fn">upsertOne</span>(state, { id: <span class="str">'p1'</span>, price: 200 })
+<span class="cm">// → entities.p1 = { ...old, price: 200 }   (shallow merge)</span>
+
+<span class="cm">// setOne — "заменить запись целиком"</span>
+<span class="cm">// Полезно когда сервер вернул ПОЛНЫЙ объект и вы уверены в схеме.</span>
+<span class="fn">setOne</span>(state, { id: <span class="str">'p1'</span>, price: 200, title: <span class="str">'New'</span> })
+<span class="cm">// → entities.p1 = { id:'p1', price: 200, title: 'New' }</span>
+
+<span class="cm">// addOne — "добавить только если нет" (кэш-miss)</span>
+<span class="cm">// silent no-op если уже есть. Полезно когда не хочешь перетереть свежие данные.</span></div>
+
+        <h3>В RTKQ</h3>
+        <p style="color: var(--text-secondary);">
+          RTKQ хранит свой cache не через <code>createEntityAdapter</code>, а через
+          <code>state.api.queries[cacheKey]</code> — тоже plain object. Но философия та же: id-индекс
+          для O(1) доступа. Многие кодбейсы используют <code>createEntityAdapter</code> ВМЕСТЕ с RTKQ:
+          API возвращает список → <code>transformResponse</code> прогоняет через <code>setAll</code>.
+          Это даёт плоский state и плюсы нормализации.
+        </p>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../46-entity-why-normalized/">46 — зачем нормализация</a></li>
+          <li><a href="../52-adapter-getselectors/">52 — getSelectors</a></li>
+          <li><a href="../43-weakmap-memoize/">43 — weakMapMemoize для selectById в списке</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

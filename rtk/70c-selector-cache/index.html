@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>70c — Memoized selectors как view cache</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .runner-row { display: grid; grid-template-columns: 1fr 100px 100px; gap: 10px; align-items: center;
+                  padding: 10px 14px; background: var(--bg-tertiary); border: 1px solid var(--border);
+                  border-radius: var(--radius-sm); margin: 6px 0; font-family: var(--font-mono); font-size: .82rem; }
+    .runner-row__name { color: var(--accent-cyan); }
+    .runner-row__runs { text-align: right; font-weight: 700; font-size: 1rem; }
+    .runner-row--naive .runner-row__runs { color: var(--warning); }
+    .runner-row--memo  .runner-row__runs { color: var(--success); }
+    .runner-row__last { color: var(--text-muted); text-align: right; font-size: .78rem; }
+    .ms { color: var(--accent-orange); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">70c / 106</span>Memoized selectors — кэш на уровне view</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../70b-structural-sharing-cache/">← Назад</a>
+      <a href="../70d-entity-as-cache-table/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Когда === сломан — спасает createSelector</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В 70b мы видели, что Immer сохраняет ссылки → <code>===</code> работает. Но как только селектор
+          <strong>трансформирует</strong> данные (filter / map / sort / merge), результат — новый объект
+          каждый раз. Даже если исходные данные не менялись. Компоненты ререндерят впустую.
+        </p>
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>createSelector</code> из reselect добавляет <strong>кэш по ссылкам на inputs</strong>: если
+          все input-селекторы вернули <code>===</code> те же значения — не пересчитываем, возвращаем
+          закэшированный output.
+        </p>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin: 12px 0;">
+          <button class="btn btn--accent" id="btn-add-user">users/added (меняет users)</button>
+          <button class="btn btn--accent" id="btn-ui">ui/clicked (НЕ меняет users)</button>
+          <button class="btn" id="btn-read">Прочитать оба селектора (x 10)</button>
+          <button class="btn btn--secondary" id="btn-reset">Reset</button>
+        </div>
+
+        <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem; margin:12px 0 6px;">Naive vs memoized — один и тот же вычисляемый output</h4>
+        <div>
+          <div class="runner-row runner-row--naive">
+            <div class="runner-row__name">selectAdminsNaive(s) = s.users.filter(...).map(...)</div>
+            <div class="runner-row__runs" id="naive-runs">0</div>
+            <div class="runner-row__last"><span class="ms" id="naive-last">—</span> last</div>
+          </div>
+          <div class="runner-row runner-row--memo">
+            <div class="runner-row__name">selectAdminsMemo — createSelector</div>
+            <div class="runner-row__runs" id="memo-runs">0</div>
+            <div class="runner-row__last"><span class="ms" id="memo-last">—</span> last</div>
+          </div>
+        </div>
+
+        <p style="color: var(--text-secondary); font-size: .82rem; margin-top: 10px;">
+          «runs» = сколько раз функция вычислила результат. «last» = сколько было cache hits vs real runs
+          в последнем пакете чтений.
+        </p>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 70c. Что именно кэширует reselect</div>
+      <div class="theory__body">
+        <h3>Принцип</h3>
+        <div class="code-block"><span class="kw">const</span> selectAdminsMemo = <span class="fn">createSelector</span>(
+  [(s: <span class="type">RootState</span>) =&gt; s.users],     <span class="cm">// ← input-селекторы</span>
+  (users) =&gt; users                          <span class="cm">// ← combiner — ВЫЧИСЛИТ результат</span>
+    .<span class="fn">filter</span>(u =&gt; u.role === <span class="str">'admin'</span>)
+    .<span class="fn">map</span>(u =&gt; u.name),
+)
+
+<span class="cm">// reselect хранит: last inputs[], last output.</span>
+<span class="cm">// На каждом вызове:</span>
+<span class="cm">// 1. Запустить input-селекторы → получить inputs'[]</span>
+<span class="cm">// 2. Сравнить inputs' с last inputs по === (default equality).</span>
+<span class="cm">// 3. Если все равны — вернуть last output (cache hit).</span>
+<span class="cm">// 4. Иначе — вызвать combiner, сохранить inputs' и output.</span></div>
+
+        <h3>Когда создавать createSelector</h3>
+        <table style="width:100%; border-collapse: collapse; margin: 10px 0; font-size: .82rem;">
+          <thead>
+            <tr style="background: var(--bg-tertiary);">
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">Селектор</th>
+              <th style="padding:8px 10px; text-align:left; color:var(--accent);">Нужен createSelector?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>s =&gt; s.users</code></td>
+                <td style="padding:8px 10px; border-top:1px solid var(--border);">Нет — уже === стабильный.</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>s =&gt; s.user.name</code></td>
+                <td style="padding:8px 10px; border-top:1px solid var(--border);">Нет — примитив.</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>s =&gt; s.users.map(u =&gt; u.name)</code></td>
+                <td style="padding:8px 10px; border-top:1px solid var(--border);">ДА — новый массив каждый раз.</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>s =&gt; ({ a: s.x.a, b: s.y.b })</code></td>
+                <td style="padding:8px 10px; border-top:1px solid var(--border);">ДА — inline object.</td></tr>
+            <tr><td style="padding:8px 10px; border-top:1px solid var(--border);"><code>s =&gt; s.todos.filter(t =&gt; !t.done).length</code></td>
+                <td style="padding:8px 10px; border-top:1px solid var(--border);">Число — не обязательно, но вычисление тяжёлое → да.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Параметризованные селекторы — ловушка</h3>
+        <div class="warning">
+          <code>createSelector</code> по умолчанию — <strong>lruMemoize size 1</strong>. Это значит один слот кэша.<br>
+          Если у вас компонент <code>&lt;BookById id=&#123;id&#125; /&gt;</code> × 100 штук, каждый дёргает
+          <code>selectBookById(s, id)</code> с разным <code>id</code> — кэш промахивается на каждом вызове.
+          Решение: <code>createSelector</code> с <code>memoize: weakMapMemoize</code> (см. урок
+          <a href="../43-weakmap-memoize/">43</a>). Это дерево кэшей по WeakMap'ам — каждый id свой слот.
+        </div>
+
+        <h3>Размер кэша — аргумент memoizeOptions</h3>
+        <div class="code-block"><span class="kw">import</span> { createSelector, lruMemoize, weakMapMemoize } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="cm">// ① lru size N — фиксированный размер, вытесняет старые</span>
+<span class="kw">const</span> selectTopN = <span class="fn">createSelector</span>(
+  [(s: <span class="type">RootState</span>) =&gt; s.posts, (_: <span class="type">RootState</span>, n: <span class="kw">number</span>) =&gt; n],
+  (posts, n) =&gt; posts.<span class="fn">slice</span>(0, n),
+  { memoize: lruMemoize, memoizeOptions: { maxSize: 10 } },
+)
+
+<span class="cm">// ② weakMap — авто-GC, подходит когда ключи — объекты</span>
+<span class="kw">const</span> selectByEntity = <span class="fn">createSelector</span>(
+  [(s: <span class="type">RootState</span>) =&gt; s.data, (_: <span class="type">RootState</span>, entity: Entity) =&gt; entity],
+  (data, entity) =&gt; data.<span class="fn">filter</span>(d =&gt; d.owner === entity),
+  { memoize: weakMapMemoize },
+)</div>
+
+        <h3>Ключевое отличие от Layer 1</h3>
+        <div class="tip">
+          <strong>Layer 1 (structural sharing):</strong> «вернуть ту же ссылку если state не трогали» —
+          пассивно, встроено.<br>
+          <strong>Layer 2 (memoized selector):</strong> «вернуть тот же вычисленный результат если inputs
+          === те же» — активно, настраивается.<br>
+          Без Layer 1 Layer 2 бесполезен: если <code>state.users</code> меняет ссылку на каждый dispatch (даже
+          когда содержимое то же) — memoize всегда будет промахиваться.
+        </div>
+
+        <h3>В RTKQ</h3>
+        <p style="color: var(--text-secondary);">
+          RTKQ использует Layer 2 внутри — <code>selectFromResult</code> как раз строит createSelector
+          под капотом. Внешние memoized селекторы над <code>state.api.queries</code> пишутся точно так же,
+          как над обычным state.
+        </p>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../40b-memoization-why/">40b — зачем нужна memoization (базовый)</a></li>
+          <li><a href="../41-createselector-from-rtk/">41 — createSelector из RTK</a></li>
+          <li><a href="../43-weakmap-memoize/">43 — weakMapMemoize для параметризованных</a></li>
+          <li><a href="../44-slice-selectors-memoized/">44 — memoized selectors в slice</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

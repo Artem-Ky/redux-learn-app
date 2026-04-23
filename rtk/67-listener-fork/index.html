@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>67 — fork() параллельные задачи</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .poll-box {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px 16px; margin: 12px 0; display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; align-items: center;
+    }
+    .poll-box__label { color: var(--text-muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; }
+    .poll-box__value { color: var(--accent-cyan); font-family: var(--font-mono); font-size: .95rem; }
+    .poll-box__status { color: var(--accent); font-family: var(--font-mono); font-size: .85rem; }
+    .poll-box__status.off { color: var(--text-muted); }
+    .poll-box__status.on { color: var(--success); }
+    .poll-box__status.cancelled { color: var(--warning); }
+    .svg-wrap { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 12px 0; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">67 / 106</span>fork() — параллельные задачи внутри listener'а</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../66-listener-api-full/">← Назад</a>
+      <a href="../68-listener-cancellation/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Polling: два независимых fork'а + graceful cancel</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          На <code>pollStart</code> listener запускает два <code>fork</code>'а:
+          один тикает каждую секунду (диспатчит <code>tick</code>), второй — каждые 2 секунды (диспатчит <code>heartbeat</code>).
+          «Stop» — вызываем <code>childTask.cancel()</code>, у форка ловится <code>TaskAbortError</code>, cleanup через <code>finally</code>.
+        </p>
+
+        <div class="btn-group">
+          <button class="btn btn--accent" id="start">Start poll</button>
+          <button class="btn btn--danger" id="stop">Stop poll</button>
+          <button class="btn" id="reset">reset</button>
+        </div>
+
+        <div class="poll-box">
+          <div class="poll-box__label">ticks (1c)</div>
+          <div class="poll-box__value" id="ticks">0</div>
+
+          <div class="poll-box__label">heartbeats (2c)</div>
+          <div class="poll-box__value" id="hb">0</div>
+
+          <div class="poll-box__label">fork tick</div>
+          <div class="poll-box__status off" id="status-tick">off</div>
+
+          <div class="poll-box__label">fork heartbeat</div>
+          <div class="poll-box__status off" id="status-hb">off</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 67. fork, ForkedTaskAPI и parent/child abort linkage</div>
+      <div class="theory__body">
+
+        <h3>Что такое fork</h3>
+        <div class="quote">
+          «Queues in the next microtask the execution of a task. <code>fork</code> is useful for running long-running side tasks that should live independently of the listener's effect callback. The forked task has its own <code>AbortSignal</code>, linked to the parent listener's signal: when the parent is cancelled, the child is cancelled too.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createListenerMiddleware#forking-tasks-from-listeners" target="_blank">RTK docs — forking tasks</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>fork</code> ставит задачу в следующий microtask. Нужен для долгоиграющих побочек, которые должны жить независимо от основного effect. У fork'а свой <code>AbortSignal</code>, связанный с сигналом родителя: когда родитель отменён — ребёнок тоже.»
+        </div>
+
+        <h3>ForkedTaskAPI — что видит fork-экзекьютор</h3>
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">ForkedTaskAPI</span> {
+  <span class="prop">pause</span>&lt;W&gt;(waitFor: <span class="type">Promise</span>&lt;W&gt;): <span class="type">Promise</span>&lt;W&gt;   <span class="cm">// abort-aware await</span>
+  <span class="prop">delay</span>(timeoutMs: <span class="type">number</span>): <span class="type">Promise</span>&lt;<span class="kw">void</span>&gt;       <span class="cm">// abort-aware setTimeout</span>
+  <span class="prop">signal</span>: <span class="type">AbortSignal</span>                          <span class="cm">// сигнал именно этой child-задачи</span>
+}
+
+<span class="cm">// ForkedTask<T>, который вернёт fork():</span>
+<span class="kw">interface</span> <span class="type">ForkedTask</span>&lt;T&gt; {
+  <span class="prop">result</span>: <span class="type">Promise</span>&lt;TaskResult&lt;T&gt;&gt;                 <span class="cm">// { status: 'ok' | 'cancelled' | 'rejected', ... }</span>
+  <span class="prop">cancel</span>(): <span class="kw">void</span>                                <span class="cm">// отменить ребёнка</span>
+}
+        </div>
+
+        <h3>Исходник — createFork (parent → child abort linkage)</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/listenerMiddleware/index.ts, createFork</span>
+<span class="kw">const</span> <span class="fn">createFork</span> = (
+  parentAbortSignal: <span class="type">AbortSignal</span>,
+  parentBlockingPromises: <span class="type">Promise</span>&lt;<span class="kw">any</span>&gt;[],
+) =&gt; {
+  <span class="cm">// связываем: родитель.abort() → ребёнок.abort(такой же reason)</span>
+  <span class="kw">const</span> <span class="fn">linkControllers</span> = (controller: <span class="type">AbortController</span>) =&gt;
+    <span class="fn">addAbortSignalListener</span>(parentAbortSignal, () =&gt;
+      controller.<span class="fn">abort</span>(parentAbortSignal.reason),
+    )
+
+  <span class="kw">return</span> &lt;T&gt;(taskExecutor: ForkedTaskExecutor&lt;T&gt;, opts?: ForkOptions): ForkedTask&lt;T&gt; =&gt; {
+    <span class="fn">assertFunction</span>(taskExecutor, <span class="str">'taskExecutor'</span>)
+    <span class="kw">const</span> childAbortController = <span class="kw">new</span> <span class="fn">AbortController</span>()
+
+    <span class="fn">linkControllers</span>(childAbortController)                <span class="cm">// &lt;&lt;&lt;</span>
+
+    <span class="kw">const</span> result = <span class="fn">runTask</span>&lt;T&gt;(
+      <span class="kw">async</span> (): <span class="type">Promise</span>&lt;T&gt; =&gt; {
+        <span class="fn">validateActive</span>(parentAbortSignal)                <span class="cm">// родитель жив?</span>
+        <span class="fn">validateActive</span>(childAbortController.signal)      <span class="cm">// ребёнок жив?</span>
+        <span class="kw">const</span> result = (<span class="kw">await</span> <span class="fn">taskExecutor</span>({
+          pause: <span class="fn">createPause</span>(childAbortController.signal),
+          delay: <span class="fn">createDelay</span>(childAbortController.signal),
+          signal: childAbortController.signal,
+        })) <span class="kw">as</span> T
+        <span class="fn">validateActive</span>(childAbortController.signal)
+        <span class="kw">return</span> result
+      },
+      () =&gt; childAbortController.<span class="fn">abort</span>(taskCompleted),         <span class="cm">// cleanup: помечаем completed</span>
+    )
+
+    <span class="kw">if</span> (opts?.autoJoin) {
+      parentBlockingPromises.<span class="fn">push</span>(result.<span class="fn">catch</span>(noop))     <span class="cm">// родитель будет ждать ребёнка</span>
+    }
+
+    <span class="kw">return</span> {
+      result: <span class="fn">createPause</span>&lt;TaskResult&lt;T&gt;&gt;(parentAbortSignal)(result),
+      <span class="fn">cancel</span>() { childAbortController.<span class="fn">abort</span>(taskCancelled) },
+    }
+  }
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/index.ts#L82-L126" target="_blank">github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/index.ts#L82-L126</a>
+        </p>
+
+        <h3>Fork-cancellation схема</h3>
+        <div class="svg-wrap">
+          <svg viewBox="0 0 820 300" width="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrr67" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#c586c0"/>
+              </marker>
+              <marker id="arrr67-2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#f44747"/>
+              </marker>
+            </defs>
+
+            <rect x="20" y="20" width="760" height="80" rx="8" fill="#1b1b1b" stroke="#569cd6"/>
+            <text x="40" y="44" fill="#569cd6" font-family="JetBrains Mono" font-size="13" font-weight="bold">Parent effect (listener)</text>
+            <text x="40" y="66" fill="#ccc" font-size="11">parentAbortController (internalTaskController из notifyListener)</text>
+            <text x="40" y="84" fill="#ccc" font-size="11">signal: listenerApi.signal — живёт, пока effect выполняется</text>
+
+            <rect x="40" y="140" width="340" height="140" rx="8" fill="#1b1b1b" stroke="#c586c0"/>
+            <text x="55" y="164" fill="#c586c0" font-family="JetBrains Mono" font-size="12" font-weight="bold">fork #1 (child)</text>
+            <text x="55" y="184" fill="#ccc" font-size="11">childAbortController</text>
+            <text x="55" y="204" fill="#ccc" font-size="11">forkApi.signal — свой AbortSignal</text>
+            <text x="55" y="224" fill="#ccc" font-size="11">forkApi.delay / forkApi.pause</text>
+            <text x="55" y="250" fill="#999" font-size="10">linkControllers: если parent.abort, то</text>
+            <text x="55" y="266" fill="#999" font-size="10">ребёнок abort'ится с той же reason</text>
+
+            <rect x="420" y="140" width="340" height="140" rx="8" fill="#1b1b1b" stroke="#c586c0"/>
+            <text x="435" y="164" fill="#c586c0" font-family="JetBrains Mono" font-size="12" font-weight="bold">fork #2 (child)</text>
+            <text x="435" y="184" fill="#ccc" font-size="11">childAbortController</text>
+            <text x="435" y="204" fill="#ccc" font-size="11">independent от fork #1</text>
+            <text x="435" y="224" fill="#ccc" font-size="11">cancel одного — не трогает другого</text>
+            <text x="435" y="250" fill="#999" font-size="10">runTask ловит TaskAbortError:</text>
+            <text x="435" y="266" fill="#999" font-size="10">{ status: 'cancelled', error }</text>
+
+            <line x1="110" y1="100" x2="110" y2="140" stroke="#c586c0" stroke-width="2" marker-end="url(#arrr67)"/>
+            <line x1="490" y1="100" x2="490" y2="140" stroke="#c586c0" stroke-width="2" marker-end="url(#arrr67)"/>
+
+            <text x="200" y="125" fill="#999" font-size="10">api.fork(...)</text>
+            <text x="580" y="125" fill="#999" font-size="10">api.fork(...)</text>
+          </svg>
+        </div>
+
+        <h3>autoJoin — родитель ждёт детей</h3>
+        <div class="code-block">
+<span class="cm">// Без autoJoin: родительский effect возвращается сразу, fork живёт «сам по себе».</span>
+api.<span class="fn">fork</span>(<span class="kw">async</span> (f) =&gt; { <span class="kw">await</span> f.<span class="fn">delay</span>(1000) })
+<span class="cm">// effect закончится мгновенно, fork ещё тикает 1с.</span>
+
+<span class="cm">// С { autoJoin: true }: middleware.notifyListener дождётся всех autoJoin-форков</span>
+<span class="cm">// в блоке finally: `await Promise.all(autoJoinPromises)` — и только потом abort.</span>
+api.<span class="fn">fork</span>(<span class="kw">async</span> (f) =&gt; { <span class="kw">await</span> f.<span class="fn">delay</span>(1000) }, { autoJoin: <span class="kw">true</span> })
+        </div>
+
+        <div class="warning">
+          <strong>Два критичных подводных камня fork:</strong>
+          <ul>
+            <li><strong>Без <code>autoJoin</code> родительский effect завершается раньше.</strong> Если внутри fork'а вы диспатчите action после <code>delay(1000)</code>, но effect заканчивается через 10мс — родительский <code>internalTaskController.abort(listenerCompleted)</code> в <code>finally</code> уронит fork через linked signal. Решение: либо <code>{ autoJoin: true }</code>, либо <code>await task.result</code>.</li>
+            <li><strong>Ловите отмену через <code>try/finally</code>, а не <code>try/catch</code>.</strong> <code>catch (e)</code> проглотит <code>TaskAbortError</code>, и ваш финальный <code>dispatch(poll.result)</code> выстрелит уже после отмены, сломав state. <code>runTask</code> уже заворачивает результат в <code>{ status: 'cancelled' }</code> — просто проверяйте его; cleanup кладите в <code>finally</code>.</li>
+          </ul>
+        </div>
+
+        <h3>Правильный cleanup для poll-фрка</h3>
+        <div class="code-block">
+<span class="kw">const</span> pollTask = api.<span class="fn">fork</span>(<span class="kw">async</span> (forkApi) =&gt; {
+  <span class="kw">let</span> ticks = <span class="num">0</span>
+  <span class="kw">try</span> {
+    <span class="kw">while</span> (<span class="kw">true</span>) {
+      <span class="kw">await</span> forkApi.<span class="fn">delay</span>(<span class="num">1000</span>)                <span class="cm">// бросит TaskAbortError при cancel</span>
+      ticks++
+      api.dispatch(<span class="fn">tick</span>())
+    }
+  } <span class="kw">finally</span> {
+    <span class="cm">// всегда выполнится — и при cancel, и при ошибке</span>
+    <span class="fn">unsubscribeFromWhatever</span>()
+    <span class="fn">console</span>.<span class="fn">log</span>(<span class="str">'poll stopped at tick'</span>, ticks)
+  }
+})
+
+<span class="cm">// cancel извне:</span>
+pollTask.<span class="fn">cancel</span>()
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../61-thunk-cancellation/">61 — AbortController и cancellation в thunk</a></li>
+          <li><a href="../66-listener-api-full/">66 — весь listenerApi целиком</a></li>
+          <li><a href="../68-listener-cancellation/">68 — TaskAbortError и takeLatest</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

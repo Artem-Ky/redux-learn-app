@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>62 — getPendingMeta, fulfillWithValue, custom meta</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .state-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; }
+    .state-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .74rem; color: var(--accent-cyan); white-space: pre; overflow: auto; max-height: 320px; }
+    .meta-dump { background: #0d0d0d; border: 1px solid #333; border-radius: 6px; padding: 12px; font-family: var(--font-mono); font-size: .72rem; color: #ccc; max-height: 300px; overflow: auto; }
+    .meta-key { color: #9cdcfe; }
+    .meta-val { color: #ce9178; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">62 / 106</span>getPendingMeta + fulfillWithValue + idGenerator</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../61-requestid-race/">← Назад</a>
+      <a href="../63-create-asyncthunk-in-slice/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Thunk <code>fetchData</code> обогащает мету каждого action'а:
+        </p>
+        <ul style="color: var(--text-secondary); font-size: .85rem;">
+          <li><code>getPendingMeta: (base, api) =&gt; ({ startedAt: Date.now() })</code> — попадает в <em>pending</em>;</li>
+          <li><code>return fulfillWithValue(result, { server: 'eu-west-1', cached: false })</code> — попадает в <em>fulfilled</em>;</li>
+          <li><code>return rejectWithValue(err, { retryable: true })</code> — попадает в <em>rejected</em>;</li>
+          <li><code>idGenerator: (arg) =&gt; 'req-' + arg</code> — фиксированный requestId.</li>
+        </ul>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin: 12px 0;">
+          <button class="btn btn--accent" id="fetch-ok">fetchData('ok')</button>
+          <button class="btn btn--danger" id="fetch-fail">fetchData('fail')</button>
+          <button class="btn" id="fetch-both">Оба (видим duration)</button>
+        </div>
+
+        <div class="state-card">
+          <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem;">Последний action — полный дамп</h4>
+          <div class="meta-dump" id="action-dump">— нажмите кнопку —</div>
+        </div>
+
+        <div class="state-card">
+          <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem;">store.getState()</h4>
+          <div class="state-out" id="state-out">—</div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 62. AsyncThunkOptions полностью</div>
+      <div class="theory__body">
+        <h3>Цитата</h3>
+        <div class="quote">
+          «<code>getPendingMeta</code>: A method to generate additional properties to be added to <code>meta</code>
+          of the pending action. Using the <code>pendingMeta</code> field of the <code>ThunkApiConfig</code>
+          generic parameter gives you correctly typed overloads.»<br>
+          — <a href="https://redux-toolkit.js.org/api/createAsyncThunk#options" target="_blank">createAsyncThunk — Options</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>getPendingMeta</code> — метод, генерирующий дополнительные поля <code>meta</code>
+          для pending-action'а. Чтобы получить корректную типизацию, используйте поле
+          <code>pendingMeta</code> параметра <code>ThunkApiConfig</code>.»
+        </div>
+
+        <h3>Полный тип <code>AsyncThunkOptions</code> — исходник</h3>
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строки 310–370</span>
+<span class="kw">export type</span> AsyncThunkOptions&lt;ThunkArg, ThunkApiConfig&gt; = {
+  <span class="cm">/** Вернуть false — пропустить выполнение (см. урок 59). */</span>
+  <span class="fn">condition</span>?(
+    arg: ThunkArg,
+    api: <span class="type">Pick</span>&lt;<span class="type">GetThunkAPI</span>&lt;ThunkApiConfig&gt;, <span class="str">'getState'</span> | <span class="str">'extra'</span>&gt;,
+  ): <span class="type">MaybePromise</span>&lt;<span class="type">boolean</span> | <span class="kw">undefined</span>&gt;
+
+  <span class="cm">/** Диспатчить ли rejected с meta.condition=true. Default: false. */</span>
+  dispatchConditionRejection?: <span class="type">boolean</span>
+
+  <span class="cm">/** Кастомный serializer для SerializedError (по умолч. miniSerializeError). */</span>
+  serializeError?: (x: <span class="type">unknown</span>) =&gt; <span class="type">GetSerializedErrorType</span>&lt;ThunkApiConfig&gt;
+
+  <span class="cm">/** Кастомный requestId (по умолч. nanoid). Вызывается ДО condition. */</span>
+  idGenerator?: (arg: ThunkArg) =&gt; <span class="type">string</span>
+} &amp; <span class="type">IsUnknown</span>&lt;
+  <span class="type">GetPendingMeta</span>&lt;ThunkApiConfig&gt;,
+  {
+    <span class="cm">/** JavaScript-овская перегрузка (без точной типизации). */</span>
+    getPendingMeta?(
+      base: { arg: ThunkArg; requestId: <span class="type">string</span> },
+      api: <span class="type">Pick</span>&lt;<span class="type">GetThunkAPI</span>&lt;ThunkApiConfig&gt;, <span class="str">'getState'</span> | <span class="str">'extra'</span>&gt;,
+    ): <span class="type">GetPendingMeta</span>&lt;ThunkApiConfig&gt;
+  },
+  {
+    <span class="cm">/** TypeScript-перегрузка — обязательна, если pendingMeta указан в ThunkApiConfig */</span>
+    getPendingMeta(
+      base: { arg: ThunkArg; requestId: <span class="type">string</span> },
+      api: <span class="type">Pick</span>&lt;<span class="type">GetThunkAPI</span>&lt;ThunkApiConfig&gt;, <span class="str">'getState'</span> | <span class="str">'extra'</span>&gt;,
+    ): <span class="type">GetPendingMeta</span>&lt;ThunkApiConfig&gt;
+  }
+&gt;</div>
+        <p style="font-size:.78rem;"><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L310" target="_blank">createAsyncThunk.ts#L310</a></p>
+
+        <h3>Типизация через ThunkApiConfig</h3>
+        <div class="code-block"><span class="kw">const</span> fetchData = <span class="fn">createAsyncThunk</span>&lt;
+  <span class="type">DataResult</span>,           <span class="cm">// Returned</span>
+  <span class="type">string</span>,               <span class="cm">// ThunkArg</span>
+  {
+    pendingMeta:   { startedAt: <span class="type">number</span> }
+    fulfilledMeta: { server: <span class="type">string</span>; cached: <span class="type">boolean</span> }
+    rejectedMeta:  { retryable: <span class="type">boolean</span> }
+    rejectValue:   { code: <span class="type">number</span>; message: <span class="type">string</span> }
+    state:         <span class="type">RootState</span>
+  }
+&gt;(<span class="str">'data/fetch'</span>,
+  <span class="kw">async</span> (arg, { fulfillWithValue, rejectWithValue }) =&gt; {
+    <span class="kw">try</span> {
+      <span class="kw">const</span> data = <span class="kw">await</span> <span class="fn">api</span>(arg)
+      <span class="kw">return</span> <span class="fn">fulfillWithValue</span>(data, { server: <span class="str">'eu-west-1'</span>, cached: <span class="kw">false</span> })  <span class="cm">// ✓ типизировано</span>
+    } <span class="kw">catch</span> (e) {
+      <span class="kw">return</span> <span class="fn">rejectWithValue</span>({ code: <span class="num">500</span>, message: <span class="str">'err'</span> }, { retryable: <span class="kw">true</span> })
+    }
+  },
+  {
+    getPendingMeta: () =&gt; ({ startedAt: <span class="fn">Date</span>.<span class="fn">now</span>() }),
+    idGenerator:    (arg) =&gt; <span class="str">`req-</span>${<span class="str">arg</span>}<span class="str">-</span>${<span class="str">Date.now()</span>}<span class="str">`</span>,
+  },
+)</div>
+
+        <h3>Какой получится action</h3>
+        <div class="code-block"><span class="cm">// pending:</span>
+{
+  type: <span class="str">'data/fetch/pending'</span>,
+  payload: <span class="kw">undefined</span>,
+  meta: {
+    arg: <span class="str">'ok'</span>,
+    requestId: <span class="str">'req-ok-1718000000000'</span>,
+    requestStatus: <span class="str">'pending'</span>,
+    startedAt: <span class="num">1718000000000</span>,                      <span class="cm">// ← getPendingMeta</span>
+  },
+}
+<span class="cm">// fulfilled:</span>
+{
+  type: <span class="str">'data/fetch/fulfilled'</span>,
+  payload: { <span class="cm">/* ... */</span> },
+  meta: {
+    arg: <span class="str">'ok'</span>,
+    requestId: <span class="str">'req-ok-1718000000000'</span>,
+    requestStatus: <span class="str">'fulfilled'</span>,
+    server: <span class="str">'eu-west-1'</span>,                            <span class="cm">// ← fulfillWithValue meta</span>
+    cached: <span class="kw">false</span>,
+  },
+}</div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Без <code>ThunkApiConfig.pendingMeta</code> типизация <code>getPendingMeta</code> не работает.</strong>
+          JS-версия разрешит написать что угодно — но action.meta.startedAt будет <code>unknown</code> в reducer'е.
+          Всегда объявляйте <code>pendingMeta</code> в generic'е.<br>
+          <strong>2. <code>idGenerator</code> вызывается ДО <code>condition</code>.</strong>
+          Даже если condition вернёт <code>false</code>, <code>idGenerator(arg)</code> успеет выполниться.
+          Не кладите туда тяжёлую логику. Полезный side-effect: стабильный ID для одинакового <code>arg</code>
+          → но помните, что action всё равно дедупликация не делает.<br>
+          <strong>3. <code>fulfillWithValue</code> — это <em>класс</em> <code>FulfillWithMeta</code>.</strong>
+          RTK проверяет через <code>instanceof</code>. Если обернёте в <code>Promise.resolve(fulfillWithValue(...))</code>
+          — работает. Если через <code>JSON.stringify/parse</code> — <em>сломается</em>: потеряется <code>_type</code> маркер, останется plain-object.<br>
+          <strong>4. pendingMeta не попадает в fulfilled/rejected.</strong>
+          Если нужно <code>duration = Date.now() - startedAt</code> — reducer должен сохранить <code>startedAt</code>
+          в state на pending, считать diff на fulfilled. Либо — просто класть в caller-side (промис знает время).
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../55-asyncthunk-basic/">55 — базовый createAsyncThunk</a></li>
+          <li><a href="../58-rejectwithvalue/">58 — rejectWithValue (rejectedMeta тут же)</a></li>
+          <li><a href="../61-requestid-race/">61 — requestId (nanoid по умолчанию)</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

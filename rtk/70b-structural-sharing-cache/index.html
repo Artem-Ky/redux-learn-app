@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>70b — Structural sharing как бесплатный кэш</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .slices { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 14px 0; }
+    .slice-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .slice-card__name { font-family: var(--font-mono); color: var(--accent); font-size: .78rem; font-weight: 700; }
+    .slice-card__ref  { font-family: var(--font-mono); color: var(--text-muted); font-size: .72rem; margin-top: 6px; }
+    .slice-card__renders { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; margin-top: 6px; }
+    .slice-card.changed { border-color: var(--warning); }
+    .slice-card.unchanged { border-color: var(--success); }
+    .slice-card.changed .slice-card__renders { color: var(--warning); }
+    .slice-card.unchanged .slice-card__renders { color: var(--success); }
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: .68rem; font-family: var(--font-mono); letter-spacing: .3px; }
+    .badge--same { background: rgba(76,175,80,.15); color: #7bd37e; border: 1px solid var(--success); }
+    .badge--new  { background: rgba(255,152,0,.15); color: var(--warning); border: 1px solid var(--warning); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">70b / 106</span>Structural sharing — бесплатный кэш на уровне state</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../70a-caching-overview/">← Назад</a>
+      <a href="../70c-selector-cache/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Immer не копирует то, чего не трогал</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Когда вы <code>dispatch(action)</code>, Immer запускается ТОЛЬКО на той slice, чей reducer отработал.
+          Остальные slices в RootState получают <strong>ту же ссылку</strong>. Это значит:
+          <code>useSelector(s =&gt; s.untouchedSlice)</code> вернёт старое <code>===</code> → React не ререндерит.
+          Это <strong>бесплатный кэш</strong> — вы ничего не настраивали, он работает всегда.
+        </p>
+
+        <div class="slices">
+          <div class="slice-card" id="card-users">
+            <div class="slice-card__name">state.users</div>
+            <div class="slice-card__ref">ref#: <span id="ref-users">1</span> <span class="badge badge--same" id="bd-users">same</span></div>
+            <div class="slice-card__renders" id="r-users">0</div>
+            <div style="font-size: .72rem; color: var(--text-muted);">useSelector re-runs</div>
+          </div>
+          <div class="slice-card" id="card-todos">
+            <div class="slice-card__name">state.todos</div>
+            <div class="slice-card__ref">ref#: <span id="ref-todos">1</span> <span class="badge badge--same" id="bd-todos">same</span></div>
+            <div class="slice-card__renders" id="r-todos">0</div>
+            <div style="font-size: .72rem; color: var(--text-muted);">useSelector re-runs</div>
+          </div>
+          <div class="slice-card" id="card-ui">
+            <div class="slice-card__name">state.ui</div>
+            <div class="slice-card__ref">ref#: <span id="ref-ui">1</span> <span class="badge badge--same" id="bd-ui">same</span></div>
+            <div class="slice-card__renders" id="r-ui">0</div>
+            <div style="font-size: .72rem; color: var(--text-muted);">useSelector re-runs</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin: 12px 0;">
+          <button class="btn btn--accent" id="btn-users">Dispatch users/added</button>
+          <button class="btn btn--accent" id="btn-todos">Dispatch todos/toggled</button>
+          <button class="btn btn--accent" id="btn-ui">Dispatch ui/themeChanged</button>
+          <button class="btn" id="btn-noop">Dispatch users/noop (ничего не меняет)</button>
+          <button class="btn btn--secondary" id="btn-reset">Reset счётчики</button>
+        </div>
+
+        <p style="color: var(--text-secondary); font-size: .82rem;">
+          Нажмите «users/added» — только у <code>state.users</code> ссылка поменяется, у остальных останется.
+          Нажмите «users/noop» — Immer увидит, что <strong>ничего не мутировали</strong> в draft'е, и вернёт
+          оригинал. <strong>Ссылка не изменится</strong> даже у <code>state.users</code>.
+        </p>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 70b. Почему это кэш</div>
+      <div class="theory__body">
+        <h3>Ментальная модель</h3>
+        <p>
+          Ваш <strong>RootState — это дерево</strong>. После dispatch'а:
+        </p>
+        <ul>
+          <li>Если reducer slice <em>не отработал</em> — ссылка на эту slice такая же, что и раньше.</li>
+          <li>Если reducer отработал, но <em>ничего не изменил в draft</em> — Immer вернёт оригинал. Ссылка та же.</li>
+          <li>Если reducer изменил одно поле в глубине — Immer скопирует <strong>только</strong> путь до этого поля. Всё остальное — по старым ссылкам.</li>
+        </ul>
+
+        <h3>Что из этого следует для кэша</h3>
+        <div class="code-block"><span class="cm">// Компонент А читает только users:</span>
+<span class="kw">function</span> <span class="fn">UsersList</span>() {
+  <span class="kw">const</span> users = <span class="fn">useSelector</span>(s =&gt; s.users)   <span class="cm">// будет === пока не было users/* action</span>
+  ...
+}
+
+<span class="cm">// Компонент B читает только todos:</span>
+<span class="kw">function</span> <span class="fn">TodosList</span>() {
+  <span class="kw">const</span> todos = <span class="fn">useSelector</span>(s =&gt; s.todos)   <span class="cm">// === пока не было todos/* action</span>
+  ...
+}
+
+<span class="cm">// dispatch(users/added) → useSelector UsersList пересчитает, TodosList — нет.</span>
+<span class="cm">// Это бесплатный кэш, встроенный в модель Immer.</span></div>
+
+        <h3>Что ломает structural sharing</h3>
+        <div class="warning">
+          <strong>1. Новый массив каждый раз</strong> (<code>s =&gt; s.users.map(u =&gt; u.name)</code>) — это уже Layer 2, memoized
+          selector нужен. Каждый dispatch любой slice'а даст новый массив, компонент ререндерит.<br>
+          <strong>2. Inline объект в selector'е</strong> (<code>s =&gt; ({ name: s.user.name, isAdmin: s.user.role === 'admin' })</code>) —
+          та же проблема: новый объект каждый раз. Либо <code>createSelector</code>, либо <code>shallowEqual</code>
+          в <code>useSelector</code>.<br>
+          <strong>3. Прямая мутация без Immer</strong> (<code>state.users.push(x); return state</code>) — ссылка та же, но
+          state изменился. React <strong>не заметит</strong> изменений. Это баг.<br>
+          <strong>4. Замена неизменённого объекта</strong> (<code>state.users = [...state.users]</code> без причины) —
+          ссылка новая, structural sharing сломан. Лишние ререндеры.
+        </div>
+
+        <h3>Структура Immer'а</h3>
+        <div class="code-block"><span class="cm">// Псевдокод для понимания:</span>
+<span class="kw">function</span> <span class="fn">produce</span>(base, recipe) {
+  <span class="kw">const</span> draft = <span class="fn">createProxy</span>(base)
+  <span class="fn">recipe</span>(draft)
+  <span class="kw">if</span> (!<span class="fn">wasModified</span>(draft)) <span class="kw">return</span> base   <span class="cm">// ← та же ссылка!</span>
+  <span class="kw">return</span> <span class="fn">finalize</span>(draft)                    <span class="cm">// ← новая ссылка, но shared sub-trees</span>
+}</div>
+
+        <h3>Рассуждение: selector — почему === достаточно в 80% случаев</h3>
+        <div class="tip">
+          <code>useSelector(s =&gt; s.users)</code> — простая форма. Она работает когда:<br>
+          • Вы возвращаете <strong>ссылку на уже существующую часть state</strong> (не новый объект).<br>
+          • State мутируется через Immer (который хранит structural sharing invariant).<br>
+          <br>
+          Как только вы трансформируете данные (filter/map/merge), <code>===</code> ломается —
+          нужен Layer 2 (memoized selectors, следующий урок).
+        </div>
+
+        <h3>В RTKQ</h3>
+        <p style="color: var(--text-secondary);">
+          Layer 1 остаётся полностью. RTKQ хранит свой cache в обычном slice (<code>state.api.queries</code>),
+          и <code>structural sharing</code> работает там точно так же. Поэтому
+          <code>useGetFooQuery().data</code> — стабильная ссылка, если ответ не изменился.
+          <code>selectFromResult</code> из RTKQ как раз использует этот принцип.
+        </p>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../26-immer-inside/">26 — Immer внутри createReducer</a></li>
+          <li><a href="../40a-slice-caching-refs/">40a — structural sharing в RTK (детально)</a></li>
+          <li><a href="../70c-selector-cache/">70c — когда === недостаточно</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

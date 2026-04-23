@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>43 — weakMapMemoize: кэш для аргументированных селекторов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .mode-switch {
+      display: flex; gap: 6px; background: var(--bg-panel);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 4px; width: fit-content;
+    }
+    .mode-btn {
+      background: none; border: none; color: var(--text-secondary);
+      padding: 6px 14px; font-family: var(--font-mono); font-size: .8rem;
+      cursor: pointer; border-radius: 3px; transition: background .15s, color .15s;
+    }
+    .mode-btn.active { background: var(--accent); color: #fff; }
+    .mode-btn:hover:not(.active) { background: var(--bg-hover); color: var(--text-bright); }
+
+    .stats-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 14px 0;
+    }
+    .stat-tile {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 14px; text-align: center;
+    }
+    .stat-tile__label {
+      font-size: .68rem; text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text-muted); margin-bottom: 6px;
+    }
+    .stat-tile__value {
+      font-family: var(--font-mono); font-size: 1.6rem; font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .stat-tile--miss .stat-tile__value { color: var(--error); }
+    .stat-tile--hit .stat-tile__value { color: var(--success); }
+
+    .todo-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px;
+      max-height: 420px; overflow-y: auto; padding: 4px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-panel);
+    }
+    .todo-cell {
+      padding: 6px 8px; font-size: .72rem; font-family: var(--font-mono);
+      border-radius: 3px; border: 1px solid var(--border);
+      background: var(--bg-tertiary); display: flex; gap: 6px; align-items: center;
+      transition: background .15s, border-color .15s;
+    }
+    .todo-cell--done { opacity: .5; text-decoration: line-through; }
+    .todo-cell__id { color: var(--text-muted); min-width: 28px; }
+    .todo-cell__text { flex: 1; color: var(--text-bright); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .todo-cell.miss { animation: flash-miss .5s ease-out; }
+    .todo-cell.hit { animation: flash-hit .5s ease-out; }
+    @keyframes flash-miss {
+      0% { background: rgba(244,71,71,.4); border-color: var(--error); }
+      100% { background: var(--bg-tertiary); border-color: var(--border); }
+    }
+    @keyframes flash-hit {
+      0% { background: rgba(76,175,80,.25); border-color: var(--success); }
+      100% { background: var(--bg-tertiary); border-color: var(--border); }
+    }
+
+    .legend { display: flex; gap: 16px; font-size: .75rem; color: var(--text-muted); margin: 8px 0; }
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot--miss { background: var(--error); }
+    .dot--hit { background: var(--success); }
+
+    .cache-tree-svg { display: block; margin: 14px auto; max-width: 700px; }
+    .cache-tree-svg text { font-family: var(--font-mono); font-size: 10px; fill: #ccc; }
+    .cache-tree-svg .lbl { fill: #888; font-size: 9px; }
+
+    .compare-table {
+      width: 100%; border-collapse: collapse; margin: 12px 0;
+      font-size: .82rem; background: var(--bg-panel);
+    }
+    .compare-table th, .compare-table td {
+      border: 1px solid var(--border); padding: 8px 10px; text-align: left;
+      vertical-align: top; color: var(--text-secondary);
+    }
+    .compare-table th {
+      background: var(--bg-tertiary); color: var(--text-bright);
+      font-weight: 600;
+    }
+    .compare-table td:first-child { color: var(--text-muted); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">43 / 106</span>weakMapMemoize — кэш для селекторов с аргументами</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../42-createdraftsafeselector/">← Назад</a>
+      <a href="../44-slice-selectors-memoized/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">50 todos, каждый вызывает selectTodoById(state, id)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px;">
+          Сетка рендерит 50 элементов. Для каждой ячейки вызывается <code>selectTodoById(state, id)</code>.
+          Переключите <strong>стратегию мемоизации</strong> и нажмите «toggleTheme» (он не меняет todos, но
+          вызывает все селекторы заново). Смотрите на счётчик «compute count».
+        </p>
+
+        <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+          <div class="mode-switch" id="mode-switch">
+            <button class="mode-btn active" data-mode="lru1">lruMemoize(1)</button>
+            <button class="mode-btn" data-mode="weakmap">weakmap + input=items</button>
+            <button class="mode-btn" data-mode="weakmap-smart">weakmap + input=items.find</button>
+            <button class="mode-btn" data-mode="factory">Factory: селектор на id</button>
+          </div>
+          <div class="legend">
+            <span><span class="dot dot--miss"></span>cache miss — combiner вызван</span>
+            <span><span class="dot dot--hit"></span>cache hit — взят из кэша</span>
+          </div>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-tile stat-tile--miss">
+            <div class="stat-tile__label">compute count (за последний render)</div>
+            <div class="stat-tile__value" id="last-computes">0</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-tile__label">всего compute за сессию</div>
+            <div class="stat-tile__value" id="total-computes">0</div>
+          </div>
+          <div class="stat-tile stat-tile--hit">
+            <div class="stat-tile__label">cache hits / lookups</div>
+            <div class="stat-tile__value" id="hit-rate">0 / 0</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-tile__label">factory Map size</div>
+            <div class="stat-tile__value" id="factory-size">0</div>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn--accent" data-act="theme">Toggle theme (не меняет todos!)</button>
+          <button class="btn" data-act="toggle-random">Toggle случайный todo</button>
+          <button class="btn" data-act="add">Добавить todo</button>
+          <button class="btn btn--danger" data-act="reset">Reset</button>
+        </div>
+
+        <div class="todo-grid" id="grid" style="margin-top: 14px;"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 43. weakMapMemoize, cache size и WeakMap-дерево</div>
+      <div class="theory__body">
+
+        <h3>Цитата из reselect docs</h3>
+        <div class="quote">
+          «Creates a tree of <code>WeakMap</code>-based cache nodes based on the identity of the arguments
+          it's been called with. This allows <code>weakMapMemoize</code> to have an effectively infinite
+          cache size.»
+          <br>— <a href="https://reselect.js.org/api/weakmapmemoize" target="_blank">reselect.js.org/api/weakmapmemoize</a>
+        </div>
+        <div class="quote quote--ru">
+          «Создаёт дерево узлов кэша на основе <code>WeakMap</code> по идентичности аргументов, с которыми
+          был вызван. Это даёт <code>weakMapMemoize</code> фактически неограниченный размер кэша.»
+        </div>
+
+        <h3>Проблема, которую решает weakMapMemoize: cache size = 1</h3>
+        <p>
+          До reselect v5 <code>createSelector</code> использовал <code>lruMemoize</code> c
+          <code>maxSize: 1</code>. Для селектора без аргументов (<code>selectAllTodos</code>) этого хватало.
+          Но для <strong>параметризованного</strong> — беда:
+        </p>
+        <div class="code-block">
+<span class="cm">// Симуляция старого дефолта — явно lruMemoize(1)</span>
+<span class="kw">const</span> createSelectorLru1 = <span class="fn">createSelectorCreator</span>(lruMemoize, { maxSize: <span class="num">1</span> })
+<span class="kw">const</span> selectTodoById = <span class="fn">createSelectorLru1</span>(
+  [(s) =&gt; s.items, (_s, id) =&gt; id],
+  (items, id) =&gt; items.<span class="fn">find</span>((t) =&gt; t.id === id),
+)
+
+<span class="fn">selectTodoById</span>(state, <span class="str">'a'</span>)  <span class="cm">// compute #1, кэш: {a → result}</span>
+<span class="fn">selectTodoById</span>(state, <span class="str">'b'</span>)  <span class="cm">// compute #2, кэш: {b → result} — 'a' вытеснен</span>
+<span class="fn">selectTodoById</span>(state, <span class="str">'a'</span>)  <span class="cm">// compute #3 — снова! hit-rate = 0%</span>
+        </div>
+        <div class="warning">
+          <strong>Начиная с reselect v5 default поменяли.</strong>
+          Теперь <code>createSelector</code> по умолчанию использует <code>weakMapMemoize</code> — именно
+          потому, что cache-1 слишком часто кусал параметризованные селекторы. Источник:
+          <a href="https://github.com/reduxjs/reselect/blob/master/src/createSelectorCreator.ts" target="_blank">createSelectorCreator.ts</a>:
+          <code>export const createSelector = createSelectorCreator(weakMapMemoize)</code>.
+          Поэтому в демо выше первая кнопка — <strong>явный</strong> <code>lruMemoize(1)</code>: без него
+          «проблему» не увидеть, обычный <code>createSelector</code> ведёт себя как weakmap-режим.
+        </div>
+
+        <h3>Решение: weakMapMemoize — дерево WeakMap'ов по аргументам</h3>
+        <svg class="cache-tree-svg" viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg">
+          <!-- root -->
+          <rect x="290" y="20" width="100" height="36" rx="4" fill="#2a2d2e" stroke="#569cd6"/>
+          <text x="340" y="42" text-anchor="middle" style="fill:#569cd6">fnNode (root)</text>
+
+          <!-- level 1: objects (state) -->
+          <line x1="340" y1="56" x2="200" y2="90" stroke="#666" marker-end="url(#ar3)"/>
+          <line x1="340" y1="56" x2="480" y2="90" stroke="#666" marker-end="url(#ar3)"/>
+
+          <rect x="130" y="90" width="140" height="40" rx="4" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="200" y="108" text-anchor="middle">items (ссылка #1)</text>
+          <text x="200" y="124" text-anchor="middle" class="lbl">WeakMap key (object)</text>
+
+          <rect x="410" y="90" width="140" height="40" rx="4" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="480" y="108" text-anchor="middle">items (ссылка #2)</text>
+          <text x="480" y="124" text-anchor="middle" class="lbl">после dispatch</text>
+
+          <!-- level 2: primitives (id) -->
+          <line x1="200" y1="130" x2="120" y2="170" stroke="#666" marker-end="url(#ar3)"/>
+          <line x1="200" y1="130" x2="200" y2="170" stroke="#666" marker-end="url(#ar3)"/>
+          <line x1="200" y1="130" x2="280" y2="170" stroke="#666" marker-end="url(#ar3)"/>
+
+          <rect x="70" y="170" width="90" height="30" rx="3" fill="#252526" stroke="#4ec9b0"/>
+          <text x="115" y="190" text-anchor="middle">id='a'</text>
+          <rect x="155" y="170" width="90" height="30" rx="3" fill="#252526" stroke="#4ec9b0"/>
+          <text x="200" y="190" text-anchor="middle">id='b'</text>
+          <rect x="240" y="170" width="90" height="30" rx="3" fill="#252526" stroke="#4ec9b0"/>
+          <text x="285" y="190" text-anchor="middle">id='c'</text>
+
+          <line x1="115" y1="200" x2="115" y2="220" stroke="#4caf50" marker-end="url(#ar3)"/>
+          <line x1="200" y1="200" x2="200" y2="220" stroke="#4caf50" marker-end="url(#ar3)"/>
+          <line x1="285" y1="200" x2="285" y2="220" stroke="#4caf50" marker-end="url(#ar3)"/>
+
+          <text x="115" y="240" text-anchor="middle" style="fill:#4caf50">result</text>
+          <text x="200" y="240" text-anchor="middle" style="fill:#4caf50">result</text>
+          <text x="285" y="240" text-anchor="middle" style="fill:#4caf50">result</text>
+          <text x="200" y="254" text-anchor="middle" class="lbl">Map&lt;primitive, CacheNode&gt;</text>
+
+          <defs>
+            <marker id="ar3" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="#aaa"/>
+            </marker>
+          </defs>
+        </svg>
+
+        <h3>Исходник: как строится дерево</h3>
+        <div class="code-block">
+<span class="cm">// reselect/src/weakMapMemoize.ts — фрагмент</span>
+<span class="cm">// https://github.com/reduxjs/reselect/blob/master/src/weakMapMemoize.ts</span>
+
+<span class="kw">interface</span> <span class="type">CacheNode</span>&lt;T&gt; {
+  s: <span class="num">0</span> | <span class="num">1</span>                                <span class="cm">// status: unterminated / terminated</span>
+  v: T | <span class="kw">void</span>                          <span class="cm">// value</span>
+  o: <span class="type">WeakMap</span>&lt;<span class="type">object</span>, <span class="type">CacheNode</span>&lt;T&gt;&gt; | <span class="kw">null</span>   <span class="cm">// object cache</span>
+  p: <span class="type">Map</span>&lt;<span class="type">primitive</span>, <span class="type">CacheNode</span>&lt;T&gt;&gt; | <span class="kw">null</span>  <span class="cm">// primitive cache</span>
+}
+
+<span class="kw">function</span> <span class="fn">memoized</span>() {
+  <span class="kw">let</span> cacheNode = fnNode
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; arguments.length; i++) {
+    <span class="kw">const</span> arg = arguments[i]
+
+    <span class="kw">if</span> (<span class="kw">typeof</span> arg === <span class="str">'object'</span> &amp;&amp; arg !== <span class="kw">null</span>) {
+      <span class="kw">let</span> objectCache = cacheNode.o
+      <span class="kw">if</span> (objectCache === <span class="kw">null</span>) cacheNode.o = objectCache = <span class="kw">new</span> <span class="fn">WeakMap</span>()
+      <span class="kw">const</span> objectNode = objectCache.<span class="fn">get</span>(arg)
+      <span class="kw">if</span> (objectNode === <span class="kw">undefined</span>) {                <span class="cm">// новая ветка</span>
+        cacheNode = <span class="fn">createCacheNode</span>()
+        objectCache.<span class="fn">set</span>(arg, cacheNode)
+      } <span class="kw">else</span> {
+        cacheNode = objectNode                         <span class="cm">// 👀 спускаемся вглубь дерева</span>
+      }
+    } <span class="kw">else</span> {
+      <span class="kw">let</span> primitiveCache = cacheNode.p
+      <span class="kw">if</span> (primitiveCache === <span class="kw">null</span>) cacheNode.p = primitiveCache = <span class="kw">new</span> <span class="fn">Map</span>()
+      <span class="kw">const</span> primitiveNode = primitiveCache.<span class="fn">get</span>(arg)
+      <span class="kw">if</span> (primitiveNode === <span class="kw">undefined</span>) {
+        cacheNode = <span class="fn">createCacheNode</span>()
+        primitiveCache.<span class="fn">set</span>(arg, cacheNode)
+      } <span class="kw">else</span> {
+        cacheNode = primitiveNode
+      }
+    }
+  }
+
+  <span class="kw">if</span> (cacheNode.s === TERMINATED) {
+    <span class="kw">return</span> cacheNode.v          <span class="cm">// 🎯 cache hit — возвращаем запомненное</span>
+  }
+  <span class="kw">const</span> result = func.<span class="fn">apply</span>(<span class="kw">null</span>, arguments)  <span class="cm">// miss — считаем</span>
+  cacheNode.s = TERMINATED
+  cacheNode.v = result
+  <span class="kw">return</span> result
+}
+        </div>
+
+        <h3>Про два типа узлов: WeakMap для объектов, Map для примитивов</h3>
+        <p>
+          Если у вас <code>selectTodoById(state, id)</code>, то <code>state</code> — это объект (уходит в
+          <code>WeakMap</code>), а <code>id</code> — строка/число (уходит в обычный <code>Map</code>).
+          Почему нельзя оба в <code>WeakMap</code>? Потому что <strong>WeakMap принимает ключи только
+          типа object</strong> — это встроенное ограничение JS. Ссылка на примитив не может быть слабой —
+          сборщик мусора не видит «ссылок» на строку, она всегда дублируется.
+        </p>
+
+        <h3>Почему WeakMap — GC-friendly</h3>
+        <div class="code-block">
+<span class="cm">// Обычный Map — держит ключи в памяти вечно:</span>
+<span class="kw">const</span> cache = <span class="kw">new</span> <span class="fn">Map</span>()
+cache.<span class="fn">set</span>(oldState, result)
+oldState = <span class="kw">null</span>                 <span class="cm">// но cache ещё держит ссылку → утечка</span>
+
+<span class="cm">// WeakMap — ссылка слабая:</span>
+<span class="kw">const</span> cache = <span class="kw">new</span> <span class="fn">WeakMap</span>()
+cache.<span class="fn">set</span>(oldState, result)
+oldState = <span class="kw">null</span>                 <span class="cm">// если других ссылок нет — GC очистит запись</span>
+        </div>
+        <p>
+          В контексте Redux это означает: история state'ов в time-travel-дебагере <em>не растёт
+          бесконечно</em> при работе с <code>weakMapMemoize</code>. Как только snapshot state'а удалён из
+          DevTools — его кеш-записи очищаются.
+        </p>
+
+        <h3>weakMapMemoize — default в createDraftSafeSelector</h3>
+        <p>Напомним код из урока 42:</p>
+        <div class="code-block">
+<span class="kw">export const</span> createDraftSafeSelector =
+  <span class="fn">createDraftSafeSelectorCreator</span>(<strong>weakMapMemoize</strong>)
+<span class="cm">// ☝ специально, потому что в reducer'е селектор получает разные state'ы (before/after).</span>
+<span class="cm">// lruMemoize(1) вытеснял бы каждый раз. weakMapMemoize держит все пока state жив.</span>
+        </div>
+
+        <h3>Как включить weakMapMemoize в обычном createSelector</h3>
+        <div class="code-block">
+<span class="kw">import</span> { createSelector, weakMapMemoize } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> selectTodoById = <span class="fn">createSelector</span>(
+  [(s: <span class="type">RootState</span>) =&gt; s.todos.items, (_s: <span class="type">RootState</span>, id: <span class="type">string</span>) =&gt; id],
+  (items, id) =&gt; items.<span class="fn">find</span>((t) =&gt; t.id === id),
+  {
+    memoize: weakMapMemoize,
+    argsMemoize: weakMapMemoize,
+  },
+)
+        </div>
+        <p>
+          Два <code>memoize</code> поля:
+          <code>memoize</code> управляет кэшем <strong>результата combiner'а</strong>,
+          <code>argsMemoize</code> — кэшем <strong>массива аргументов</strong> самой обёртки (снижает
+          повторные вычисления <code>=== prev</code>). Для полной «бесконечной» мемоизации ставьте оба.
+        </p>
+
+        <h3>Альтернатива weakMap: фабрика селекторов (селектор на id)</h3>
+        <p>
+          До <code>weakMapMemoize</code> классический приём против cache-1 был такой: не один «умный»
+          селектор с большим кешем, а <strong>много маленьких</strong> — по одному на каждый id —
+          каждый со своим <code>lruMemoize(1)</code>. Все вместе они держатся в <code>Map&lt;id, selector&gt;</code>.
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> factoryCache = <span class="kw">new</span> <span class="fn">Map</span>&lt;<span class="type">string</span>, <span class="type">TodoSelector</span>&gt;()
+
+<span class="kw">function</span> <span class="fn">makeSelectorFor</span>(id: <span class="type">string</span>) {
+  <span class="kw">return</span> <span class="fn">createSelectorLru1</span>(
+    <span class="cm">// ⚠ ключевое: input — САМ объект todo, а не items.</span>
+    [(s: <span class="type">RootState</span>) =&gt; s.todos.items.<span class="fn">find</span>((t) =&gt; t.id === id)],
+    (item) =&gt; item,
+  )
+}
+
+<span class="kw">const</span> selectTodoById = (state: <span class="type">RootState</span>, id: <span class="type">string</span>) =&gt; {
+  <span class="kw">let</span> sel = factoryCache.<span class="fn">get</span>(id)
+  <span class="kw">if</span> (!sel) { sel = <span class="fn">makeSelectorFor</span>(id); factoryCache.<span class="fn">set</span>(id, sel) }
+  <span class="kw">return</span> <span class="fn">sel</span>(state)
+}
+        </div>
+        <p>
+          Почему это работает там, где weakmap не работает? Immer делает <strong>structural
+          sharing</strong>: при <code>toggle</code> одного todo новый массив <code>items</code> содержит
+          49 ТЕХ ЖЕ ссылок на объекты + 1 новую. Если input-селектор достаёт именно объект
+          (<code>items.find(id)</code>), то для 49 селекторов <code>input === prev</code> → hit. А
+          weakmap смотрит на <code>items</code> как на ключ WeakMap — новая ссылка массива = осиротевшая
+          ветка дерева, все 50 id пересчитаются.
+        </p>
+        <p>
+          То же работает и с weakmap, если переписать input так же: extracting не весь массив, а
+          конкретный объект. Это <strong>третий режим</strong> в демо — <em>«weakmap + input=items.find»</em>:
+        </p>
+        <div class="code-block">
+<span class="kw">const</span> selectTodoById = <span class="fn">createSelector</span>(
+  [
+    <span class="cm">// input достаёт сам объект, а не массив</span>
+    (s: <span class="type">RootState</span>, id: <span class="type">string</span>) =&gt; s.todos.items.<span class="fn">find</span>((t) =&gt; t.id === id),
+    (_s: <span class="type">RootState</span>, id: <span class="type">string</span>) =&gt; id,
+  ],
+  (item, _id): <span class="type">Todo</span> | <span class="kw">undefined</span> =&gt; item,
+  { memoize: weakMapMemoize, argsMemoize: weakMapMemoize },
+)
+        </div>
+        <p>
+          Поведение при toggle: <strong>49 hit, 1 miss</strong> — как у factory. Суть не в механизме
+          хранения кеша (Map vs WeakMap), а в <strong>форме input-селектора</strong>. Фабрика просто
+          подталкивает думать в правильных терминах: «что конкретно нужно этому селектору?».
+        </p>
+        <p>Сравнение четырёх вариантов:</p>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>lru1<br><small>input=items</small></th>
+              <th>weakmap<br><small>input=items</small></th>
+              <th>weakmap-smart<br><small>input=items.find(id)</small></th>
+              <th>Factory<br><small>input=items.find(id)</small></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Где кеш</td>
+              <td>1 селектор, lru size 1</td>
+              <td>1 селектор, дерево WeakMap</td>
+              <td>1 селектор, дерево WeakMap</td>
+              <td>N селекторов в <code>Map&lt;id, sel&gt;</code></td>
+            </tr>
+            <tr>
+              <td>toggleTheme (items не менялись)</td>
+              <td>50 miss</td>
+              <td>50 hit</td>
+              <td>50 hit</td>
+              <td>50 hit</td>
+            </tr>
+            <tr>
+              <td>toggle одного todo</td>
+              <td>50 miss</td>
+              <td>50 miss</td>
+              <td><strong>49 hit, 1 miss</strong></td>
+              <td><strong>49 hit, 1 miss</strong></td>
+            </tr>
+            <tr>
+              <td>Удаление id (todo убран)</td>
+              <td>—</td>
+              <td>Ветка умирает с <code>items</code> (GC-friendly)</td>
+              <td>Ветка умирает с <code>items</code> (GC-friendly)</td>
+              <td>Селектор висит в Map, пока не <code>delete</code></td>
+            </tr>
+            <tr>
+              <td>Объём кода</td>
+              <td>Одна опция <code>{ maxSize: 1 }</code></td>
+              <td><code>{ memoize: weakMapMemoize }</code></td>
+              <td><code>{ memoize: weakMapMemoize }</code> + перестроенный input</td>
+              <td>Отдельный <code>Map</code> + обёртка</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          Практика: если всё равно нужно сравнивать через <code>items</code> целиком —
+          <code>weakMapMemoize</code> проще. Если селектор зависит от одного элемента и хочется
+          пережить точечные мутации — нужен либо «умный» input (<code>items.find(id)</code>), либо
+          фабрика, либо <code>entityAdapter</code> с <code>selectById</code> (урок 52).
+        </p>
+
+        <h3>Подводные камни</h3>
+
+        <div class="warning">
+          <strong>1. Примитивы не GC-ятся.</strong>
+          Узлы с ключами-примитивами (<code>id</code>, <code>category</code>) лежат в обычном <code>Map</code>
+          и живут, пока живёт сам селектор. Если у вас 10 000 уникальных id — кеш растёт. <em>Почему:</em> WeakMap
+          не поддерживает примитивы как ключи. <em>Смягчить:</em> если id — это большой шардированный uuid, иногда
+          лучше хранить кеш на уровне компонента с TTL, а не в селекторе.
+        </div>
+
+        <div class="warning">
+          <strong>2. weakMapMemoize теперь default, но только в reselect v5+.</strong>
+          Если в проекте reselect v4 / старый RTK (&lt; 2.0) — default всё ещё <code>lruMemoize(1)</code>,
+          и параметризованные селекторы миссят. <em>Как проверить:</em>
+          <code>cat node_modules/reselect/package.json</code>. <em>Почему важно:</em> код «я просто
+          <code>createSelector</code> вызвал» ведёт себя по-разному на разных мажорах reselect.
+        </div>
+
+        <div class="warning">
+          <strong>3. Инлайновый селектор разрушает всё.</strong>
+          <code>useSelector(s =&gt; selectTodoById(s, id))</code> где <code>selectTodoById</code> создан с
+          <code>weakMapMemoize</code> — всё ок. Но
+          <code>useSelector(s =&gt; createSelector(...)(s))</code> внутри тела компонента — каждый render
+          создаёт <em>новый селектор с пустым кешем</em>. Выносите в модуль-скоуп.
+        </div>
+
+        <div class="warning">
+          <strong>4. resultEqualityCheck — как спасти от ненужных ререндеров.</strong>
+          Допустим, combiner возвращает <code>items.map(t =&gt; t.id)</code>. Даже если <code>items</code>
+          не менялся, ссылка на результат <em>новая</em> → подписчики реагируют. Опция
+          <code>resultEqualityCheck: shallowEqual</code> (или свой deep) <em>восстановит старую ссылку</em>,
+          если новое значение «такое же». <em>Почему:</em> reselect пер-результатно кеширует последний output через
+          <code>WeakRef</code> и сравнивает твоим чекером.
+        </div>
+
+        <div class="warning">
+          <strong>5. ≈lruMemoize по скорости, но чуть медленнее.</strong>
+          В доке reselect прямо написано: <em>«roughly the same speed as lruMemoize, although likely a
+          fraction slower»</em>. Разница в <code>WeakMap.get</code> vs линейный поиск в массиве при maxSize=1.
+          Для 99% случаев незаметно.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../41-createselector-from-rtk/">41 — createSelector базовый (lruMemoize 1)</a></li>
+          <li><a href="../42-createdraftsafeselector/">42 — createDraftSafeSelector (где weakMapMemoize по умолчанию)</a></li>
+          <li><a href="../44-slice-selectors-memoized/">44 — createSelector внутри slice</a></li>
+          <li><a href="../52-get-selectors-entity/" onclick="event.preventDefault()" style="opacity: .5; cursor: not-allowed;" title="Будет в секции F">52 — entity adapter selectors (soon)</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://reselect.js.org/api/weakmapmemoize" target="_blank">reselect docs — weakMapMemoize</a></li>
+          <li><a href="https://github.com/reduxjs/reselect/blob/master/src/weakMapMemoize.ts" target="_blank">GitHub — weakMapMemoize.ts</a></li>
+          <li><a href="https://github.com/reduxjs/reselect/blob/master/src/lruMemoize.ts" target="_blank">GitHub — lruMemoize.ts (сравнить)</a></li>
+          <li><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakMap" target="_blank">MDN WeakMap</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

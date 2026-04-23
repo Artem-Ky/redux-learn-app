@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>46 — Зачем нормализованное состояние</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .bench-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin: 12px 0;
+    }
+    .bench-card h4 { color: var(--accent); font-family: var(--font-mono); font-size: .82rem; margin-bottom: 10px; }
+    .bench-row { display: flex; align-items: center; gap: 12px; margin: 8px 0; font-family: var(--font-mono); font-size: .82rem; }
+    .bench-row__label { width: 120px; color: var(--text-secondary); }
+    .bench-row__bar-wrap { flex: 1; background: var(--bg-panel); height: 26px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); position: relative; }
+    .bench-row__bar {
+      height: 100%;
+      transition: width .4s ease-out;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      color: #fff;
+      font-size: .72rem;
+      font-weight: 600;
+      min-width: 0;
+    }
+    .bench-row__bar--array { background: linear-gradient(90deg, #a04040, #f44747); }
+    .bench-row__bar--map { background: linear-gradient(90deg, #205030, #4caf50); }
+    .bench-row__value { width: 100px; color: var(--accent-cyan); text-align: right; }
+    .shape-cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+    .shape-box { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; }
+    .shape-box h5 { color: var(--accent); font-family: var(--font-mono); font-size: .78rem; margin-bottom: 6px; }
+    .shape-box pre { font-family: var(--font-mono); font-size: .72rem; color: var(--accent-cyan); white-space: pre-wrap; line-height: 1.5; }
+    .svg-wrap { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">46 / 106</span>Зачем нормализованное состояние</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../45a-quiz-e/">← Quiz E</a>
+      <a href="../47-entityadapter-basics/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Lookup по id: массив O(n) vs map O(1)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Сгенерим 1000 todo в двух формах и будем искать один todo по случайному id —
+          <code>Array.prototype.find</code> против <code>entities[id]</code>. Разница растёт линейно
+          с размером коллекции.
+        </p>
+
+        <div class="btn-group" style="margin: 14px 0;">
+          <button class="btn" id="gen">generate (N штук)</button>
+          <input type="number" id="size" value="1000" min="10" max="100000" step="100"
+                 style="width: 120px;">
+          <button class="btn btn--accent" id="bench">▶ benchmark find</button>
+          <button class="btn" id="clear">clear</button>
+        </div>
+
+        <div class="bench-card">
+          <h4>Результаты (время одной операции find)</h4>
+          <div class="bench-row">
+            <div class="bench-row__label">Array.find</div>
+            <div class="bench-row__bar-wrap"><div class="bench-row__bar bench-row__bar--array" id="bar-array" style="width: 0">—</div></div>
+            <div class="bench-row__value" id="val-array">— ms</div>
+          </div>
+          <div class="bench-row">
+            <div class="bench-row__label">entities[id]</div>
+            <div class="bench-row__bar-wrap"><div class="bench-row__bar bench-row__bar--map" id="bar-map" style="width: 0">—</div></div>
+            <div class="bench-row__value" id="val-map">— ms</div>
+          </div>
+          <div id="ratio" style="margin-top: 8px; color: var(--accent-yellow); font-size: .82rem;">—</div>
+        </div>
+
+        <div class="shape-cmp">
+          <div class="shape-box">
+            <h5>Форма A — массив</h5>
+            <pre id="shape-a">[ {id, text}, ... ]</pre>
+          </div>
+          <div class="shape-box">
+            <h5>Форма B — { ids, entities }</h5>
+            <pre id="shape-b">{ ids: [], entities: {} }</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 46. Нормализация в Redux state</div>
+      <div class="theory__body">
+        <h3>Проблема: «база данных» из массивов</h3>
+        <p>
+          Типичный начинающий хранит коллекции как <code>items: Todo[]</code>. Пока их 5 — всё быстро.
+          Когда их 1000+ и мы каждый рендер делаем <code>items.find(t =&gt; t.id === action.id)</code>
+          в reducer'е, селекторе и в компоненте — получаем <strong>O(n)</strong> × рендеры × компоненты.
+          Обновление одного объекта требует нового массива (<code>items.map</code>) — ещё <strong>O(n)</strong>
+          с аллокацией.
+        </p>
+
+        <h3>Цитата — Redux docs</h3>
+        <div class="quote">
+          «<strong>Treat a portion of your Redux store as if it were a database.</strong> Each type of data
+          gets its own "table". Each "data table" should store the individual items in an object, with the
+          IDs of the items as keys and the items themselves as the values. Any references to individual
+          items should be done by storing the item's ID.»
+          <br>— <a href="https://redux.js.org/usage/structuring-reducers/normalizing-state-shape" target="_blank">Structuring Reducers · Normalizing State Shape</a>
+        </div>
+        <div class="quote quote--ru">
+          «Относитесь к части вашего Redux-стора как к <strong>базе данных</strong>. У каждого типа данных —
+          своя «таблица». Внутри таблицы элементы лежат в объекте <code>{ [id]: item }</code>, а любые ссылки
+          на отдельный элемент — через его id.»
+        </div>
+
+        <h3>Форма EntityState&lt;T&gt;</h3>
+        <div class="code-block">
+<span class="cm">// Это та самая форма, которую использует createEntityAdapter (урок 47-48)</span>
+<span class="kw">interface</span> <span class="type">EntityState</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt; {
+  ids: <span class="type">Id</span>[]           <span class="cm">// сохраняет порядок</span>
+  entities: <span class="type">Record</span>&lt;<span class="type">Id</span>, <span class="type">T</span>&gt;  <span class="cm">// быстрый lookup O(1)</span>
+}
+        </div>
+
+        <h3>Схема: как массив превращается в нормализованный state</h3>
+        <div class="svg-wrap">
+          <svg width="760" height="200" viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,0 L10,5 L0,10 Z" fill="#569cd6"/>
+              </marker>
+            </defs>
+            <!-- ARRAY SIDE -->
+            <text x="20" y="20" fill="#999" font-family="monospace" font-size="11">items: Todo[]</text>
+            <g transform="translate(20, 30)">
+              <rect width="260" height="40" fill="#2a2a2a" stroke="#f44747" stroke-width="1.5" rx="3"/>
+              <text x="10" y="25" fill="#ce9178" font-family="monospace" font-size="11">[ {id:'a', …}, {id:'b', …}, …, {id:'z'} ]</text>
+            </g>
+            <text x="20" y="100" fill="#f44747" font-family="monospace" font-size="11">• items.find(t=&gt;t.id===X)  O(n)</text>
+            <text x="20" y="118" fill="#f44747" font-family="monospace" font-size="11">• items.map(...)           O(n)</text>
+            <text x="20" y="136" fill="#f44747" font-family="monospace" font-size="11">• дублирование {id} в ref'ах</text>
+
+            <!-- ARROW -->
+            <path d="M290,90 L430,90" stroke="#569cd6" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+            <text x="310" y="80" fill="#569cd6" font-family="monospace" font-size="11">нормализация</text>
+
+            <!-- MAP SIDE -->
+            <text x="440" y="20" fill="#999" font-family="monospace" font-size="11">{ ids, entities }</text>
+            <g transform="translate(440, 30)">
+              <rect width="300" height="40" fill="#2a2a2a" stroke="#4caf50" stroke-width="1.5" rx="3"/>
+              <text x="10" y="16" fill="#9cdcfe" font-family="monospace" font-size="10.5">ids: ['a','b',…,'z']</text>
+              <text x="10" y="32" fill="#9cdcfe" font-family="monospace" font-size="10.5">entities: {a:{…}, b:{…}, …, z:{…}}</text>
+            </g>
+            <text x="440" y="100" fill="#4caf50" font-family="monospace" font-size="11">• entities[X]              O(1)</text>
+            <text x="440" y="118" fill="#4caf50" font-family="monospace" font-size="11">• order сохраняется в ids</text>
+            <text x="440" y="136" fill="#4caf50" font-family="monospace" font-size="11">• одна ссылка на объект</text>
+          </svg>
+        </div>
+
+        <h3>Зачем 2 поля, а не одно?</h3>
+        <ul>
+          <li><code>entities</code> — fast lookup и дедупликация (не хранить юзера дважды).</li>
+          <li><code>ids</code> — сохраняет <strong>порядок</strong> (у объекта ключи формально упорядочены,
+              но полагаться на это — плохо), даёт «витрину»: <code>ids.map(id =&gt; entities[id])</code>.</li>
+        </ul>
+
+        <h3>Дублирование — второй враг</h3>
+        <p>
+          В классическом дереве часто лежит <code>selectedTodo: Todo</code> и одновременно
+          <code>todos: Todo[]</code> с тем же объектом. Обновляем один — забыли обновить другой — данные
+          «разъезжаются». В нормализованной форме хранится <strong>только id</strong>:
+          <code>selectedTodoId: 'a3'</code>. Единственный источник истины.
+        </p>
+
+        <h3>Когда НЕ нормализовать</h3>
+        <div class="warning">
+          <strong>Не нормализуйте просто ради того, что «так принято».</strong>
+          <ul style="margin-top: 6px;">
+            <li>UI-state из 3 полей (<code>isModalOpen</code>, <code>theme</code>, <code>filter</code>) —
+                overkill.</li>
+            <li>Коллекция &lt; 20 элементов, которую никогда не ищут по id — overkill.</li>
+            <li>Дерево (tree of categories) — лучше оставить древовидным или хранить <em>два</em> поля:
+                плоскую <code>entities</code> + отдельный <code>rootIds</code>.</li>
+          </ul>
+        </div>
+
+        <h3>Подводные камни нормализации</h3>
+        <div class="warning">
+          <strong>1. Дублирование id.</strong> Сам <code>id</code> лежит и в <code>ids[i]</code>, и в
+          <code>entities[id].id</code>. При смене id (редко) — надо поддерживать оба места
+          (RTK это делает автоматически в <code>updateOne</code>, см. урок 50).
+          <br><br>
+          <strong>2. Потеря порядка.</strong> Если строите UI из <code>Object.values(entities)</code> —
+          порядок не гарантирован. Используйте <code>ids.map(id =&gt; entities[id])</code> (это и есть
+          <code>selectAll</code> adapter'а). Сортировку контролирует <code>sortComparer</code>
+          (см. урок 51).
+          <br><br>
+          <strong>3. Nested data.</strong> Если <code>Todo</code> ссылается на <code>User</code> — нельзя
+          хранить весь user внутри каждого todo; лучше <code>userId</code> + отдельный
+          <code>usersAdapter</code>. Это и есть normalizr-подход из документации.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../47-entityadapter-basics/">47 — первый createEntityAdapter</a> — построим форму автоматически.</li>
+          <li><a href="../48-entity-state-shape/">48 — структура EntityState&lt;T&gt;</a>.</li>
+          <li><a href="../51-selectid-sortcomparer/">51 — sortComparer</a> (про порядок в <code>ids</code>).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux.js.org/usage/structuring-reducers/normalizing-state-shape" target="_blank">Normalizing State Shape</a></li>
+          <li><a href="https://redux-toolkit.js.org/api/createEntityAdapter" target="_blank">RTK · createEntityAdapter</a></li>
+          <li><a href="https://github.com/paularmstrong/normalizr" target="_blank">normalizr</a> (вдохновитель формы)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

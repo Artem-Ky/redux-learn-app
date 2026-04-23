@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>54 — Зачем createAsyncThunk</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+    @media (max-width: 900px) { .side-by-side { grid-template-columns: 1fr; } }
+    .side-by-side > .pane { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+    .pane h4 { color: var(--accent); font-size: .82rem; margin-bottom: 6px; font-family: var(--font-mono); }
+    .pane .loc { color: var(--text-muted); font-size: .7rem; font-family: var(--font-mono); }
+    .state-mini { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .76rem; white-space: pre; color: var(--accent-cyan); overflow-x: auto; margin-top: 8px; }
+    .sm-rect { fill: #1b1b1b; stroke: #569cd6; stroke-width: 1.5; rx: 6; }
+    .sm-text { fill: #cccccc; font: 600 12px 'JetBrains Mono', monospace; text-anchor: middle; dominant-baseline: middle; }
+    .sm-edge { stroke: #888; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+    .sm-label { fill: #9cdcfe; font: 10px 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">54 / 106</span>Ручной thunk vs createAsyncThunk</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../53a-quiz-f/">← Quiz F</a>
+      <a href="../55-asyncthunk-basic/">Далее →</a>
+    </nav>
+  </div>
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Две реализации одного и того же <strong>fetch users</strong> бок-о-бок. Левая — «ручной» thunk с тремя
+          action creators и <code>switch</code>-reducer'ом. Правая — <code>createAsyncThunk</code> + <code>extraReducers</code>.
+          Нажмите кнопку — оба store отрабатывают одинаково, но в коде разница разительная.
+        </p>
+        <div style="display:flex; gap:8px; flex-wrap: wrap; margin: 12px 0;">
+          <button class="btn btn--accent" id="fetch-both">Fetch users (random delay/fail)</button>
+          <button class="btn btn--secondary" id="reset-both">Сбросить оба</button>
+        </div>
+
+        <div class="side-by-side">
+          <div class="pane">
+            <h4>Слева — ручной thunk <span class="loc">(≈40 строк)</span></h4>
+            <div class="state-mini" id="manual-state">—</div>
+            <div class="code-block" style="font-size:.72rem;"><span class="cm">// 3 action creators, switch, try/catch</span>
+<span class="kw">const</span> fetchPending   = () =&gt; ({ type: <span class="str">'USERS/PENDING'</span> })
+<span class="kw">const</span> fetchFulfilled = (u) =&gt; ({ type: <span class="str">'USERS/OK'</span>, payload: u })
+<span class="kw">const</span> fetchRejected  = (e) =&gt; ({ type: <span class="str">'USERS/FAIL'</span>, error: e })
+
+<span class="kw">const</span> <span class="fn">fetchUsers</span> = () =&gt; <span class="kw">async</span> (dispatch) =&gt; {
+  dispatch(<span class="fn">fetchPending</span>())
+  <span class="kw">try</span> { dispatch(<span class="fn">fetchFulfilled</span>(<span class="kw">await</span> <span class="fn">api</span>())) }
+  <span class="kw">catch</span> (e) { dispatch(<span class="fn">fetchRejected</span>((e <span class="kw">as</span> <span class="type">Error</span>).message)) }
+}
+
+<span class="kw">function</span> <span class="fn">reducer</span>(state = init, action) {
+  <span class="kw">switch</span> (action.type) {
+    <span class="kw">case</span> <span class="str">'USERS/PENDING'</span>:   <span class="kw">return</span> {...state, loading:<span class="kw">true</span>, error:<span class="kw">null</span>}
+    <span class="kw">case</span> <span class="str">'USERS/OK'</span>:        <span class="kw">return</span> {...state, loading:<span class="kw">false</span>, list:action.payload}
+    <span class="kw">case</span> <span class="str">'USERS/FAIL'</span>:      <span class="kw">return</span> {...state, loading:<span class="kw">false</span>, error:action.error}
+    <span class="kw">default</span>: <span class="kw">return</span> state
+  }
+}</div>
+          </div>
+
+          <div class="pane">
+            <h4>Справа — createAsyncThunk <span class="loc">(≈12 строк)</span></h4>
+            <div class="state-mini" id="rtk-state">—</div>
+            <div class="code-block" style="font-size:.72rem;"><span class="cm">// один createAsyncThunk, extraReducers на life-cycle</span>
+<span class="kw">const</span> fetchUsers = <span class="fn">createAsyncThunk</span>(
+  <span class="str">'users/fetch'</span>,
+  () =&gt; <span class="fn">api</span>(),
+)
+
+<span class="kw">const</span> slice = <span class="fn">createSlice</span>({
+  name: <span class="str">'users'</span>,
+  initialState: { loading:<span class="kw">false</span>, list:[], error:<span class="kw">null</span> },
+  reducers: {},
+  extraReducers: (b) =&gt; {
+    b.<span class="fn">addCase</span>(fetchUsers.pending,   (s) =&gt; { s.loading=<span class="kw">true</span>; s.error=<span class="kw">null</span> })
+    b.<span class="fn">addCase</span>(fetchUsers.fulfilled, (s,a) =&gt; { s.loading=<span class="kw">false</span>; s.list=a.payload })
+    b.<span class="fn">addCase</span>(fetchUsers.rejected,  (s,a) =&gt; { s.loading=<span class="kw">false</span>; s.error=a.error.message })
+  },
+})</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 54. State machine async-thunk'а</div>
+      <div class="theory__body">
+        <h3>Цитата из документации</h3>
+        <div class="quote">
+          «<code>createAsyncThunk</code> accepts three parameters: a string action type value, a <code>payloadCreator</code> callback,
+          and an options object. It returns a standard Redux thunk action creator that will automatically dispatch
+          <em>pending</em>, <em>fulfilled</em>, or <em>rejected</em> actions based on the returned promise.»<br>
+          — <a href="https://redux-toolkit.js.org/api/createAsyncThunk" target="_blank">redux-toolkit.js.org/api/createAsyncThunk</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>createAsyncThunk</code> принимает три параметра: строку <code>type</code>, callback <code>payloadCreator</code>
+          и объект опций. Возвращает обычный Redux thunk action creator, который <strong>автоматически</strong> диспатчит
+          <em>pending</em>, <em>fulfilled</em> или <em>rejected</em> действия в зависимости от того, чем закончится promise.»
+        </div>
+
+        <h3>State machine</h3>
+        <p>Любой async-запрос живёт в одном из пяти состояний. createAsyncThunk инкапсулирует переходы:</p>
+        <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:760px;display:block;margin:0 auto;">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#888"/>
+            </marker>
+          </defs>
+          <!-- idle -->
+          <rect class="sm-rect" x="20" y="85" width="90" height="40"/>
+          <text class="sm-text" x="65" y="105">idle</text>
+          <!-- pending -->
+          <rect class="sm-rect" x="190" y="85" width="100" height="40"/>
+          <text class="sm-text" x="240" y="105">pending</text>
+          <!-- fulfilled -->
+          <rect class="sm-rect" x="400" y="20" width="110" height="40" style="stroke:#4caf50"/>
+          <text class="sm-text" x="455" y="40">fulfilled</text>
+          <!-- rejected -->
+          <rect class="sm-rect" x="400" y="90" width="110" height="40" style="stroke:#f44747"/>
+          <text class="sm-text" x="455" y="110">rejected</text>
+          <!-- aborted -->
+          <rect class="sm-rect" x="400" y="160" width="110" height="40" style="stroke:#ff9800"/>
+          <text class="sm-text" x="455" y="180">rejected (aborted)</text>
+          <!-- skipped (condition false) -->
+          <rect class="sm-rect" x="190" y="160" width="100" height="40" style="stroke:#888;stroke-dasharray:4 3"/>
+          <text class="sm-text" x="240" y="180" style="fill:#888">skipped</text>
+
+          <!-- edges -->
+          <path class="sm-edge" d="M 110 105 L 188 105"/>
+          <text class="sm-label" x="115" y="97">dispatch(thunk())</text>
+
+          <path class="sm-edge" d="M 290 98 C 340 70, 370 50, 400 40"/>
+          <text class="sm-label" x="300" y="60">resolve</text>
+
+          <path class="sm-edge" d="M 290 110 L 400 110"/>
+          <text class="sm-label" x="310" y="104">throw / rejectWithValue</text>
+
+          <path class="sm-edge" d="M 290 120 C 340 150, 370 170, 400 180"/>
+          <text class="sm-label" x="300" y="160">abort()</text>
+
+          <path class="sm-edge" d="M 240 85 L 240 165" style="stroke-dasharray:4 3"/>
+          <text class="sm-label" x="244" y="140">condition:false</text>
+
+          <path class="sm-edge" d="M 510 40 C 580 40, 580 100, 580 105 L 580 105 L 600 105"/>
+          <rect class="sm-rect" x="600" y="85" width="90" height="40"/>
+          <text class="sm-text" x="645" y="105">idle</text>
+          <path class="sm-edge" d="M 510 110 L 600 110"/>
+          <path class="sm-edge" d="M 510 180 C 580 180, 580 120, 595 112"/>
+        </svg>
+        <p style="color:var(--text-muted); font-size:.78rem; text-align:center;">
+          <span class="tag tag--info">pending</span> — запрос стартовал;
+          <span class="tag tag--good">fulfilled</span> — payload вернулся;
+          <span class="tag tag--bad">rejected</span> — throw/rejectWithValue/abort/condition.
+        </p>
+
+        <h3>Что даёт createAsyncThunk «из коробки»</h3>
+        <ul>
+          <li>3 автоматических action-creator'а: <code>thunk.pending</code>, <code>thunk.fulfilled</code>, <code>thunk.rejected</code>;</li>
+          <li><code>meta</code> с <code>arg</code>, <code>requestId</code>, <code>requestStatus</code>, <code>aborted</code>, <code>condition</code> — для любого action'а;</li>
+          <li>AbortController и <code>signal</code> — прозрачная отмена;</li>
+          <li><code>condition</code> — пропуск запуска до pending;</li>
+          <li><code>rejectWithValue</code> — ошибка с типизированным payload;</li>
+          <li>promise с <code>.unwrap()</code> — для try/catch в UI-слое;</li>
+          <li>правильная сериализация ошибки через <code>miniSerializeError</code> (не теряем stack).</li>
+        </ul>
+
+        <h3>Фрагмент исходника — весь pending/fulfilled/rejected</h3>
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строки 539–599</span>
+<span class="kw">const</span> fulfilled = <span class="fn">createAction</span>(
+  typePrefix + <span class="str">'/fulfilled'</span>,
+  (payload, requestId, arg, meta?) =&gt; ({
+    payload,
+    meta: { ...(meta || {}), arg, requestId, requestStatus: <span class="str">'fulfilled'</span> },
+  }),
+)
+
+<span class="kw">const</span> pending = <span class="fn">createAction</span>(
+  typePrefix + <span class="str">'/pending'</span>,
+  (requestId, arg, meta?) =&gt; ({
+    payload: <span class="kw">undefined</span>,
+    meta: { ...(meta || {}), arg, requestId, requestStatus: <span class="str">'pending'</span> },
+  }),
+)
+
+<span class="kw">const</span> rejected = <span class="fn">createAction</span>(
+  typePrefix + <span class="str">'/rejected'</span>,
+  (error, requestId, arg, payload?, meta?) =&gt; ({
+    payload,
+    error: (options?.serializeError || miniSerializeError)(error || <span class="str">'Rejected'</span>),
+    meta: {
+      ...(meta || {}), arg, requestId,
+      rejectedWithValue: !!payload,
+      requestStatus: <span class="str">'rejected'</span>,
+      aborted: error?.name === <span class="str">'AbortError'</span>,
+      condition: error?.name === <span class="str">'ConditionError'</span>,
+    },
+  }),
+)</div>
+        <p style="font-size:.78rem;">
+          Источник: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L539" target="_blank">createAsyncThunk.ts</a>
+        </p>
+
+        <h3>Почему ручной thunk — проблема</h3>
+        <div class="warning">
+          <strong>1. Не стандартизировано.</strong> Каждая фича изобретает своё именование
+          (<code>USERS/PENDING</code>, <code>fetchTodos/start</code>, <code>posts/LOAD_BEGIN</code>). DevTools — зоопарк.<br>
+          <strong>2. Меты нет.</strong> <code>requestId</code>, <code>arg</code>, <code>requestStatus</code> либо отсутствуют, либо каждый раз пишутся руками — и с ошибками.<br>
+          <strong>3. Нет отмены.</strong> AbortController и <code>signal</code> нужно прокидывать вручную; race condition guards тоже.<br>
+          <strong>4. Ошибка теряется.</strong> Обычно пишут <code>dispatch({type:'FAIL', error: e.message})</code> — и <em>stack</em> пропадает. RTK кладёт весь <code>SerializedError</code>.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../55-asyncthunk-basic/">55 — базовый createAsyncThunk</a></li>
+          <li><a href="../56-asyncthunk-action-creators/">56 — thunk.pending/fulfilled/rejected + matchers</a></li>
+          <li><a href="../31-extra-reducers/">31 — extraReducers (builder)</a></li>
+          <li><a href="../32-reducer-creators/">32 — create.asyncThunk внутри slice</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>78 — Когда НЕ использовать RTK: decision tree</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .tree-container {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px 22px; margin: 14px 0; min-height: 280px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .tree-breadcrumbs {
+      display: flex; gap: 6px; flex-wrap: wrap; font-size: .72rem; color: var(--text-muted); font-family: var(--font-mono);
+    }
+    .tree-breadcrumbs span { background: var(--bg-panel); padding: 2px 8px; border-radius: var(--radius-sm); }
+    .tree-breadcrumbs span.yes { color: var(--success); border-left: 2px solid var(--success); }
+    .tree-breadcrumbs span.no { color: var(--accent-red); border-left: 2px solid var(--accent-red); }
+
+    .tree-question {
+      color: var(--text-bright); font-size: 1.1rem; line-height: 1.5; font-weight: 600;
+      padding: 10px 0;
+    }
+    .tree-hint {
+      color: var(--text-secondary); font-size: .82rem; line-height: 1.55;
+    }
+    .tree-hint code { background: var(--bg-panel); padding: 1px 5px; border-radius: 3px; color: var(--accent-cyan); font-size: .82rem; }
+
+    .tree-buttons { display: flex; gap: 10px; margin-top: 6px; }
+    .tree-buttons .btn { min-width: 90px; font-weight: 600; }
+    .tree-buttons .btn--yes { background: rgba(76,175,80,.2); border-color: var(--success); color: var(--success); }
+    .tree-buttons .btn--no  { background: rgba(244,71,71,.15); border-color: var(--accent-red); color: var(--accent-red); }
+
+    .tree-result {
+      background: var(--bg-secondary); border: 2px solid var(--accent); border-radius: var(--radius);
+      padding: 18px 22px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .tree-result__tool {
+      font-family: var(--font-mono); font-size: 1.5rem; color: var(--accent-cyan); font-weight: 700;
+    }
+    .tree-result__reason { color: var(--text-secondary); font-size: .9rem; line-height: 1.6; }
+    .tree-result__pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tree-result__box { background: var(--bg-panel); border-radius: var(--radius-sm); padding: 10px 12px; }
+    .tree-result__box h4 { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .tree-result__box.pros h4 { color: var(--success); }
+    .tree-result__box.cons h4 { color: var(--accent-red); }
+    .tree-result__box ul { list-style: none; font-size: .82rem; line-height: 1.55; }
+    .tree-result__box li { padding: 2px 0; color: var(--text-primary); }
+    .tree-result__box li::before { content: '•'; margin-right: 6px; color: var(--text-muted); }
+    .tree-result__link {
+      font-size: .85rem; color: var(--accent-blue-bright); text-decoration: none;
+    }
+    .tree-result__link:hover { text-decoration: underline; }
+    .tree-result__restart { align-self: flex-start; }
+
+    .comparison-table { width: 100%; border-collapse: collapse; font-size: .8rem; margin: 14px 0; }
+    .comparison-table th, .comparison-table td {
+      border: 1px solid var(--border); padding: 7px 9px; text-align: left; vertical-align: top;
+    }
+    .comparison-table th {
+      background: var(--bg-tertiary); color: var(--accent); font-family: var(--font-mono); font-size: .72rem;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .comparison-table .tool-name { font-family: var(--font-mono); color: var(--accent-cyan); font-weight: 600; }
+    .comparison-table td.size { font-family: var(--font-mono); font-size: .78rem; }
+    .comparison-table .score {
+      display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: .72rem; font-family: var(--font-mono);
+    }
+    .comparison-table .score--great { background: rgba(76,175,80,.2); color: var(--success); }
+    .comparison-table .score--ok    { background: rgba(86,156,214,.15); color: var(--accent); }
+    .comparison-table .score--mid   { background: rgba(255,152,0,.15); color: var(--warning); }
+    .comparison-table .score--bad   { background: rgba(244,71,71,.15); color: var(--accent-red); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">78 / 106</span>
+      Когда НЕ использовать RTK: интерактивное decision-tree
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../77-migration-classic-to-rtk/">← Назад</a>
+      <a href="../">На главную →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Decision tree — 5–7 вопросов → рекомендация</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Отвечай Yes / No — дерево приведёт к одному из 6 инструментов. Цель: не использовать Redux/RTK там,
+          где хватает <code>useState</code>, и не писать свой cache там, где уже есть RTK Query или React Query.
+        </p>
+
+        <div class="tree-container" id="tree-root"></div>
+
+        <h3 style="color: var(--text-bright); margin: 18px 0 8px; font-size: .92rem;">Сводная таблица — 6 инструментов</h3>
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Инструмент</th>
+              <th>Bundle</th>
+              <th>Learning</th>
+              <th>DevTools</th>
+              <th>Server cache</th>
+              <th>TS</th>
+              <th>Use case</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="tool-name">React useState/useReducer</td>
+              <td class="size">0 KB</td>
+              <td><span class="score score--great">low</span></td>
+              <td><span class="score score--bad">no</span></td>
+              <td><span class="score score--bad">no</span></td>
+              <td><span class="score score--great">excellent</span></td>
+              <td>local UI-state, небольшие формы</td>
+            </tr>
+            <tr>
+              <td class="tool-name">Zustand</td>
+              <td class="size">~1.2 KB</td>
+              <td><span class="score score--great">very low</span></td>
+              <td><span class="score score--mid">opt-in</span></td>
+              <td><span class="score score--bad">no</span></td>
+              <td><span class="score score--great">excellent</span></td>
+              <td>mini-store без ceremony, startups</td>
+            </tr>
+            <tr>
+              <td class="tool-name">Jotai</td>
+              <td class="size">~3 KB</td>
+              <td><span class="score score--ok">low</span></td>
+              <td><span class="score score--mid">partial</span></td>
+              <td><span class="score score--bad">no</span></td>
+              <td><span class="score score--great">excellent</span></td>
+              <td>атомарный state, fine-grained reactivity</td>
+            </tr>
+            <tr>
+              <td class="tool-name">Redux + RTK</td>
+              <td class="size">~14 KB</td>
+              <td><span class="score score--mid">medium</span></td>
+              <td><span class="score score--great">best-in-class</span></td>
+              <td><span class="score score--bad">no (нужен RTKQ)</span></td>
+              <td><span class="score score--great">excellent</span></td>
+              <td>large apps, cross-cutting, time-travel</td>
+            </tr>
+            <tr>
+              <td class="tool-name">RTK Query</td>
+              <td class="size">+~9 KB</td>
+              <td><span class="score score--mid">medium</span></td>
+              <td><span class="score score--great">через Redux DevTools</span></td>
+              <td><span class="score score--great">built-in</span></td>
+              <td><span class="score score--great">excellent</span></td>
+              <td>server state внутри Redux-проекта</td>
+            </tr>
+            <tr>
+              <td class="tool-name">React Query (TanStack)</td>
+              <td class="size">~13 KB</td>
+              <td><span class="score score--ok">low-medium</span></td>
+              <td><span class="score score--great">React Query Devtools</span></td>
+              <td><span class="score score--great">best-in-class</span></td>
+              <td><span class="score score--great">excellent</span></td>
+              <td>server state без Redux</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — Redux/RTK не «silver bullet»</div>
+      <div class="theory__body">
+        <h3>Цитата — Redux FAQ</h3>
+        <div class="quote">
+          «Not all apps need Redux. It's important to understand the kind of app you're building,
+          the kinds of problems that you need to solve, and what tools can best solve the problems you're facing.
+          Redux is a valuable tool for certain situations but it's not the only or best tool for every situation.»
+          <br>— <a href="https://redux.js.org/faq/general#when-should-i-use-redux" target="_blank">Redux FAQ — When should I use Redux</a>
+        </div>
+        <div class="quote quote--ru">
+          «Не каждому приложению нужен Redux. Важно понимать, какого типа приложение вы строите,
+          какие задачи решаете, и какие инструменты лучше подходят. Redux — ценный инструмент
+          в определённых ситуациях, но не единственный и не лучший для каждой.»
+        </div>
+
+        <h3>Критерии для Redux/RTK</h3>
+        <ul>
+          <li>State нужен <strong>многим компонентам</strong>, разнесённым по дереву.</li>
+          <li>Есть <strong>cross-cutting concerns</strong>: analytics, notifications, WebSocket, undo/redo.</li>
+          <li>Команда больше 3 человек — важна единая convention.</li>
+          <li>Ценны <strong>time-travel DevTools</strong> для отладки сложных багов.</li>
+        </ul>
+
+        <h3>Когда Redux избыточен</h3>
+        <ul>
+          <li><strong>Только local UI-state:</strong> модалки, чекбоксы, формы → <code>useState</code>/<code>useReducer</code>.</li>
+          <li><strong>Только server state:</strong> всё приложение — это «загрузить-показать-обновить» → React Query или RTK Query (без slice'ов).</li>
+          <li><strong>Мелкий SPA без серьёзной логики</strong> — Zustand решит за 5 минут то, на что Redux тратит 50.</li>
+        </ul>
+
+        <h3>RTK Query vs React Query — почти одно и то же</h3>
+        <p>
+          Оба решают server state: cache, dedup, invalidation, polling, optimistic updates.
+          <strong>RTK Query</strong> — выбор, если у вас уже Redux (интеграция бесплатная, один store, один DevTools).
+          <strong>React Query</strong> — выбор, если Redux не нужен вовсе. По возможностям они примерно равны;
+          по API React Query чуть гибче (лучше документация для edge cases), RTK Query — строже и type-safe.
+        </p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>Redux для форм — почти всегда ошибка.</strong>
+          Форма — это local state до submit. Redux-формы (old style) заставляют диспатчить action на каждый keystroke —
+          медленно и шумно в DevTools. Используйте <code>react-hook-form</code> / <code>Formik</code> / обычный <code>useState</code>.
+        </div>
+        <div class="warning">
+          <strong>RTK Query + React Query одновременно — redundancy.</strong>
+          Не добавляйте React Query в Redux-проект «потому что красивее API». Выберите одно.
+          Два кэша, два инвалидатора, два DevTools — двойная сложность.
+        </div>
+        <div class="warning">
+          <strong>Zustand ≠ скрытый Redux.</strong>
+          Zustand не эквивалентен Redux по возможностям: нет middleware-экосистемы уровня Redux,
+          DevTools только через плагин, time-travel ограниченный. Если вам нужны listener/saga/RTK Query —
+          возвращайтесь в Redux.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../01-what-is-rtk/">01 — что такое RTK</a>.</li>
+          <li><a href="../02-pain-of-classic/">02 — pain of classic Redux</a>.</li>
+          <li><a href="../05-installation-bundle-size/">05 — bundle size</a>.</li>
+          <li><a href="../75-side-by-side-counter/">75 — three approaches side-by-side</a>.</li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/comparison" target="_blank">RTK Query comparison with other tools</a>.</li>
+          <li><a href="https://redux.js.org/faq/general#when-should-i-use-redux" target="_blank">Redux FAQ — when should I use Redux</a>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

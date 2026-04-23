@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>70 — TypedStartListening, addAppListener</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .files {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: 10px 0;
+    }
+    .file {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px;
+    }
+    .file__name { color: var(--accent); font-family: var(--font-mono); font-size: .78rem; font-weight: 600; }
+    .file__role { color: var(--text-muted); font-size: .72rem; margin-top: 2px; }
+    .file__code { margin-top: 8px; font-family: var(--font-mono); font-size: .75rem; color: var(--text-secondary); line-height: 1.5; white-space: pre; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">70 / 106</span>Типизация: TypedStartListening и addAppListener</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../69-listener-patterns/">← Назад</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">startAppListening + addAppListener — один раз задали типы, больше не мучаемся с <code>as RootState</code></div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В уроках 64–69 в каждом effect'е писали <code>api.getState() as RootState</code>. В «боевом» проекте
+          такое неудобно. Решение: создать один <strong>typed startListening</strong> и использовать его везде.
+          <code>thunk</code>'и тоже можно диспатчить изнутри listener'а — <code>AppDispatch</code> их принимает без каста.
+        </p>
+
+        <div class="files">
+          <div class="file">
+            <div class="file__name">app/store.ts</div>
+            <div class="file__role">инстанс listenerMiddleware + store</div>
+            <div class="file__code">export const listener = createListenerMiddleware()
+export const store = configureStore({
+  reducer: rootReducer,
+  middleware: (g) =&gt; g()
+    .prepend(listener.middleware),
+})
+export type RootState = ReturnType&lt;
+  typeof store.getState&gt;
+export type AppDispatch = typeof store.dispatch</div>
+          </div>
+          <div class="file">
+            <div class="file__name">app/listener.ts</div>
+            <div class="file__role">typed helpers (отдельно, чтобы не было circular)</div>
+            <div class="file__code">import { addListener } from '@reduxjs/toolkit'
+import type { RootState, AppDispatch }
+  from './store'
+
+export const startAppListening =
+  listener.startListening
+    .withTypes&lt;RootState, AppDispatch&gt;()
+
+export const addAppListener =
+  addListener
+    .withTypes&lt;RootState, AppDispatch&gt;()</div>
+          </div>
+          <div class="file">
+            <div class="file__name">features/users/listeners.ts</div>
+            <div class="file__role">конкретные listener'ы — используют startAppListening</div>
+            <div class="file__code">import { startAppListening }
+  from '../../app/listener'
+import { userLoggedIn, fetchProfile }
+  from './usersSlice'
+
+startAppListening({
+  actionCreator: userLoggedIn,
+  effect: async (action, api) =&gt; {
+    // api.getState() → RootState
+    // api.dispatch(thunk()) — без каста
+    await api.dispatch(
+      fetchProfile(action.payload.id))
+  },
+})</div>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn--accent" id="login">Login</button>
+          <button class="btn" id="runtime">Добавить runtime-listener</button>
+          <button class="btn btn--danger" id="reset">reset</button>
+        </div>
+
+        <div class="state-display">
+          <div class="state-display__label">state</div>
+          <div class="state-display__value" id="state-out">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 70. Type-safe listenerMiddleware</div>
+      <div class="theory__body">
+
+        <h3>Официальный рецепт</h3>
+        <div class="quote">
+          «For use with <code>configureStore</code>, we can export pre-typed versions of <code>startListening</code> and <code>addListener</code> to replace <code>RootState</code> and <code>AppDispatch</code> types in every listener's API.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createListenerMiddleware#typescript-usage" target="_blank">RTK docs — typescript usage</a>
+        </div>
+        <div class="quote quote--ru">
+          «Для <code>configureStore</code> экспортируйте "pre-typed" версии <code>startListening</code> и <code>addListener</code> — чтобы не писать в каждом listener'е <code>RootState</code> и <code>AppDispatch</code> руками.»
+        </div>
+
+        <h3>Исходник — TypedStartListening из <code>types.ts</code></h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/listenerMiddleware/types.ts, строки 650–711</span>
+<span class="kw">export type</span> <span class="type">TypedStartListening</span>&lt;
+  StateType,
+  DispatchType <span class="kw">extends</span> <span class="type">Dispatch</span> = <span class="type">ThunkDispatch</span>&lt;StateType, <span class="kw">unknown</span>, <span class="type">UnknownAction</span>&gt;,
+  ExtraArgument = <span class="kw">unknown</span>,
+&gt; = <span class="type">AddListenerOverloads</span>&lt;
+  <span class="type">UnsubscribeListener</span>,
+  StateType,
+  DispatchType,
+  ExtraArgument
+&gt; &amp; {
+  <span class="cm">/** Pre-typed startListening с RootState/AppDispatch/Extra */</span>
+  <span class="prop">withTypes</span>: &lt;
+    OverrideStateType <span class="kw">extends</span> StateType,
+    OverrideDispatchType <span class="kw">extends</span> <span class="type">Dispatch</span> = <span class="type">ThunkDispatch</span>&lt;
+      OverrideStateType, <span class="kw">unknown</span>, <span class="type">UnknownAction</span>
+    &gt;,
+    OverrideExtraArgument = <span class="kw">unknown</span>,
+  &gt;() =&gt; <span class="type">TypedStartListening</span>&lt;
+    OverrideStateType,
+    OverrideDispatchType,
+    OverrideExtraArgument
+  &gt;
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/types.ts#L650-L711" target="_blank">github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/types.ts#L650-L711</a>
+        </p>
+
+        <h3>Что даёт <code>withTypes&lt;S, D&gt;()</code></h3>
+        <div class="code-block">
+<span class="cm">// БЕЗ withTypes — каст в каждом effect'е</span>
+listener.<span class="fn">startListening</span>({
+  actionCreator: loginSuccess,
+  effect: (a, api) =&gt; {
+    <span class="kw">const</span> s = api.<span class="fn">getState</span>() <span class="kw">as</span> RootState   <span class="cm">// 🙁 каст</span>
+    api.<span class="fn">dispatch</span>(<span class="fn">fetchProfile</span>(s.auth.user!.id) <span class="kw">as any</span>)  <span class="cm">// 🙁 thunk не типизирован</span>
+  },
+})
+
+<span class="cm">// С withTypes — всё сразу правильно</span>
+startAppListening({
+  actionCreator: loginSuccess,
+  effect: (a, api) =&gt; {
+    <span class="kw">const</span> s = api.<span class="fn">getState</span>()                   <span class="cm">// 😊 RootState</span>
+    api.<span class="fn">dispatch</span>(<span class="fn">fetchProfile</span>(s.auth.user!.id))   <span class="cm">// 😊 AppDispatch знает thunk'и</span>
+  },
+})
+        </div>
+
+        <h3>Runtime-добавление listener'а через addAppListener</h3>
+        <div class="code-block">
+<span class="cm">// Внутри хука/компонента — без прямого импорта listenerMiddleware</span>
+<span class="kw">function</span> <span class="fn">useAnalyticsListener</span>() {
+  <span class="kw">const</span> dispatch = <span class="fn">useAppDispatch</span>()
+
+  <span class="fn">useEffect</span>(() =&gt; {
+    <span class="kw">const</span> unsubscribe = <span class="fn">dispatch</span>(<span class="fn">addAppListener</span>({
+      matcher: <span class="fn">isAnyOf</span>(userLoggedIn, userLoggedOut),
+      effect: (action, api) =&gt; {
+        api.<span class="fn">getState</span>()                  <span class="cm">// RootState</span>
+        <span class="fn">track</span>(action.type)
+      },
+    }))
+    <span class="kw">return</span> unsubscribe <span class="kw">as</span> () =&gt; <span class="kw">void</span>
+  }, [dispatch])
+}
+        </div>
+
+        <div class="warning">
+          <strong>Два частых подводных камня типизации:</strong>
+          <ul>
+            <li><strong>Circular imports между <code>store.ts</code> и <code>listener.ts</code>.</strong> Если <code>listener.ts</code> импортирует <code>RootState</code> из <code>store.ts</code>, а сам инстанс <code>listenerMiddleware</code> живёт в <code>store.ts</code> — получаете цикл. Разбивайте на три файла: (1) создание <code>listenerMiddleware</code> в <code>app/listener.ts</code>, (2) <code>store.ts</code> импортирует из (1), (3) <code>features/*/listeners.ts</code> берут <code>startAppListening</code> из (1) + <code>RootState</code> из (2) только как <em>type</em> (<code>import type</code>).</li>
+            <li><strong><code>addListener.withTypes</code> тоже нужен.</strong> Экшен <code>addListener</code> используется для runtime-подписки через <code>dispatch(addAppListener(...))</code>. Без <code>.withTypes()</code> тип payload остаётся <code>unknown</code> — получаете те же касты, что и раньше, просто в другом месте. <code>addListener.withTypes&lt;RootState, AppDispatch&gt;()</code> — обязательный парный вызов.</li>
+          </ul>
+        </div>
+
+        <h3>Полная раскладка типов в проекте</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem;">
+          <thead style="background: var(--bg-panel);">
+            <tr>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); color: var(--accent);">Файл</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Экспорт</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Импортируется из…</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">app/listener.ts</td><td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">listenerMiddleware, startAppListening, addAppListener</td><td style="padding: 6px 10px; border: 1px solid var(--border);">всех features/* и store.ts</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">app/store.ts</td><td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">store, RootState, AppDispatch</td><td style="padding: 6px 10px; border: 1px solid var(--border);">index.tsx, components</td></tr>
+            <tr><td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">features/users/listeners.ts</td><td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">side-effects only (без экспортов)</td><td style="padding: 6px 10px; border: 1px solid var(--border);">только импортируется в app/init</td></tr>
+          </tbody>
+        </table>
+
+        <h3>ThunkDispatch внутри AppDispatch — thunk'и без каста</h3>
+        <div class="code-block">
+<span class="cm">// AppDispatch автоматически содержит ThunkDispatch</span>
+<span class="cm">// (configureStore добавляет thunk в default middleware)</span>
+<span class="kw">type</span> <span class="type">AppDispatch</span> = <span class="kw">typeof</span> store.dispatch
+<span class="cm">//   ≈ ThunkDispatch&lt;RootState, unknown, UnknownAction&gt;</span>
+
+<span class="cm">// ⇒ thunk'и принимаются:</span>
+api.<span class="fn">dispatch</span>(<span class="fn">fetchProfile</span>(<span class="num">42</span>))          <span class="cm">// Promise&lt;fetchProfile.fulfilled | rejected&gt;</span>
+<span class="kw">const</span> result = <span class="kw">await</span> api.<span class="fn">dispatch</span>(<span class="fn">fetchProfile</span>(<span class="num">42</span>)).<span class="fn">unwrap</span>()
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../19-typed-store/">19 — RootState и AppDispatch</a></li>
+          <li><a href="../36-with-slice-typing/">36 — WithSlice и типизация slices</a></li>
+          <li><a href="../45-typed-selectors-hooks/">45 — typed useAppSelector/useAppDispatch</a></li>
+          <li><a href="../65-listener-setup-predicates/">65 — 4 формы startListening</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

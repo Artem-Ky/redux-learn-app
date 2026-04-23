@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>55 — Базовый createAsyncThunk + extraReducers</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .state-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; }
+    .state-card h4 { color: var(--accent); font-family: var(--font-mono); font-size: .78rem; margin-bottom: 6px; }
+    .state-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); white-space: pre; overflow: auto; max-height: 260px; }
+    .lifecycle { display:flex; gap:6px; margin:10px 0; flex-wrap:wrap; }
+    .lc-pill { padding: 4px 10px; border: 1px solid var(--border); border-radius: 99px; font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); background: var(--bg-panel); }
+    .lc-pill.on { color: #fff; border-color: var(--accent); background: rgba(86,156,214,0.25); }
+    .lc-pill.ok { color: #4caf50; border-color: #4caf50; background: rgba(76,175,80,0.15); }
+    .lc-pill.err { color: #f44747; border-color: #f44747; background: rgba(244,71,71,0.15); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">55 / 106</span>Базовый createAsyncThunk</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../54-asyncthunk-why/">← Назад</a>
+      <a href="../56-asyncthunk-action-creators/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Первый рабочий <code>createAsyncThunk</code>. <code>fetchUserById(id)</code> возвращает <em>AsyncThunkAction</em>,
+          dispatch которого <strong>автоматически</strong> запускает 3 action'а жизненного цикла:
+          <code>users/fetchById/pending → fulfilled | rejected</code>.
+        </p>
+
+        <div class="code-block"><span class="kw">const</span> fetchUserById = <span class="fn">createAsyncThunk</span>(
+  <span class="str">'users/fetchById'</span>,
+  <span class="kw">async</span> (id: <span class="type">number</span>, thunkAPI) =&gt; {
+    <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fakeFetch</span>(id, thunkAPI.signal)
+    <span class="kw">return</span> res            <span class="cm">// станет action.payload в fulfilled</span>
+  },
+)</div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0;">
+          <button class="btn btn--accent" id="fetch-1">Fetch user #1</button>
+          <button class="btn btn--accent" id="fetch-2">Fetch user #2</button>
+          <button class="btn btn--danger" id="fetch-fail">Fetch user #404 (fail)</button>
+          <button class="btn" id="unwrap-demo">Fetch + .unwrap() + try/catch</button>
+        </div>
+
+        <div class="lifecycle">
+          <span class="lc-pill" id="lc-idle">idle</span>
+          <span class="lc-pill" id="lc-pending">pending</span>
+          <span class="lc-pill" id="lc-ok">fulfilled</span>
+          <span class="lc-pill" id="lc-err">rejected</span>
+        </div>
+
+        <div class="state-card">
+          <h4>store.getState()</h4>
+          <div class="state-out" id="state-out">—</div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 55. 3 автоматических action creators</div>
+      <div class="theory__body">
+        <h3>Цитата из документации</h3>
+        <div class="quote">
+          «Redux Toolkit's <code>createAsyncThunk</code> API generates thunks that automatically dispatch those
+          <em>start/success/failure</em> actions. <em>Provide a callback function that makes an async call, returns
+          a Promise for the result, and RTK will dispatch the right actions based on the Promise that's returned.</em>»<br>
+          — <a href="https://redux-toolkit.js.org/api/createAsyncThunk" target="_blank">createAsyncThunk — Overview</a>
+        </div>
+        <div class="quote quote--ru">
+          «Redux Toolkit'овский <code>createAsyncThunk</code> генерирует thunk'и, автоматически диспатчащие
+          <em>start / success / failure</em> действия. Передайте callback, делающий async-вызов и
+          возвращающий Promise — RTK сам диспатчит нужные actions по результату Promise'а.»
+        </div>
+
+        <h3>Что такое <code>thunk.pending / fulfilled / rejected</code></h3>
+        <p>Это <strong>обычные <code>createAction</code>-креаторы</strong> с <em>prepare callback</em>.
+          Каждый получает <code>requestId</code>, <code>arg</code> и кладёт их в <code>action.meta</code>.</p>
+
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строки 539–599 — как создаются 3 креатора</span>
+<span class="kw">const</span> fulfilled = <span class="fn">createAction</span>(
+  typePrefix + <span class="str">'/fulfilled'</span>,
+  (payload, requestId, arg, meta?) =&gt; ({
+    payload,
+    meta: { ...(meta || {}), arg, requestId, requestStatus: <span class="str">'fulfilled'</span> },
+  }),
+)
+<span class="kw">const</span> pending = <span class="fn">createAction</span>(
+  typePrefix + <span class="str">'/pending'</span>,
+  (requestId, arg, meta?) =&gt; ({
+    payload: <span class="kw">undefined</span>,
+    meta: { ...(meta || {}), arg, requestId, requestStatus: <span class="str">'pending'</span> },
+  }),
+)
+<span class="kw">const</span> rejected = <span class="fn">createAction</span>(
+  typePrefix + <span class="str">'/rejected'</span>,
+  (error, requestId, arg, payload?, meta?) =&gt; ({
+    payload,
+    error: (options?.serializeError || miniSerializeError)(error || <span class="str">'Rejected'</span>),
+    meta: {
+      ...(meta || {}), arg, requestId,
+      rejectedWithValue: !!payload,
+      requestStatus: <span class="str">'rejected'</span>,
+      aborted: error?.name === <span class="str">'AbortError'</span>,
+      condition: error?.name === <span class="str">'ConditionError'</span>,
+    },
+  }),
+)</div>
+        <p style="font-size: .78rem;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L539" target="_blank">createAsyncThunk.ts#L539</a>
+        </p>
+
+        <h3>Что лежит в <code>action.meta</code></h3>
+        <ul>
+          <li><code>arg</code> — <em>ровно тот</em> аргумент, который передали в <code>thunk(arg)</code>. В reducer удобно использовать для diff ID;</li>
+          <li><code>requestId</code> — nanoid, сгенерированный в момент dispatch. Одинаков для pending / fulfilled / rejected <strong>одного</strong> запроса;</li>
+          <li><code>requestStatus</code> — дискриминант: <code>'pending' | 'fulfilled' | 'rejected'</code>;</li>
+          <li><code>aborted</code> — <code>true</code>, если ошибка была <code>AbortError</code> (только в rejected);</li>
+          <li><code>condition</code> — <code>true</code>, если сработал <code>options.condition → false</code> (только в rejected);</li>
+          <li><code>rejectedWithValue</code> — <code>true</code>, если payload пришёл через <code>rejectWithValue</code>.</li>
+        </ul>
+
+        <h3>thunkAPI — второй параметр payload-creator'а</h3>
+        <div class="code-block"><span class="kw">async</span> (arg, thunkAPI) =&gt; {
+  thunkAPI.dispatch        <span class="cm">// полноценный dispatch (можно слать другие actions/thunks)</span>
+  thunkAPI.<span class="fn">getState</span>()      <span class="cm">// RootState — актуальный, не snapshot старта</span>
+  thunkAPI.extra           <span class="cm">// extraArgument из middleware (apiClient, history…)</span>
+  thunkAPI.requestId       <span class="cm">// тот же, что в meta</span>
+  thunkAPI.signal          <span class="cm">// AbortSignal — пробрасываем в fetch</span>
+  thunkAPI.<span class="fn">abort</span>(reason?)   <span class="cm">// отменить this запрос</span>
+  thunkAPI.<span class="fn">rejectWithValue</span>  <span class="cm">// вернуть типизированную ошибку (см. урок 58)</span>
+  thunkAPI.<span class="fn">fulfillWithValue</span> <span class="cm">// добавить meta к fulfilled (см. урок 62)</span>
+}</div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Promise от thunk никогда не отклоняется.</strong> Даже если payload-creator бросил исключение —
+          возвращённый promise <em>всё равно fulfilled</em>. Он содержит <strong>rejected action</strong>, а не reject.
+          То есть <code>await store.dispatch(thunk())</code> никогда не уйдёт в <code>catch</code>.
+          Для try/catch используйте <code>.unwrap()</code>:
+          <div class="code-block" style="margin-top:8px;"><span class="kw">try</span> {
+  <span class="kw">const</span> user = <span class="kw">await</span> store.<span class="fn">dispatch</span>(<span class="fn">fetchUserById</span>(1)).<span class="fn">unwrap</span>()
+  console.<span class="fn">log</span>(<span class="str">'payload:'</span>, user)
+} <span class="kw">catch</span> (e) {
+  console.<span class="fn">error</span>(<span class="str">'реальная ошибка:'</span>, e)
+}</div>
+          <strong>2. action.payload (rejectWithValue) vs action.error.</strong>
+          В rejected есть <em>и</em> <code>payload</code>, <em>и</em> <code>error</code>, но они значат разное:
+          <ul style="margin-top: 6px;">
+            <li><code>throw new Error('...')</code> → <code>action.payload === undefined</code>, <code>action.error = SerializedError</code>;</li>
+            <li><code>return rejectWithValue({code:404})</code> → <code>action.payload = {code:404}</code>, <code>action.error = { message: 'Rejected' }</code>.</li>
+          </ul>
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../54-asyncthunk-why/">54 — зачем createAsyncThunk</a></li>
+          <li><a href="../56-asyncthunk-action-creators/">56 — matchers и thunk.settled</a></li>
+          <li><a href="../57-thunkapi-basics/">57 — thunkAPI: dispatch/getState/extra</a></li>
+          <li><a href="../58-rejectwithvalue/">58 — rejectWithValue</a></li>
+          <li><a href="../22-prepare-callback/">22 — prepare callback (на чём построены creators)</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

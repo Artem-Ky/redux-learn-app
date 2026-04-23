@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>45 — withTypes и useAppSelector: полная типобезопасность</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .file-tabs {
+      display: flex; gap: 2px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0;
+    }
+    .file-tab {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      color: var(--text-secondary);
+      padding: 6px 14px;
+      font-family: var(--font-mono);
+      font-size: .8rem;
+      cursor: pointer;
+      border-radius: 4px 4px 0 0;
+      margin-right: 2px;
+    }
+    .file-tab.active {
+      background: var(--bg-panel);
+      color: var(--accent);
+      border-color: var(--accent);
+      border-bottom: 1px solid var(--bg-panel);
+      position: relative; z-index: 1;
+    }
+    .file-content {
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
+      background: var(--bg-panel);
+      padding: 14px;
+      font-family: var(--font-mono); font-size: .78rem;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      margin-bottom: 18px;
+      min-height: 200px;
+    }
+
+    .react-app {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+      margin-bottom: 16px;
+    }
+    .react-app h4 {
+      font-family: var(--font-mono); font-size: .82rem; color: var(--accent); margin-bottom: 10px;
+    }
+
+    .users-table {
+      width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: .78rem;
+    }
+    .users-table th, .users-table td {
+      padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left;
+    }
+    .users-table th { color: var(--text-muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; }
+    .users-table tr.active { color: var(--text-bright); }
+    .users-table tr.inactive td { opacity: .5; }
+    .users-table .badge-active { color: var(--success); }
+    .users-table .badge-inactive { color: var(--text-muted); }
+
+    .ts-error {
+      background: #1a0f0f; border-left: 3px solid var(--error);
+      padding: 10px 14px; font-family: var(--font-mono); font-size: .78rem;
+      color: var(--error); white-space: pre; overflow-x: auto;
+      margin: 12px 0;
+    }
+    .ts-error .file-line { color: var(--accent-yellow); }
+    .ts-error .squiggly {
+      color: var(--error); border-bottom: 2px wavy var(--error);
+    }
+
+    .wrap-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 12px 0;
+    }
+    .wrap-card {
+      background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px;
+      font-family: var(--font-mono); font-size: .74rem;
+    }
+    .wrap-card h5 {
+      color: var(--accent); font-size: .78rem; margin-bottom: 6px;
+    }
+    .wrap-card .val {
+      color: var(--accent-cyan); margin-top: 4px;
+    }
+
+    .flow-withtypes { display: block; margin: 14px auto; max-width: 680px; }
+    .flow-withtypes text { font-family: var(--font-mono); font-size: 11px; fill: #ccc; }
+    .flow-withtypes .lbl { fill: #888; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">45 / 106</span>withTypes + useAppSelector: типизированные хуки и селекторы</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../44-slice-selectors-memoized/">← Назад</a>
+      <a href="../45a-quiz-e/">Далее → Quiz E</a>
+    </nav>
+  </div>
+
+  <div class="page">
+
+    <!-- ====== DEMO ====== -->
+    <div class="demo-section">
+      <div class="demo-section__header">Живое React-приложение с типизированным useAppSelector</div>
+      <div class="demo-section__body">
+
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px;">
+          Приложение состоит из <strong>трёх файлов</strong>. Первые два — только типы/настройка (их код
+          показан ниже). Третий <code>App.tsx</code> — исполняемый React-компонент. Он использует
+          <code>useAppSelector</code> <em>без явного указания</em> <code>RootState</code>, и
+          <code>slice.selectors.selectActive</code> автоматически типизирован правильным shape'ом.
+        </p>
+
+        <!-- File tabs -->
+        <div class="file-tabs">
+          <button class="file-tab active" data-file="store">store.ts</button>
+          <button class="file-tab" data-file="hooks">hooks.ts</button>
+          <button class="file-tab" data-file="slice">usersSlice.ts</button>
+          <button class="file-tab" data-file="app">App.tsx</button>
+        </div>
+
+        <div class="file-content" id="file-content"></div>
+
+        <!-- React root -->
+        <div class="react-app">
+          <h4>Приложение в действии (React + react-redux 9.2)</h4>
+          <div id="react-root"></div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn--accent" data-act="toggle-random">Переключить случайного</button>
+          <button class="btn" data-act="add">Добавить user</button>
+          <button class="btn btn--danger" data-act="ts-error">Показать ошибку TS</button>
+          <button class="btn" data-act="reset">Reset</button>
+        </div>
+
+        <div id="ts-error-box" style="display: none;"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <!-- ====== THEORY ====== -->
+    <div class="theory">
+      <div class="theory__header">Теория — 45. withTypes, identity-function и pre-typed hooks</div>
+      <div class="theory__body">
+
+        <h3>Цитата из RTK TypeScript guide</h3>
+        <div class="quote">
+          «Starting in React-Redux v9.1, hooks have a built-in <code>.withTypes()</code> method for
+          defining "pre-typed" versions of the <code>useDispatch</code>, <code>useSelector</code>, and
+          <code>useStore</code> hooks.»
+          <br>— <a href="https://redux-toolkit.js.org/usage/usage-with-typescript#withtypes" target="_blank">RTK docs — withTypes</a>
+        </div>
+        <div class="quote quote--ru">
+          «Начиная с React-Redux v9.1, хуки имеют встроенный метод <code>.withTypes()</code> для определения
+          «предтипизированных» версий <code>useDispatch</code>, <code>useSelector</code> и
+          <code>useStore</code>.»
+        </div>
+
+        <h3>Что такое withTypes — «identity function с магией»</h3>
+        <div class="code-block">
+<span class="cm">// react-redux/src/hooks/useSelector.ts — фрагмент</span>
+<span class="cm">// https://github.com/reduxjs/react-redux/blob/master/src/hooks/useSelector.ts</span>
+
+<span class="kw">export interface</span> <span class="type">UseSelector</span>&lt;StateType = <span class="type">unknown</span>&gt; {
+  <span class="cm">// ... перегрузки вызова useSelector(selector, equalityFn?) ...</span>
+
+  <span class="fn">withTypes</span>: &lt;
+    OverrideStateType <span class="kw">extends</span> StateType,
+  &gt;() =&gt; <span class="type">UseSelector</span>&lt;OverrideStateType&gt;       <span class="cm">// 👀 возвращает себя же, но с узким типом</span>
+}
+
+<span class="cm">// Реализация — буквально:</span>
+<span class="fn">Object</span>.<span class="fn">assign</span>(useSelector, {
+  withTypes: () =&gt; useSelector,                <span class="cm">// 👀 runtime — identity</span>
+})
+        </div>
+        <p>
+          В runtime <code>useSelector.withTypes&lt;RootState&gt;()</code> возвращает <strong>тот же самый
+          useSelector</strong>. Вся магия в TypeScript-сигнатуре: возвращаемый тип параметризован
+          <code>RootState</code>, и TS теперь знает, что первый аргумент — селектор вида
+          <code>(state: RootState) =&gt; T</code>.
+        </p>
+
+        <h3>createSelector.withTypes — тот же приём</h3>
+        <div class="code-block">
+<span class="cm">// reselect/src/createSelectorCreator.ts — фрагмент</span>
+<span class="cm">// https://github.com/reduxjs/reselect/blob/master/src/createSelectorCreator.ts</span>
+
+<span class="fn">Object</span>.<span class="fn">assign</span>(createSelector, {
+  withTypes: () =&gt; createSelector              <span class="cm">// 👀 runtime identity</span>
+})
+<span class="cm">// В TS — возвращает CreateSelectorFunction&lt;..., OverrideStateType&gt;</span>
+
+<span class="cm">// Использование:</span>
+<span class="kw">export const</span> createAppSelector = createSelector.<span class="fn">withTypes</span>&lt;<span class="type">RootState</span>&gt;()
+
+<span class="kw">const</span> selectTodoIds = <span class="fn">createAppSelector</span>(
+  [state =&gt; state.todos],   <span class="cm">// state автоматически: RootState</span>
+  todos =&gt; todos.<span class="fn">map</span>((t) =&gt; t.id),
+)
+        </div>
+
+        <h3>Полный сет hooks.ts — стандарт индустрии</h3>
+        <div class="code-block">
+<span class="cm">// hooks.ts — paste-and-go</span>
+<span class="kw">import</span> { useDispatch, useSelector, useStore } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import type</span> { <span class="type">RootState</span>, <span class="type">AppDispatch</span>, <span class="type">AppStore</span> } <span class="kw">from</span> <span class="str">'./store'</span>
+
+<span class="kw">export const</span> useAppDispatch = useDispatch.<span class="fn">withTypes</span>&lt;<span class="type">AppDispatch</span>&gt;()
+<span class="kw">export const</span> useAppSelector = useSelector.<span class="fn">withTypes</span>&lt;<span class="type">RootState</span>&gt;()
+<span class="kw">export const</span> useAppStore = useStore.<span class="fn">withTypes</span>&lt;<span class="type">AppStore</span>&gt;()
+
+<span class="cm">// Теперь в компонентах:</span>
+<span class="kw">const</span> dispatch = <span class="fn">useAppDispatch</span>()        <span class="cm">// знает про thunks</span>
+<span class="kw">const</span> users = <span class="fn">useAppSelector</span>((s) =&gt; s.users)  <span class="cm">// s: RootState</span>
+        </div>
+
+        <h3>Как сужается тип — схема</h3>
+        <svg class="flow-withtypes" viewBox="0 0 660 260" xmlns="http://www.w3.org/2000/svg">
+          <!-- react-redux generic useSelector -->
+          <rect x="10" y="20" width="180" height="60" rx="4" fill="#1b1b1b" stroke="#569cd6"/>
+          <text x="100" y="44" text-anchor="middle" style="fill:#569cd6">useSelector</text>
+          <text x="100" y="62" text-anchor="middle" class="lbl">UseSelector&lt;unknown&gt;</text>
+
+          <!-- withTypes call -->
+          <line x1="190" y1="50" x2="240" y2="50" stroke="#c586c0" stroke-width="2" marker-end="url(#ar4)"/>
+          <text x="215" y="40" text-anchor="middle" style="fill:#c586c0; font-size: 10px;">.withTypes&lt;RootState&gt;()</text>
+          <text x="215" y="65" text-anchor="middle" class="lbl">runtime: identity</text>
+
+          <!-- pre-typed -->
+          <rect x="240" y="20" width="200" height="60" rx="4" fill="#2a2d2e" stroke="#4ec9b0"/>
+          <text x="340" y="44" text-anchor="middle" style="fill:#4ec9b0">useAppSelector</text>
+          <text x="340" y="62" text-anchor="middle" class="lbl">UseSelector&lt;RootState&gt;</text>
+
+          <!-- usage arrow -->
+          <line x1="340" y1="80" x2="340" y2="120" stroke="#666" marker-end="url(#ar4)"/>
+
+          <!-- usage in component -->
+          <rect x="170" y="120" width="340" height="70" rx="4" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="340" y="142" text-anchor="middle">useAppSelector(s =&gt; s.users.filter(...))</text>
+          <text x="340" y="160" text-anchor="middle" class="lbl">TS знает: s: RootState</text>
+          <text x="340" y="175" text-anchor="middle" style="fill:#4caf50; font-size: 10px;">✓ s.users автокомплит работает</text>
+
+          <!-- error case -->
+          <rect x="170" y="210" width="340" height="40" rx="4" fill="#1a0f0f" stroke="#f44747"/>
+          <text x="340" y="230" text-anchor="middle">useAppSelector(s =&gt; s.wrongPath)</text>
+          <text x="340" y="244" text-anchor="middle" style="fill:#f44747; font-size: 10px;">✖ Property 'wrongPath' does not exist</text>
+
+          <defs>
+            <marker id="ar4" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="#aaa"/>
+            </marker>
+          </defs>
+        </svg>
+
+        <h3>Почему не импортировать RootState каждый раз вручную</h3>
+        <div class="code-block">
+<span class="cm">// ❌ Старый способ — работает, но надо везде писать дженерик:</span>
+<span class="kw">import</span> { useSelector } <span class="kw">from</span> <span class="str">'react-redux'</span>
+<span class="kw">import type</span> { <span class="type">RootState</span> } <span class="kw">from</span> <span class="str">'./store'</span>
+
+<span class="kw">const</span> users = <span class="fn">useSelector</span>((s: <span class="type">RootState</span>) =&gt; s.users)
+<span class="cm">//                           ^^^^^^^^^^^^^ шум в каждом компоненте</span>
+
+<span class="cm">// ✅ Современный способ — один раз в hooks.ts:</span>
+<span class="kw">const</span> users = <span class="fn">useAppSelector</span>((s) =&gt; s.users)   <span class="cm">// s уже типизирован</span>
+        </div>
+
+        <h3>AppDispatch — не просто Dispatch</h3>
+        <div class="code-block">
+<span class="cm">// store.ts</span>
+<span class="kw">export type</span> <span class="type">AppDispatch</span> = <span class="kw">typeof</span> store.dispatch
+
+<span class="cm">// AppDispatch = ThunkDispatch&lt;RootState, undefined, UnknownAction&gt; &amp; Dispatch&lt;UnknownAction&gt;</span>
+<span class="cm">// Благодаря этому:</span>
+dispatch(<span class="fn">fetchUsers</span>())         <span class="cm">// ✅ fetchUsers() возвращает thunk — TS не ругается</span>
+
+<span class="cm">// Без typed dispatch:</span>
+dispatch(<span class="fn">fetchUsers</span>())         <span class="cm">// ✖ Argument of type 'ThunkAction' is not assignable to...</span>
+        </div>
+
+        <h3>Рекомендуемая структура проекта</h3>
+        <div class="code-block">
+src/
+├── app/
+│   ├── store.ts         <span class="cm">// configureStore, RootState, AppDispatch</span>
+│   ├── hooks.ts         <span class="cm">// useAppDispatch, useAppSelector, useAppStore</span>
+│   └── selectors.ts     <span class="cm">// createAppSelector = createSelector.withTypes&lt;RootState&gt;()</span>
+├── features/
+│   ├── users/
+│   │   ├── usersSlice.ts
+│   │   ├── usersSelectors.ts   <span class="cm">// используют createAppSelector</span>
+│   │   └── UsersList.tsx       <span class="cm">// используют useAppSelector</span>
+│   └── ...
+└── main.tsx
+        </div>
+
+        <h3>Подводные камни</h3>
+
+        <div class="warning">
+          <strong>1. withTypes не валидирует runtime.</strong>
+          Это <em>identity function</em>. Если вы через <code>as</code> привели state к неправильному
+          типу — TS поверит, а runtime получит <code>undefined.filter</code>. <em>Почему:</em> стоимость runtime
+          проверки типа = сериализация + сверка каждой грани. Для redux это стало бы тормозом.
+          <em>Решение:</em> тесты + schema validation (zod) на границе API, если state приходит извне.
+        </div>
+
+        <div class="warning">
+          <strong>2. Не реэкспортируйте useSelector как useAppSelector.</strong>
+          <code>export { useSelector as useAppSelector } from 'react-redux'</code> — на вид то же,
+          но без <code>.withTypes</code>. У такого «хука» дефолтный <code>StateType = unknown</code>,
+          и TS не знает shape. <em>Почему:</em> withTypes возвращает хук с <em>конкретно</em> этим StateType
+          через дженерик-ограничение. Без вызова withTypes TS не получает RootState.
+        </div>
+
+        <div class="warning">
+          <strong>3. RootState от store.getState(), а не от { …InitialStates }.</strong>
+          <code>type RootState = ReturnType&lt;typeof store.getState&gt;</code> — единственный правильный путь.
+          Если собирать RootState вручную — пропустите autoInjected slices, RTK Query state, и подобное.
+          <em>Почему:</em> <code>configureStore</code> добавляет свой собственный ключ для RTKQ, enhancers и т.д.
+        </div>
+
+        <div class="warning">
+          <strong>4. withTypes — ≥ react-redux 9.1.</strong>
+          До 9.1 нужно было вручную создавать <code>TypedUseSelectorHook</code>:
+          <code>export const useAppSelector: TypedUseSelectorHook&lt;RootState&gt; = useSelector</code>.
+          Если в projеct'е стоит старая версия — обновите, либо используйте старый паттерн.
+        </div>
+
+        <div class="warning">
+          <strong>5. Циркулярный импорт store ↔ hooks ↔ slice.</strong>
+          Типичная ошибка: <code>hooks.ts</code> импортирует RootState из <code>store.ts</code>, который в
+          свою очередь собирается из slice'ов, которые используют <code>useAppSelector</code> из
+          <code>hooks.ts</code>. <em>Почему:</em> TS ещё способен это разрешить (типы «ленивы»), но bundler'ы
+          могут словить ReferenceError в runtime.
+          <em>Решение:</em> держите selector-функции в <em>отдельном</em> файле (<code>usersSelectors.ts</code>),
+          а хуки используйте только в компонентах.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../19-typed-store/">19 — RootState и AppDispatch (store-уровень)</a></li>
+          <li><a href="../16-tuple-typing/">16 — Tuple для типизации middleware</a></li>
+          <li><a href="../36-with-slice-typing/">36 — WithSlice</a></li>
+          <li><a href="../44-slice-selectors-memoized/">44 — slice.selectors с createSelector</a></li>
+          <li><a href="../70-listener-withtypes/" onclick="event.preventDefault()" style="opacity: .5; cursor: not-allowed;" title="В секции H">70 — addAppListener.withTypes (soon)</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/usage/usage-with-typescript#withtypes" target="_blank">RTK — withTypes</a></li>
+          <li><a href="https://react-redux.js.org/using-react-redux/usage-with-typescript" target="_blank">react-redux — Usage with TypeScript</a></li>
+          <li><a href="https://github.com/reduxjs/react-redux/blob/master/src/hooks/useSelector.ts" target="_blank">react-redux useSelector.ts</a></li>
+          <li><a href="https://github.com/reduxjs/reselect/blob/master/src/createSelectorCreator.ts" target="_blank">reselect createSelectorCreator.ts</a></li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>53 — getInitialState({ extra }) + loading flag</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      font-weight: 600;
+    }
+    .status-idle { background: rgba(102,102,102,.25); color: #ccc; }
+    .status-pending { background: rgba(86,156,214,.2); color: var(--accent); }
+    .status-fulfilled { background: rgba(76,175,80,.2); color: var(--success); }
+    .status-rejected { background: rgba(244,71,71,.2); color: var(--error); }
+
+    .status-bar {
+      display: grid;
+      grid-template-columns: 100px 1fr 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin: 12px 0;
+      font-family: var(--font-mono);
+      font-size: .84rem;
+    }
+    .status-bar__label { color: var(--text-muted); text-transform: uppercase; font-size: .7rem; }
+    .status-bar__error { color: var(--error); }
+
+    .post-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin: 12px 0;
+    }
+    .post-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 140px;
+      gap: 10px;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .8rem;
+    }
+    .post-row__id { color: var(--text-muted); }
+    .post-row__title { color: var(--text-bright); }
+    .post-row__author { color: var(--accent-orange); text-align: right; }
+
+    .flat-state {
+      background: var(--bg-panel);
+      border-left: 3px solid var(--accent-cyan);
+      padding: 10px 14px;
+      margin: 12px 0;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      color: var(--accent-cyan);
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">53 / 106</span>getInitialState({ loading, error }) — постсы</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../52-adapter-getselectors/">← Назад</a>
+      <a href="../53a-quiz-f/">Далее → Quiz F</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">postsSlice — entity state + loading + error в одном стейте</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>adapter.getInitialState({ loading: 'idle', error: null }, initialPosts)</code> —
+          RTK 2 позволяет передать <strong>additionalState</strong> и <strong>initial entities</strong>
+          одним вызовом. Результат: <code>{ ids, entities, loading, error }</code> — одна плоская
+          slice.
+        </p>
+
+        <div class="btn-group" style="margin: 12px 0;">
+          <button class="btn btn--accent" id="fetch-ok">▶ Simulate fetch (ok)</button>
+          <button class="btn btn--danger" id="fetch-fail">▶ Simulate fetch (rejected)</button>
+          <button class="btn" id="reset">reset</button>
+        </div>
+
+        <div class="status-bar">
+          <div class="status-bar__label">status:</div>
+          <div>
+            <span class="status-badge" id="status-badge">idle</span>
+          </div>
+          <div class="status-bar__error" id="error-msg">—</div>
+        </div>
+
+        <div class="post-list" id="post-list"></div>
+
+        <h4 style="margin-top: 20px; color: var(--text-bright); font-size: .95rem;">Сырой state</h4>
+        <div class="flat-state" id="state-out">—</div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 53. getInitialState(additionalState, entities)</div>
+      <div class="theory__body">
+        <h3>Сигнатура (RTK 2.x)</h3>
+        <div class="code-block">
+<span class="cm">// Две перегрузки</span>
+<span class="fn">getInitialState</span>(
+  state?: <span class="kw">undefined</span>,
+  entities?: <span class="type">Record</span>&lt;<span class="type">Id</span>, <span class="type">T</span>&gt; | <span class="kw">readonly</span> <span class="type">T</span>[],
+): <span class="type">EntityState</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt;
+
+<span class="fn">getInitialState</span>&lt;<span class="type">S</span> <span class="kw">extends</span> <span class="type">object</span>&gt;(
+  additionalState: <span class="type">S</span>,
+  entities?: <span class="type">Record</span>&lt;<span class="type">Id</span>, <span class="type">T</span>&gt; | <span class="kw">readonly</span> <span class="type">T</span>[],
+): <span class="type">EntityState</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt; &amp; <span class="type">S</span>
+        </div>
+
+        <h3>Исходник — <code>entity_state.ts</code></h3>
+        <div class="code-block">
+<span class="kw">export function</span> <span class="fn">createInitialStateFactory</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt;(
+  stateAdapter: <span class="type">EntityStateAdapter</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt;,
+): <span class="type">EntityStateFactory</span>&lt;<span class="type">T</span>, <span class="type">Id</span>&gt; {
+  <span class="kw">function</span> <span class="fn">getInitialState</span>(
+    additionalState: <span class="type">any</span> = {},
+    entities?: <span class="kw">readonly</span> <span class="type">T</span>[] | <span class="type">Record</span>&lt;<span class="type">Id</span>, <span class="type">T</span>&gt;,
+  ): <span class="type">any</span> {
+    <span class="kw">const</span> state = <span class="type">Object</span>.<span class="fn">assign</span>(<span class="fn">getInitialEntityState</span>(), additionalState)
+    <span class="kw">return</span> entities ? stateAdapter.<span class="fn">setAll</span>(state, entities) : state
+  }
+  <span class="kw">return</span> { getInitialState }
+}
+        </div>
+        <p>
+          GitHub: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/entity_state.ts" target="_blank">entities/entity_state.ts</a>
+        </p>
+        <p>
+          <strong>Ключевое.</strong> Сначала <code>Object.assign({ ids:[], entities:{} }, additionalState)</code>
+          — получаем плоский объект. Затем, если передан второй аргумент, вызывается
+          <code>adapter.setAll(state, entities)</code>, который мутирует <code>ids/entities</code>
+          через <code>createStateOperator</code>. Если state plain (мы вне reducer'а) — оператор
+          оборачивает в <code>createNextState</code> → <em>безопасно</em>.
+        </p>
+
+        <h3>Цитата — RTK docs</h3>
+        <div class="quote">
+          «The <code>getInitialState</code> function now has a second parameter that accepts initial
+          entities. This allows you to seed the entity state with data at slice creation time, with no
+          extra dispatch.»
+          <br>— RTK 2.0 release notes
+        </div>
+        <div class="quote quote--ru">
+          «В <code>getInitialState</code> теперь есть <strong>второй параметр</strong> — начальные
+          entity. Можно засеивать данные при создании slice без лишнего dispatch.»
+        </div>
+
+        <h3>Типичный паттерн «async flags + entity»</h3>
+        <div class="code-block">
+<span class="kw">type</span> <span class="type">LoadingStatus</span> = <span class="str">'idle'</span> | <span class="str">'pending'</span> | <span class="str">'fulfilled'</span> | <span class="str">'rejected'</span>
+
+<span class="kw">const</span> postsSlice = <span class="fn">createSlice</span>({
+  name: <span class="str">'posts'</span>,
+  initialState: postsAdapter.<span class="fn">getInitialState</span>({
+    loading: <span class="str">'idle'</span> <span class="kw">as</span> <span class="type">LoadingStatus</span>,
+    error: <span class="kw">null as</span> <span class="type">string</span> | <span class="kw">null</span>,
+  }),
+  reducers: {
+    fetchPending:    (s) =&gt; { s.loading = <span class="str">'pending'</span>;   s.error = <span class="kw">null</span> },
+    fetchFulfilled:  (s, a) =&gt; { s.loading = <span class="str">'fulfilled'</span>; postsAdapter.<span class="fn">setAll</span>(s, a.payload) },
+    fetchRejected:   (s, a) =&gt; { s.loading = <span class="str">'rejected'</span>;  s.error = a.payload },
+  },
+})
+        </div>
+
+        <h3>Плюсы плоской структуры</h3>
+        <ul>
+          <li>Одна slice — одна фича. UI читает <code>state.posts.loading</code> и
+            <code>state.posts.entities</code> из одного места.</li>
+          <li>React-компоненты подписываются через <code>useSelector</code> на удобные селекторы:
+            <code>selectLoading</code>, <code>selectAll</code> — сам подстейт вложен, нам не важно.</li>
+          <li>Когда мигрируешь на <code>createAsyncThunk</code> (секция G) — схема уже готова.</li>
+        </ul>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Не используй ключи <code>ids</code> или <code>entities</code> в additionalState.</strong>
+          <br><code>Object.assign(initial, additionalState)</code> в исходнике — если additionalState
+          содержит эти поля, они <strong>перезапишут</strong> пустые. Потом setAll снова их пересоздаст
+          (при наличии entities), но если entities <em>не</em> передан — останутся твои плохие данные.
+          Используй любые другие имена: <code>status</code>, <code>meta</code>, <code>filter</code>.
+          <br><br>
+          <strong>2. <code>setAll</code> мутирует.</strong>
+          Когда RTK вызывает <code>stateAdapter.setAll(state, entities)</code> в getInitialState — это
+          работает, потому что <code>state</code> только что создан (ещё не заморожен Immer'ом). Но
+          <em>не</em> делай <code>adapter.setAll(plainExistingStore, …)</code> руками — <code>createStateOperator</code>
+          обернёт в <code>createNextState</code> (immutably) и вернёт <strong>новый</strong> объект; старый
+          не поменяется. Всегда используй внутри reducer'а / сохраняй результат.
+          <br><br>
+          <strong>3. Селекторы должны быть готовы к loading/error.</strong>
+          <code>selectAll</code> вернёт <code>[]</code> в состоянии <code>pending</code>. В UI всегда
+          проверяй <code>loading === 'pending'</code> <strong>до</strong> того, как показать «пусто» —
+          иначе покажешь empty-state при живом запросе.
+          <br><br>
+          <strong>4. Второй параметр <code>entities</code> — появился только в RTK 2.x.</strong>
+          В 1.x надо было делать <code>adapter.setAll(adapter.getInitialState(extra), initial)</code>
+          вручную. Если видишь старый код — просто перепиши на 2-аргументный.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../48-entity-state-shape/">48 — EntityState&lt;T&gt;</a></li>
+          <li><a href="../47-entityadapter-basics/">47 — setAll базово</a></li>
+          <li>Секция G — createAsyncThunk (55+) — здесь паттерн расцветает полностью.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createEntityAdapter#getinitialstate" target="_blank">RTK · getInitialState</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/entity_state.ts" target="_blank">entity_state.ts</a></li>
+          <li><a href="https://redux.js.org/tutorials/essentials/part-5-async-logic#loading-posts" target="_blank">Redux Essentials — loading state</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

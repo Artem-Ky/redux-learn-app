@@ -187,6 +187,11 @@
         <div class="index-card__title">Counter side-by-side</div>
         <div class="index-card__desc">Полное сравнение classic + react-redux vs RTK</div>
       </a>
+      <a href="./07a-quiz-a/" class="index-card" style="border-left: 3px solid var(--accent);">
+        <div class="index-card__num">🧠 Qa</div>
+        <div class="index-card__title">Quiz A — введение и мотивация</div>
+        <div class="index-card__desc">Recap 01–07 + 10 вопросов multi-select</div>
+      </a>
     </div>
 
     <!-- ============ SECTION B ============ -->
@@ -204,6 +209,11 @@
       <a href="./17-devtools-option/" class="index-card"><div class="index-card__num">17</div><div class="index-card__title">Опция devTools</div><div class="index-card__desc">trace, predicate, actionsDenylist</div></a>
       <a href="./18-preloaded-state/" class="index-card"><div class="index-card__num">18</div><div class="index-card__title">preloadedState</div><div class="index-card__desc">Hydration из localStorage</div></a>
       <a href="./19-typed-store/" class="index-card"><div class="index-card__num">19</div><div class="index-card__title">RootState и AppDispatch</div><div class="index-card__desc">Типизация store, withTypes</div></a>
+      <a href="./19a-quiz-b/" class="index-card" style="border-left: 3px solid var(--accent);">
+        <div class="index-card__num">🧠 Qb</div>
+        <div class="index-card__title">Quiz B — configureStore</div>
+        <div class="index-card__desc">Recap 08–19 + 10 вопросов multi-select</div>
+      </a>
     </div>
 
     <!-- ============ SECTION C ============ -->
@@ -218,6 +228,11 @@
       <a href="./25-add-matcher-default/" class="index-card"><div class="index-card__num">25</div><div class="index-card__title">addMatcher, addDefaultCase</div><div class="index-card__desc">Сводный matcher, порядок выполнения</div></a>
       <a href="./26-immer-inside/" class="index-card"><div class="index-card__num">26</div><div class="index-card__title">Immer внутри createReducer</div><div class="index-card__desc">Как работает produce и draft</div></a>
       <a href="./27-immer-pitfalls/" class="index-card"><div class="index-card__num">27</div><div class="index-card__title">Подводные камни Immer</div><div class="index-card__desc">return + mutate, current / original / isDraft</div></a>
+      <a href="./27a-quiz-c/" class="index-card" style="border-left: 3px solid var(--accent);">
+        <div class="index-card__num">🧠 Qc</div>
+        <div class="index-card__title">Quiz C — createAction + createReducer</div>
+        <div class="index-card__desc">Recap 20–27 + 10 вопросов multi-select</div>
+      </a>
     </div>
 
     <!-- ============ SECTION D ============ -->
@@ -238,74 +253,104 @@
       <a href="./38-immer-quiz/" class="index-card"><div class="index-card__num">38</div><div class="index-card__title">Правила Immer-reducer</div><div class="index-card__desc">Quiz: можно/нельзя</div></a>
       <a href="./39-feature-folder-pattern/" class="index-card"><div class="index-card__num">39</div><div class="index-card__title">Pattern: slice per feature</div><div class="index-card__desc">Структура папок и organisation</div></a>
       <a href="./40-current-original-debug/" class="index-card"><div class="index-card__num">40</div><div class="index-card__title">current() в дебаге slice</div><div class="index-card__desc">Логи snapshot'ов в reducer'е</div></a>
+      <a href="./40c-quiz-d/" class="index-card" style="border-left: 3px solid var(--accent);">
+        <div class="index-card__num">🧠 Qd</div>
+        <div class="index-card__title">Quiz D — createSlice глубоко</div>
+        <div class="index-card__desc">Recap 28–40 + 10 вопросов multi-select</div>
+      </a>
     </div>
 
     <!-- ============ SECTION E ============ -->
-    <div class="section-title">E. Selectors в RTK <span class="section-title__count">5 уроков</span></div>
+    <div class="section-title">E. Selectors в RTK <span class="section-title__count">7 уроков</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">41</div><div class="index-card__title">createSelector из RTK</div><div class="index-card__desc">Re-export reselect</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">42</div><div class="index-card__title">createDraftSafeSelector</div><div class="index-card__desc">Safe внутри Immer-reducer</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">43</div><div class="index-card__title">weakMapMemoize</div><div class="index-card__desc">Аргументированные селекторы</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">44</div><div class="index-card__title">Memoized selectors в slice</div><div class="index-card__desc">slice.selectors + createSelector</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">45</div><div class="index-card__title">Типизация селекторов</div><div class="index-card__desc">useAppSelector + slice.selectors</div></a>
+      <a href="./40a-slice-caching-refs/" class="index-card"><div class="index-card__num">40a</div><div class="index-card__title">Structural sharing + === в RTK</div><div class="index-card__desc">База кеша: Immer сохраняет ссылки, useSelector === </div></a>
+      <a href="./40b-memoization-why/" class="index-card"><div class="index-card__num">40b</div><div class="index-card__title">Зачем нужна мемоизация</div><div class="index-card__desc">Наивная memoize1, 3 селектора на одном store</div></a>
+      <a href="./41-createselector-from-rtk/" class="index-card"><div class="index-card__num">41</div><div class="index-card__title">createSelector из RTK</div><div class="index-card__desc">Re-export reselect + naive vs memoized</div></a>
+      <a href="./42-createdraftsafeselector/" class="index-card"><div class="index-card__num">42</div><div class="index-card__title">createDraftSafeSelector</div><div class="index-card__desc">Safe внутри Immer-reducer, isDraft/current</div></a>
+      <a href="./43-weakmap-memoize/" class="index-card"><div class="index-card__num">43</div><div class="index-card__title">weakMapMemoize</div><div class="index-card__desc">Дерево WeakMap для параметризованных селекторов</div></a>
+      <a href="./44-slice-selectors-memoized/" class="index-card"><div class="index-card__num">44</div><div class="index-card__title">Memoized selectors в slice</div><div class="index-card__desc">slice.selectors + getSelectors + 3 кейса</div></a>
+      <a href="./45-typed-selectors-hooks/" class="index-card"><div class="index-card__num">45</div><div class="index-card__title">Типизация селекторов</div><div class="index-card__desc">withTypes, useAppSelector, AppDispatch</div></a>
+      <a href="./45a-quiz-e/" class="index-card" style="border-left: 3px solid var(--accent);"><div class="index-card__num">🧠 Qe</div><div class="index-card__title">Quiz E — селекторы</div><div class="index-card__desc">Recap 41–45 + 10 вопросов multi-select</div></a>
     </div>
 
     <!-- ============ SECTION F ============ -->
     <div class="section-title">F. createEntityAdapter <span class="section-title__count">8 уроков</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">46</div><div class="index-card__title">Зачем нормализация</div><div class="index-card__desc">O(n) vs O(1) lookup</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">47</div><div class="index-card__title">createEntityAdapter база</div><div class="index-card__desc">Первый adapter</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">48</div><div class="index-card__title">EntityState shape</div><div class="index-card__desc">{ ids, entities } внутри</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">49</div><div class="index-card__title">addOne / setOne / upsertOne</div><div class="index-card__desc">Различия CRUD-методов</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">50</div><div class="index-card__title">updateOne shallow gotcha</div><div class="index-card__desc">Подводный камень nested</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">51</div><div class="index-card__title">selectId, sortComparer</div><div class="index-card__desc">Кастомный id и сортировка</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">52</div><div class="index-card__title">getSelectors</div><div class="index-card__desc">selectAll, selectById, ...</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">53</div><div class="index-card__title">Adapter + loading state</div><div class="index-card__desc">getInitialState({ loading })</div></a>
+      <a href="./46-entity-why-normalized/" class="index-card"><div class="index-card__num">46</div><div class="index-card__title">Зачем нормализация</div><div class="index-card__desc">O(n) vs O(1) lookup</div></a>
+      <a href="./47-entityadapter-basics/" class="index-card"><div class="index-card__num">47</div><div class="index-card__title">createEntityAdapter база</div><div class="index-card__desc">Первый adapter</div></a>
+      <a href="./48-entity-state-shape/" class="index-card"><div class="index-card__num">48</div><div class="index-card__title">EntityState shape</div><div class="index-card__desc">{ ids, entities } внутри</div></a>
+      <a href="./49-add-set-upsert/" class="index-card"><div class="index-card__num">49</div><div class="index-card__title">addOne / setOne / upsertOne</div><div class="index-card__desc">Различия CRUD-методов</div></a>
+      <a href="./50-entity-update-shallow/" class="index-card"><div class="index-card__num">50</div><div class="index-card__title">updateOne shallow gotcha</div><div class="index-card__desc">Подводный камень nested</div></a>
+      <a href="./51-selectid-sortcomparer/" class="index-card"><div class="index-card__num">51</div><div class="index-card__title">selectId, sortComparer</div><div class="index-card__desc">Кастомный id и сортировка</div></a>
+      <a href="./52-adapter-getselectors/" class="index-card"><div class="index-card__num">52</div><div class="index-card__title">getSelectors</div><div class="index-card__desc">selectAll, selectById, ...</div></a>
+      <a href="./53-getinitialstate-extra/" class="index-card"><div class="index-card__num">53</div><div class="index-card__title">Adapter + loading state</div><div class="index-card__desc">getInitialState({ loading })</div></a>
+      <a href="./53a-quiz-f/" class="index-card" style="border-left: 3px solid var(--accent);">
+        <div class="index-card__num">🧠 Qf</div>
+        <div class="index-card__title">Quiz F — createEntityAdapter</div>
+        <div class="index-card__desc">Recap 46–53 + 10 вопросов multi-select</div>
+      </a>
     </div>
+
 
     <!-- ============ SECTION G ============ -->
     <div class="section-title">G. createAsyncThunk <span class="section-title__count">10 уроков</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">54</div><div class="index-card__title">Зачем нужен thunk</div><div class="index-card__desc">State machine pending/fulfilled/rejected</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">55</div><div class="index-card__title">createAsyncThunk база</div><div class="index-card__desc">Первый async thunk</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">56</div><div class="index-card__title">3 action creators</div><div class="index-card__desc">.pending/.fulfilled/.rejected</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">57</div><div class="index-card__title">extraReducers для thunk</div><div class="index-card__desc">addCase на life-cycle</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">58</div><div class="index-card__title">thunkAPI: dispatch, getState, signal</div><div class="index-card__desc">Все методы аргумента</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">59</div><div class="index-card__title">rejectWithValue</div><div class="index-card__desc">Типизированные ошибки</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">60</div><div class="index-card__title">condition</div><div class="index-card__desc">Отмена до старта</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">61</div><div class="index-card__title">Cancellation через signal</div><div class="index-card__desc">AbortController, thunk.abort()</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">62</div><div class="index-card__title">action.meta: requestId, arg</div><div class="index-card__desc">Race condition guard</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">63</div><div class="index-card__title">create.asyncThunk в slice</div><div class="index-card__desc">Всё в одном файле</div></a>
+      <a href="./54-asyncthunk-why/" class="index-card"><div class="index-card__num">54</div><div class="index-card__title">Зачем createAsyncThunk</div><div class="index-card__desc">Ручной thunk vs RTK, state machine</div></a>
+      <a href="./55-asyncthunk-basic/" class="index-card"><div class="index-card__num">55</div><div class="index-card__title">Базовый createAsyncThunk</div><div class="index-card__desc">Первый thunk + extraReducers</div></a>
+      <a href="./56-asyncthunk-action-creators/" class="index-card"><div class="index-card__num">56</div><div class="index-card__title">.pending/.fulfilled/.rejected + matchers</div><div class="index-card__desc">settled, isPending для group loader</div></a>
+      <a href="./57-thunkapi-basics/" class="index-card"><div class="index-card__num">57</div><div class="index-card__title">thunkAPI: dispatch, getState, extra</div><div class="index-card__desc">extraArgument, cache-check</div></a>
+      <a href="./58-rejectwithvalue/" class="index-card"><div class="index-card__num">58</div><div class="index-card__title">rejectWithValue</div><div class="index-card__desc">Типизированные ошибки, payload vs error</div></a>
+      <a href="./59-asyncthunk-condition/" class="index-card"><div class="index-card__num">59</div><div class="index-card__title">condition: когда не запускать</div><div class="index-card__desc">ConditionError, dispatchConditionRejection</div></a>
+      <a href="./60-asyncthunk-cancellation/" class="index-card"><div class="index-card__num">60</div><div class="index-card__title">Cancellation: signal, abort()</div><div class="index-card__desc">AbortController, external signal</div></a>
+      <a href="./61-requestid-race/" class="index-card"><div class="index-card__num">61</div><div class="index-card__title">meta.requestId и last-wins</div><div class="index-card__desc">Race condition guard</div></a>
+      <a href="./62-asyncthunk-meta-extras/" class="index-card"><div class="index-card__num">62</div><div class="index-card__title">getPendingMeta, fulfillWithValue</div><div class="index-card__desc">Custom meta, idGenerator</div></a>
+      <a href="./63-create-asyncthunk-in-slice/" class="index-card"><div class="index-card__num">63</div><div class="index-card__title">create.asyncThunk внутри slice</div><div class="index-card__desc">buildCreateSlice + asyncThunkCreator</div></a>
     </div>
 
     <!-- ============ SECTION H ============ -->
     <div class="section-title">H. listenerMiddleware <span class="section-title__count">7 уроков</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">64</div><div class="index-card__title">Зачем listener</div><div class="index-card__desc">vs saga / observable / thunk</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">65</div><div class="index-card__title">Подключение к store</div><div class="index-card__desc">prepend(listener.middleware)</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">66</div><div class="index-card__title">startListening: 4 формы</div><div class="index-card__desc">actionCreator/type/matcher/predicate</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">67</div><div class="index-card__title">listenerApi полный</div><div class="index-card__desc">take, condition, fork, cancel, ...</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">68</div><div class="index-card__title">fork() и ChildTaskAPI</div><div class="index-card__desc">Long-running fork с cancellation</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">69</div><div class="index-card__title">Debounce / throttle / takeLatest</div><div class="index-card__desc">Common patterns</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">70</div><div class="index-card__title">Типизация addAppListener</div><div class="index-card__desc">withTypes для type-safe effects</div></a>
+      <a href="./64-listener-why/" class="index-card"><div class="index-card__num">64</div><div class="index-card__title">Зачем listener</div><div class="index-card__desc">vs saga / observable / thunk</div></a>
+      <a href="./65-listener-setup-predicates/" class="index-card"><div class="index-card__num">65</div><div class="index-card__title">Подключение + 4 формы startListening</div><div class="index-card__desc">prepend, actionCreator/type/matcher/predicate</div></a>
+      <a href="./66-listener-api-full/" class="index-card"><div class="index-card__num">66</div><div class="index-card__title">listenerApi полный</div><div class="index-card__desc">take, condition, pause, delay, cancel</div></a>
+      <a href="./67-listener-fork/" class="index-card"><div class="index-card__num">67</div><div class="index-card__title">fork() и ForkedTaskAPI</div><div class="index-card__desc">Параллельные задачи, parent/child abort</div></a>
+      <a href="./68-listener-cancellation/" class="index-card"><div class="index-card__num">68</div><div class="index-card__title">Cancellation и TaskAbortError</div><div class="index-card__desc">takeLatest для debounced search</div></a>
+      <a href="./69-listener-patterns/" class="index-card"><div class="index-card__num">69</div><div class="index-card__title">Debounce / throttle / takeLatest/Every/Leading</div><div class="index-card__desc">4 паттерна на одном benchmark</div></a>
+      <a href="./70-listener-typed/" class="index-card"><div class="index-card__num">70</div><div class="index-card__title">Типизация: TypedStartListening, addAppListener</div><div class="index-card__desc">withTypes + thunk dispatch без каста</div></a>
+    </div>
+
+    <!-- ============ SECTION H' — CACHING BEFORE RTKQ ============ -->
+    <div class="section-title">H*. Кэширование и оптимизации до RTK Query <span class="section-title__count">7 уроков</span></div>
+    <div class="index-grid">
+      <a href="./70a-caching-overview/" class="index-card"><div class="index-card__num">70a</div><div class="index-card__title">5 слоёв кэша в RTK — обзор</div><div class="index-card__desc">Immer / memo / adapter / dedup / TTL</div></a>
+      <a href="./70b-structural-sharing-cache/" class="index-card"><div class="index-card__num">70b</div><div class="index-card__title">Structural sharing: Immer как L1-кэш</div><div class="index-card__desc">Ref-equality нетронутого подграфа</div></a>
+      <a href="./70c-selector-cache/" class="index-card"><div class="index-card__num">70c</div><div class="index-card__title">createSelector — мемоизация derive</div><div class="index-card__desc">lruMemoize vs weakMapMemoize</div></a>
+      <a href="./70d-entity-as-cache-table/" class="index-card"><div class="index-card__num">70d</div><div class="index-card__title">EntityAdapter как O(1) кэш-таблица</div><div class="index-card__desc">Bench: find vs entities[id]</div></a>
+      <a href="./70e-request-dedup/" class="index-card"><div class="index-card__num">70e</div><div class="index-card__title">Request dedup: condition + takeLatest</div><div class="index-card__desc">Idempotent vs sequential-разные</div></a>
+      <a href="./70f-ttl-invalidation/" class="index-card"><div class="index-card__num">70f</div><div class="index-card__title">TTL cache и invalidation в slice</div><div class="index-card__desc">fetchedAt + condition + invalidateOne/All</div></a>
+      <a href="./70g-quiz-caching/" class="index-card" style="border-left: 3px solid var(--accent);">
+        <div class="index-card__num">🧠 Qc</div>
+        <div class="index-card__title">Quiz — итог по кэшу до RTKQ</div>
+        <div class="index-card__desc">Recap 70a–70f + 10 вопросов multi-select</div>
+      </a>
     </div>
 
     <!-- ============ SECTION I ============ -->
     <div class="section-title">I. Утилиты RTK <span class="section-title__count">4 урока</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">71</div><div class="index-card__title">autoBatchEnhancer deep</div><div class="index-card__desc">raf / tick / timer / callback</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">72</div><div class="index-card__title">isPlainObject, isAction, ...</div><div class="index-card__desc">Маленькие утилиты</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">73</div><div class="index-card__title">Все matchers сводно</div><div class="index-card__desc">Таблица + примеры</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">74</div><div class="index-card__title">Sequential vs parallel thunks</div><div class="index-card__desc">await / Promise.all / race</div></a>
+      <a href="./71-autobatch-prepareautobatched/" class="index-card"><div class="index-card__num">71</div><div class="index-card__title">autoBatchEnhancer deep</div><div class="index-card__desc">raf / tick / timer / callback · 100 vs 1 notif</div></a>
+      <a href="./72-isplainobject-isaction-utils/" class="index-card"><div class="index-card__num">72</div><div class="index-card__title">isPlainObject, isAction, miniSerializeError, Tuple</div><div class="index-card__desc">Маленькие утилиты с реальными кейсами</div></a>
+      <a href="./73-all-matchers-sweep/" class="index-card"><div class="index-card__num">73</div><div class="index-card__title">Все matchers сводно</div><div class="index-card__desc">isAnyOf / isAllOf / isPending / isRejectedWithValue / …</div></a>
+      <a href="./74-async-thunk-patterns/" class="index-card"><div class="index-card__num">74</div><div class="index-card__title">Sequential / Parallel / Race / AllSettled</div><div class="index-card__desc">await / Promise.all / race / allSettled — таймер</div></a>
     </div>
 
     <!-- ============ SECTION J ============ -->
     <div class="section-title">J. Сравнение Classic vs RTK vs RTK Query <span class="section-title__count">4 урока</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">75</div><div class="index-card__title">Counter в трёх вариантах</div><div class="index-card__desc">classic / RTK / RTK Query</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">76</div><div class="index-card__title">Async todos в трёх вариантах</div><div class="index-card__desc">Полный цикл загрузки</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">77</div><div class="index-card__title">Гайд миграции</div><div class="index-card__desc">5 шагов: classic → RTK</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">78</div><div class="index-card__title">RTK / RTKQ / react-query / useState</div><div class="index-card__desc">Decision tree</div></a>
+      <a href="./75-side-by-side-counter/" class="index-card"><div class="index-card__num">75</div><div class="index-card__title">Counter в трёх вариантах</div><div class="index-card__desc">classic / RTK / RTK Query — три store side-by-side</div></a>
+      <a href="./76-side-by-side-todos-async/" class="index-card"><div class="index-card__num">76</div><div class="index-card__title">Async todos в трёх вариантах</div><div class="index-card__desc">Manual thunk / createAsyncThunk / build.query — кто что делает</div></a>
+      <a href="./77-migration-classic-to-rtk/" class="index-card"><div class="index-card__num">77</div><div class="index-card__title">Гайд миграции</div><div class="index-card__desc">5 шагов: const → createAction → createReducer → createSlice → configureStore</div></a>
+      <a href="./78-when-not-to-use-rtk/" class="index-card"><div class="index-card__num">78</div><div class="index-card__title">RTK / RTKQ / react-query / useState / Zustand / Jotai</div><div class="index-card__desc">Interactive decision tree + comparison table</div></a>
     </div>
 
     <!-- ============ SECTION K ============ -->

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>41 — createSelector из RTK: re-export и мотивация</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .col-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .col-card h4 {
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      color: var(--accent);
+      margin: 0;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .col-card__hint { color: var(--text-muted); font-size: .76rem; }
+
+    .counter-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+    .counter-row .counter__value { font-size: 2.2rem; min-width: 60px; }
+    .counter-cmp { color: var(--accent-yellow); font-family: var(--font-mono); font-size: .75rem; }
+
+    .todo-list {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px; min-height: 90px;
+      font-family: var(--font-mono); font-size: .78rem;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .todo-item { display: flex; gap: 8px; align-items: center; padding: 2px 4px; border-radius: 3px; }
+    .todo-item--done { color: var(--text-muted); text-decoration: line-through; }
+    .theme-banner {
+      padding: 10px 14px; border-radius: var(--radius-sm);
+      font-family: var(--font-mono); font-size: .8rem;
+      transition: background .3s, color .3s;
+    }
+    .theme-banner.light { background: #f5f5f5; color: #222; }
+    .theme-banner.dark { background: #0d0d0d; color: #9cdcfe; border: 1px solid #333; }
+
+    .flash { animation: flash-bg 0.6s ease-out; }
+    @keyframes flash-bg {
+      0% { background: rgba(244, 71, 71, 0.3); }
+      100% { background: transparent; }
+    }
+    .flash--ok { animation: flash-ok 0.6s ease-out; }
+    @keyframes flash-ok {
+      0% { background: rgba(76,175,80,.3); }
+      100% { background: transparent; }
+    }
+
+    .meter {
+      display: flex; gap: 8px; align-items: center;
+      font-family: var(--font-mono); font-size: .72rem;
+      color: var(--text-muted);
+    }
+    .meter strong { color: var(--accent-cyan); font-size: .95rem; }
+
+    .select-svg { display: block; margin: 14px auto; max-width: 620px; }
+    .select-svg text { font-family: var(--font-mono); font-size: 11px; fill: #ccc; }
+    .select-svg .lbl { fill: #888; font-size: 10px; }
+    .select-svg .hit { fill: #4caf50; }
+    .select-svg .miss { fill: #f44747; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">41 / 106</span>createSelector из RTK — re-export reselect и мотивация мемоизации</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../40b-memoization-why/">← Назад</a>
+      <a href="../42-createdraftsafeselector/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Naive selector vs Memoized selector — сравнение рендеров</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px;">
+          Две колонки слушают <strong>один и тот же store</strong>. Слева — «наивный» селектор
+          <code>state =&gt; state.todos.items.filter(...)</code>: создаёт <em>новый массив</em> при каждом
+          <code>dispatch</code>, даже если <code>todos</code> не менялись. Справа — <code>createSelector</code>:
+          пересчитывает combiner только когда изменились входы.
+        </p>
+
+        <div class="two-col">
+          <!-- LEFT: naive -->
+          <div class="col-card" id="naive-card">
+            <h4><span class="tag tag--bad">naive</span> state =&gt; state.todos.items.filter(...)</h4>
+            <div class="col-card__hint">Каждый dispatch → <code>.filter()</code> даёт новую ссылку → компонент считает, что данные изменились.</div>
+
+            <div class="counter-row">
+              <div>
+                <div class="state-display__label">Renders</div>
+                <div class="counter__value" id="naive-renders">0</div>
+              </div>
+              <div>
+                <div class="state-display__label">Combiner calls</div>
+                <div class="counter__value" id="naive-calls" style="color: var(--accent-orange)">0</div>
+              </div>
+              <div class="counter-cmp" id="naive-cmp">prev === next? —</div>
+            </div>
+
+            <div class="todo-list" id="naive-list"></div>
+          </div>
+
+          <!-- RIGHT: memoized -->
+          <div class="col-card" id="memo-card">
+            <h4><span class="tag tag--good">memoized</span> createSelector([s =&gt; s.todos.items], items =&gt; items.filter(...))</h4>
+            <div class="col-card__hint">Combiner вызывается только когда <strong>ссылка</strong> на <code>items</code> изменилась. Для <code>toggleTheme</code> — кеш-хит.</div>
+
+            <div class="counter-row">
+              <div>
+                <div class="state-display__label">Renders</div>
+                <div class="counter__value" id="memo-renders" style="color: var(--success)">0</div>
+              </div>
+              <div>
+                <div class="state-display__label">Combiner calls</div>
+                <div class="counter__value" id="memo-calls" style="color: var(--success)">0</div>
+              </div>
+              <div class="counter-cmp" id="memo-cmp">prev === next? —</div>
+            </div>
+
+            <div class="todo-list" id="memo-list"></div>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <div class="state-display__label">Тема (не относится к todos — провокатор)</div>
+          <div class="theme-banner dark" id="theme-banner">theme: dark</div>
+        </div>
+
+        <div class="btn-group" style="margin-top: 16px;">
+          <button class="btn btn--accent" data-act="theme">Toggle theme</button>
+          <button class="btn" data-act="toggle1">Toggle todo #1</button>
+          <button class="btn" data-act="add">Add todo</button>
+          <button class="btn btn--danger" data-act="reset">Reset</button>
+        </div>
+
+        <div class="meter" style="margin-top: 14px;">
+          <span>Всего dispatch'ей: <strong id="dispatch-count">0</strong></span>
+          <span>•</span>
+          <span>naive combiner: <strong id="naive-rate">0</strong></span>
+          <span>•</span>
+          <span>memoized combiner: <strong id="memo-rate">0</strong></span>
+          <span>•</span>
+          <span>экономия пересчётов: <strong id="savings" style="color: var(--success)">0</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 41. createSelector, reselect и мемоизация</div>
+      <div class="theory__body">
+
+        <h3>Цитата из официальной доки RTK</h3>
+        <div class="quote">
+          «The <code>createSelector</code> utility from the Reselect library, re-exported for ease of use.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createSelector" target="_blank">redux-toolkit.js.org/api/createSelector</a>
+        </div>
+        <div class="quote quote--ru">
+          «Утилита <code>createSelector</code> из библиотеки Reselect, реэкспортированная для удобства использования.»
+        </div>
+
+        <h3>Почему реэкспорт?</h3>
+        <p>
+          Reselect — отдельная библиотека (~2 KB gzip), но Redux Toolkit включает её в свои зависимости и
+          реэкспортирует те же функции. Это даёт три выгоды:
+        </p>
+        <ul>
+          <li><strong>Один импорт</strong> — <code>import { createSelector } from '@reduxjs/toolkit'</code> вместо двух пакетов.</li>
+          <li><strong>Версия synced с RTK</strong> — RTK сам следит за совместимостью с <code>immer</code> и reselect.</li>
+          <li><strong>Tree-shaking не страдает</strong> — reselect экспортирует ESM, бандлер выбрасывает лишнее.</li>
+        </ul>
+
+        <h3>Исходник: что именно реэкспортирует RTK</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/reselectImports.ts</span>
+<span class="cm">// https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/reselectImports.ts</span>
+<span class="kw">export</span> { <span class="fn">createSelectorCreator</span>, <span class="fn">weakMapMemoize</span> } <span class="kw">from</span> <span class="str">'reselect'</span>
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Это <strong>всё</strong>, что пакет импортирует напрямую из reselect <em>внутри src</em>. А вот что
+          видно через <code>index.ts</code> (то есть пользователю):
+        </p>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/index.ts (фрагмент)</span>
+<span class="kw">export</span> {
+  <span class="fn">createSelector</span>,
+  <span class="fn">createSelectorCreator</span>,
+  <span class="fn">lruMemoize</span>,
+  <span class="fn">weakMapMemoize</span>,
+  <span class="fn">unstable_autotrackMemoize</span>,
+  <span class="fn">createStructuredSelector</span>,
+} <span class="kw">from</span> <span class="str">'reselect'</span>
+<span class="cm">// 👀 именно здесь RTK пробрасывает API reselect наружу</span>
+        </div>
+
+        <h3>Анатомия createSelector</h3>
+        <svg class="select-svg" viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg">
+          <!-- state -->
+          <rect x="10" y="90" width="70" height="40" rx="4" fill="#252526" stroke="#569cd6"/>
+          <text x="45" y="114" text-anchor="middle">state</text>
+
+          <!-- arrows -->
+          <line x1="80" y1="110" x2="130" y2="50" stroke="#666" stroke-width="1" marker-end="url(#arr)"/>
+          <line x1="80" y1="110" x2="130" y2="110" stroke="#666" stroke-width="1" marker-end="url(#arr)"/>
+          <line x1="80" y1="110" x2="130" y2="170" stroke="#666" stroke-width="1" marker-end="url(#arr)"/>
+
+          <!-- input selectors -->
+          <rect x="130" y="25" width="120" height="40" rx="4" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="190" y="49" text-anchor="middle">s =&gt; s.todos</text>
+          <rect x="130" y="90" width="120" height="40" rx="4" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="190" y="114" text-anchor="middle">s =&gt; s.filter</text>
+          <rect x="130" y="155" width="120" height="40" rx="4" fill="#1b1b1b" stroke="#dcdcaa"/>
+          <text x="190" y="179" text-anchor="middle">s =&gt; s.sortBy</text>
+          <text x="190" y="15" text-anchor="middle" class="lbl">input selectors (прокси)</text>
+
+          <!-- eq check -->
+          <rect x="280" y="75" width="110" height="70" rx="4" fill="#2a2d2e" stroke="#c586c0" stroke-dasharray="3,3"/>
+          <text x="335" y="104" text-anchor="middle" style="fill: #c586c0">argsMemoize</text>
+          <text x="335" y="124" text-anchor="middle" class="lbl">===</text>
+          <text x="335" y="64" text-anchor="middle" class="lbl">reference equality</text>
+
+          <!-- combiner -->
+          <rect x="420" y="75" width="120" height="70" rx="4" fill="#1b1b1b" stroke="#4ec9b0"/>
+          <text x="480" y="104" text-anchor="middle" style="fill:#4ec9b0">resultFunc</text>
+          <text x="480" y="124" text-anchor="middle" class="lbl">combiner</text>
+          <text x="480" y="64" text-anchor="middle" class="lbl">expensive compute</text>
+
+          <line x1="250" y1="45" x2="280" y2="95" stroke="#666" stroke-width="1" marker-end="url(#arr)"/>
+          <line x1="250" y1="110" x2="280" y2="110" stroke="#666" stroke-width="1" marker-end="url(#arr)"/>
+          <line x1="250" y1="175" x2="280" y2="125" stroke="#666" stroke-width="1" marker-end="url(#arr)"/>
+
+          <line x1="390" y1="110" x2="420" y2="110" stroke="#c586c0" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="405" y="100" text-anchor="middle" class="lbl">miss</text>
+
+          <path d="M 335 145 Q 335 210 480 210 L 480 145" fill="none" stroke="#4caf50" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="415" y="225" class="hit" style="font-size: 11px">кеш-хит → return lastResult</text>
+
+          <defs>
+            <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M 0 0 L 6 3 L 0 6 z" fill="#aaa"/>
+            </marker>
+          </defs>
+        </svg>
+
+        <h3>Что значит «identity check», а не deep equality</h3>
+        <div class="code-block">
+<span class="cm">// reselect сравнивает так (lruMemoize):</span>
+<span class="kw">function</span> <span class="fn">referenceEqualityCheck</span>(a, b) {
+  <span class="kw">return</span> a === b
+}
+
+<span class="cm">// Поэтому:</span>
+state1.todos === state2.todos   <span class="cm">// если Immer/reducer не трогал todos — true → cache hit</span>
+[...items] === items            <span class="cm">// false → cache miss, combiner пересчитает</span>
+{ a: 1 } === { a: 1 }           <span class="cm">// false! два разных объекта → miss</span>
+        </div>
+
+        <h3>LRU по умолчанию, размер 1</h3>
+        <div class="code-block">
+<span class="cm">// reselect/src/lruMemoize.ts — фрагмент</span>
+<span class="cm">// https://github.com/reduxjs/reselect/blob/master/src/lruMemoize.ts</span>
+<span class="kw">function</span> <span class="fn">createSingletonCache</span>(equals) {
+  <span class="kw">let</span> entry
+  <span class="kw">return</span> {
+    <span class="fn">get</span>(key) {
+      <span class="kw">if</span> (entry &amp;&amp; <span class="fn">equals</span>(entry.key, key)) {
+        <span class="kw">return</span> entry.value        <span class="cm">// 👀 один слот — если ключ совпал, возвращаем value</span>
+      }
+      <span class="kw">return</span> NOT_FOUND            <span class="cm">// иначе — пересчитать</span>
+    },
+    <span class="fn">put</span>(key, value) {
+      entry = { key, value }      <span class="cm">// перетираем, размер всегда 1</span>
+    },
+    <span class="fn">clear</span>() { entry = <span class="kw">undefined</span> },
+  }
+}
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Это делает мемоизацию лёгкой, но одноразовой: стоит вызвать селектор с <strong>другим</strong>
+          набором входов — прошлый кеш затирается. Про кеш на несколько записей — урок 43.
+        </p>
+
+        <h3>Что такое «expensive computation»?</h3>
+        <p>В плане Redux-а это <strong>любая операция, которая создаёт новую ссылку</strong>:</p>
+        <ul>
+          <li><code>arr.filter</code>, <code>arr.map</code>, <code>arr.slice</code>, <code>[...arr]</code> — O(n), возвращают новый массив.</li>
+          <li><code>Object.keys / Object.values / Object.entries</code> — новый массив каждый раз.</li>
+          <li><code>{ ...obj }</code>, <code>Object.fromEntries</code> — новый объект.</li>
+          <li><code>.toSorted()</code>, <code>.reduce((a, x) =&gt; ...)</code> — O(n log n) или O(n).</li>
+        </ul>
+        <p>
+          Сама операция может быть быстрой. Но если компонент делает её <strong>внутри селектора</strong>,
+          то каждый <code>dispatch</code> вызывает <code>useSelector</code> (до RTK react-redux это было true
+          для каждого подписчика), <code>===</code> между старым и новым результатом даёт <code>false</code>,
+          React-Redux считает «state изменился» → компонент перерисовывается.
+        </p>
+
+        <h3>Подводные камни</h3>
+
+        <div class="warning">
+          <strong>1. Reselect не делает глубокое сравнение.</strong>
+          Если твой input-selector возвращает <code>state.todos.filter(t =&gt; t.active)</code> — это новый
+          массив на каждый вызов, и <code>===</code> всегда даст <code>false</code>. <em>Почему:</em> reselect
+          использует <code>referenceEqualityCheck</code>, потому что глубокое сравнение O(n×m) убивает смысл
+          мемоизации (быстрее просто пересчитать). Правило: <strong>input-selector должен тянуть сырую ссылку
+          из state</strong>, а фильтрация/трансформация — только в <code>resultFunc</code>.
+        </div>
+
+        <div class="warning">
+          <strong>2. Default cache size = 1.</strong>
+          <code>selectTodoById(state, 1)</code>, затем <code>selectTodoById(state, 2)</code> — второй вызов
+          <em>вытеснит</em> первый результат. В списке из 50 todos каждый render вытесняет соседей → 0% попаданий в кеш.
+          <em>Почему так сделано:</em> минимум памяти, максимум предсказуемости. <em>Решение:</em> <code>weakMapMemoize</code> (урок 43) или
+          <code>createSelector.withCache</code>.
+        </div>
+
+        <div class="warning">
+          <strong>3. Инлайновый селектор внутри useSelector.</strong>
+          <code>useSelector(state =&gt; state.todos.filter(...))</code> — <em>каждый вызов компонента
+          создаёт новую стрелку</em>, у которой нет персистентного замыкания. Даже если бы внутри был
+          <code>createSelector</code> — его бы пересоздали. <em>Почему:</em> кеш живёт в замыкании селектора. Выносите <code>createSelector</code> в модуль-скоуп.
+        </div>
+
+        <div class="warning">
+          <strong>4. Не импортируйте createSelector из вложенных entry points.</strong>
+          Не надо <code>import { createSelector } from '@reduxjs/toolkit/dist/reselectImports'</code>. Это не публичный API — сломается при любом минорном апдейте. <em>Почему:</em> RTK гарантирует
+          совместимость только через корневой <code>@reduxjs/toolkit</code> и <code>@reduxjs/toolkit/query</code>.
+        </div>
+
+        <div class="warning">
+          <strong>5. Мемоизация — per instance.</strong>
+          Два компонента, каждый <code>useSelector(selectActive)</code> — один кеш (хорошо).
+          Но <code>useSelector(makeSelectActive())</code> — у каждого свой селектор и свой кеш (плохо, кешлайф == render lifecycle компонента). Для параметризованных селекторов используйте
+          <code>useMemo(() =&gt; makeSelectActive(), [])</code>.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../33-slice-selectors/">33 — slice.selectors (без мемоизации)</a></li>
+          <li><a href="../42-createdraftsafeselector/">42 — createDraftSafeSelector (safe inside Immer)</a></li>
+          <li><a href="../43-weakmap-memoize/">43 — weakMapMemoize для аргументированных селекторов</a></li>
+          <li><a href="../44-slice-selectors-memoized/">44 — createSelector внутри slice</a></li>
+          <li><a href="../45-typed-selectors-hooks/">45 — withTypes для типизации</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createSelector" target="_blank">RTK docs — createSelector</a></li>
+          <li><a href="https://reselect.js.org/" target="_blank">Reselect docs</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/reselectImports.ts" target="_blank">RTK src — reselectImports.ts</a></li>
+          <li><a href="https://github.com/reduxjs/reselect/blob/master/src/lruMemoize.ts" target="_blank">Reselect src — lruMemoize.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

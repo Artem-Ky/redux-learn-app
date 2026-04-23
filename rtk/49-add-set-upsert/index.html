@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>49 — addOne vs setOne vs upsertOne</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .cmp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: .8rem;
+      margin: 12px 0;
+    }
+    .cmp-table th, .cmp-table td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .cmp-table th {
+      background: var(--bg-tertiary);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .cmp-table td.yes { color: var(--success); }
+    .cmp-table td.no { color: var(--error); }
+    .cmp-table td.maybe { color: var(--warning); }
+
+    .state-before-after {
+      display: grid;
+      grid-template-columns: 1fr 24px 1fr;
+      gap: 10px;
+      align-items: center;
+      margin: 12px 0;
+    }
+    .sba-pane {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      color: var(--accent-cyan);
+      white-space: pre-wrap;
+      min-height: 180px;
+    }
+    .sba-arrow { text-align: center; color: var(--accent); font-size: 1.3rem; }
+    .sba-label {
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .highlighted-diff {
+      background: rgba(244,71,71,.18);
+      border-radius: 2px;
+      padding: 1px 3px;
+    }
+    .highlighted-add {
+      background: rgba(76,175,80,.22);
+      border-radius: 2px;
+      padding: 1px 3px;
+    }
+
+    .payload-input {
+      display: grid;
+      grid-template-columns: 100px 1fr 100px 1fr 100px 1fr;
+      gap: 6px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">49 / 106</span>addOne · setOne · upsertOne</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../48-entity-state-shape/">← Назад</a>
+      <a href="../50-entity-update-shallow/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Три кнопки — три очень разных поведения</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В state существует <code>book = { id: 'a', title: 'A', price: 10, author: 'Knuth' }</code>.
+          Введите изменённый объект и нажмите одну из трёх кнопок. Слева — state до, справа — после.
+          Красным подсвечены <strong>потерянные</strong> поля, зелёным — новые/изменённые.
+        </p>
+
+        <div class="payload-input">
+          <label style="color: var(--text-muted); align-self: center;">id:</label>
+          <input type="text" id="p-id" value="a">
+          <label style="color: var(--text-muted); align-self: center;">price:</label>
+          <input type="number" id="p-price" value="20">
+          <label style="color: var(--text-muted); align-self: center;">title:</label>
+          <input type="text" id="p-title" placeholder="(пусто = не передаём)">
+        </div>
+
+        <div class="btn-group">
+          <button class="btn" id="do-add">addOne({ id, price })</button>
+          <button class="btn btn--accent" id="do-set">setOne({ id, price })</button>
+          <button class="btn btn--success" id="do-upsert">upsertOne({ id, price })</button>
+          <button class="btn" id="reset">reset state</button>
+        </div>
+
+        <div class="state-before-after" style="margin-top: 16px;">
+          <div>
+            <div class="sba-label">state.books.entities ДО</div>
+            <div class="sba-pane" id="pane-before">—</div>
+          </div>
+          <div class="sba-arrow">→</div>
+          <div>
+            <div class="sba-label">state.books.entities ПОСЛЕ</div>
+            <div class="sba-pane" id="pane-after">—</div>
+          </div>
+        </div>
+
+        <div id="last-action" style="margin-top: 6px; color: var(--accent-yellow); font-size: .82rem; font-family: var(--font-mono);"></div>
+
+        <h4 style="margin-top: 24px; color: var(--text-bright); font-size: .95rem;">Сравнение методов</h4>
+        <table class="cmp-table">
+          <thead>
+            <tr>
+              <th>Метод</th>
+              <th>id нет → </th>
+              <th>id есть → </th>
+              <th>Поля не в payload</th>
+              <th>Позиция в <code>ids</code></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>addOne</code></td>
+              <td class="yes">add</td>
+              <td class="no">ignore (no-op)</td>
+              <td class="yes">сохраняются</td>
+              <td>push в конец</td>
+            </tr>
+            <tr>
+              <td><code>setOne</code></td>
+              <td class="yes">add</td>
+              <td class="maybe">REPLACE</td>
+              <td class="no">теряются</td>
+              <td>место не меняется (unsorted)</td>
+            </tr>
+            <tr>
+              <td><code>upsertOne</code></td>
+              <td class="yes">add</td>
+              <td class="yes">SHALLOW merge</td>
+              <td class="yes">сохраняются (верх-1)</td>
+              <td>место не меняется</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 49. addOne vs setOne vs upsertOne</div>
+      <div class="theory__body">
+        <h3>Цитата — RTK docs</h3>
+        <div class="quote">
+          «<strong>addOne</strong> will do nothing if the provided entity already exists in the state.
+          <strong>setOne</strong> will overwrite an existing entity if it exists. <strong>upsertOne</strong>
+          will perform a shallow update, preserving any existing fields that are not in the payload.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createEntityAdapter#should-i-add-set-or-upsert-my-entity" target="_blank">Should I add, set, or upsert my entity?</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>addOne</code> ничего не сделает, если entity уже есть в state. <code>setOne</code>
+          <strong>полностью перезапишет</strong> существующую запись. <code>upsertOne</code> выполнит
+          <strong>shallow merge</strong>, сохраняя поля, которых нет в payload.»
+        </div>
+
+        <h3>Исходник — unsorted_state_adapter.ts (фрагмент)</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">addOneMutably</span>(entity: <span class="type">T</span>, state: <span class="type">R</span>): <span class="type">void</span> {
+  <span class="kw">const</span> key = <span class="fn">selectIdValue</span>(entity, selectId)
+  <span class="kw">if</span> (key <span class="kw">in</span> state.entities) {
+    <span class="kw">return</span>                                  <span class="cm">// ← no-op!</span>
+  }
+  state.ids.<span class="fn">push</span>(key)
+  ;(state.entities)[key] = entity
+}
+
+<span class="kw">function</span> <span class="fn">setOneMutably</span>(entity: <span class="type">T</span>, state: <span class="type">R</span>): <span class="type">void</span> {
+  <span class="kw">const</span> key = <span class="fn">selectIdValue</span>(entity, selectId)
+  <span class="kw">if</span> (!(key <span class="kw">in</span> state.entities)) {
+    state.ids.<span class="fn">push</span>(key)
+  }
+  ;(state.entities)[key] = entity                <span class="cm">// ← полная замена</span>
+}
+
+<span class="kw">function</span> <span class="fn">upsertOneMutably</span>(entity: <span class="type">T</span>, state: <span class="type">R</span>): <span class="type">void</span> {
+  <span class="kw">return</span> <span class="fn">upsertManyMutably</span>([entity], state)
+}
+
+<span class="kw">function</span> <span class="fn">upsertManyMutably</span>(newEntities, state) {
+  <span class="kw">const</span> [added, updated] = <span class="fn">splitAddedUpdatedEntities</span>(newEntities, selectId, state)
+  <span class="fn">addManyMutably</span>(added, state)
+  <span class="fn">updateManyMutably</span>(updated, state)        <span class="cm">// ← идёт через updateOne → Object.assign</span>
+}
+        </div>
+        <p>
+          GitHub: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/unsorted_state_adapter.ts" target="_blank">unsorted_state_adapter.ts</a>
+        </p>
+
+        <h3>Когда какой использовать</h3>
+        <ul>
+          <li><code>addOne</code> — только создание, не важна идемпотентность. (Пример: принять сообщение
+            из websocket — если уже есть, не перезаписываем.)</li>
+          <li><code>setOne</code> — «server is the truth». Пришёл свежий объект с бэка, весь —
+            клиентский заменяется (без merge).</li>
+          <li><code>upsertOne</code> — <strong>patch-семантика</strong>. Пришёл кусочек объекта (id +
+            изменения) — подмешать.</li>
+        </ul>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. <code>upsertOne</code> — только shallow merge.</strong>
+          Внутри вызывается <code>updateOne</code>, который делает <code>Object.assign({}, original,
+          changes)</code>. Для nested полей: <code>{ profile: { name: 'Bob' } }</code> <strong>затрёт весь
+          profile</strong>, включая <code>age</code>. Деталь — урок 50.
+          <br><br>
+          <strong>2. <code>setOne</code> не двигает позицию в <code>ids</code>.</strong>
+          Даже если это «новая» версия, её место в массиве <code>ids</code> остаётся прежним (для unsorted
+          adapter'а). Чтобы обновить порядок — используй <code>sortComparer</code> (урок 51) или
+          <code>remove</code> + <code>add</code> руками.
+          <br><br>
+          <strong>3. <code>addOne</code> тихо игнорирует дубликат.</strong>
+          Никакого warning в консоли. Если ожидаешь, что addOne «всегда сработает» — используй
+          <code>upsertOne</code>. Это классическая ловушка: код кажется рабочим, но одно поле не обновилось.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../47-entityadapter-basics/">47 — базовый CRUD</a></li>
+          <li><a href="../50-entity-update-shallow/">50 — shallow gotcha</a></li>
+          <li><a href="../51-selectid-sortcomparer/">51 — sortComparer (меняет поведение set/upsert!)</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createEntityAdapter#crud-functions" target="_blank">RTK · CRUD functions</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/unsorted_state_adapter.ts" target="_blank">unsorted_state_adapter.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

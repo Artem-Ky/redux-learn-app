@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>64 — Зачем listenerMiddleware</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .impl-tabs { display: flex; gap: 4px; margin: 12px 0; flex-wrap: wrap; }
+    .impl-tab {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      color: var(--text-secondary); padding: 6px 14px; border-radius: var(--radius-sm);
+      cursor: pointer; font-family: var(--font-mono); font-size: .78rem;
+    }
+    .impl-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(86,156,214,.12); }
+    .impl-panel { display: none; }
+    .impl-panel.active { display: block; }
+    .cmp-table { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: 10px; }
+    .cmp-table th, .cmp-table td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+    .cmp-table thead { background: var(--bg-panel); color: var(--accent); }
+    .cmp-table td code { font-size: .78rem; }
+    .svg-wrap { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 12px 0; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">64 / 106</span>Зачем listenerMiddleware: сравнение с thunk/saga/observable</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../63-create-asyncthunk-in-slice/">← Назад</a>
+      <a href="../65-listener-setup-predicates/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Сценарий: после <code>loginSuccess</code> → fetch profile + start websocket + analytics</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Типичная задача: на один action нужно запустить <strong>три независимых reactive-побочки</strong>.
+          Ниже три реализации — thunk-цепочка, sagas (псевдокод), <code>listenerMiddleware</code>.
+          Кнопка «Login» запускает живую реализацию на listener'ах — видно фазы в консоли.
+        </p>
+
+        <div class="btn-group" style="margin: 10px 0;">
+          <button class="btn btn--accent" id="login">Login (dispatch loginSuccess)</button>
+          <button class="btn" id="logout">Logout</button>
+          <button class="btn" id="reset">Reset</button>
+        </div>
+
+        <div class="state-display">
+          <div class="state-display__label">state.auth</div>
+          <div class="state-display__value" id="state-out">—</div>
+        </div>
+
+        <div class="impl-tabs">
+          <button class="impl-tab active" data-tab="thunk">1. thunk-chain</button>
+          <button class="impl-tab" data-tab="saga">2. saga (псевдокод)</button>
+          <button class="impl-tab" data-tab="listener">3. listenerMiddleware</button>
+        </div>
+
+        <div class="impl-panel active" data-panel="thunk">
+          <div class="code-block">
+<span class="cm">// 1. thunk-chain: логика вшита в thunk.</span>
+<span class="cm">// Проблемы:</span>
+<span class="cm">//   — логика связана с точкой вызова (login кнопка должна знать про fetchProfile/analytics/ws);</span>
+<span class="cm">//   — добавить четвёртый эффект — редактировать все места вызова;</span>
+<span class="cm">//   — cancellation руками через AbortController;</span>
+<span class="cm">//   — нет доступа к originalState (до reducer'а).</span>
+<span class="kw">const</span> <span class="fn">loginAndSetup</span> = <span class="fn">createAsyncThunk</span>(
+  <span class="str">'auth/loginAndSetup'</span>,
+  <span class="kw">async</span> (creds, { dispatch }) =&gt; {
+    <span class="kw">const</span> user = <span class="kw">await</span> <span class="fn">api</span>.<span class="fn">login</span>(creds)
+    dispatch(<span class="fn">loginSuccess</span>(user))
+    <span class="kw">await</span> dispatch(<span class="fn">fetchProfile</span>(user.id))
+    <span class="fn">ws</span>.<span class="fn">connect</span>(user.token)
+    <span class="fn">analytics</span>.<span class="fn">track</span>(<span class="str">'login'</span>, user.id)
+  }
+)
+          </div>
+        </div>
+
+        <div class="impl-panel" data-panel="saga">
+          <div class="code-block">
+<span class="cm">// 2. redux-saga: мощная reactive-модель через generator'ы.</span>
+<span class="cm">// Плюсы: takeLatest/fork/race/cancel — всё из коробки.</span>
+<span class="cm">// Минусы: +17kB, свой язык effects, отдельная ментальная модель,</span>
+<span class="cm">//        typescript-поддержка исторически слабая.</span>
+<span class="kw">function</span>* <span class="fn">afterLoginSaga</span>() {
+  <span class="kw">while</span> (<span class="kw">true</span>) {
+    <span class="kw">const</span> { payload } = <span class="kw">yield</span> <span class="fn">take</span>(loginSuccess.type)
+    <span class="kw">yield</span> <span class="fn">all</span>([
+      <span class="fn">call</span>(fetchProfile, payload.id),
+      <span class="fn">fork</span>(watchWebsocket, payload.token),
+      <span class="fn">call</span>(track, <span class="str">'login'</span>, payload.id),
+    ])
+  }
+}
+          </div>
+        </div>
+
+        <div class="impl-panel" data-panel="listener">
+          <div class="code-block">
+<span class="cm">// 3. listenerMiddleware: reactive без generator'ов, в 1.5kB.</span>
+<span class="cm">// Плюсы: TS strict из коробки, async/await, fork/take/cancel,</span>
+<span class="cm">//        любой predicate (actionCreator | type | matcher | predicate).</span>
+listener.<span class="fn">startListening</span>({
+  actionCreator: loginSuccess,
+  effect: <span class="kw">async</span> (action, api) =&gt; {
+    api.<span class="fn">cancelActiveListeners</span>()               <span class="cm">// takeLatest</span>
+    <span class="kw">const</span> profileTask = api.<span class="fn">fork</span>(() =&gt; <span class="fn">fetchProfile</span>(action.payload.id))
+    <span class="kw">const</span> wsTask      = api.<span class="fn">fork</span>((forkApi) =&gt; <span class="fn">runWS</span>(action.payload.token, forkApi))
+    api.dispatch(<span class="fn">track</span>(<span class="str">'login'</span>, action.payload.id))
+    <span class="kw">const</span> res = <span class="kw">await</span> profileTask.result
+    <span class="kw">if</span> (res.status === <span class="str">'ok'</span>) api.dispatch(<span class="fn">profileLoaded</span>(res.value))
+  },
+})
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 64. Зачем listenerMiddleware и чем он лучше thunk/saga</div>
+      <div class="theory__body">
+
+        <h3>Официальное определение</h3>
+        <div class="quote">
+          «The listener middleware lets you define "listener entries" that contain an "effect" callback with additional logic, and a way to specify when that callback should run based on dispatched actions or state changes. It's intended to be a lightweight alternative to more widely used Redux async middleware like sagas and observables. While similar to thunks in level of complexity and concept, it can be used to replicate some common saga usage patterns.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createListenerMiddleware" target="_blank">createListenerMiddleware docs</a>
+        </div>
+        <div class="quote quote--ru">
+          «Listener middleware позволяет задавать "listener entries" — записи с effect-коллбеком и правилом, когда он должен запускаться (по action или по изменению state). Это лёгкая альтернатива более тяжёлым saga/observable. По сложности ближе к thunk, но покрывает типичные паттерны саг.»
+        </div>
+
+        <h3>Три слоя побочных эффектов в Redux</h3>
+        <div class="svg-wrap">
+          <svg viewBox="0 0 860 260" width="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arr64" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#569cd6"/>
+              </marker>
+            </defs>
+
+            <rect x="20" y="20" width="170" height="220" rx="8" fill="#1b1b1b" stroke="#333"/>
+            <text x="105" y="48" text-anchor="middle" fill="#c586c0" font-family="JetBrains Mono" font-size="13" font-weight="bold">thunk</text>
+            <text x="105" y="72" text-anchor="middle" fill="#999" font-size="11">imperative, push</text>
+            <text x="35" y="100" fill="#ccc" font-size="11">+ async/await</text>
+            <text x="35" y="120" fill="#ccc" font-size="11">+ встроен в RTK</text>
+            <text x="35" y="140" fill="#ccc" font-size="11">- нет take/fork</text>
+            <text x="35" y="160" fill="#ccc" font-size="11">- cancellation</text>
+            <text x="35" y="175" fill="#ccc" font-size="11">&#160;&#160;&#160;руками (signal)</text>
+            <text x="35" y="200" fill="#ccc" font-size="11">- caller знает об</text>
+            <text x="35" y="215" fill="#ccc" font-size="11">&#160;&#160;&#160;побочках</text>
+
+            <rect x="210" y="20" width="200" height="220" rx="8" fill="#1b1b1b" stroke="#569cd6"/>
+            <text x="310" y="48" text-anchor="middle" fill="#569cd6" font-family="JetBrains Mono" font-size="13" font-weight="bold">listenerMiddleware</text>
+            <text x="310" y="72" text-anchor="middle" fill="#999" font-size="11">reactive, pull</text>
+            <text x="225" y="100" fill="#ccc" font-size="11">+ take / fork / cancel</text>
+            <text x="225" y="120" fill="#ccc" font-size="11">+ predicate по state</text>
+            <text x="225" y="140" fill="#ccc" font-size="11">+ ~1.5kB, TS strict</text>
+            <text x="225" y="160" fill="#ccc" font-size="11">+ startListening/stop</text>
+            <text x="225" y="180" fill="#ccc" font-size="11">&#160;&#160;&#160;в рантайме</text>
+            <text x="225" y="205" fill="#ccc" font-size="11">- нет generator'ов</text>
+            <text x="225" y="220" fill="#ccc" font-size="11">&#160;&#160;&#160;(для некоторых + )</text>
+
+            <rect x="430" y="20" width="190" height="220" rx="8" fill="#1b1b1b" stroke="#333"/>
+            <text x="525" y="48" text-anchor="middle" fill="#ce9178" font-family="JetBrains Mono" font-size="13" font-weight="bold">redux-saga</text>
+            <text x="525" y="72" text-anchor="middle" fill="#999" font-size="11">reactive, generators</text>
+            <text x="445" y="100" fill="#ccc" font-size="11">+ all/race/retry</text>
+            <text x="445" y="120" fill="#ccc" font-size="11">+ тестируется step-by-step</text>
+            <text x="445" y="140" fill="#ccc" font-size="11">- ~17kB</text>
+            <text x="445" y="160" fill="#ccc" font-size="11">- свой DSL (effects)</text>
+            <text x="445" y="180" fill="#ccc" font-size="11">- TS-дружба хромает</text>
+            <text x="445" y="200" fill="#ccc" font-size="11">- отдельная ментальная</text>
+            <text x="445" y="215" fill="#ccc" font-size="11">&#160;&#160;&#160;модель</text>
+
+            <rect x="640" y="20" width="200" height="220" rx="8" fill="#1b1b1b" stroke="#333"/>
+            <text x="740" y="48" text-anchor="middle" fill="#4ec9b0" font-family="JetBrains Mono" font-size="13" font-weight="bold">redux-observable</text>
+            <text x="740" y="72" text-anchor="middle" fill="#999" font-size="11">reactive, RxJS</text>
+            <text x="655" y="100" fill="#ccc" font-size="11">+ вся мощь RxJS</text>
+            <text x="655" y="120" fill="#ccc" font-size="11">+ combineEpics</text>
+            <text x="655" y="140" fill="#ccc" font-size="11">- нужно знать RxJS</text>
+            <text x="655" y="160" fill="#ccc" font-size="11">- ~30kB с rxjs</text>
+            <text x="655" y="180" fill="#ccc" font-size="11">- holistic mind-model</text>
+            <text x="655" y="200" fill="#ccc" font-size="11">&#160;&#160;&#160;нужна команде</text>
+          </svg>
+        </div>
+
+        <h3>Когда какой выбирать</h3>
+        <table class="cmp-table">
+          <thead>
+            <tr><th>Возможность</th><th>thunk</th><th>listenerMiddleware</th><th>saga</th><th>observable</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Dispatch чего-либо из другого action'а</td><td><span class="tag tag--bad">нет (caller нужен)</span></td><td><span class="tag tag--good">да, reactive</span></td><td><span class="tag tag--good">да</span></td><td><span class="tag tag--good">да</span></td></tr>
+            <tr><td><code>condition</code> — ждать state</td><td><span class="tag tag--bad">нет</span></td><td><span class="tag tag--good">condition(pred, ms)</span></td><td><code>take + select</code></td><td><code>filter</code></td></tr>
+            <tr><td>Cancellation (takeLatest)</td><td>AbortController руками</td><td><code>cancelActiveListeners()</code></td><td><code>takeLatest</code></td><td><code>switchMap</code></td></tr>
+            <tr><td>Fork параллельных задач</td><td><span class="tag tag--bad">нет API</span></td><td><code>api.fork()</code></td><td><code>fork()</code></td><td><code>mergeMap</code></td></tr>
+            <tr><td><code>take</code> (ждать конкретный action)</td><td><span class="tag tag--bad">нет</span></td><td><code>api.take(pred, ms?)</code></td><td><code>take(type)</code></td><td><code>ofType().first()</code></td></tr>
+            <tr><td>Debounce</td><td>руками через setTimeout</td><td><code>cancelActive + delay</code></td><td><code>debounce()</code></td><td><code>debounceTime()</code></td></tr>
+            <tr><td>Размер</td><td>входит в RTK</td><td>~1.5kB (в RTK)</td><td>~17kB</td><td>~30kB (с rxjs)</td></tr>
+            <tr><td>Добавляется в runtime</td><td><span class="tag tag--bad">нет</span></td><td><span class="tag tag--good">startListening/stopListening</span></td><td><code>runSaga</code></td><td><code>epicMiddleware.run</code></td></tr>
+            <tr><td>TS из коробки</td><td>ok</td><td><span class="tag tag--good">отлично (withTypes)</span></td><td>частично</td><td>ok</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Исходник — ядро middleware из <code>index.ts</code></h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/listenerMiddleware/index.ts (строки 480–554, сокр.)</span>
+<span class="kw">const</span> middleware: ListenerMiddleware&lt;...&gt; = (api) =&gt; (next) =&gt; (action) =&gt; {
+  <span class="kw">if</span> (!<span class="fn">isAction</span>(action)) <span class="kw">return</span> <span class="fn">next</span>(action)
+
+  <span class="kw">if</span> (addListener.<span class="fn">match</span>(action))      <span class="kw">return</span> <span class="fn">startListening</span>(action.payload)
+  <span class="kw">if</span> (clearAllListeners.<span class="fn">match</span>(action)) { <span class="fn">clearListenerMiddleware</span>(); <span class="kw">return</span> }
+  <span class="kw">if</span> (removeListener.<span class="fn">match</span>(action))   <span class="kw">return</span> <span class="fn">stopListening</span>(action.payload)
+
+  <span class="cm">// 1) снимок originalState ДО reducer'а</span>
+  <span class="kw">let</span> originalState = api.<span class="fn">getState</span>()
+  <span class="kw">const</span> <span class="fn">getOriginalState</span> = () =&gt; { <span class="cm">/* sync-only, throws иначе */</span> }
+
+  <span class="kw">try</span> {
+    <span class="cm">// 2) прогоняем reducer</span>
+    result = <span class="fn">next</span>(action)
+
+    <span class="kw">if</span> (listenerMap.size &gt; 0) {
+      <span class="kw">const</span> currentState = api.<span class="fn">getState</span>()
+      <span class="kw">for</span> (<span class="kw">const</span> entry <span class="kw">of</span> <span class="fn">Array</span>.<span class="fn">from</span>(listenerMap.<span class="fn">values</span>())) {
+        <span class="kw">let</span> runListener = <span class="kw">false</span>
+        <span class="kw">try</span> {
+          <span class="cm">// 3) predicate решает, запускать ли effect</span>
+          runListener = entry.<span class="fn">predicate</span>(action, currentState, originalState)
+        } <span class="kw">catch</span> (e) { <span class="fn">safelyNotifyError</span>(onError, e, { raisedBy: <span class="str">'predicate'</span> }) }
+        <span class="kw">if</span> (runListener) <span class="fn">notifyListener</span>(entry, action, api, getOriginalState)
+      }
+    }
+  } <span class="kw">finally</span> { originalState = INTERNAL_NIL_TOKEN }  <span class="cm">// запретить async вызов getOriginalState</span>
+
+  <span class="kw">return</span> result
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          Источник: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/index.ts#L480-L554" target="_blank">github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/listenerMiddleware/index.ts#L480-L554</a>
+        </p>
+
+        <h3>Что важно понять из исходника</h3>
+        <ul>
+          <li><code>originalState</code> снимается <strong>до</strong> <code>next(action)</code> — поэтому <code>getOriginalState()</code> работает только синхронно.</li>
+          <li>Listeners прогоняются <strong>после</strong> reducer'а — новый state уже в store.</li>
+          <li>Все формы подписки (<code>actionCreator</code>, <code>type</code>, <code>matcher</code>, <code>predicate</code>) компилируются в единый <code>predicate(action, currentState, originalState)</code>.</li>
+          <li>Ошибка в predicate — не роняет dispatch, а уходит в <code>onError</code>.</li>
+        </ul>
+
+        <div class="warning">
+          <strong>Почему listenerMiddleware НЕ заменяет thunk:</strong>
+          <ul>
+            <li><strong>Нет ответа на dispatch.</strong> Вы дёргаете <code>store.dispatch(action)</code> и не можете await'ить саму бизнес-логику. Thunk возвращает Promise — listener нет.</li>
+            <li><strong>Нет аргументов, кроме payload action'а.</strong> Если нужен сложный input с несколькими полями, их придётся положить в payload, что иногда неуместно.</li>
+          </ul>
+          <strong>Почему thunk НЕ заменяет listenerMiddleware:</strong>
+          <ul>
+            <li>Reactive-связь «любой <code>loginSuccess</code> → setup» — thunk не умеет. Нужна реакция на action, которая может прилететь из любого места.</li>
+            <li>Нет <code>take/condition/fork</code> — писать вручную через subscribe+AbortController болезненно.</li>
+          </ul>
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../11-default-middleware/">11 — getDefaultMiddleware</a> (куда подключать listener)</li>
+          <li><a href="../65-listener-setup-predicates/">65 — подключение и 4 формы <code>startListening</code></a></li>
+          <li><a href="../68-listener-cancellation/">68 — cancellation и TaskAbortError</a></li>
+          <li><a href="../69-listener-patterns/">69 — паттерны debounce/throttle/takeLatest</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

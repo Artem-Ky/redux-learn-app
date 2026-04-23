@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>63 — create.asyncThunk внутри createSlice</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .state-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; }
+    .state-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); white-space: pre; overflow: auto; max-height: 280px; }
+    .user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin: 10px 0; }
+    .user-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; font-size: .82rem; }
+    .user-card .name { color: var(--accent); font-family: var(--font-mono); font-size: .8rem; }
+    .user-card .email { color: var(--text-muted); font-size: .72rem; }
+    .side-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 900px) { .side-diff { grid-template-columns: 1fr; } }
+    .side-diff .pane { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+    .side-diff h4 { color: var(--accent); font-family: var(--font-mono); font-size: .78rem; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">63 / 106</span>create.asyncThunk внутри createSlice</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../62-asyncthunk-meta-extras/">← Назад</a>
+      <a href="../64-listener-why/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Весь <code>fetchAll</code> живёт <strong>внутри</strong> <code>createSlice</code>. Никаких
+          <code>createAsyncThunk</code> + <code>extraReducers</code> отдельно. Creator-форма через
+          <code>buildCreateSlice({ creators: { asyncThunk: asyncThunkCreator } })</code>.
+          Обратите внимание: <code>slice.actions.fetchAll</code> — это <em>и есть</em> готовый thunk.
+        </p>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin:12px 0;">
+          <button class="btn btn--accent" id="fetch">fetchAll()</button>
+          <button class="btn btn--danger" id="fetch-fail">fetchAll() → fail</button>
+          <button class="btn" id="fetch-slow">fetchAll() → медленный</button>
+          <button class="btn btn--secondary" id="reset">Сбросить</button>
+        </div>
+
+        <div class="state-card">
+          <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem;">Список пользователей</h4>
+          <div class="user-list" id="users-list">— пусто —</div>
+          <div id="status-line" style="font-family:var(--font-mono); font-size:.78rem; color:var(--text-muted); margin-top:8px;"></div>
+        </div>
+
+        <div class="state-card">
+          <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem;">store.getState()</h4>
+          <div class="state-out" id="state-out">—</div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 63. Creator-форма для asyncThunk</div>
+      <div class="theory__body">
+        <h3>Зачем нужна creator-форма</h3>
+        <p>В RTK 2.0 появилась возможность писать <code>reducers</code> как колбэк:</p>
+        <div class="code-block">reducers: (create) =&gt; ({
+  increment: create.<span class="fn">reducer</span>((s) =&gt; { s.value++ }),
+  add:       create.<span class="fn">preparedReducer</span>(...),
+  fetchAll:  create.<span class="fn">asyncThunk</span>(payloadCreator, { pending, fulfilled, rejected, settled }),
+})</div>
+        <p>Это — <strong>единственный</strong> способ объявить thunk <em>внутри</em> slice'а.
+          Все handlers собраны в одном месте — state-машина «loading / data / error» не размазана по файлам.</p>
+
+        <h3>Цитата из документации</h3>
+        <div class="quote">
+          «By default, Redux Toolkit's <code>createSlice</code> does not create an <code>asyncThunk</code> creator
+          because it would inflate the bundle size for users who don't need it. You need to use
+          <code>buildCreateSlice</code> and pass <code>asyncThunkCreator</code> to enable it:»<br>
+          — <a href="https://redux-toolkit.js.org/api/createSlice#createasyncthunk" target="_blank">createSlice — createAsyncThunk</a>
+        </div>
+        <div class="quote quote--ru">
+          «По умолчанию у <code>createSlice</code> <strong>нет</strong> <code>asyncThunk</code>-creator'а —
+          это раздуло бы bundle тем, кому он не нужен. Включается он через <code>buildCreateSlice</code>
+          с передачей <code>asyncThunkCreator</code>.»
+        </div>
+
+        <h3>Подключение</h3>
+        <div class="code-block"><span class="kw">import</span> {
+  buildCreateSlice, asyncThunkCreator, nanoid,
+} <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="cm">// На ВСЁ приложение — один такой createSlice</span>
+<span class="kw">export const</span> createAppSlice = <span class="fn">buildCreateSlice</span>({
+  creators: { asyncThunk: asyncThunkCreator },
+})
+
+<span class="cm">// Далее везде вместо createSlice</span>
+<span class="kw">const</span> usersSlice = <span class="fn">createAppSlice</span>({
+  name: <span class="str">'users'</span>,
+  initialState: { loading: <span class="str">'idle'</span>, list: [], error: <span class="kw">null</span> },
+  reducers: (create) =&gt; ({
+    fetchAll: create.<span class="fn">asyncThunk</span>(
+      <span class="kw">async</span> (_, { signal }) =&gt; (<span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/users'</span>, { signal })).<span class="fn">json</span>(),
+      {
+        pending:   (s) =&gt; { s.loading = <span class="str">'pending'</span> },
+        fulfilled: (s, a) =&gt; { s.list = a.payload; s.loading = <span class="str">'idle'</span> },
+        rejected:  (s, a) =&gt; { s.loading = <span class="str">'idle'</span>; s.error = a.error.message ?? <span class="str">'unknown'</span> },
+        settled:   (s) =&gt; { <span class="cm">/* опционально: cleanup */</span> },
+      },
+    ),
+  }),
+})
+
+<span class="kw">export const</span> { fetchAll } = usersSlice.actions
+<span class="cm">// dispatch(fetchAll()) — работает как обычный thunk</span></div>
+
+        <h3>Под капотом — что создаётся</h3>
+        <p>Creator раскладывается на два объекта и кладёт их в <code>extraReducers</code> автоматически:</p>
+        <ul>
+          <li>Создаётся «честный» <code>createAsyncThunk</code> с <code>typePrefix = <code>`${name}/${key}`</code></code>;</li>
+          <li>handlers (<code>pending</code>/<code>fulfilled</code>/<code>rejected</code>/<code>settled</code>) регистрируются в <code>extraReducers</code>;</li>
+          <li>итоговый thunk экспортируется через <code>slice.actions.fetchAll</code> (<em>не</em> <code>slice.thunks.fetchAll</code> — он не существует);</li>
+          <li><code>slice.caseReducers.fetchAll</code> НЕ содержит reducer — там не на что указывать, есть три разных handler'а.</li>
+        </ul>
+
+        <h3>Полная форма с options</h3>
+        <div class="code-block">fetchAll: create.<span class="fn">asyncThunk</span>(
+  <span class="kw">async</span> (arg, thunkAPI) =&gt; { <span class="cm">/* ... */</span> },
+  {
+    pending,   fulfilled,   rejected,   settled,
+
+    options: {                                   <span class="cm">// обычные AsyncThunkOptions</span>
+      condition: (arg, { getState }) =&gt; getState().users.loading !== <span class="str">'pending'</span>,
+      idGenerator: (arg) =&gt; <span class="str">`u-</span>${<span class="str">arg</span>}<span class="str">`</span>,
+      dispatchConditionRejection: <span class="kw">false</span>,
+    },
+  },
+)</div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Нужен buildCreateSlice (не default).</strong>
+          Если импортируете обычный <code>createSlice</code> из <code>@reduxjs/toolkit</code>, то
+          <code>reducers: (create) =&gt; ({ … })</code> будет компилироваться, но <code>create.asyncThunk</code>
+          бросит ошибку в runtime: <em>«asyncThunk creator must be added via buildCreateSlice»</em>.<br>
+          <strong>2. <code>slice.actions.fetchAll</code> — это thunk, но в тип <code>ActionCreator</code> он НЕ вписывается.</strong>
+          Если у вас есть тип <code>type SliceActions = typeof slice.actions</code>, в нём <code>fetchAll</code>
+          будет с <code>AsyncThunk&lt;…&gt;</code>-сигнатурой (не <code>ActionCreator</code>). При деструктуризации
+          <code>const { fetchAll } = slice.actions</code> — TS всё понимает, но утилиты вроде <code>bindActionCreators</code> могут ломаться.<br>
+          <strong>3. Нет отдельного <code>fetchAll.pending</code> импорта.</strong>
+          В обычном флоу вы экспортируете <code>export const fetchAll = createAsyncThunk(...)</code>
+          и дёргаете <code>fetchAll.pending.type</code> где угодно. С creator-формой —
+          <code>slice.actions.fetchAll.pending.type</code> (они всё ещё есть на thunk'е), и доступны <em>только</em>
+          после экспорта из slice'а. В миграции это часто забывают.<br>
+          <strong>4. Bundle size — creator-форма НЕ tree-shake'ится.</strong>
+          Если в приложении используется <code>buildCreateSlice + asyncThunkCreator</code> хотя бы раз,
+          весь <code>createAsyncThunk</code> попадает в bundle. Обычная форма — тоже (т.к. thunk объявлен отдельно).
+          Разница незначительная, но существует.<br>
+          <strong>5. Миграция «от thunk'а» сложна.</strong>
+          Был <code>export const fetchUsers = createAsyncThunk(...)</code>, все dispatch'ы работали напрямую.
+          Переехали в creator-форму → <code>fetchUsers</code> пропал как standalone export, пришлось менять
+          все импорты. Учитывайте, если рефакторите legacy.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../32-reducer-creators/">32 — reducers как callback (create.reducer / preparedReducer / asyncThunk)</a></li>
+          <li><a href="../32a-reducers-syntax-bundle/">32a — object vs callback, bundle size</a></li>
+          <li><a href="../31-extra-reducers/">31 — extraReducers (альтернативная форма)</a></li>
+          <li><a href="../55-asyncthunk-basic/">55 — базовый createAsyncThunk (снаружи slice)</a></li>
+          <li><a href="https://redux-toolkit.js.org/api/createSlice#createasyncthunk" target="_blank">RTK docs — createSlice#createAsyncThunk</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

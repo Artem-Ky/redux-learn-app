@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>77 — Миграция Classic Redux → RTK: 5 шагов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .wizard-nav {
+      display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0;
+    }
+    .wizard-nav .step-btn {
+      flex: 1 1 140px;
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 12px; text-align: left; cursor: pointer; font-family: var(--font-mono); font-size: .82rem;
+      color: var(--text-secondary); transition: all .15s;
+    }
+    .wizard-nav .step-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+    .wizard-nav .step-btn.active {
+      background: rgba(86,156,214,.15); border-color: var(--accent); color: var(--text-bright);
+    }
+    .wizard-nav .step-btn__num { color: var(--accent); font-weight: 700; margin-right: 6px; }
+    .wizard-nav .step-btn__subtitle { display: block; font-size: .7rem; color: var(--text-muted); margin-top: 2px; font-family: var(--font-sans); }
+
+    .diff-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0;
+    }
+    @media (max-width: 1000px) { .diff-grid { grid-template-columns: 1fr; } }
+
+    .diff-col {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+    }
+    .diff-col__head {
+      padding: 8px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;
+    }
+    .diff-col__title { font-family: var(--font-mono); font-size: .82rem; font-weight: 600; }
+    .diff-col--before .diff-col__head { background: rgba(244,71,71,.10); }
+    .diff-col--before .diff-col__title { color: var(--accent-red); }
+    .diff-col--after .diff-col__head { background: rgba(76,175,80,.12); }
+    .diff-col--after .diff-col__title { color: var(--success); }
+    .diff-col__lines { font-family: var(--font-mono); font-size: .72rem; color: var(--text-muted); background: var(--bg-panel); padding: 2px 8px; border-radius: var(--radius-sm); }
+    .diff-col__body {
+      font-family: var(--font-mono); font-size: .74rem; line-height: 1.55; padding: 12px 14px;
+      white-space: pre; overflow-x: auto; max-height: 440px; overflow-y: auto; color: var(--text-primary);
+    }
+    .diff-col__body .kw { color: var(--accent-purple); }
+    .diff-col__body .str { color: var(--accent-orange); }
+    .diff-col__body .fn { color: var(--accent-yellow); }
+    .diff-col__body .cm { color: var(--text-muted); font-style: italic; }
+    .diff-col__body .num { color: var(--accent-cyan); }
+    .diff-col__body .gone { background: rgba(244,71,71,.15); color: #f88; text-decoration: line-through; display: inline-block; }
+    .diff-col__body .added { background: rgba(76,175,80,.12); color: #9f9; display: inline-block; }
+
+    .step-info {
+      background: var(--bg-secondary); border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0;
+      border-radius: var(--radius-sm);
+    }
+    .step-info h3 { color: var(--text-bright); font-size: 1rem; margin-bottom: 6px; }
+    .step-info p { color: var(--text-secondary); font-size: .88rem; }
+
+    .final-counter {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 16px; margin-top: 14px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+    }
+    .final-counter__label { font-family: var(--font-mono); font-size: .78rem; color: var(--text-muted); }
+    .final-counter__value {
+      font-family: var(--font-mono); font-size: 2rem; color: var(--accent-cyan);
+      background: var(--bg-panel); padding: 6px 18px; border-radius: var(--radius-sm); min-width: 80px; text-align: center;
+    }
+    .final-counter .btn { min-width: 50px; }
+
+    .recap { margin-top: 14px; }
+    .recap-row {
+      display: grid; grid-template-columns: 60px 1fr 80px 80px 60px; gap: 10px;
+      padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: .82rem; align-items: center;
+    }
+    .recap-row:first-child {
+      background: var(--bg-tertiary); color: var(--accent); font-family: var(--font-mono); font-size: .74rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .recap-row__num { color: var(--accent); font-family: var(--font-mono); font-weight: 700; }
+    .recap-row__before { color: var(--accent-red); font-family: var(--font-mono); text-align: center; }
+    .recap-row__after { color: var(--success); font-family: var(--font-mono); text-align: center; }
+    .recap-row__delta { color: var(--warning); font-family: var(--font-mono); text-align: center; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">77 / 106</span>
+      Миграция Classic Redux → RTK в 5 шагов (wizard)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../76-side-by-side-todos-async/">← Назад</a>
+      <a href="../78-when-not-to-use-rtk/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Поэтапная миграция — before/after</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Один counter переводится на RTK в 5 шагов. На каждом шаге — одно изменение: новый API RTK заменяет одну
+          классическую конструкцию. Кликай шаги и смотри, как уменьшается файл.
+        </p>
+
+        <div class="wizard-nav" id="wizard-nav">
+          <button class="step-btn active" data-step="1">
+            <span class="step-btn__num">Step 1</span>createAction
+            <span class="step-btn__subtitle">Заменяем action types + creators</span>
+          </button>
+          <button class="step-btn" data-step="2">
+            <span class="step-btn__num">Step 2</span>createReducer
+            <span class="step-btn__subtitle">switch → builder.addCase + Immer</span>
+          </button>
+          <button class="step-btn" data-step="3">
+            <span class="step-btn__num">Step 3</span>createSlice
+            <span class="step-btn__subtitle">Объединяем actions + reducer</span>
+          </button>
+          <button class="step-btn" data-step="4">
+            <span class="step-btn__num">Step 4</span>configureStore
+            <span class="step-btn__subtitle">createStore → configureStore</span>
+          </button>
+          <button class="step-btn" data-step="5">
+            <span class="step-btn__num">Step 5</span>createAsyncThunk
+            <span class="step-btn__subtitle">Ручной thunk → async thunk</span>
+          </button>
+        </div>
+
+        <div class="step-info" id="step-info"></div>
+
+        <div class="diff-grid">
+          <div class="diff-col diff-col--before">
+            <div class="diff-col__head">
+              <div class="diff-col__title">BEFORE — Classic Redux</div>
+              <div class="diff-col__lines" id="before-lines">— строк</div>
+            </div>
+            <div class="diff-col__body" id="before-body"></div>
+          </div>
+          <div class="diff-col diff-col--after">
+            <div class="diff-col__head">
+              <div class="diff-col__title">AFTER — Redux Toolkit</div>
+              <div class="diff-col__lines" id="after-lines">— строк</div>
+            </div>
+            <div class="diff-col__body" id="after-body"></div>
+          </div>
+        </div>
+
+        <div class="recap">
+          <div class="recap-row">
+            <div>Шаг</div><div>Что меняем</div><div>Было</div><div>Стало</div><div>Δ</div>
+          </div>
+          <div class="recap-row">
+            <div class="recap-row__num">1</div>
+            <div>Action types + creators</div>
+            <div class="recap-row__before">~18</div>
+            <div class="recap-row__after">~6</div>
+            <div class="recap-row__delta">−12</div>
+          </div>
+          <div class="recap-row">
+            <div class="recap-row__num">2</div>
+            <div>switch-reducer</div>
+            <div class="recap-row__before">~14</div>
+            <div class="recap-row__after">~7</div>
+            <div class="recap-row__delta">−7</div>
+          </div>
+          <div class="recap-row">
+            <div class="recap-row__num">3</div>
+            <div>createSlice (actions + reducer)</div>
+            <div class="recap-row__before">~13</div>
+            <div class="recap-row__after">~10</div>
+            <div class="recap-row__delta">−3</div>
+          </div>
+          <div class="recap-row">
+            <div class="recap-row__num">4</div>
+            <div>configureStore</div>
+            <div class="recap-row__before">~6</div>
+            <div class="recap-row__after">~3</div>
+            <div class="recap-row__delta">−3</div>
+          </div>
+          <div class="recap-row">
+            <div class="recap-row__num">5</div>
+            <div>createAsyncThunk</div>
+            <div class="recap-row__before">~22</div>
+            <div class="recap-row__after">~8</div>
+            <div class="recap-row__delta">−14</div>
+          </div>
+          <div class="recap-row" style="font-weight: 700; background: var(--bg-panel);">
+            <div class="recap-row__num">Σ</div>
+            <div>Итого весь counter-файл</div>
+            <div class="recap-row__before">~80</div>
+            <div class="recap-row__after">~25</div>
+            <div class="recap-row__delta">−69%</div>
+          </div>
+        </div>
+
+        <div class="final-counter">
+          <div class="final-counter__label">Результат миграции (рабочий RTK counter):</div>
+          <div class="final-counter__value" id="final-value">0</div>
+          <button class="btn" id="final-inc">+1</button>
+          <button class="btn" id="final-dec">−1</button>
+          <button class="btn" id="final-async">fetch +10 async</button>
+          <button class="btn btn--secondary" id="final-reset">reset</button>
+          <span class="final-counter__label" id="final-status">idle</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — как мигрировать без паники</div>
+      <div class="theory__body">
+        <h3>Цитата из Redux docs</h3>
+        <div class="quote">
+          «Redux Toolkit is our official recommendation for writing Redux logic.
+          It wraps around the Redux core, and contains packages and functions that we think are essential
+          for building a Redux app. Redux Toolkit builds in our suggested best practices, simplifies most
+          Redux tasks, prevents common mistakes, and makes it easier to write Redux applications.»
+          <br>— <a href="https://redux.js.org/usage/migrating-to-modern-redux" target="_blank">Migrating to Modern Redux</a>
+        </div>
+        <div class="quote quote--ru">
+          «Redux Toolkit — наша официальная рекомендация. Он оборачивает Redux core,
+          включает всё необходимое, применяет best practices, предотвращает типовые ошибки.»
+        </div>
+
+        <h3>Порядок 5 шагов — почему именно так</h3>
+        <ol>
+          <li><strong>createAction</strong> — самый маленький, безопасный refactor: заменяет 1 константу + 1 функцию на 1 вызов. Reducer продолжает работать, потому что <code>createAction('x')().type === 'x'</code>.</li>
+          <li><strong>createReducer</strong> — меняет switch на builder. Immer начинает работать — можно писать <code>state.value++</code>.</li>
+          <li><strong>createSlice</strong> — объединяет actions + reducer. После этого action creators из шага 1 удаляются — slice их генерирует.</li>
+          <li><strong>configureStore</strong> — меняет <code>createStore + applyMiddleware + composeWithDevTools</code> на одну строку.</li>
+          <li><strong>createAsyncThunk</strong> — трогает каждый thunk отдельно; самый объёмный шаг, но самый ценный.</li>
+        </ol>
+
+        <h3>Что важно помнить при миграции большого проекта</h3>
+        <ul>
+          <li><strong>Мигрируйте по одному slice за раз.</strong> Старый switch-reducer и новый slice.reducer прекрасно сосуществуют в <code>combineReducers</code>.</li>
+          <li><strong>Типы action creators совместимы.</strong> <code>createAction('x')</code> возвращает функцию с <code>.type === 'x'</code> — все места, где раньше был <code>import { INCREMENT }</code>, меняются на <code>increment.type</code>.</li>
+          <li><strong>extraReducers — builder callback обязателен для TS.</strong> Не используйте объектную форму, она deprecated в TS-проектах.</li>
+          <li><strong>Удалите старые action types после createSlice.</strong> Легко забыть — и в проекте останутся мёртвые константы.</li>
+        </ul>
+
+        <h3>Что НЕ меняется</h3>
+        <p>
+          Концепция Redux (store, action, reducer, dispatch, subscribe) остаётся той же.
+          React-биндинги (<code>Provider</code>, <code>useSelector</code>, <code>useDispatch</code>) — те же.
+          Форма action'а <code>{ type, payload }</code> — та же. Миграция — это замена <em>инструмента</em>,
+          а не архитектуры.
+        </p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>Не делайте миграцию в одном PR.</strong>
+          5 шагов выше — это 5 PR'ов. Каждый маленький, каждый безопасный.
+          Одновременная замена action creators + reducer + store ломает code review и увеличивает вероятность регрессий.
+        </div>
+        <div class="warning">
+          <strong>extraReducers без builder callback — уже deprecated.</strong>
+          <code>extraReducers: { [type]: reducer }</code> теряет types и убирает addMatcher.
+          Пишите <code>extraReducers: (builder) => builder.addCase(...)</code>.
+        </div>
+        <div class="warning">
+          <strong>Immer не всегда оптимален.</strong>
+          В горячих путях (много raw-объектов, primitives) ручной spread иногда быстрее Immer-proxy.
+          В 99% случаев — не важно, но знать надо (<a href="../27-immer-pitfalls/">27 — immer pitfalls</a>).
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../07-classic-vs-rtk-side-by-side/">07 — сравнение «до / после» без поэтапной миграции</a>.</li>
+          <li><a href="../20-create-action-basic/">20 — createAction</a>, <a href="../24-create-reducer-builder/">24 — createReducer</a>.</li>
+          <li><a href="../28-slice-basic/">28 — createSlice</a>, <a href="../08-configure-store-basic/">08 — configureStore</a>.</li>
+          <li><a href="../55-asyncthunk-basic/">55 — createAsyncThunk</a>.</li>
+          <li><a href="https://redux.js.org/usage/migrating-to-modern-redux" target="_blank">Official guide — Migrating to Modern Redux</a>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

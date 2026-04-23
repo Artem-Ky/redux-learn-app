@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>75 — Counter: classic / RTK / RTK Query side-by-side</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .triple-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 14px 0;
+    }
+    @media (max-width: 1200px) { .triple-grid { grid-template-columns: 1fr; } }
+
+    .col {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .col__head { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .col__title { font-family: var(--font-mono); font-size: .88rem; font-weight: 600; }
+    .col--classic .col__head { background: rgba(244,71,71,.10); }
+    .col--classic .col__title { color: var(--accent-red); }
+    .col--rtk .col__head { background: rgba(118,74,188,.15); }
+    .col--rtk .col__title { color: var(--accent-purple); }
+    .col--rtkq .col__head { background: rgba(86,156,214,.12); }
+    .col--rtkq .col__title { color: var(--accent); }
+    .col__lines { font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted); background: var(--bg-panel); padding: 2px 8px; border-radius: var(--radius-sm); }
+    .col__body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+    .counter-display {
+      text-align: center; padding: 12px 0;
+      font-family: var(--font-mono); font-size: 2rem; color: var(--accent-cyan);
+      background: var(--bg-panel); border-radius: var(--radius-sm);
+    }
+    .counter-display__label { font-size: .7rem; color: var(--text-muted); margin-bottom: 4px; display: block; font-family: var(--font-sans); }
+    .counter-display__status { font-size: .7rem; color: var(--text-muted); margin-top: 4px; display: block; font-family: var(--font-sans); }
+    .counter-display__status.pending { color: var(--warning); }
+    .counter-display__status.error { color: var(--error); }
+
+    .counter-buttons { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+    .counter-buttons .btn { min-width: 48px; }
+
+    .src-block {
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 10px 12px; font-family: var(--font-mono); font-size: .72rem;
+      white-space: pre; overflow-x: auto; max-height: 280px; overflow-y: auto;
+      color: var(--text-primary); line-height: 1.55;
+    }
+    .src-block .kw { color: var(--accent-purple); }
+    .src-block .str { color: var(--accent-orange); }
+    .src-block .fn { color: var(--accent-yellow); }
+    .src-block .cm { color: var(--text-muted); font-style: italic; }
+    .src-block .num { color: var(--accent-cyan); }
+
+    .summary-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin: 14px 0; }
+    .summary-table th, .summary-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+    .summary-table th { background: var(--bg-tertiary); color: var(--accent); font-family: var(--font-mono); font-size: .75rem; }
+    .summary-table td.classic { color: var(--accent-red); }
+    .summary-table td.rtk { color: var(--accent-purple); }
+    .summary-table td.rtkq { color: var(--accent); }
+    .summary-table code { background: var(--bg-panel); padding: 1px 5px; border-radius: 3px; color: var(--accent-cyan); font-size: .78rem; }
+
+    .mini-label { font-size: .7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">75 / 106</span>
+      Counter в трёх вариантах: Classic Redux / RTK / RTK Query
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../74-async-thunk-patterns/">← Назад</a>
+      <a href="../76-side-by-side-todos-async/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Три независимых store работают параллельно</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Один и тот же counter реализован тремя способами. Classic — <code>createStore</code> + ручной reducer.
+          RTK — <code>configureStore</code> + <code>createSlice</code>. RTK Query — <code>createApi</code>
+          с mutation к mock-API (setTimeout 300 мс вместо сети). У каждого — свой store; в DevTools внизу
+          показан именно RTK store (ключевой для секции), но все три работают в памяти.
+        </p>
+
+        <div class="triple-grid">
+          <!-- CLASSIC -->
+          <div class="col col--classic">
+            <div class="col__head">
+              <div class="col__title">Classic Redux</div>
+              <div class="col__lines" id="classic-lines">— строк</div>
+            </div>
+            <div class="col__body">
+              <div class="counter-display">
+                <span class="counter-display__label">value (classic)</span>
+                <span id="classic-value">0</span>
+                <span class="counter-display__status" id="classic-status">ready</span>
+              </div>
+              <div class="counter-buttons">
+                <button class="btn" id="classic-inc">+1</button>
+                <button class="btn" id="classic-dec">−1</button>
+                <button class="btn btn--secondary" id="classic-reset">reset</button>
+              </div>
+              <div class="src-block" id="classic-src"></div>
+            </div>
+          </div>
+
+          <!-- RTK -->
+          <div class="col col--rtk">
+            <div class="col__head">
+              <div class="col__title">Redux Toolkit (slice)</div>
+              <div class="col__lines" id="rtk-lines">— строк</div>
+            </div>
+            <div class="col__body">
+              <div class="counter-display">
+                <span class="counter-display__label">value (rtk)</span>
+                <span id="rtk-value">0</span>
+                <span class="counter-display__status" id="rtk-status">ready</span>
+              </div>
+              <div class="counter-buttons">
+                <button class="btn" id="rtk-inc">+1</button>
+                <button class="btn" id="rtk-dec">−1</button>
+                <button class="btn btn--secondary" id="rtk-reset">reset</button>
+              </div>
+              <div class="src-block" id="rtk-src"></div>
+            </div>
+          </div>
+
+          <!-- RTK QUERY -->
+          <div class="col col--rtkq">
+            <div class="col__head">
+              <div class="col__title">RTK Query (mutation)</div>
+              <div class="col__lines" id="rtkq-lines">— строк</div>
+            </div>
+            <div class="col__body">
+              <div class="counter-display">
+                <span class="counter-display__label">value (rtkq — из cache)</span>
+                <span id="rtkq-value">0</span>
+                <span class="counter-display__status" id="rtkq-status">idle</span>
+              </div>
+              <div class="counter-buttons">
+                <button class="btn" id="rtkq-inc">+1</button>
+                <button class="btn" id="rtkq-dec">−1</button>
+                <button class="btn btn--secondary" id="rtkq-reset">reset</button>
+              </div>
+              <div class="src-block" id="rtkq-src"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-label">Сводная таблица</div>
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>Метрика</th>
+              <th>Classic Redux</th>
+              <th>Redux Toolkit</th>
+              <th>RTK Query</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Строк кода</td>
+              <td class="classic">~35</td>
+              <td class="rtk">~12</td>
+              <td class="rtkq">~25 (mutation + baseQuery)</td>
+            </tr>
+            <tr>
+              <td>Dependencies</td>
+              <td class="classic"><code>redux</code></td>
+              <td class="rtk"><code>@reduxjs/toolkit</code></td>
+              <td class="rtkq"><code>@reduxjs/toolkit/query</code> (входит в toolkit)</td>
+            </tr>
+            <tr>
+              <td>Time-travel DevTools</td>
+              <td class="classic">ручной setup</td>
+              <td class="rtk">автоматически</td>
+              <td class="rtkq">автоматически</td>
+            </tr>
+            <tr>
+              <td>Async-native</td>
+              <td class="classic">нужен redux-thunk вручную</td>
+              <td class="rtk"><code>createAsyncThunk</code></td>
+              <td class="rtkq">всё построено на async: pending/fulfilled/rejected</td>
+            </tr>
+            <tr>
+              <td>Cache / dedup / invalidation</td>
+              <td class="classic">нет — писать самому</td>
+              <td class="rtk">нет — писать самому</td>
+              <td class="rtkq">из коробки (tags, keepUnusedDataFor)</td>
+            </tr>
+            <tr>
+              <td>Когда применять</td>
+              <td class="classic">легаси / learning</td>
+              <td class="rtk">client state (UI, формы, локальный кэш)</td>
+              <td class="rtkq">server state (CRUD, pagination, subscription)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DevTools к RTK store -->
+    <div id="devtools-container"></div>
+
+    <!-- Console -->
+    <div id="console-container"></div>
+
+    <!-- THEORY -->
+    <div class="theory">
+      <div class="theory__header">Теория — три уровня абстракции над одной задачей</div>
+      <div class="theory__body">
+        <h3>Цитата из доки</h3>
+        <div class="quote">
+          «Redux Toolkit is our official, opinionated, batteries-included toolset for efficient Redux development.
+          RTK Query is a powerful data fetching and caching tool.
+          It is designed to simplify common cases for loading data in a web application, eliminating the need
+          to hand-write data fetching &amp; caching logic yourself.»
+          <br>— <a href="https://redux-toolkit.js.org/introduction/getting-started" target="_blank">RTK docs — Getting Started</a>
+        </div>
+        <div class="quote quote--ru">
+          «Redux Toolkit — официальный набор инструментов для эффективной работы с Redux.
+          RTK Query — мощный инструмент для загрузки и кэширования данных.
+          Он устраняет необходимость писать логику data fetching и cache руками.»
+        </div>
+
+        <h3>Почему counter в RTK Query — это «перебор»</h3>
+        <p>
+          Counter — это классический пример <strong>client state</strong>: он принадлежит UI, не существует на сервере.
+          RTK Query создан для <strong>server state</strong>: GET/POST/PUT/DELETE, cache по параметрам,
+          invalidation по тегам. Использовать mutation для +1 — это как забивать гвозди микроскопом.
+          Здесь это сделано только для <em>демонстрации формы API</em> — на реальном проекте counter — это <code>createSlice</code>,
+          а RTK Query держите для <code>/api/todos</code>, <code>/api/users/:id</code> и подобного.
+        </p>
+
+        <h3>Что видно из трёх фрагментов</h3>
+        <ul>
+          <li><strong>Classic</strong> — 3 action types руками, switch в reducer, spread для immutability, явный <code>createStore</code>.</li>
+          <li><strong>RTK</strong> — одна <code>createSlice</code>, Immer внутри, <code>configureStore</code> автоматически подключает DevTools и thunk.</li>
+          <li><strong>RTK Query</strong> — нет явных action types; <code>createApi</code> сам генерирует reducer, middleware, actions (pending/fulfilled/rejected) и хуки. Cache живёт в <code>state.counterApi</code>.</li>
+        </ul>
+
+        <h3>Manual subscription в RTK Query (без React hooks)</h3>
+        <p>
+          Хуки <code>useXxxMutation</code> — это фасад над <code>store.dispatch(api.endpoints.X.initiate(arg))</code>.
+          В этом уроке мы используем именно dispatch — чтобы показать, что RTK Query — это обычный Redux store,
+          а React — просто одна из оболочек. Подписка на результат — через <code>store.subscribe</code>
+          и <code>api.endpoints.X.select(arg)(state)</code>.
+        </p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>Classic Redux → много boilerplate.</strong>
+          Action types, action creators, switch в reducer, spread для immutability — всё вручную.
+          Для любой фичи нужно править 3–5 файлов. Именно поэтому RTK появился.
+        </div>
+        <div class="warning">
+          <strong>RTK Query — не замена createSlice.</strong>
+          Для чисто клиентского state (модалки, темы, формы, счётчики) используйте <code>createSlice</code>.
+          RTK Query — специально для server state, где нужны cache, dedup, invalidation, polling.
+          Применение RTKQ к локальному counter (как здесь) — демо, а не рекомендация.
+        </div>
+        <div class="warning">
+          <strong>Три разных store — редкий случай.</strong>
+          В реальном приложении обычно один <code>configureStore</code>, в котором соседствуют
+          обычные slice'ы и <code>api.reducer</code>. Разделение в уроке — только для наглядности.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../07-classic-vs-rtk-side-by-side/">07 — classic vs RTK</a> — то же сравнение без RTK Query.</li>
+          <li><a href="../28-slice-basic/">28 — createSlice basic</a>.</li>
+          <li><a href="../76-side-by-side-todos-async/">76 — тот же приём для async todos</a>.</li>
+          <li><a href="../77-migration-classic-to-rtk/">77 — поэтапная миграция</a>.</li>
+          <li><a href="../../classic-redux/100-putting-it-all-together/">classic-redux/100 — базовый counter без RTK</a>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

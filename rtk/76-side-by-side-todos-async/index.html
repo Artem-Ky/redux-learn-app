@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>76 — Todos async: classic thunk / createAsyncThunk / RTK Query</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .triple-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 14px 0;
+    }
+    @media (max-width: 1200px) { .triple-grid { grid-template-columns: 1fr; } }
+
+    .col {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .col__head { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .col__title { font-family: var(--font-mono); font-size: .88rem; font-weight: 600; }
+    .col--classic .col__head { background: rgba(244,71,71,.10); }
+    .col--classic .col__title { color: var(--accent-red); }
+    .col--rtk .col__head { background: rgba(118,74,188,.15); }
+    .col--rtk .col__title { color: var(--accent-purple); }
+    .col--rtkq .col__head { background: rgba(86,156,214,.12); }
+    .col--rtkq .col__title { color: var(--accent); }
+    .col__lines { font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted); background: var(--bg-panel); padding: 2px 8px; border-radius: var(--radius-sm); }
+    .col__body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+    .status-row {
+      display: flex; gap: 6px; align-items: center; font-family: var(--font-mono); font-size: .78rem;
+    }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); display: inline-block; }
+    .status-dot.idle { background: #555; }
+    .status-dot.loading { background: var(--warning); animation: pulse 1s infinite; }
+    .status-dot.success { background: var(--success); }
+    .status-dot.error { background: var(--error); }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    .todo-list {
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 8px; min-height: 100px; max-height: 180px; overflow-y: auto;
+    }
+    .todo-list__item {
+      padding: 4px 6px; font-size: .82rem; border-bottom: 1px solid var(--border);
+      display: flex; gap: 6px; align-items: center;
+    }
+    .todo-list__item:last-child { border-bottom: none; }
+    .todo-list__item.done { text-decoration: line-through; color: var(--text-muted); }
+    .todo-list__empty { padding: 12px; text-align: center; color: var(--text-muted); font-size: .78rem; font-style: italic; }
+    .todo-list__error { padding: 10px; color: var(--error); font-size: .78rem; background: rgba(244,71,71,.1); border-radius: var(--radius-sm); }
+    .todo-list__spinner { padding: 12px; text-align: center; color: var(--warning); font-size: .8rem; }
+
+    .state-shape {
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 8px 10px; font-family: var(--font-mono); font-size: .7rem; color: var(--text-secondary);
+      white-space: pre; overflow-x: auto; max-height: 100px; overflow-y: auto;
+    }
+
+    .buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .handled-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin: 14px 0; }
+    .handled-table th, .handled-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+    .handled-table th { background: var(--bg-tertiary); color: var(--accent); font-family: var(--font-mono); font-size: .75rem; }
+    .handled-table td.you { color: var(--accent-red); font-weight: 600; }
+    .handled-table td.lib { color: var(--success); font-weight: 600; }
+    .handled-table code { background: var(--bg-panel); padding: 1px 5px; border-radius: 3px; color: var(--accent-cyan); font-size: .78rem; }
+
+    .mini-label { font-size: .7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-top: 8px; }
+    .sim-fail-toggle { margin: 8px 0; font-size: .82rem; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">76 / 106</span>
+      Async todos: classic thunk / createAsyncThunk / RTK Query
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../75-side-by-side-counter/">← Назад</a>
+      <a href="../77-migration-classic-to-rtk/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Асинхронная загрузка списка — три варианта</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Одна задача: загрузить список todos с mock-API (800 мс), показать спиннер, отрисовать список,
+          показать ошибку. Три реализации: ручной thunk (FETCH_START/SUCCESS/FAIL),
+          <code>createAsyncThunk</code> + extraReducers, и RTK Query с build.query.
+          Кнопка <em>Simulate fail</em> глобально включает ошибку на mock-API.
+        </p>
+
+        <label class="sim-fail-toggle">
+          <input type="checkbox" id="sim-fail"> Simulate fail (next request will throw)
+        </label>
+
+        <div class="triple-grid">
+          <!-- CLASSIC THUNK -->
+          <div class="col col--classic">
+            <div class="col__head">
+              <div class="col__title">Classic: ручной thunk</div>
+              <div class="col__lines">~45 строк</div>
+            </div>
+            <div class="col__body">
+              <div class="buttons">
+                <button class="btn" id="classic-fetch">Fetch</button>
+                <button class="btn btn--secondary" id="classic-clear">Clear</button>
+              </div>
+              <div class="status-row">
+                <span class="status-dot" id="classic-dot"></span>
+                <span id="classic-status">idle</span>
+              </div>
+              <div class="todo-list" id="classic-list"></div>
+              <div class="mini-label">state shape</div>
+              <div class="state-shape" id="classic-shape"></div>
+            </div>
+          </div>
+
+          <!-- CREATE ASYNC THUNK -->
+          <div class="col col--rtk">
+            <div class="col__head">
+              <div class="col__title">RTK: createAsyncThunk</div>
+              <div class="col__lines">~22 строк</div>
+            </div>
+            <div class="col__body">
+              <div class="buttons">
+                <button class="btn" id="rtk-fetch">Fetch</button>
+                <button class="btn btn--secondary" id="rtk-clear">Clear</button>
+              </div>
+              <div class="status-row">
+                <span class="status-dot" id="rtk-dot"></span>
+                <span id="rtk-status">idle</span>
+              </div>
+              <div class="todo-list" id="rtk-list"></div>
+              <div class="mini-label">state shape</div>
+              <div class="state-shape" id="rtk-shape"></div>
+            </div>
+          </div>
+
+          <!-- RTK QUERY -->
+          <div class="col col--rtkq">
+            <div class="col__head">
+              <div class="col__title">RTK Query: build.query</div>
+              <div class="col__lines">~15 строк</div>
+            </div>
+            <div class="col__body">
+              <div class="buttons">
+                <button class="btn" id="rtkq-fetch">Fetch</button>
+                <button class="btn btn--secondary" id="rtkq-refetch">Refetch (cache!)</button>
+              </div>
+              <div class="status-row">
+                <span class="status-dot" id="rtkq-dot"></span>
+                <span id="rtkq-status">uninitialized</span>
+              </div>
+              <div class="todo-list" id="rtkq-list"></div>
+              <div class="mini-label">cache state (state.todosApi.queries)</div>
+              <div class="state-shape" id="rtkq-shape"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-label">Кто что делает: вы или библиотека</div>
+        <table class="handled-table">
+          <thead>
+            <tr>
+              <th>Задача</th>
+              <th>Classic thunk</th>
+              <th>createAsyncThunk</th>
+              <th>RTK Query</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Три action types (start/success/fail)</td>
+              <td class="you">вы пишете</td>
+              <td class="lib">генерируется</td>
+              <td class="lib">генерируется</td>
+            </tr>
+            <tr>
+              <td>Loading flag</td>
+              <td class="you">вы пишете</td>
+              <td class="you">вы добавляете (.pending)</td>
+              <td class="lib">в cache entry</td>
+            </tr>
+            <tr>
+              <td>Error state</td>
+              <td class="you">вы пишете + сбрасываете</td>
+              <td class="you">вы добавляете (.rejected)</td>
+              <td class="lib">в cache entry</td>
+            </tr>
+            <tr>
+              <td>Dedup одинаковых запросов</td>
+              <td class="you">руками</td>
+              <td class="you">через <code>condition</code></td>
+              <td class="lib">автоматически по cache key</td>
+            </tr>
+            <tr>
+              <td>Cache между маунтами</td>
+              <td class="you">руками</td>
+              <td class="you">руками (TTL в slice)</td>
+              <td class="lib"><code>keepUnusedDataFor</code></td>
+            </tr>
+            <tr>
+              <td>Refetch / invalidation</td>
+              <td class="you">руками</td>
+              <td class="you">диспатч снова</td>
+              <td class="lib"><code>invalidatesTags</code> / <code>providesTags</code></td>
+            </tr>
+            <tr>
+              <td>Optimistic updates</td>
+              <td class="you">руками</td>
+              <td class="you">руками</td>
+              <td class="lib"><code>onQueryStarted</code> + <code>updateQueryData</code></td>
+            </tr>
+            <tr>
+              <td>Cancellation</td>
+              <td class="you">руками</td>
+              <td class="lib"><code>thunkAPI.signal</code></td>
+              <td class="lib">автоматически при unsub</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DevTools → connect to RTK store -->
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — зачем нужен RTK Query</div>
+      <div class="theory__body">
+        <h3>Цитата из доки RTK Query</h3>
+        <div class="quote">
+          «RTK Query is a powerful data fetching and caching tool. It is designed to simplify common cases
+          for loading data in a web application, eliminating the need to hand-write data fetching &amp;
+          caching logic yourself. RTK Query is <strong>purpose-built</strong> to solve the use case of
+          data fetching, as opposed to a general-purpose state management library.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/overview" target="_blank">RTK Query — Overview</a>
+        </div>
+        <div class="quote quote--ru">
+          «RTK Query — инструмент специально под задачу загрузки и кэширования данных.
+          Он устраняет необходимость писать fetching/caching вручную.
+          В отличие от Redux вообще, RTK Query — не general-purpose, а <strong>целевой</strong>
+          для одной конкретной задачи: server state.»
+        </div>
+
+        <h3>Три уровня «что вы пишете»</h3>
+        <p>
+          В classic-версии вы руками держите <code>loading</code>, <code>error</code>, <code>data</code>
+          и три action types. Забыли сбросить <code>error</code> перед следующим запросом — пользователь
+          увидит старое сообщение над свежим списком.
+        </p>
+        <p>
+          В <code>createAsyncThunk</code> три action types генерируются, <code>thunkAPI.signal</code>
+          даёт AbortController. Но <strong>cache и dedup</strong> всё ещё на вас.
+        </p>
+        <p>
+          В RTK Query сам endpoint хранит запись в <code>state.todosApi.queries['getTodos(undefined)']</code>
+          с полями <code>status</code>, <code>data</code>, <code>error</code>, <code>startedTimeStamp</code>,
+          <code>fulfilledTimeStamp</code>. Второй вызов с теми же аргументами возвращает кэш.
+        </p>
+
+        <h3>Manual subscription vs React hook</h3>
+        <p>
+          В уроке — без React. <code>store.dispatch(api.endpoints.getTodos.initiate())</code> возвращает
+          promise-подобный объект с методом <code>.unsubscribe()</code>. Пока есть хотя бы один подписчик —
+          cache entry жив; когда подписчиков ноль, по истечении <code>keepUnusedDataFor</code> запись удаляется.
+          В React <code>useGetTodosQuery()</code> делает именно это: <code>initiate</code> при маунте,
+          <code>unsubscribe</code> при анмаунте.
+        </p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>Classic thunk: легко забыть сбросить error.</strong>
+          При старте нового запроса нужно сделать <code>error = null</code>, иначе старая ошибка останется поверх
+          нового fulfilled списка. Со всеми полями нужно танцевать руками — это источник регулярных багов.
+        </div>
+        <div class="warning">
+          <strong>createAsyncThunk — нет dedup из коробки.</strong>
+          Пользователь жмёт кнопку 5 раз — пойдёт 5 одинаковых запросов.
+          Нужно руками: <code>condition: (arg, { getState }) => !getState().todos.loading</code>.
+          В RTK Query dedup по cache key автоматический.
+        </div>
+        <div class="warning">
+          <strong>RTK Query без React — subscription руками.</strong>
+          В React хуки сами считают subscribers. Без React надо помнить
+          <code>const sub = dispatch(endpoints.X.initiate(arg))</code>, потом <code>sub.unsubscribe()</code>.
+          Иначе cache entry никогда не удалится.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../54-asyncthunk-why/">54 — зачем createAsyncThunk</a>, <a href="../55-asyncthunk-basic/">55 — basic</a>.</li>
+          <li><a href="../59-asyncthunk-condition/">59 — condition (dedup вручную)</a>.</li>
+          <li><a href="../60-asyncthunk-cancellation/">60 — AbortController</a>.</li>
+          <li><a href="../70e-request-dedup/">70e — dedup механика</a>, <a href="../70f-ttl-invalidation/">70f — TTL/invalidation</a>.</li>
+          <li><a href="../../classic-redux/76c-redux-thunk-full-api/">classic-redux/76c — redux-thunk full API</a>.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

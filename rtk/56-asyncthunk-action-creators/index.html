@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>56 — thunk.pending/fulfilled/rejected + matchers</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .state-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; }
+    .state-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); white-space: pre; overflow: auto; max-height: 260px; }
+    .matcher-hit { background: #0d0d0d; border: 1px solid #333; border-radius: 6px; padding: 4px 10px; font-family: var(--font-mono); font-size: .72rem; color: #888; transition: background .4s, color .4s, border-color .4s; display:inline-flex; gap:6px; align-items:center; }
+    .matcher-hit.hit { background: rgba(86,156,214,.2); color: #fff; border-color: var(--accent); }
+    .matcher-hit.ok  { background: rgba(76,175,80,.2); color: #4caf50; border-color: #4caf50; }
+    .matcher-hit.err { background: rgba(244,71,71,.2); color: #f44747; border-color: #f44747; }
+    .matchers-row { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">56 / 106</span>thunk.pending / fulfilled / rejected + matchers</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../55-asyncthunk-basic/">← Назад</a>
+      <a href="../57-thunkapi-basics/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Один <code>extraReducers</code> использует <strong>все формы</strong>: три точечных
+          <code>addCase(thunk.pending / fulfilled / rejected)</code>,
+          <code>addMatcher(isPending(thunkA, thunkB))</code> для общего loader,
+          и <code>addMatcher(thunkA.settled)</code> — объединяет fulfilled+rejected.
+          Два независимых thunk'а (<code>fetchUsers</code>, <code>fetchPosts</code>)
+          — matchers видят <strong>оба</strong>.
+        </p>
+
+        <div style="display:flex; gap:8px; flex-wrap: wrap; margin: 12px 0;">
+          <button class="btn btn--accent" id="fetch-users">Fetch users</button>
+          <button class="btn btn--accent" id="fetch-posts">Fetch posts</button>
+          <button class="btn btn--danger" id="fail-users">Users (fail)</button>
+          <button class="btn btn--danger" id="fail-posts">Posts (fail)</button>
+          <button class="btn" id="fetch-both">Оба параллельно</button>
+        </div>
+
+        <div class="matchers-row">
+          <span class="matcher-hit" id="m-pending">isPending(usersThunk, postsThunk)</span>
+          <span class="matcher-hit" id="m-settled-users">usersThunk.settled</span>
+          <span class="matcher-hit" id="m-settled-posts">postsThunk.settled</span>
+          <span class="matcher-hit" id="m-ok">isFulfilled(*)</span>
+          <span class="matcher-hit" id="m-err">isRejected(*)</span>
+        </div>
+
+        <div class="state-card"><div class="state-out" id="state-out">—</div></div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 56. action creators + matchers + settled</div>
+      <div class="theory__body">
+        <h3>Цитата — про <code>.settled</code> (RTK 2.x)</h3>
+        <div class="quote">
+          «<code>AsyncThunk</code> objects have a new <code>settled</code> property, which is a matcher that will match
+          on either of the <code>fulfilled</code> or <code>rejected</code> action types. This is useful for handling
+          cleanup logic in <code>extraReducers</code>.»<br>
+          — <a href="https://github.com/reduxjs/redux-toolkit/blob/master/docs/api/createAsyncThunk.mdx" target="_blank">createAsyncThunk docs (v2)</a>
+        </div>
+        <div class="quote quote--ru">
+          «У объекта <code>AsyncThunk</code> появилось свойство <code>settled</code> — matcher, который ловит
+          <strong>и</strong> fulfilled, <strong>и</strong> rejected. Удобно для cleanup-логики (например, сбросить <code>loading = 'idle'</code>).»
+        </div>
+
+        <h3>Тип <code>AsyncThunk&lt;Returned, ThunkArg, ThunkApiConfig&gt;</code></h3>
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строки 437–457 — тип возвращаемого объекта</span>
+<span class="kw">export type</span> AsyncThunk&lt;Returned, ThunkArg, ThunkApiConfig&gt; =
+  AsyncThunkActionCreator&lt;Returned, ThunkArg, ThunkApiConfig&gt; &amp; {
+    pending:   AsyncThunkPendingActionCreator&lt;ThunkArg, ThunkApiConfig&gt;
+    rejected:  AsyncThunkRejectedActionCreator&lt;ThunkArg, ThunkApiConfig&gt;
+    fulfilled: AsyncThunkFulfilledActionCreator&lt;Returned, ThunkArg, ThunkApiConfig&gt;
+    <span class="cm">// matchSettled?</span>
+    settled: (action: <span class="kw">any</span>) =&gt; action <span class="kw">is</span> <span class="type">ReturnType</span>&lt;
+      | AsyncThunkRejectedActionCreator&lt;ThunkArg, ThunkApiConfig&gt;
+      | AsyncThunkFulfilledActionCreator&lt;Returned, ThunkArg, ThunkApiConfig&gt;
+    &gt;
+    typePrefix: <span class="type">string</span>
+  }
+
+<span class="cm">// И как settled реализован:</span>
+<span class="kw">return</span> <span class="fn">Object</span>.<span class="fn">assign</span>(actionCreator, {
+  pending, rejected, fulfilled,
+  settled: <span class="fn">isAnyOf</span>(rejected, fulfilled),   <span class="cm">// ← один из двух</span>
+  typePrefix,
+})</div>
+        <p style="font-size: .78rem;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L437" target="_blank">createAsyncThunk.ts#L437</a>
+        </p>
+
+        <h3>Три формы в одном builder</h3>
+        <div class="code-block">extraReducers: (b) =&gt; {
+  <span class="cm">// 1. Точечно на конкретный thunk</span>
+  b.<span class="fn">addCase</span>(fetchUsers.pending,   (s) =&gt; { s.users.loading = <span class="kw">true</span> })
+  b.<span class="fn">addCase</span>(fetchUsers.fulfilled, (s, a) =&gt; { s.users.list = a.payload })
+  b.<span class="fn">addCase</span>(fetchUsers.rejected,  (s, a) =&gt; { s.users.error = a.error.message })
+
+  <span class="cm">// 2. Matcher для НЕСКОЛЬКИХ thunk'ов — общий loader</span>
+  b.<span class="fn">addMatcher</span>(<span class="fn">isPending</span>(fetchUsers, fetchPosts), (s) =&gt; { s.anyLoading = <span class="kw">true</span> })
+
+  <span class="cm">// 3. thunk.settled — cleanup (fulfilled ИЛИ rejected)</span>
+  b.<span class="fn">addMatcher</span>(fetchPosts.settled, (s) =&gt; { s.posts.loading = <span class="kw">false</span> })
+
+  <span class="cm">// 4. isPending() без аргументов — на ЛЮБОЙ pending</span>
+  b.<span class="fn">addMatcher</span>(<span class="fn">isPending</span>, (_, a) =&gt; console.log(<span class="str">'any pending'</span>, a.type))
+}</div>
+
+        <h3>.match(), .type, доступ к прочему</h3>
+        <div class="code-block"><span class="cm">// Каждый из 3 креаторов — это честный createAction с .match, .type, .toString</span>
+fetchUsers.pending.<span class="fn">type</span>        <span class="cm">// "users/fetch/pending"</span>
+fetchUsers.fulfilled.<span class="fn">type</span>      <span class="cm">// "users/fetch/fulfilled"</span>
+fetchUsers.rejected.<span class="fn">type</span>       <span class="cm">// "users/fetch/rejected"</span>
+fetchUsers.typePrefix         <span class="cm">// "users/fetch"</span>
+
+fetchUsers.fulfilled.<span class="fn">match</span>(action)   <span class="cm">// type predicate: action is fulfilled-action</span>
+
+<span class="kw">if</span> (fetchUsers.rejected.<span class="fn">match</span>(action)) {
+  <span class="cm">// action типизирован: { payload, error: SerializedError, meta: {arg, requestId, aborted, ...} }</span>
+}</div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. <code>thunk.pending</code> — это action creator, не строка.</strong>
+          <code>addCase(thunk.pending.type, ...)</code> — <em>работает</em>, но теряется типизация action.
+          Всегда передавайте сам creator.<br>
+          <strong>2. <code>isPending(thunkA, thunkB)</code> ≠ <code>isPending</code>.</strong>
+          С аргументами — matcher ловит <em>только</em> эти thunk'и. Без аргументов — <em>любой</em> pending-action
+          (тип payload теряется). В RTK это часто путают: для «общего загрузчика» всегда передавайте список.<br>
+          <strong>3. Порядок в extraReducers — как в createReducer.</strong>
+          Сначала <code>addCase</code>, затем <code>addMatcher</code>, наконец <code>addDefaultCase</code>.
+          На <em>один</em> action матчится <strong>один</strong> <code>addCase</code> + <em>все</em> подходящие <code>addMatcher</code> по очереди.<br>
+          <strong>4. Не путайте <code>thunk.settled</code> и <code>isAnyOf(thunk.fulfilled, thunk.rejected)</code>.</strong>
+          Это одно и то же (см. исходник выше), но <code>settled</code> — читабельнее и типизированно.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../23-matchers-utilities/">23 — nanoid, isAnyOf, isAllOf</a></li>
+          <li><a href="../23a-matchers-deep/">23a — matchers глубоко</a></li>
+          <li><a href="../25-add-matcher-default/">25 — addMatcher / addDefaultCase</a></li>
+          <li><a href="../55-asyncthunk-basic/">55 — базовый createAsyncThunk</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

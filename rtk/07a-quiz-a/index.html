@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Quiz A — Введение и мотивация (итоги по урокам 01–07)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .quiz-intro { background: linear-gradient(135deg, rgba(138,79,255,.15), rgba(0,170,255,.1));
+                  border: 1px solid var(--accent); border-radius: var(--radius); padding: 18px 22px; margin: 12px 0 24px; }
+    .quiz-intro h2 { color: var(--accent); font-size: 1.1rem; margin-bottom: 8px; }
+    .quiz-intro p { color: var(--text-secondary); font-size: .88rem; line-height: 1.55; }
+    .quiz-intro ul { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 6px;
+                    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .quiz-intro ul li { background: var(--bg-panel); padding: 6px 10px; border-radius: var(--radius-sm);
+                       font-family: var(--font-mono); font-size: .78rem; color: var(--accent-cyan);
+                       border-left: 2px solid var(--accent-cyan); }
+
+    .recap-block { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+                  margin: 16px 0; padding: 18px 22px; }
+    .recap-block__header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px;
+                          padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .recap-block__num { font-family: var(--font-mono); font-size: .75rem; color: var(--accent);
+                       background: rgba(138,79,255,.12); padding: 3px 8px; border-radius: var(--radius-sm); }
+    .recap-block__title { color: var(--text-primary); font-size: 1rem; font-weight: 600; }
+    .recap-block p { color: var(--text-secondary); font-size: .85rem; line-height: 1.6; margin: 8px 0; }
+    .recap-block p code { background: var(--bg-panel); padding: 1px 5px; border-radius: 3px;
+                         color: var(--accent-cyan); font-size: .82rem; }
+    .recap-block h4 { color: var(--accent); font-family: var(--font-mono); font-size: .8rem;
+                     margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .5px; }
+    .recap-block .code-block { margin: 8px 0 12px; font-size: .78rem; }
+    .recap-block__split { display: grid; gap: 12px; grid-template-columns: 1fr; }
+    @media (min-width: 1100px) { .recap-block__split { grid-template-columns: 1fr 1fr; } }
+    .file-label { font-family: var(--font-mono); font-size: .7rem; color: var(--text-muted);
+                 display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .file-label::before { content: '📄'; font-size: .75rem; }
+
+    .key-insight { background: rgba(0,170,255,.08); border-left: 3px solid var(--accent-cyan);
+                  padding: 10px 14px; margin: 10px 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+                  font-size: .84rem; color: var(--text-primary); }
+    .key-insight strong { color: var(--accent-cyan); }
+
+    .trap { background: rgba(255,170,0,.08); border-left: 3px solid var(--accent-orange, #ffaa00);
+           padding: 10px 14px; margin: 10px 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+           font-size: .84rem; color: var(--text-primary); }
+    .trap strong { color: var(--accent-orange, #ffaa00); }
+
+    .good { background: rgba(76,175,80,.08); border-left: 3px solid var(--success);
+           padding: 10px 14px; margin: 10px 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+           font-size: .84rem; color: var(--text-primary); }
+    .good strong { color: var(--success); }
+
+    .quiz-divider { text-align: center; font-family: var(--font-mono); color: var(--accent);
+                   font-size: .9rem; margin: 40px 0 20px; padding: 14px; background: var(--bg-tertiary);
+                   border-radius: var(--radius); border: 1px dashed var(--accent); }
+
+    .quiz-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+                padding: 18px 22px; margin: 16px 0; border-left: 4px solid var(--text-muted); }
+    .quiz-card.answered.correct { border-left-color: var(--success); }
+    .quiz-card.answered.wrong { border-left-color: var(--accent-red); }
+    .quiz-card__head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+    .quiz-card__num { font-family: var(--font-mono); font-size: .72rem; color: var(--accent);
+                     background: rgba(138,79,255,.14); padding: 3px 8px; border-radius: var(--radius-sm); }
+    .quiz-card__title { color: var(--text-primary); font-size: .98rem; font-weight: 600; }
+    .quiz-card__prompt { color: var(--text-primary); font-size: .88rem; margin: 10px 0; line-height: 1.55; }
+    .quiz-card__prompt code { background: var(--bg-panel); padding: 1px 5px; border-radius: 3px;
+                             color: var(--accent-cyan); font-size: .82rem; }
+    .quiz-card__multihint { font-size: .74rem; color: var(--text-muted); margin-top: 4px; font-style: italic; }
+
+    .option-list { display: grid; gap: 8px; margin: 14px 0; }
+    .option { display: flex; gap: 12px; padding: 10px 14px; background: var(--bg-panel);
+             border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+             transition: all .15s ease; align-items: flex-start; }
+    .option:hover:not(.locked) { border-color: var(--accent); background: rgba(138,79,255,.06); }
+    .option.picked { background: rgba(138,79,255,.14); border-color: var(--accent); }
+    .option.locked { cursor: default; }
+    .option.locked.is-correct { background: rgba(76,175,80,.12); border-color: var(--success); }
+    .option.locked.is-wrong-picked { background: rgba(220,53,69,.12); border-color: var(--accent-red); }
+    .option__box { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 4px;
+                  display: flex; align-items: center; justify-content: center;
+                  font-family: var(--font-mono); font-size: .75rem; color: var(--text-primary);
+                  flex-shrink: 0; margin-top: 1px; }
+    .option.picked .option__box { background: var(--accent); border-color: var(--accent); color: white; }
+    .option.locked.is-correct .option__box { background: var(--success); border-color: var(--success); color: white; }
+    .option.locked.is-wrong-picked .option__box { background: var(--accent-red); border-color: var(--accent-red); color: white; }
+    .option__body { flex: 1; font-size: .85rem; color: var(--text-primary); line-height: 1.5; }
+    .option__code { font-family: var(--font-mono); font-size: .78rem; background: var(--bg-secondary);
+                   padding: 6px 8px; border-radius: 3px; margin-top: 6px; display: block;
+                   border-left: 2px solid var(--border); color: var(--text-primary); white-space: pre-wrap; }
+    .option__verdict { margin-top: 8px; font-size: .78rem; padding-left: 4px; }
+    .option.locked.is-correct .option__verdict { color: var(--success); }
+    .option.locked.is-wrong-picked .option__verdict { color: var(--accent-red); }
+    .option.locked:not(.is-correct):not(.is-wrong-picked) .option__verdict { color: var(--text-muted); }
+
+    .quiz-card__submit { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+    .quiz-card__global { margin-top: 12px; padding: 12px 14px; background: var(--bg-panel);
+                        border-radius: var(--radius-sm); font-size: .82rem; color: var(--text-primary);
+                        border-left: 3px solid var(--accent); line-height: 1.6; }
+    .quiz-card__global strong { color: var(--accent); }
+    .quiz-card__global pre { background: var(--bg-secondary); padding: 8px 10px; border-radius: 3px;
+                            font-size: .77rem; margin: 8px 0; overflow-x: auto; color: var(--accent-cyan); }
+
+    .score-panel { position: sticky; bottom: 16px; display: flex; gap: 12px; align-items: center;
+                  padding: 14px 20px; background: var(--bg-tertiary); border: 1px solid var(--accent);
+                  border-radius: var(--radius); margin: 24px 0; box-shadow: 0 4px 20px rgba(0,0,0,.3); }
+    .score-panel__label { font-family: var(--font-mono); font-size: .85rem; color: var(--text-secondary); }
+    .score-panel__value { font-family: var(--font-mono); font-size: 1.2rem; color: var(--accent); font-weight: 600; }
+    .score-panel__bar { flex: 1; height: 8px; background: var(--bg-panel); border-radius: 4px; overflow: hidden; }
+    .score-panel__bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent-cyan), var(--accent), var(--success));
+                            transition: width .3s ease; width: 0%; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">Quiz A</span>Введение и мотивация — итоги уроков 01–07</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../07-classic-vs-rtk-side-by-side/">← Урок 07</a>
+      <a href="../08-configure-store-basic/">Урок 08 →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="quiz-intro">
+      <h2>Итог по секции A — зачем вообще RTK</h2>
+      <p>
+        Здесь собрано всё из уроков 01–07 в один длинный пробник. Сначала — <strong>напоминание</strong>
+        с полным рабочим кодом (store, slice, компонент, импорты — всё включено, без сокращений). Потом —
+        <strong>квиз из 10 задач</strong> с множественным выбором: отмечайте ВСЕ варианты, которые сработают / верны.
+      </p>
+      <ul>
+        <li>3 боли классики → 3 решения RTK</li>
+        <li>configureStore / createSlice / createAsyncThunk</li>
+        <li>3 entry points пакета</li>
+        <li>bundle ~17 kB, peer deps</li>
+        <li>immer / reselect / thunk / redux внутри</li>
+      </ul>
+    </div>
+
+    <div class="demo-section">
+      <div class="demo-section__header">Часть 1 — напоминание с полным кодом</div>
+      <div class="demo-section__body" id="recaps-container"></div>
+    </div>
+
+    <div class="quiz-divider">🧠 ЧАСТЬ 2 — КВИЗ, 10 ВОПРОСОВ 🧠</div>
+
+    <div class="demo-section">
+      <div class="demo-section__header">Множественный выбор. Отметьте ВСЕ правильные варианты, потом проверьте.</div>
+      <div class="demo-section__body">
+        <div id="quiz-container"></div>
+
+        <div class="score-panel">
+          <span class="score-panel__label">Счёт:</span>
+          <span class="score-panel__value" id="score">0 / 10</span>
+          <div class="score-panel__bar"><div class="score-panel__bar-fill" id="score-bar"></div></div>
+          <button class="btn btn--secondary" id="reset-quiz">Сбросить</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="console-container"></div>
+    <div id="devtools-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Шпаргалка по секции A (быстрая сверка)</div>
+      <div class="theory__body">
+        <h3>Пять правил, которые нужно запомнить</h3>
+        <ol>
+          <li><strong>RTK — это обёртка, не замена Redux.</strong> Те же <code>action → dispatch → reducer → store</code>,
+              те же три принципа (SSOT, read-only state, pure reducers). Просто меньше boilerplate.</li>
+          <li><strong>Три боли</strong>, которые решает RTK дословно из доки: "Configuring a Redux store is too
+              complicated", "I have to add a lot of packages", "Redux requires too much boilerplate code".</li>
+          <li><strong>Три точки входа:</strong> <code>@reduxjs/toolkit</code> (core), <code>@reduxjs/toolkit/query</code>
+              (createApi без React), <code>@reduxjs/toolkit/query/react</code> (createApi с auto-generated хуками).
+              Разделены, чтобы RTK работал в Node/Svelte/Vue без peer react.</li>
+          <li><strong>Внутри RTK</strong>: <code>redux</code>, <code>immer</code>, <code>reselect</code>,
+              <code>redux-thunk</code> (все как dependencies). <code>react</code> и <code>react-redux</code> —
+              peer dependencies, нужно ставить отдельно.</li>
+          <li><strong>Bundle:</strong> core ≈ 17 kB min+gzip. Полный RTK + RTK Query + хуки ≈ 28 kB.
+              Классический стек (redux+thunk+reselect+immer+react-redux) ≈ 22.5 kB — разница всего 5-6 kB
+              в обмен на x3 меньше кода.</li>
+        </ol>
+
+        <h3>Шпаргалка импортов</h3>
+        <div class="code-block">
+<span class="cm">// Core — всё кроме createApi</span>
+<span class="kw">import</span> { configureStore, createSlice, createAsyncThunk,
+         createEntityAdapter, createListenerMiddleware,
+         createSelector, nanoid } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="cm">// RTK Query без React</span>
+<span class="kw">import</span> { createApi, fetchBaseQuery } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query'</span>
+
+<span class="cm">// RTK Query С автогенерацией хуков</span>
+<span class="kw">import</span> { createApi, fetchBaseQuery } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query/react'</span>
+<span class="cm">// → api.useGetPostsQuery, api.useAddPostMutation</span>
+        </div>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/introduction/getting-started" target="_blank">RTK — Getting Started</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/overview" target="_blank">RTK — RTK Query Overview</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/package.json" target="_blank">packages/toolkit/package.json</a></li>
+          <li><a href="https://bundlephobia.com/package/@reduxjs/toolkit" target="_blank">bundlephobia — @reduxjs/toolkit</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

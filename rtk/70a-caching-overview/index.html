@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>70a — Карта кэша в RTK до RTK Query</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .layer-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); margin: 16px 0; }
+    .layer {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px 16px; border-left: 4px solid var(--accent);
+    }
+    .layer__num { font-family: var(--font-mono); font-size: .72rem; color: var(--accent); font-weight: 700; letter-spacing: .5px; }
+    .layer__title { color: var(--text-bright); font-weight: 600; font-size: .95rem; margin: 4px 0; }
+    .layer__key { font-family: var(--font-mono); font-size: .75rem; color: var(--accent-cyan); margin: 6px 0; }
+    .layer__desc { color: var(--text-secondary); font-size: .82rem; line-height: 1.55; }
+    .layer__lessons { margin-top: 8px; font-size: .72rem; color: var(--text-muted); font-family: var(--font-mono); }
+    .layer__lessons a { color: var(--accent-blue-bright); text-decoration: none; margin-right: 6px; }
+    .layer__lessons a:hover { text-decoration: underline; }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0; }
+    .stat { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+    .stat__label { color: var(--text-muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; }
+    .stat__value { color: var(--accent-cyan); font-size: 1.3rem; font-family: var(--font-mono); font-weight: 700; }
+    .stat__value--warn { color: var(--warning); }
+    .stat__value--good { color: var(--success); }
+
+    .compare-table { width: 100%; border-collapse: collapse; font-size: .8rem; margin: 12px 0; }
+    .compare-table th, .compare-table td {
+      border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top;
+    }
+    .compare-table th { background: var(--bg-tertiary); color: var(--accent); font-family: var(--font-mono); font-size: .75rem; }
+    .compare-table td code { background: var(--bg-panel); padding: 1px 5px; border-radius: 3px; color: var(--accent-cyan); font-size: .78rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">70a / 106</span>Кэш и оптимизации в RTK — обзор 5 слоёв до RTK Query</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../70-listener-typed/">← Назад</a>
+      <a href="../70b-structural-sharing-cache/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что RTK даёт вам до подключения RTK Query</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          RTK Query решает проблему server-state автоматически: cache key, deduplication, TTL, invalidation.
+          Но RTK сам по себе <strong>уже содержит 5 слоёв кэша/оптимизации</strong>. Понимание этих слоёв —
+          это (а) понимание того, что даёт RTK Query «бесплатно», (б) знание, какой слой заменяет
+          RTKQ, а какой остаётся актуальным и после него.
+        </p>
+
+        <div class="layer-grid">
+          <div class="layer">
+            <div class="layer__num">LAYER 1 — state</div>
+            <div class="layer__title">Structural sharing (ссылки как кэш-ключи)</div>
+            <div class="layer__key">Immer + <code>===</code></div>
+            <div class="layer__desc">
+              Reducer возвращает ту же ссылку, если не было мутации. <code>useSelector</code> сравнивает
+              <code>===</code> — нет изменения, нет ререндера. Это <strong>бесплатный кэш на уровне state</strong>.
+            </div>
+            <div class="layer__lessons">
+              → <a href="../40a-slice-caching-refs/">40a</a> <a href="../26-immer-inside/">26</a>
+            </div>
+          </div>
+
+          <div class="layer">
+            <div class="layer__num">LAYER 2 — view</div>
+            <div class="layer__title">Memoized selectors</div>
+            <div class="layer__key">createSelector / weakMapMemoize</div>
+            <div class="layer__desc">
+              Когда <code>===</code> недостаточно (фильтр, сумма, merge двух слайсов). Reselect кэширует
+              computed value по ссылкам на inputs. Это <strong>кэш на уровне view</strong>.
+            </div>
+            <div class="layer__lessons">
+              → <a href="../41-createselector-from-rtk/">41</a> <a href="../43-weakmap-memoize/">43</a> <a href="../44-slice-selectors-memoized/">44</a>
+            </div>
+          </div>
+
+          <div class="layer">
+            <div class="layer__num">LAYER 3 — data shape</div>
+            <div class="layer__title">Нормализация — O(1) кэш-таблица</div>
+            <div class="layer__key">createEntityAdapter</div>
+            <div class="layer__desc">
+              <code>{ ids, entities }</code> — это хеш-таблица. <code>selectById</code> = O(1) lookup,
+              как cache-hit. <strong>Кэш на уровне данных.</strong>
+            </div>
+            <div class="layer__lessons">
+              → <a href="../46-entity-why-normalized/">46</a> <a href="../47-entityadapter-basics/">47</a> <a href="../52-adapter-getselectors/">52</a>
+            </div>
+          </div>
+
+          <div class="layer">
+            <div class="layer__num">LAYER 4 — requests</div>
+            <div class="layer__title">Request dedup + condition</div>
+            <div class="layer__key">condition / listener takeLatest</div>
+            <div class="layer__desc">
+              Не запускать thunk, если inflight. Отменять предыдущий, если пришёл новый. <strong>Кэш
+              на уровне запросов.</strong>
+            </div>
+            <div class="layer__lessons">
+              → <a href="../59-asyncthunk-condition/">59</a> <a href="../60-asyncthunk-cancellation/">60</a> <a href="../69-listener-patterns/">69</a>
+            </div>
+          </div>
+
+          <div class="layer">
+            <div class="layer__num">LAYER 5 — lifetime</div>
+            <div class="layer__title">TTL cache + invalidation руками</div>
+            <div class="layer__key">fetchedAt + condition</div>
+            <div class="layer__desc">
+              Храним <code>fetchedAt</code> в state, в <code>condition</code> проверяем свежесть.
+              Invalidate — через reducer. <strong>Кэш на уровне времени жизни.</strong>
+            </div>
+            <div class="layer__lessons">
+              → <a href="./">Урок 70f</a>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin: 18px 0;">
+          <p style="color: var(--text-secondary); font-size: .85rem;">
+            Ниже — живой мини-демо, который прогоняет <strong>все 5 слоёв</strong> на одном store. Нажимайте
+            кнопки и смотрите статистику: рендеры, сетевые запросы, cache hits, skipped by condition.
+          </p>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0;">
+            <button class="btn btn--accent" id="btn-view">① Change unrelated slice (Layer 1 проверит ===)</button>
+            <button class="btn btn--accent" id="btn-compute">② Read expensive selector (Layer 2 memo)</button>
+            <button class="btn btn--accent" id="btn-fetch">③ Fetch product #1 (Layer 3+4+5 комбо)</button>
+            <button class="btn btn--secondary" id="btn-reset">Reset</button>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="stat__label">Клики unrelated</div>
+              <div class="stat__value" id="st-clicks">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">Selector recompute</div>
+              <div class="stat__value" id="st-recomputes">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">Real fetch</div>
+              <div class="stat__value stat__value--warn" id="st-fetches">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">Cache hits (TTL)</div>
+              <div class="stat__value stat__value--good" id="st-hits">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">Skipped by condition</div>
+              <div class="stat__value stat__value--good" id="st-skips">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 70a. Что именно кэшируется и где</div>
+      <div class="theory__body">
+        <h3>Сводная таблица</h3>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Слой</th>
+              <th>Что кэшируется</th>
+              <th>Ключ кэша</th>
+              <th>Когда инвалидируется</th>
+              <th>Заменяется ли RTKQ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1. Structural sharing</td>
+              <td>Ссылки на под-объекты state</td>
+              <td><code>===</code> на identity</td>
+              <td>Любая реальная мутация в Immer</td>
+              <td>Нет — остаётся актуальным</td>
+            </tr>
+            <tr>
+              <td>2. Memoized selectors</td>
+              <td>Computed values (filter/sort/sum)</td>
+              <td>Ссылки на inputs</td>
+              <td>Изменение любого input по <code>===</code></td>
+              <td>Нет — остаётся актуальным</td>
+            </tr>
+            <tr>
+              <td>3. Нормализация</td>
+              <td>Entity-таблица для O(1) lookup</td>
+              <td><code>selectId(entity)</code></td>
+              <td>CRUD-методы adapter'а</td>
+              <td>Частично — RTKQ хранит по <code>cacheKey</code></td>
+            </tr>
+            <tr>
+              <td>4. Request dedup</td>
+              <td>Сам факт inflight-запроса</td>
+              <td><code>loading === 'pending'</code></td>
+              <td>Fulfilled/rejected thunk'а</td>
+              <td>Да — RTKQ делает это автоматом по cacheKey</td>
+            </tr>
+            <tr>
+              <td>5. TTL cache</td>
+              <td>Момент последней загрузки</td>
+              <td><code>fetchedAt</code> per id</td>
+              <td>Таймер (TTL) + ручной invalidate</td>
+              <td>Да — RTKQ делает через <code>keepUnusedDataFor</code> + tags</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Ментальная модель: когда какой слой включается</h3>
+        <div class="code-block"><span class="cm">// Типичный путь одного update'а:</span>
+
+<span class="fn">dispatch</span>(<span class="fn">cartItemAdded</span>(item))
+  ↓
+<span class="cm">// [4] condition сказал ok → pending диспатчится</span>
+<span class="cm">// [3] adapter.addOne(state, item) — O(1) вставка в {ids, entities}</span>
+<span class="cm">// [1] structural sharing: state.cart изменился, state.user — нет (ссылка та же)</span>
+  ↓
+<span class="cm">// React обходит useSelector-subscribers:</span>
+<span class="fn">useSelector</span>(s =&gt; s.user)          <span class="cm">// === совпало → skip render</span>
+<span class="fn">useSelector</span>(s =&gt; s.cart.ids)      <span class="cm">// !== → render + [2] селектор recompute</span>
+<span class="fn">useSelector</span>(<span class="fn">selectCartTotal</span>)     <span class="cm">// [2] createSelector: recompute</span>
+<span class="fn">useSelector</span>(<span class="fn">selectCartItems</span>)     <span class="cm">// [2] weakMapMemoize hit если refs те же</span></div>
+
+        <h3>Что НЕ будет покрыто в этой секции</h3>
+        <div class="warning">
+          <strong>1.</strong> autoBatchEnhancer — это оптимизация <em>рендеров</em>, не кэша. Он уже разбирался в уроке
+          <a href="../15-enhancers-autobatch/">15</a>.<br>
+          <strong>2.</strong> Оптимистичные апдейты — это UX-оптимизация, тоже не кэш. Ручной паттерн разбирался
+          в листенерах (67–69). В RTKQ — <code>onQueryStarted + updateQueryData</code>.<br>
+          <strong>3.</strong> Код-сплиттинг slices (lazy injection, урок 35/35a) — оптимизация бандла, не runtime-кэша.
+        </div>
+
+        <h3>Рассуждение: зачем вообще этим заниматься, если есть RTKQ</h3>
+        <div class="tip">
+          <strong>Три причины знать слои 4/5 руками:</strong><br>
+          • RTKQ покрывает только server-state. Клиентский state (фильтры, UI, draft-формы) живёт в обычных slices — и там кэш/дедуп полезны.<br>
+          • Миграция: вы приходите в проект без RTKQ и должны поддерживать условный <code>condition</code> + TTL. Без понимания слоёв — правите вслепую.<br>
+          • Внутри RTKQ те же идеи: <code>cacheKey</code> = нормализация, <code>keepUnusedDataFor</code> = TTL, tags = invalidation. Зная «руками» — быстрее читаете документацию RTKQ.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="./70b-structural-sharing-cache/">70b — Structural sharing как кэш</a></li>
+          <li><a href="./70c-selector-cache/">70c — Memoized selectors как view cache</a></li>
+          <li><a href="./70d-entity-as-cache-table/">70d — EntityAdapter как O(1) таблица</a></li>
+          <li><a href="./70e-request-dedup/">70e — Request dedup руками</a></li>
+          <li><a href="./70f-ttl-invalidation/">70f — TTL cache и invalidation</a></li>
+          <li><a href="./70g-quiz-caching/">70g — Quiz по кэшу</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

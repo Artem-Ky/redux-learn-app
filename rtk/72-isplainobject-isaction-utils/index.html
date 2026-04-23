@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>72 — isPlainObject, isAction, miniSerializeError, Tuple</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .util-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px; margin: 12px 0;
+    }
+    .util-card h4 {
+      font-family: var(--font-mono); color: var(--accent);
+      font-size: .9rem; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .util-card p { color: var(--text-secondary); font-size: .84rem; margin-bottom: 10px; }
+
+    .case-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 8px; margin: 8px 0;
+    }
+    .case-btn {
+      background: var(--bg-panel); border: 1px solid var(--border);
+      color: var(--text-primary); padding: 8px 10px;
+      border-radius: var(--radius-sm); cursor: pointer;
+      font-family: var(--font-mono); font-size: .76rem;
+      text-align: left; transition: border-color .15s, background .15s;
+    }
+    .case-btn:hover { border-color: var(--accent); background: var(--bg-hover); }
+    .case-btn__expr { color: var(--accent-orange); }
+
+    .result-box {
+      background: var(--bg-panel); border: 1px dashed var(--border);
+      border-radius: var(--radius-sm); padding: 10px 12px;
+      font-family: var(--font-mono); font-size: .82rem;
+      color: var(--text-primary); min-height: 60px;
+      white-space: pre-wrap; word-break: break-all;
+      margin-top: 8px;
+    }
+    .result-box .k { color: var(--accent-yellow); }
+    .result-box .v-true { color: var(--success); }
+    .result-box .v-false { color: var(--accent-red); }
+    .result-box .v-str { color: var(--accent-orange); }
+
+    .run-all-row {
+      display: flex; gap: 10px; align-items: center; margin: 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">72 / 106</span>isPlainObject, isAction, miniSerializeError, Tuple — утилиты RTK</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../71-autobatch-prepareautobatched/">← Назад</a>
+      <a href="../73-all-matchers-sweep/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Четыре малых утилиты — полный пробег кейсов</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Каждая карточка — одна утилита и набор тест-кейсов. Нажми кнопку — результат
+          попадёт в поле справа и в <code>ConsolePanel</code>. Особое внимание к краевым
+          случаям (например, <code>Object.create(null)</code>).
+        </p>
+
+        <!-- ── isPlainObject ───────────────────────────────────── -->
+        <div class="util-card">
+          <h4><span class="tag tag--info">redux</span>isPlainObject(value): boolean</h4>
+          <p>Проверка «простого объекта» — объекта-литерала или <code>Object.create(null)</code>. Используется внутри <code>isAction</code>, serializable-middleware, Immer.</p>
+          <div class="case-grid" data-util="isPlainObject">
+            <button class="case-btn" data-case="obj"><span class="case-btn__expr">{ a: 1 }</span> → ?</button>
+            <button class="case-btn" data-case="array"><span class="case-btn__expr">[1, 2, 3]</span> → ?</button>
+            <button class="case-btn" data-case="null"><span class="case-btn__expr">null</span> → ?</button>
+            <button class="case-btn" data-case="undefined"><span class="case-btn__expr">undefined</span> → ?</button>
+            <button class="case-btn" data-case="map"><span class="case-btn__expr">new Map()</span> → ?</button>
+            <button class="case-btn" data-case="set"><span class="case-btn__expr">new Set()</span> → ?</button>
+            <button class="case-btn" data-case="date"><span class="case-btn__expr">new Date()</span> → ?</button>
+            <button class="case-btn" data-case="createNull"><span class="case-btn__expr">Object.create(null)</span> → ?</button>
+            <button class="case-btn" data-case="classInst"><span class="case-btn__expr">new Foo()</span> → ?</button>
+            <button class="case-btn" data-case="number"><span class="case-btn__expr">42</span> → ?</button>
+          </div>
+          <div class="result-box" id="res-isPlainObject">—</div>
+        </div>
+
+        <!-- ── isAction ──────────────────────────────────────── -->
+        <div class="util-card">
+          <h4><span class="tag tag--info">redux</span>isAction(value): boolean</h4>
+          <p>Проверка action'а в Redux-смысле: plain object + <code>typeof type === 'string'</code>.</p>
+          <div class="case-grid" data-util="isAction">
+            <button class="case-btn" data-case="simple"><span class="case-btn__expr">{ type: 'INC' }</span> → ?</button>
+            <button class="case-btn" data-case="payload"><span class="case-btn__expr">{ type: 'X', payload: 1 }</span> → ?</button>
+            <button class="case-btn" data-case="empty"><span class="case-btn__expr">{}</span> → ?</button>
+            <button class="case-btn" data-case="noType"><span class="case-btn__expr">{ foo: 'bar' }</span> → ?</button>
+            <button class="case-btn" data-case="typeNum"><span class="case-btn__expr">{ type: 42 }</span> → ?</button>
+            <button class="case-btn" data-case="classAction"><span class="case-btn__expr">new ClassAction('X')</span> → ?</button>
+          </div>
+          <div class="result-box" id="res-isAction">—</div>
+        </div>
+
+        <!-- ── miniSerializeError ─────────────────────────────── -->
+        <div class="util-card">
+          <h4><span class="tag tag--good">RTK</span>miniSerializeError(value): SerializedError</h4>
+          <p>Сериализация ошибки в plain object для safe-сохранения в state (Redux требует serializable). Вытаскивает <em>только</em> поля <code>name</code>, <code>message</code>, <code>stack</code>, <code>code</code>.</p>
+          <div class="case-grid" data-util="miniSerializeError">
+            <button class="case-btn" data-case="error"><span class="case-btn__expr">new Error('boom')</span></button>
+            <button class="case-btn" data-case="typeError"><span class="case-btn__expr">new TypeError('nope')</span></button>
+            <button class="case-btn" data-case="string"><span class="case-btn__expr">'some string'</span></button>
+            <button class="case-btn" data-case="number"><span class="case-btn__expr">42</span></button>
+            <button class="case-btn" data-case="null"><span class="case-btn__expr">null</span></button>
+            <button class="case-btn" data-case="custom"><span class="case-btn__expr">{name,message,code,extra}</span></button>
+            <button class="case-btn" data-case="errorWithCode"><span class="case-btn__expr">Error + .code + .custom</span></button>
+          </div>
+          <div class="result-box" id="res-miniSerializeError">—</div>
+        </div>
+
+        <!-- ── Tuple ────────────────────────────────────────── -->
+        <div class="util-card">
+          <h4><span class="tag tag--good">RTK</span>Tuple — Array с сохранением типа</h4>
+          <p>Подкласс <code>Array</code> с <code>Symbol.species = Tuple</code>: <code>concat</code>/<code>slice</code>/<code>map</code> возвращают <code>Tuple</code>, не обычный массив. Критично для типизации <code>middleware</code> и <code>enhancers</code>.</p>
+          <div class="case-grid" data-util="Tuple">
+            <button class="case-btn" data-case="new"><span class="case-btn__expr">new Tuple(1, 2, 3)</span></button>
+            <button class="case-btn" data-case="concat"><span class="case-btn__expr">t1.concat(t2) — тип результата?</span></button>
+            <button class="case-btn" data-case="prepend"><span class="case-btn__expr">new Tuple(3,4).prepend([1,2])</span></button>
+            <button class="case-btn" data-case="species"><span class="case-btn__expr">t.map(x =&gt; x*2) instanceof Tuple?</span></button>
+            <button class="case-btn" data-case="vsArray"><span class="case-btn__expr">[1,2].concat([3,4]) instanceof Tuple?</span></button>
+          </div>
+          <div class="result-box" id="res-Tuple">—</div>
+        </div>
+
+        <div class="run-all-row">
+          <button class="btn btn--accent" id="run-all">Прогнать все кейсы</button>
+          <button class="btn" id="clear-results">Очистить результаты</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 72. Четыре утилиты-«кирпичика»</div>
+      <div class="theory__body">
+
+        <h3>Цитата — откуда эти утилиты</h3>
+        <div class="quote">
+          «Redux Toolkit re-exports the <code>isPlainObject</code> and <code>isAction</code> helpers from Redux core, and exports its own <code>Tuple</code> and <code>miniSerializeError</code> utilities for internal use and in public API.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createAsyncThunk#handling-thunk-errors" target="_blank">RTK docs — thunk errors</a>
+        </div>
+        <div class="quote quote--ru">
+          «RTK реэкспортирует <code>isPlainObject</code> / <code>isAction</code> из <code>redux</code> core и даёт собственные <code>Tuple</code> и <code>miniSerializeError</code> — для внутренних проверок и публичного API.»
+        </div>
+
+        <h3>Исходник — <code>isPlainObject</code> (redux core)</h3>
+        <div class="code-block">
+<span class="cm">// node_modules/redux/src/utils/isPlainObject.ts — весь файл, 16 строк</span>
+<span class="kw">export default function</span> <span class="fn">isPlainObject</span>(obj: <span class="kw">any</span>): obj <span class="kw">is</span> <span class="type">object</span> {
+  <span class="kw">if</span> (<span class="kw">typeof</span> obj !== <span class="str">'object'</span> || obj === <span class="kw">null</span>) <span class="kw">return</span> <span class="kw">false</span>
+
+  <span class="kw">let</span> proto = obj
+  <span class="kw">while</span> (<span class="type">Object</span>.<span class="fn">getPrototypeOf</span>(proto) !== <span class="kw">null</span>) {
+    proto = <span class="type">Object</span>.<span class="fn">getPrototypeOf</span>(proto)       <span class="cm">// поднимаемся к корню prototype chain</span>
+  }
+
+  <span class="kw">return</span> (
+    <span class="type">Object</span>.<span class="fn">getPrototypeOf</span>(obj) === proto     <span class="cm">// прямой потомок Object.prototype</span>
+    || <span class="type">Object</span>.<span class="fn">getPrototypeOf</span>(obj) === <span class="kw">null</span>    <span class="cm">// ИЛИ без prototype (Object.create(null))</span>
+  )
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux/blob/master/packages/redux/src/utils/isPlainObject.ts" target="_blank">github.com/reduxjs/redux/blob/master/packages/redux/src/utils/isPlainObject.ts</a>
+        </p>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          Алгоритм: идём вверх по <code>getPrototypeOf</code>, пока не упрёмся в <code>null</code>. Запоминаем
+          «последний до null» как <code>proto</code>. Если <code>getPrototypeOf(obj) === proto</code> — объект
+          лежит на один уровень ниже root (т.е. это <code>{ ... }</code>). Альтернатива — <code>null</code> сам
+          (для <code>Object.create(null)</code>).
+        </p>
+
+        <h3>Исходник — <code>isAction</code> (redux core)</h3>
+        <div class="code-block">
+<span class="cm">// node_modules/redux/src/utils/isAction.ts — весь файл</span>
+<span class="kw">export default function</span> <span class="fn">isAction</span>(action: <span class="kw">unknown</span>): action <span class="kw">is</span> <span class="type">Action</span>&lt;<span class="kw">string</span>&gt; {
+  <span class="kw">return</span> (
+    <span class="fn">isPlainObject</span>(action)
+    &amp;&amp; <span class="str">'type'</span> <span class="kw">in</span> action
+    &amp;&amp; <span class="kw">typeof</span> (action <span class="kw">as</span> <span class="type">Record</span>&lt;<span class="str">'type'</span>, <span class="kw">unknown</span>&gt;).type === <span class="str">'string'</span>
+  )
+}
+        </div>
+
+        <h3>Исходник — <code>miniSerializeError</code> (RTK)</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/createAsyncThunk.ts, строки 57-107</span>
+<span class="kw">const</span> commonProperties: <span class="type">Array</span>&lt;<span class="kw">keyof</span> <span class="type">SerializedError</span>&gt; = [
+  <span class="str">'name'</span>,
+  <span class="str">'message'</span>,
+  <span class="str">'stack'</span>,
+  <span class="str">'code'</span>,
+]
+
+<span class="cm">/** Serializes an error into a plain object. Reworked from sindresorhus/serialize-error */</span>
+<span class="kw">export const</span> <span class="fn">miniSerializeError</span> = (value: <span class="kw">any</span>): <span class="type">SerializedError</span> =&gt; {
+  <span class="kw">if</span> (<span class="kw">typeof</span> value === <span class="str">'object'</span> &amp;&amp; value !== <span class="kw">null</span>) {
+    <span class="kw">const</span> simpleError: <span class="type">SerializedError</span> = {}
+    <span class="kw">for</span> (<span class="kw">const</span> property <span class="kw">of</span> commonProperties) {
+      <span class="kw">if</span> (<span class="kw">typeof</span> value[property] === <span class="str">'string'</span>) {
+        simpleError[property] = value[property]      <span class="cm">// только string-поля из whitelist'а!</span>
+      }
+    }
+    <span class="kw">return</span> simpleError
+  }
+  <span class="kw">return</span> { message: <span class="type">String</span>(value) }               <span class="cm">// для строк/чисел/null — fallback на .message</span>
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L57-L107" target="_blank">github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L57-L107</a>
+        </p>
+
+        <h3>Исходник — <code>Tuple</code> (RTK)</h3>
+        <div class="code-block">
+<span class="cm">// packages/toolkit/src/utils.ts, строки 29-71 (сокращено — убраны TS overloads)</span>
+<span class="kw">export class</span> <span class="type">Tuple</span>&lt;Items <span class="kw">extends</span> <span class="type">ReadonlyArray</span>&lt;<span class="kw">unknown</span>&gt; = []&gt;
+  <span class="kw">extends</span> <span class="type">Array</span>&lt;Items[<span class="kw">number</span>]&gt; {
+
+  <span class="fn">constructor</span>(...items: <span class="kw">any</span>[]) {
+    <span class="kw">super</span>(...items)
+    <span class="type">Object</span>.<span class="fn">setPrototypeOf</span>(<span class="kw">this</span>, <span class="type">Tuple</span>.prototype)   <span class="cm">// важно — иначе TS downlevel теряет prototype</span>
+  }
+
+  <span class="kw">static override get</span> [<span class="type">Symbol</span>.species]() {
+    <span class="kw">return</span> <span class="type">Tuple</span> <span class="kw">as any</span>                             <span class="cm">// 🔑 map/filter/slice → Tuple, НЕ Array</span>
+  }
+
+  <span class="kw">override</span> <span class="fn">concat</span>(...arr: <span class="kw">any</span>[]) {
+    <span class="kw">return</span> <span class="kw">super</span>.concat.<span class="fn">apply</span>(<span class="kw">this</span>, arr)         <span class="cm">// Array.concat использует Symbol.species — получаем Tuple</span>
+  }
+
+  <span class="fn">prepend</span>(...arr: <span class="kw">any</span>[]) {
+    <span class="kw">if</span> (arr.length === <span class="num">1</span> &amp;&amp; <span class="type">Array</span>.<span class="fn">isArray</span>(arr[<span class="num">0</span>])) {
+      <span class="kw">return</span> <span class="kw">new</span> <span class="fn">Tuple</span>(...arr[<span class="num">0</span>].<span class="fn">concat</span>(<span class="kw">this</span>))
+    }
+    <span class="kw">return</span> <span class="kw">new</span> <span class="fn">Tuple</span>(...arr.<span class="fn">concat</span>(<span class="kw">this</span>))
+  }
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted); margin-top: -6px;">
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/utils.ts#L29-L71" target="_blank">github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/utils.ts#L29-L71</a>
+        </p>
+
+        <h3>Зачем <code>Symbol.species</code>?</h3>
+        <p>
+          Методы <code>Array</code> (map, filter, slice, concat) внутри смотрят на <code>Symbol.species</code>
+          конструктора, чтобы решить, экземпляр какого класса создать. Переопределяем — и TypeScript
+          сохраняет сигнатуру: <code>Tuple&lt;[A, B]&gt;.concat(Tuple&lt;[C]&gt;) → Tuple&lt;[A, B, C]&gt;</code>.
+          Без этого <code>concat</code> вернул бы <code>Array</code>, и <code>middleware: (g) =&gt; g().concat(custom)</code>
+          потерял бы precise-тип.
+        </p>
+
+        <div class="warning">
+          <strong>Подводные камни:</strong>
+          <ul>
+            <li><strong><code>isPlainObject(Object.create(null))</code> === true.</strong> Хотя такой объект не имеет метода <code>toString</code> / <code>hasOwnProperty</code>, он всё равно считается plain. <em>Почему:</em> создан через <code>Object.create</code> и его прототипная цепочка имеет корректную форму (обрывается на <code>null</code>). <em>Последствия:</em> Redux примет такой state/action без warning'а, но любой <code>obj.hasOwnProperty(...)</code> кинет Error — используй <code>Object.hasOwn(obj, key)</code>.</li>
+            <li><strong><code>isPlainObject</code> возвращает false для instance классов.</strong> Даже если класс простой — <code>class Foo { a = 1 }</code> — его прототип не <code>Object.prototype</code>, а <code>Foo.prototype</code>. Для state/action это корректно (Redux хочет plain), но если у тебя в payload есть <code>new Date()</code> — serializable middleware начнёт ругаться.</li>
+            <li><strong><code>miniSerializeError</code> отбрасывает не-string поля и не-whitelist ключи.</strong> Есть у тебя <code>err.userId = 42</code> (number) или <code>err.data = { ... }</code> — эти поля <em>потеряются</em>. Свой <code>serializeError: (e) =&gt; ({ ...e })</code> передавай через <code>createAsyncThunk(name, fn, { serializeError })</code>. Важно: свои поля должны быть serializable — иначе serializable-middleware ругнётся.</li>
+            <li><strong><code>Tuple</code> и JSON.</strong> <code>JSON.stringify(new Tuple(1,2,3))</code> даст <code>[1,2,3]</code>, но <code>JSON.parse</code> вернёт plain Array. Если ты хранишь Tuple в state (не надо, но вдруг) — после rehydrate получишь Array, и вся магия типизации уходит.</li>
+            <li><strong><code>isAction</code> не проверяет payload/meta.</strong> <code>{ type: 'X', payload: () =&gt; {} }</code> пройдёт — будет считаться action'ом, хотя функция в payload сразу сломает DevTools time-travel. Это <em>намеренно</em> — Redux отделяет валидацию формы action от serializability-проверки (у них отдельный middleware).</li>
+          </ul>
+        </div>
+
+        <h3>Где внутри RTK эти утилиты используются</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem;">
+          <thead style="background: var(--bg-panel);">
+            <tr>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); text-align: left; color: var(--accent);">Утилита</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Где вызывается</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">isPlainObject</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">configureStore → serializable-check; query → defaultSerializeQueryArgs; immer isDraftable (как гейт).</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">isAction</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">middleware entry-point: прежде чем next(action), Redux core проверяет формой.</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">miniSerializeError</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">createAsyncThunk default для rejected.action.error; через options.serializeError можно подменить.</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">Tuple</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">getDefaultMiddleware / getDefaultEnhancers возвращают Tuple; configureStore использует .concat/.prepend для сохранения типов.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../13-serializable-middleware/">13 — serializable middleware (где используется isPlainObject)</a></li>
+          <li><a href="../16-tuple-typing/">16 — Tuple и типизация middleware</a></li>
+          <li><a href="../58-rejectwithvalue/">58 — rejectWithValue и serializeError</a></li>
+          <li><a href="../23-matchers-utilities/">23 — matchers (там же isAction-логика)</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

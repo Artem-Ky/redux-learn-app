@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>69 — debounce / throttle / takeLatest/Every/Leading</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .tabs { display: flex; gap: 4px; margin: 12px 0; flex-wrap: wrap; }
+    .tab {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      color: var(--text-secondary); padding: 8px 14px; border-radius: var(--radius-sm);
+      cursor: pointer; font-family: var(--font-mono); font-size: .82rem;
+    }
+    .tab.active { border-color: var(--accent); color: var(--accent); background: rgba(86,156,214,.12); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .bench {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px; margin-top: 10px;
+    }
+    .bench-cell {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 12px;
+    }
+    .bench-cell__label { color: var(--text-muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; }
+    .bench-cell__value { color: var(--accent-cyan); font-family: var(--font-mono); font-size: 1.1rem; margin-top: 4px; }
+    .bench-cell.fired .bench-cell__value { color: var(--success); }
+    .cmp-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    .cmp-table th, .cmp-table td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; }
+    .cmp-table thead { background: var(--bg-panel); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">69 / 106</span>Патерны: debounce, throttle, takeLatest/Every/Leading</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../68-listener-cancellation/">← Назад</a>
+      <a href="../70-listener-typed/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">4 режима, одна и та же кнопка «spam 10 раз»</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Одинаковый action <code>ping()</code> диспатчится 10 раз подряд (каждые 50мс).
+          Во всех четырёх вкладках этот action слушает listener, но реагирует разным паттерном —
+          смотрите, сколько раз запустился effect.
+        </p>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="takeLatest">takeLatest</button>
+          <button class="tab" data-tab="takeEvery">takeEvery</button>
+          <button class="tab" data-tab="takeLeading">takeLeading</button>
+          <button class="tab" data-tab="throttle">throttle</button>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn--accent" id="spam">Spam: 10× ping каждые 50мс</button>
+          <button class="btn" id="single">Single ping</button>
+          <button class="btn btn--danger" id="reset">reset счётчиков</button>
+        </div>
+
+        <div class="bench">
+          <div class="bench-cell" id="b-dispatch">
+            <div class="bench-cell__label">Dispatched</div>
+            <div class="bench-cell__value" id="v-dispatch">0</div>
+          </div>
+          <div class="bench-cell" id="b-started">
+            <div class="bench-cell__label">Effect started</div>
+            <div class="bench-cell__value" id="v-started">0</div>
+          </div>
+          <div class="bench-cell" id="b-done">
+            <div class="bench-cell__label">Effect done</div>
+            <div class="bench-cell__value" id="v-done">0</div>
+          </div>
+          <div class="bench-cell" id="b-cancelled">
+            <div class="bench-cell__label">Cancelled</div>
+            <div class="bench-cell__value" id="v-cancelled">0</div>
+          </div>
+        </div>
+
+        <div class="tab-panel active" data-panel="takeLatest">
+          <h3 style="color: var(--accent); margin: 12px 0 6px;">takeLatest — debounce + отмена предыдущих</h3>
+          <div class="code-block">
+listener.<span class="fn">startListening</span>({
+  actionCreator: ping,
+  effect: <span class="kw">async</span> (_a, api) =&gt; {
+    api.<span class="fn">cancelActiveListeners</span>()    <span class="cm">// ← отменяем всех прежних</span>
+    <span class="kw">await</span> api.<span class="fn">delay</span>(<span class="num">150</span>)        <span class="cm">// ← debounce окно</span>
+    <span class="cm">// сюда доберётся только последний</span>
+    api.dispatch(<span class="fn">effectRan</span>(<span class="str">'takeLatest'</span>))
+  },
+})
+          </div>
+          <p style="color: var(--text-secondary); font-size: .85rem;">
+            Ожидание: 10 dispatched, 10 started, <strong>1 done</strong>, 9 cancelled.
+          </p>
+        </div>
+
+        <div class="tab-panel" data-panel="takeEvery">
+          <h3 style="color: var(--accent); margin: 12px 0 6px;">takeEvery — нет cancel, все отработают</h3>
+          <div class="code-block">
+listener.<span class="fn">startListening</span>({
+  actionCreator: ping,
+  effect: <span class="kw">async</span> (_a, api) =&gt; {
+    <span class="kw">await</span> api.<span class="fn">delay</span>(<span class="num">150</span>)        <span class="cm">// ← каждая копия живёт своей жизнью</span>
+    api.dispatch(<span class="fn">effectRan</span>(<span class="str">'takeEvery'</span>))
+  },
+})
+          </div>
+          <p style="color: var(--text-secondary); font-size: .85rem;">
+            Ожидание: 10 dispatched, 10 started, <strong>10 done</strong>, 0 cancelled. Поведение по умолчанию.
+          </p>
+        </div>
+
+        <div class="tab-panel" data-panel="takeLeading">
+          <h3 style="color: var(--accent); margin: 12px 0 6px;">takeLeading — первый запустился, остальные игнор</h3>
+          <div class="code-block">
+listener.<span class="fn">startListening</span>({
+  actionCreator: ping,
+  effect: <span class="kw">async</span> (_a, api) =&gt; {
+    <span class="cm">// Отписываемся на время своей работы — новые ping\'и не будут ловиться</span>
+    api.<span class="fn">unsubscribe</span>()
+    <span class="kw">try</span> {
+      <span class="kw">await</span> api.<span class="fn">delay</span>(<span class="num">400</span>)
+      api.dispatch(<span class="fn">effectRan</span>(<span class="str">'takeLeading'</span>))
+    } <span class="kw">finally</span> {
+      api.<span class="fn">subscribe</span>()            <span class="cm">// ← снова готовы</span>
+    }
+  },
+})
+          </div>
+          <p style="color: var(--text-secondary); font-size: .85rem;">
+            Ожидание: 10 dispatched, но <strong>effect стартует только 1 раз</strong> (на первом action'е).
+            Пока он идёт — listener снят, остальные 9 action'ов не видят entry.
+          </p>
+        </div>
+
+        <div class="tab-panel" data-panel="throttle">
+          <h3 style="color: var(--accent); margin: 12px 0 6px;">throttle — unsubscribe/subscribe на окно T</h3>
+          <div class="code-block">
+listener.<span class="fn">startListening</span>({
+  actionCreator: ping,
+  effect: <span class="kw">async</span> (_a, api) =&gt; {
+    api.<span class="fn">unsubscribe</span>()                 <span class="cm">// окно открыто</span>
+    api.dispatch(<span class="fn">effectRan</span>(<span class="str">'throttle'</span>))  <span class="cm">// немедленный «leading» throttle</span>
+    <span class="kw">await</span> api.<span class="fn">delay</span>(<span class="num">400</span>)
+    api.<span class="fn">subscribe</span>()                   <span class="cm">// готовы снова</span>
+  },
+})
+          </div>
+          <p style="color: var(--text-secondary); font-size: .85rem;">
+            Ожидание: 10 dispatched, <strong>effect done ≈ 1</strong> (в пределах 400мс окна).
+            Визуально идентично takeLeading, но разница в том, где выполняется работа:
+            здесь leading (сразу), takeLeading — trailing (в конце окна).
+          </p>
+        </div>
+
+        <div id="console-container"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 69. Common usage patterns</div>
+      <div class="theory__body">
+
+        <h3>Официальная док</h3>
+        <div class="quote">
+          «This middleware lets you express "when this action is dispatched, start this effect". Because the effect is just an <code>async</code> function that has access to <code>cancelActiveListeners</code>, <code>delay</code>, <code>unsubscribe</code>/<code>subscribe</code>, and forks, you can build the saga-like patterns on top of it.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createListenerMiddleware#common-usage-patterns" target="_blank">RTK docs — common usage patterns</a>
+        </div>
+        <div class="quote quote--ru">
+          «Middleware выражает "когда этот action — запустить этот effect". Поскольку effect — обычная async-функция с доступом к <code>cancelActiveListeners</code>, <code>delay</code>, <code>unsubscribe/subscribe</code> и <code>fork</code>, на нём строятся saga-подобные паттерны.»
+        </div>
+
+        <h3>Сопоставление саг ↔ listenerMiddleware</h3>
+        <table class="cmp-table">
+          <thead>
+            <tr><th>saga</th><th>listenerMiddleware</th><th>суть</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>takeEvery(action, saga)</code></td><td>обычный effect без cancelActive</td><td>все копии работают параллельно</td></tr>
+            <tr><td><code>takeLatest(action, saga)</code></td><td><code>cancelActiveListeners() + await delay(n)</code></td><td>живёт только последний</td></tr>
+            <tr><td><code>takeLeading(action, saga)</code></td><td><code>unsubscribe() + try/finally subscribe()</code></td><td>первый, остальные игнор пока не закончил</td></tr>
+            <tr><td><code>debounce(ms, action, saga)</code></td><td><code>cancelActiveListeners() + delay(ms)</code></td><td>тот же takeLatest (фактически синонимы)</td></tr>
+            <tr><td><code>throttle(ms, action, saga)</code></td><td><code>unsubscribe() + dispatch + delay(ms) + subscribe()</code></td><td>окно T, только первый проходит</td></tr>
+            <tr><td><code>call(fn, ...args)</code></td><td><code>await api.pause(fn(...))</code></td><td>abort-aware await</td></tr>
+            <tr><td><code>fork(saga)</code></td><td><code>api.fork(exec, opts)</code></td><td>параллельная задача</td></tr>
+            <tr><td><code>take(pattern)</code></td><td><code>api.take(pred, ms?)</code></td><td>ждать следующий action</td></tr>
+            <tr><td><code>race({ a, b })</code></td><td><code>Promise.race([api.take(a), api.take(b)])</code></td><td>гонка</td></tr>
+            <tr><td><code>select(s =&gt; s.x)</code></td><td><code>api.getState().x</code></td><td>чтение state</td></tr>
+            <tr><td><code>put(action)</code></td><td><code>api.dispatch(action)</code></td><td>диспатч</td></tr>
+          </tbody>
+        </table>
+
+        <h3>takeLeading vs throttle — в чём разница</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 8px;">
+          <thead style="background: var(--bg-panel);">
+            <tr>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); color: var(--accent);">Паттерн</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Когда игнор</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Длительность окна</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Где дорогая работа</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">takeLeading</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">пока effect не завершился</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">=duration(effect)</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">в конце (trailing)</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">throttle</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">T мс после начала</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">фиксированное T</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">в начале (leading)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Фрагмент из документации — готовые реализации</h3>
+        <div class="code-block">
+<span class="cm">// Debounce — ровно то же, что takeLatest</span>
+<span class="cm">// https://redux-toolkit.js.org/api/createListenerMiddleware#debouncing</span>
+listener.<span class="fn">startListening</span>({
+  actionCreator: eventSourceOpened,
+  effect: <span class="kw">async</span> (action, listenerApi) =&gt; {
+    <span class="cm">// Cancel any in-progress instances of this listener</span>
+    listenerApi.<span class="fn">cancelActiveListeners</span>()
+
+    <span class="cm">// Delay before starting actual work</span>
+    <span class="kw">await</span> listenerApi.<span class="fn">delay</span>(<span class="num">500</span>)
+
+    <span class="cm">// Do the work</span>
+    <span class="fn">doSomethingExpensive</span>()
+  },
+})
+        </div>
+
+        <div class="warning">
+          <strong>Подводные камни паттернов:</strong>
+          <ul>
+            <li><strong>throttle через <code>unsubscribe/subscribe</code> имеет race.</strong> Между <code>unsubscribe()</code> и <code>subscribe()</code> action может прийти в другом listener-entry (или в том же, если кто-то зовёт <code>api.subscribe()</code> извне). Безопаснее хранить <code>lastRun = Date.now()</code> в closure и в effect проверять: <code>if (Date.now() - lastRun &lt; T) return</code>.</li>
+            <li><strong><code>cancelActiveListeners</code> отменяет <em>все</em> инстансы этого entry, но не fork'и.</strong> Если внутри effect'а были <code>api.fork(...)</code>, они всё ещё крутятся до <code>internalTaskController.abort(listenerCompleted)</code> в <code>finally</code>. Для «чистого» takeLatest с fork'ами — отслеживайте tasks и вызывайте <code>task.cancel()</code> сами, либо используйте <code>{ autoJoin: true }</code>.</li>
+          </ul>
+        </div>
+
+        <h3>Альтернатива throttle без race — lastRun в closure</h3>
+        <div class="code-block">
+<span class="kw">let</span> lastRun = <span class="num">0</span>
+<span class="kw">const</span> THROTTLE_MS = <span class="num">400</span>
+
+listener.<span class="fn">startListening</span>({
+  actionCreator: ping,
+  effect: <span class="kw">async</span> (_a, api) =&gt; {
+    <span class="kw">const</span> now = <span class="type">Date</span>.<span class="fn">now</span>()
+    <span class="kw">if</span> (now - lastRun &lt; THROTTLE_MS) <span class="kw">return</span>    <span class="cm">// в окне — игнор</span>
+    lastRun = now
+    <span class="cm">// ... работа ...</span>
+    api.dispatch(<span class="fn">effectRan</span>(<span class="str">'throttle-safe'</span>))
+  },
+})
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../66-listener-api-full/">66 — listenerApi целиком</a></li>
+          <li><a href="../68-listener-cancellation/">68 — TaskAbortError, takeLatest</a></li>
+          <li><a href="../67-listener-fork/">67 — fork и cancel</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

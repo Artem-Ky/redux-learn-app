@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>50 — updateOne shallow gotcha</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .diff-grid {
+      display: grid;
+      grid-template-columns: 1fr 24px 1fr;
+      gap: 10px;
+      align-items: stretch;
+      margin: 14px 0;
+    }
+    .diff-pane {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      color: var(--accent-cyan);
+      white-space: pre;
+      overflow-x: auto;
+      min-height: 220px;
+      line-height: 1.55;
+    }
+    .diff-label { color: var(--text-muted); font-family: var(--font-mono); font-size: .72rem; margin-bottom: 4px; }
+    .diff-arrow { text-align: center; color: var(--accent); font-size: 1.3rem; }
+    .lost { background: rgba(244,71,71,.25); color: #ff8a80; padding: 1px 4px; border-radius: 2px; }
+    .kept { background: rgba(76,175,80,.22); color: #a5d6a7; padding: 1px 4px; border-radius: 2px; }
+    .added { background: rgba(86,156,214,.22); color: #79b8ff; padding: 1px 4px; border-radius: 2px; }
+
+    .merge-viz {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin: 16px 0;
+    }
+    .merge-viz code { display: inline-block; }
+
+    .scenario-buttons .btn { margin-right: 6px; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">50 / 106</span>updateOne · shallow-merge и смена id</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../49-add-set-upsert/">← Назад</a>
+      <a href="../51-selectid-sortcomparer/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Shallow merge съедает nested поля</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>updateOne({ id, changes })</code> эквивалентно <code>Object.assign(entities[id], changes)</code>.
+          Это значит: если <code>changes.profile</code> задан — он <strong>целиком</strong> заменит
+          старый <code>profile</code>. Вложенное поле <code>age</code> исчезнет.
+        </p>
+
+        <div class="scenario-buttons btn-group">
+          <button class="btn btn--danger" id="bad">❌ updateOne({ profile: { name: 'Bob' } })</button>
+          <button class="btn btn--success" id="good">✅ правильно: glue profile = { ...p, name }</button>
+          <button class="btn" id="custom-immer">💪 custom reducer + Immer (nested mutate)</button>
+          <button class="btn btn--accent" id="change-id">🔄 updateOne со сменой id (takeNewKey)</button>
+          <button class="btn btn--accent" id="batch-multi">🎯 updateMany: 2 update на тот же id (last wins)</button>
+          <button class="btn" id="reset">reset</button>
+        </div>
+
+        <div class="diff-grid">
+          <div>
+            <div class="diff-label">ДО</div>
+            <div class="diff-pane" id="pane-before">—</div>
+          </div>
+          <div class="diff-arrow">→</div>
+          <div>
+            <div class="diff-label">ПОСЛЕ</div>
+            <div class="diff-pane" id="pane-after">—</div>
+          </div>
+        </div>
+
+        <div id="explain" style="margin-top: 6px; color: var(--accent-yellow); font-size: .82rem;"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 50. updateOne / updateMany / takeNewKey</div>
+      <div class="theory__body">
+        <h3>Как именно работает <code>updateOne</code></h3>
+        <div class="merge-viz">
+          <code style="font-family: var(--font-mono); font-size: .85rem;">
+            updateOne({ id, changes }) ≡ Object.assign(entities[id], changes)
+          </code>
+          <p style="margin-top: 8px; color: var(--text-secondary); font-size: .82rem;">
+            Это <strong>shallow</strong> assign — только верхний уровень. Любое nested-поле (объект
+            или массив в <code>changes</code>) <strong>заменяет</strong> прежнее, не мёрджится.
+          </p>
+        </div>
+
+        <h3>Исходник — <code>updateManyMutably</code> + <code>takeNewKey</code></h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">takeNewKey</span>(keys, update, state): <span class="type">boolean</span> {
+  <span class="kw">const</span> original = state.entities[update.id]
+  <span class="kw">if</span> (original === <span class="kw">undefined</span>) <span class="kw">return</span> <span class="kw">false</span>
+
+  <span class="kw">const</span> updated = <span class="type">Object</span>.<span class="fn">assign</span>({}, original, update.changes)  <span class="cm">// ← shallow!</span>
+  <span class="kw">const</span> newKey = <span class="fn">selectIdValue</span>(updated, selectId)
+  <span class="kw">const</span> hasNewKey = newKey !== update.id
+
+  <span class="kw">if</span> (hasNewKey) {
+    keys[update.id] = newKey
+    <span class="kw">delete</span> state.entities[update.id]             <span class="cm">// старый ключ выкидываем</span>
+  }
+  state.entities[newKey] = updated                <span class="cm">// записываем под (возможно) новым</span>
+  <span class="kw">return</span> hasNewKey
+}
+
+<span class="kw">function</span> <span class="fn">updateManyMutably</span>(updates, state) {
+  <span class="kw">const</span> updatesPerEntity = {}
+
+  <span class="cm">// 1) мержим несколько update для одного id (last wins per key)</span>
+  updates.<span class="fn">forEach</span>((update) =&gt; {
+    <span class="kw">if</span> (update.id <span class="kw">in</span> state.entities) {
+      updatesPerEntity[update.id] = {
+        id: update.id,
+        changes: { ...updatesPerEntity[update.id]?.changes, ...update.changes },
+      }
+    }
+  })
+
+  updates = <span class="type">Object</span>.<span class="fn">values</span>(updatesPerEntity)
+
+  <span class="kw">const</span> didMutateEntities = updates.length &gt; 0
+  <span class="kw">if</span> (didMutateEntities) {
+    <span class="cm">// 2) для тех, у кого изменился id — перестраиваем ids</span>
+    <span class="kw">const</span> didMutateIds = updates.<span class="fn">filter</span>((u) =&gt; <span class="fn">takeNewKey</span>(newKeys, u, state)).length &gt; 0
+    <span class="kw">if</span> (didMutateIds) {
+      state.ids = <span class="type">Object</span>.<span class="fn">values</span>(state.entities).<span class="fn">map</span>((e) =&gt; <span class="fn">selectIdValue</span>(e, selectId))
+    }
+  }
+}
+        </div>
+        <p>
+          GitHub: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/unsorted_state_adapter.ts#L127-L170" target="_blank">unsorted_state_adapter.ts#updateManyMutably</a>
+        </p>
+
+        <h3>Смена id через <code>updateOne</code></h3>
+        <p>
+          Если <code>changes</code> включает поле, от которого зависит <code>selectId</code>, — RTK
+          <strong>автоматически</strong> перекладывает запись под новый ключ: удаляет старый ключ из
+          <code>entities</code>, вставляет под новым, и пересчитывает <code>ids</code>. Это и делает
+          <code>takeNewKey</code>.
+        </p>
+
+        <h3>Цитата — RTK docs</h3>
+        <div class="quote">
+          «<strong>updateOne</strong> and <strong>updateMany</strong> accept an <code>Update&lt;T&gt;</code>
+          object that contains an entity ID and an object containing <strong>one or more</strong> new field
+          values to update inside a <code>changes</code> field. The provided changes will be shallow-merged
+          with the existing entity.»
+        </div>
+        <div class="quote quote--ru">
+          «<code>updateOne</code>/<code>updateMany</code> принимают объект <code>Update&lt;T&gt;</code>
+          с id и одним или несколькими изменёнными полями в <code>changes</code>. Изменения
+          <strong>shallow-merge</strong>-ятся с существующим объектом.»
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Nested-поля затираются целиком.</strong>
+          <br>Пример (см. демо): <code>user.profile = { name:'Alice', age:30 }</code>,
+          <code>updateOne({ id, changes: { profile: { name: 'Bob' } } })</code> →
+          <code>profile = { name: 'Bob' }</code>. Поле <code>age</code> исчезло.
+          <br><br>
+          <strong>Решение A.</strong> Собрать полный новый nested-объект в компоненте:
+          <code>{ changes: { profile: { ...oldProfile, name: 'Bob' } } }</code>. Минус — нужен
+          <code>selectById</code> перед dispatch.
+          <br><br>
+          <strong>Решение B.</strong> Написать свой reducer с Immer-мутацией:
+          <div class="code-block" style="margin: 8px 0;">
+reducers: {
+  userNameChanged: (state, action) =&gt; {
+    <span class="kw">const</span> u = state.entities[action.payload.id]
+    <span class="kw">if</span> (u) u.profile.name = action.payload.name       <span class="cm">// ← mutate через Immer</span>
+  }
+}
+          </div>
+          Immer применит patch, <code>age</code> останется на месте.
+          <br><br>
+          <strong>2. <code>updateMany</code>: несколько update на один id → last wins per key.</strong>
+          <br>Если в массиве два <code>{ id: 'a', changes: { price: 10 } }</code> и
+          <code>{ id: 'a', changes: { price: 20 } }</code> — RTK делает
+          <code>{ ...first.changes, ...second.changes }</code>. Второй перезапишет первый. Но если
+          поля разные — объединятся. Это <em>не</em> применение по очереди, а single merge.
+          <br><br>
+          <strong>3. <code>updateOne</code> игнорирует отсутствующий id.</strong>
+          <br>Если <code>state.entities[id] === undefined</code>, <code>takeNewKey</code> возвращает
+          <code>false</code> и ничего не мутирует. Никакого error/warning. Хочешь гарантию, что
+          запись будет создана → <code>upsertOne</code>.
+          <br><br>
+          <strong>4. Смена id — Full Record rebuild.</strong>
+          Если <code>takeNewKey</code> вернул true хоть один раз — <code>state.ids</code> пересобирается
+          через <code>Object.values(state.entities).map(selectId)</code>. Для больших коллекций это
+          O(n). Не меняй id часто.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../49-add-set-upsert/">49 — setOne делает REPLACE, это похоже, но другое</a></li>
+          <li><a href="../47-entityadapter-basics/">47 — базовый CRUD</a></li>
+          <li><a href="../27-immer-pitfalls/">27 — подводные камни Immer</a></li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/api/createEntityAdapter#crud-functions" target="_blank">RTK · updateOne</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/entities/unsorted_state_adapter.ts" target="_blank">unsorted_state_adapter.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

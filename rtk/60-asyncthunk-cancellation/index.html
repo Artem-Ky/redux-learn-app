@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>60 — Cancellation: signal, thunk.abort()</title>
+  <link rel="stylesheet" href="../shared/styles.css"/>
+  <style>
+    .state-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; }
+    .state-out { background: var(--bg-panel); border-left: 3px solid var(--accent-cyan); padding: 8px 12px; font-family: var(--font-mono); font-size: .76rem; color: var(--accent-cyan); white-space: pre; overflow: auto; max-height: 280px; }
+    .timeline { background: #0d0d0d; border: 1px solid #333; border-radius: 6px; padding: 12px; font-family: var(--font-mono); font-size: .75rem; color: #ccc; max-height: 220px; overflow: auto; }
+    .tl-row { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+    .tl-row .tl-time { color: #555; margin-right: 8px; }
+    .tl-row .tl-pending { color: #569cd6; }
+    .tl-row .tl-ok { color: #4caf50; }
+    .tl-row .tl-err { color: #f44747; }
+    .tl-row .tl-abort { color: #ff9800; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">60 / 106</span>Cancellation: signal, thunk.abort()</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../59-asyncthunk-condition/">← Назад</a>
+      <a href="../61-requestid-race/">Далее →</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <section class="demo-section">
+      <div class="demo-section__header">Что тут происходит</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Долгий «fetch» (2 секунды). Кнопка <strong>Start</strong> запускает, кнопка <strong>Cancel</strong>
+          вызывает <code>promise.abort()</code>. Thunk получает <code>AbortError</code>, в DevTools появляется
+          <code>rejected</code> с <code>meta.aborted === true</code>. Второй кейс — внешний
+          <code>AbortController</code>, пробрасывается через <code>dispatch(thunk(arg, { signal: externalController.signal }))</code>.
+        </p>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin:12px 0;">
+          <button class="btn btn--accent" id="start">Start fetch (2 sec)</button>
+          <button class="btn btn--danger" id="cancel" disabled>Cancel</button>
+          <button class="btn" id="start-external">Start + external controller</button>
+          <button class="btn btn--danger" id="cancel-external" disabled>Abort external</button>
+          <button class="btn btn--secondary" id="clear-tl">Очистить timeline</button>
+        </div>
+
+        <div class="state-card">
+          <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem;">Timeline</h4>
+          <div class="timeline" id="timeline">—</div>
+        </div>
+
+        <div class="state-card">
+          <h4 style="color:var(--accent); font-family:var(--font-mono); font-size:.78rem;">store.getState()</h4>
+          <div class="state-out" id="state-out">—</div>
+        </div>
+      </div>
+    </section>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <section class="theory">
+      <div class="theory__header">Теория — 60. AbortController внутри createAsyncThunk</div>
+      <div class="theory__body">
+        <h3>Цитата</h3>
+        <div class="quote">
+          «The individual promise returned by dispatching a thunk has an <code>abort()</code> method that may be
+          used to cancel the thunk before its payload creator resolves. […] The <code>payloadCreator</code>
+          receives an <code>AbortSignal</code> as <code>thunkAPI.signal</code>, which may be used to cancel
+          any in-flight requests.»<br>
+          — <a href="https://redux-toolkit.js.org/api/createAsyncThunk#canceling-while-running" target="_blank">createAsyncThunk — Canceling While Running</a>
+        </div>
+        <div class="quote quote--ru">
+          «Promise, возвращённый dispatch'ем thunk'а, имеет метод <code>abort()</code> для отмены до того,
+          как payload creator разрешится. <code>payloadCreator</code> получает <code>AbortSignal</code>
+          через <code>thunkAPI.signal</code> — его нужно <strong>самостоятельно</strong> прокинуть в fetch.»
+        </div>
+
+        <h3>Как RTK создаёт AbortController</h3>
+        <div class="code-block"><span class="cm">// createAsyncThunk.ts, строки 610–629 + 647–657</span>
+<span class="kw">const</span> abortController = <span class="kw">new</span> <span class="fn">AbortController</span>()      <span class="cm">// внутренний</span>
+<span class="kw">let</span> abortHandler: (() =&gt; <span class="kw">void</span>) | <span class="kw">undefined</span>
+<span class="kw">let</span> abortReason: <span class="type">string</span> | <span class="kw">undefined</span>
+
+<span class="kw">function</span> <span class="fn">abort</span>(reason?: <span class="type">string</span>) {
+  abortReason = reason
+  abortController.<span class="fn">abort</span>()
+}
+
+<span class="kw">if</span> (signal) {                                <span class="cm">// если передали external signal</span>
+  <span class="kw">if</span> (signal.aborted) {
+    <span class="fn">abort</span>(externalAbortMessage)
+  } <span class="kw">else</span> {
+    signal.<span class="fn">addEventListener</span>(<span class="str">'abort'</span>, () =&gt; <span class="fn">abort</span>(externalAbortMessage), { once: <span class="kw">true</span> })
+  }
+}
+
+<span class="cm">// ниже — race между payload и abort:</span>
+<span class="kw">const</span> abortedPromise = <span class="kw">new</span> <span class="fn">Promise</span>&lt;<span class="type">never</span>&gt;((_, reject) =&gt; {
+  abortHandler = () =&gt; {
+    <span class="fn">reject</span>({ name: <span class="str">'AbortError'</span>, message: abortReason || <span class="str">'Aborted'</span> })
+  }
+  abortController.signal.<span class="fn">addEventListener</span>(<span class="str">'abort'</span>, abortHandler, { once: <span class="kw">true</span> })
+})
+
+finalAction = <span class="kw">await</span> <span class="fn">Promise</span>.<span class="fn">race</span>([
+  abortedPromise,
+  <span class="fn">Promise</span>.<span class="fn">resolve</span>(<span class="fn">payloadCreator</span>(arg, { …, signal: abortController.signal, abort, … })),
+])</div>
+        <p style="font-size:.78rem;"><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/createAsyncThunk.ts#L610" target="_blank">createAsyncThunk.ts#L610</a></p>
+
+        <h3>Три способа отмены</h3>
+        <div class="code-block"><span class="cm">// Способ 1. Вернуть promise от dispatch и вызвать .abort()</span>
+<span class="kw">const</span> promise = store.<span class="fn">dispatch</span>(<span class="fn">fetchUser</span>(1))
+promise.<span class="fn">abort</span>(<span class="str">'user left page'</span>)
+
+<span class="cm">// Способ 2. thunkAPI.abort() изнутри (самоотмена)</span>
+<span class="kw">const</span> fetchUser = <span class="fn">createAsyncThunk</span>(<span class="str">'user/fetch'</span>, <span class="kw">async</span> (id, { abort, signal }) =&gt; {
+  <span class="kw">if</span> (id &lt; 0) <span class="fn">abort</span>(<span class="str">'invalid id'</span>)
+  <span class="kw">return await</span> <span class="fn">fetch</span>(<span class="str">`/api/</span>${<span class="str">id</span>}<span class="str">`</span>, { signal })
+})
+
+<span class="cm">// Способ 3. Внешний AbortController — пробрасываем signal в config-object</span>
+<span class="kw">const</span> controller = <span class="kw">new</span> <span class="fn">AbortController</span>()
+store.<span class="fn">dispatch</span>(<span class="fn">fetchUser</span>(1, { signal: controller.signal }))   <span class="cm">// ← второй аргумент!</span>
+controller.<span class="fn">abort</span>()</div>
+
+        <h3>Что получается в reducer</h3>
+        <div class="code-block">b.<span class="fn">addCase</span>(fetchUser.rejected, (s, a) =&gt; {
+  <span class="kw">if</span> (a.meta.aborted) {
+    <span class="cm">// aborted === true + error.name === 'AbortError'</span>
+    s.canceled = <span class="kw">true</span>
+  } <span class="kw">else</span> <span class="kw">if</span> (a.meta.condition) {
+    <span class="cm">// см. урок 59</span>
+  } <span class="kw">else</span> {
+    s.error = a.error.message ?? <span class="str">'unknown'</span>
+  }
+})</div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Signal нужно передать в fetch САМОМУ.</strong> RTK не может заглянуть внутрь вашего
+          <code>fetch</code>/<code>axios</code>. Без <code>{ signal }</code> сеть продолжит работать, даже
+          если rejected-action уже задиспатчен. Это утечка: ответ придёт, вы его проигнорируете, но трафик ушёл.<br>
+          <strong>2. <code>abort()</code> идемпотентен.</strong> Повторный вызов — no-op. AbortController
+          спокойно принимает несколько <code>.abort()</code>. Удобно для cleanup в React-компонентах.<br>
+          <strong>3. После <code>fulfilled</code> abort — ничего не даст.</strong> Race выиграл payload,
+          <code>rejected(aborted)</code> НЕ будет задиспатчен. Не пытайтесь отменить завершённый thunk —
+          это silent no-op (правильное поведение, но первое, что ломает голову новичку).<br>
+          <strong>4. External signal — <em>config-object</em>, не второй аргумент thunk'а.</strong>
+          <code>dispatch(thunk(arg, { signal }))</code> — это сигнатура <code>AsyncThunkDispatchConfig</code>. Её часто путают с <code>thunkApiConfig</code>.<br>
+          <strong>5. DOMException vs Error.</strong> В браузере canonical: <code>new DOMException('Aborted', 'AbortError')</code>. В Node 20+ — тоже. Но <code>new Error()</code> с <code>err.name = 'AbortError'</code> — тоже считается (RTK проверяет <code>name === 'AbortError'</code>).
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../59-asyncthunk-condition/">59 — condition (отмена до старта)</a></li>
+          <li><a href="../61-requestid-race/">61 — race condition & requestId</a></li>
+          <li><a href="../57-thunkapi-basics/">57 — thunkAPI.signal</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

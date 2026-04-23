@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>74 — Sequential / Parallel / Race / AllSettled thunks</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .mode-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px; margin: 12px 0;
+    }
+    .mode-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .mode-card h4 {
+      font-family: var(--font-mono); color: var(--accent);
+      font-size: .88rem; display: flex; align-items: center; gap: 8px;
+    }
+    .mode-card .code-snip {
+      background: var(--bg-panel); border-radius: var(--radius-sm);
+      padding: 6px 8px; font-family: var(--font-mono); font-size: .74rem;
+      color: var(--text-secondary); white-space: pre;
+      overflow-x: auto;
+    }
+    .mode-card__timer {
+      font-family: var(--font-mono); font-size: 1.6rem;
+      color: var(--accent-yellow);
+      min-height: 34px;
+    }
+    .mode-card__timer.running { color: var(--warning); }
+    .mode-card__timer.done { color: var(--success); }
+
+    .tasks {
+      display: flex; flex-direction: column; gap: 6px;
+      max-height: 180px; overflow-y: auto;
+    }
+    .task {
+      background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 6px 10px;
+      font-family: var(--font-mono); font-size: .76rem;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .task__dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted);
+    }
+    .task--pending .task__dot { background: var(--warning); animation: pulse 1s infinite; }
+    .task--fulfilled .task__dot { background: var(--success); }
+    .task--rejected .task__dot { background: var(--accent-red); }
+    .task--zombie .task__dot { background: var(--accent-purple); animation: pulse 1.5s infinite; }
+    .task__label { flex: 1; }
+    .task__time { color: var(--text-muted); font-size: .7rem; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title"><span class="num">74 / 106</span>Sequential · Parallel · Race · AllSettled — паттерны композиции thunks</div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../73-all-matchers-sweep/">← Назад</a>
+      <a href="../75-side-by-side-counter/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Четыре режима оркестрации — сравнение таймеров и поведения</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>dispatch(thunk())</code> возвращает обычный Promise. Значит мы можем комбинировать thunk'и любым нативным
+          <code>Promise</code>-методом. Четыре главных паттерна — ниже. Нажми кнопку в любой карточке, смотри таймер и
+          список задач.
+        </p>
+
+        <div class="mode-grid">
+          <!-- Sequential -->
+          <div class="mode-card">
+            <h4><span class="tag tag--info">1</span>Sequential · ожидание по цепочке</h4>
+            <div class="code-snip">await dispatch(fetchUser(1)).unwrap()
+await dispatch(fetchPosts(uid)).unwrap()</div>
+            <div class="mode-card__timer" id="t-seq">—</div>
+            <div class="tasks" id="tasks-seq"></div>
+            <button class="btn btn--accent" data-mode="seq">Запустить Sequential</button>
+            <p style="font-size: .72rem; color: var(--text-muted);">Общее время ≈ сумма. Второй ждёт первого.</p>
+          </div>
+
+          <!-- Parallel (Promise.all) -->
+          <div class="mode-card">
+            <h4><span class="tag tag--good">2</span>Parallel · Promise.all</h4>
+            <div class="code-snip">await Promise.all([
+  dispatch(fetchA()),
+  dispatch(fetchB()),
+  dispatch(fetchC()),
+])</div>
+            <div class="mode-card__timer" id="t-par">—</div>
+            <div class="tasks" id="tasks-par"></div>
+            <button class="btn btn--success" data-mode="par">Запустить Parallel</button>
+            <p style="font-size: .72rem; color: var(--text-muted);">Общее время ≈ max. Отваливается на первом reject.</p>
+          </div>
+
+          <!-- Race (Promise.race) -->
+          <div class="mode-card">
+            <h4><span class="tag tag--info">3</span>Race · Promise.race</h4>
+            <div class="code-snip">await Promise.race([
+  dispatch(slowFetch()),
+  dispatch(fastFetch()),
+])</div>
+            <div class="mode-card__timer" id="t-race">—</div>
+            <div class="tasks" id="tasks-race"></div>
+            <button class="btn btn--accent" data-mode="race">Запустить Race</button>
+            <p style="font-size: .72rem; color: var(--text-muted);">Кто быстрее — тот выигрывает. Медленный <strong>продолжает</strong> идти в фоне (zombie).</p>
+          </div>
+
+          <!-- AllSettled -->
+          <div class="mode-card">
+            <h4><span class="tag tag--bad">4</span>AllSettled · довести всё до конца</h4>
+            <div class="code-snip">await Promise.allSettled([
+  dispatch(fetchA()),
+  dispatch(fetchB()),
+  dispatch(failingFetch()),
+])</div>
+            <div class="mode-card__timer" id="t-allset">—</div>
+            <div class="tasks" id="tasks-allset"></div>
+            <button class="btn btn--danger" data-mode="allset">Запустить AllSettled</button>
+            <p style="font-size: .72rem; color: var(--text-muted);">Упавший не прерывает остальных. Получаем массив <code>{status, value|reason}</code>.</p>
+          </div>
+        </div>
+
+        <div class="state-display" style="margin-top: 14px;">
+          <div class="state-display__label">результат последнего запуска</div>
+          <div class="state-display__value" id="last-result">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 74. Четыре паттерна композиции async thunk'ов</div>
+      <div class="theory__body">
+
+        <h3>Цитата из доки</h3>
+        <div class="quote">
+          «The dispatched action returned by <code>dispatch(someAsyncThunk())</code> is always a Promise that will be fulfilled with a pending/fulfilled/rejected action, never rejected itself. Use <code>.unwrap()</code> to get a regular rejected-promise if you want to use <code>.then/.catch</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/api/createAsyncThunk#unwrapping-result-actions" target="_blank">redux-toolkit.js.org/api/createAsyncThunk</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>dispatch(thunk())</code> <em>всегда</em> даёт fulfilled Promise — даже если внутри thunk бросил Error. Чтобы получить «нормальный» отклоняющийся Promise и использовать try/catch — вызови <code>.unwrap()</code>.»
+        </div>
+
+        <h3>Почему <code>.unwrap()</code> нужен</h3>
+        <div class="code-block">
+<span class="cm">// БЕЗ unwrap:</span>
+<span class="kw">const</span> resultAction = <span class="kw">await</span> <span class="fn">dispatch</span>(<span class="fn">fetchUser</span>(<span class="num">1</span>))
+<span class="cm">// resultAction — это либо fulfilled-action, либо rejected-action,</span>
+<span class="cm">// но Promise, который вернул dispatch, — всегда RESOLVED.</span>
+<span class="kw">if</span> (fetchUser.fulfilled.<span class="fn">match</span>(resultAction)) {
+  <span class="kw">const</span> user = resultAction.payload     <span class="cm">// ✅ типизированный User</span>
+} <span class="kw">else</span> {
+  <span class="kw">const</span> err = resultAction.error         <span class="cm">// ❌ SerializedError</span>
+}
+
+<span class="cm">// С unwrap:</span>
+<span class="kw">try</span> {
+  <span class="kw">const</span> user = <span class="kw">await</span> <span class="fn">dispatch</span>(<span class="fn">fetchUser</span>(<span class="num">1</span>)).<span class="fn">unwrap</span>()     <span class="cm">// сразу User</span>
+} <span class="kw">catch</span> (e) {
+  <span class="cm">// e — payload из rejectWithValue ИЛИ SerializedError</span>
+}
+        </div>
+        <p style="color: var(--text-secondary); font-size: .85rem;">
+          <code>Promise.all</code> / <code>Promise.race</code> / <code>Promise.allSettled</code> работают с
+          <strong>поведением Promise</strong>: им важен reject/fulfill. Без <code>.unwrap()</code> thunk
+          всегда fulfilled — <code>Promise.all</code> никогда не упадёт, даже если половина thunk'ов
+          отклонилась. Это тихий баг. Всегда пиши <code>.unwrap()</code> для управляющей логики.
+        </p>
+
+        <h3>Паттерн 1: Sequential — цепочка</h3>
+        <div class="code-block">
+<span class="cm">// Второй thunk использует payload первого — только sequential.</span>
+<span class="kw">async function</span> <span class="fn">loadFeed</span>() {
+  <span class="kw">const</span> user = <span class="kw">await</span> <span class="fn">dispatch</span>(<span class="fn">fetchUser</span>()).<span class="fn">unwrap</span>()
+  <span class="kw">const</span> posts = <span class="kw">await</span> <span class="fn">dispatch</span>(<span class="fn">fetchPosts</span>(user.id)).<span class="fn">unwrap</span>()
+  <span class="kw">return</span> { user, posts }
+}
+<span class="cm">// Время ≈ t(user) + t(posts).</span>
+        </div>
+
+        <h3>Паттерн 2: Parallel — <code>Promise.all</code></h3>
+        <div class="code-block">
+<span class="cm">// Независимые запросы — параллельно.</span>
+<span class="kw">async function</span> <span class="fn">loadDashboard</span>() {
+  <span class="kw">const</span> [a, b, c] = <span class="kw">await</span> <span class="type">Promise</span>.<span class="fn">all</span>([
+    <span class="fn">dispatch</span>(<span class="fn">fetchA</span>()).<span class="fn">unwrap</span>(),
+    <span class="fn">dispatch</span>(<span class="fn">fetchB</span>()).<span class="fn">unwrap</span>(),
+    <span class="fn">dispatch</span>(<span class="fn">fetchC</span>()).<span class="fn">unwrap</span>(),
+  ])
+  <span class="kw">return</span> { a, b, c }
+}
+<span class="cm">// Время ≈ max(ta, tb, tc). </span>
+<span class="cm">// ❗ При первом reject — всё отваливается (fail-fast).</span>
+        </div>
+
+        <h3>Паттерн 3: Race — <code>Promise.race</code></h3>
+        <div class="code-block">
+<span class="cm">// Кто первый ответил, того берём (fallback, retry, timeout…)</span>
+<span class="kw">async function</span> <span class="fn">withTimeout</span>() {
+  <span class="kw">const</span> p = <span class="fn">dispatch</span>(<span class="fn">slowFetch</span>())
+  <span class="kw">const</span> winner = <span class="kw">await</span> <span class="type">Promise</span>.<span class="fn">race</span>([
+    p.<span class="fn">unwrap</span>(),
+    <span class="kw">new</span> <span class="type">Promise</span>((_, reject) =&gt;
+      <span class="fn">setTimeout</span>(() =&gt; <span class="fn">reject</span>(<span class="kw">new</span> <span class="type">Error</span>(<span class="str">'timeout'</span>)), <span class="num">500</span>)),
+  ])
+  <span class="cm">// ❗ slowFetch продолжает идти в фоне! Прерывание не автоматическое.</span>
+  <span class="cm">// Если нужно отменить — p.abort() (AsyncThunk поддерживает AbortSignal).</span>
+  <span class="kw">return</span> winner
+}
+        </div>
+
+        <h3>Паттерн 4: AllSettled — «собрать всё, что получилось»</h3>
+        <div class="code-block">
+<span class="cm">// Несколько независимых запросов. Упавший не должен ломать остальные.</span>
+<span class="kw">async function</span> <span class="fn">loadEverything</span>() {
+  <span class="kw">const</span> results = <span class="kw">await</span> <span class="type">Promise</span>.<span class="fn">allSettled</span>([
+    <span class="fn">dispatch</span>(<span class="fn">fetchA</span>()).<span class="fn">unwrap</span>(),
+    <span class="fn">dispatch</span>(<span class="fn">fetchB</span>()).<span class="fn">unwrap</span>(),
+    <span class="fn">dispatch</span>(<span class="fn">failingFetch</span>()).<span class="fn">unwrap</span>(),
+  ])
+  <span class="kw">for</span> (<span class="kw">const</span> r <span class="kw">of</span> results) {
+    <span class="kw">if</span> (r.status === <span class="str">'fulfilled'</span>) <span class="fn">console</span>.<span class="fn">log</span>(<span class="str">'ok'</span>, r.value)
+    <span class="kw">else</span>                          <span class="fn">console</span>.<span class="fn">warn</span>(<span class="str">'fail'</span>, r.reason)
+  }
+}
+        </div>
+
+        <h3>Сравнение по временам и устойчивости</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem;">
+          <thead style="background: var(--bg-panel);">
+            <tr>
+              <th style="padding: 6px 10px; border: 1px solid var(--border); color: var(--accent); text-align: left;">Паттерн</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Время</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">На reject одного</th>
+              <th style="padding: 6px 10px; border: 1px solid var(--border);">Когда выбрать</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">Sequential</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">сумма</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">цепочка прерывается</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">зависимости по данным (user → posts)</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">Promise.all</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">max</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">fail-fast — всё ломается</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">всё-или-ничего (критичные данные)</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">Promise.race</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">min</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">reject может выиграть</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">timeout, fastest-first, fallback</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border); font-family: var(--font-mono);">Promise.allSettled</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">max</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">не влияет на остальные</td>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">независимые фичи, «best effort»</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="warning">
+          <strong>Подводные камни:</strong>
+          <ul>
+            <li><strong>Race не отменяет проигравшего.</strong> Победитель выиграл — второй Promise продолжает идти в фоне, делает сетевой запрос, диспатчит <code>fulfilled</code>/<code>rejected</code> action. Твой reducer получит «призрачный» апдейт от проигравшего. <em>Решение:</em> <code>const p = dispatch(thunk()); Promise.race([p.unwrap(), timeout]); p.abort()</code> — <code>AsyncThunkAction</code> поддерживает <code>.abort()</code> из коробки (см. урок 60).</li>
+            <li><strong>Promise.all и fail-fast.</strong> Если один из трёх thunk'ов отвалится через 50мс, два остальных дойдут до конца — но Promise.all уже reject'нулся. Они дадут <code>.fulfilled</code> действие, которое попадёт в state <em>после</em> ошибки. Иногда это ok (опишет какое-то валидное состояние), иногда нет (перетрёт error-flag на success). <em>Решение:</em> <code>Promise.allSettled</code> или явная проверка <code>requestId</code> в reducer'е.</li>
+            <li><strong>Sequential — легко сделать медленным случайно.</strong> Если у тебя <code>for (const id of ids) await dispatch(fetchOne(id)).unwrap()</code> — это 10 последовательных запросов вместо 10 параллельных. <em>Решение:</em> <code>await Promise.all(ids.map(id =&gt; dispatch(fetchOne(id)).unwrap()))</code>. Sequential имеет смысл только если <code>id</code>'s зависят друг от друга.</li>
+            <li><strong><code>.unwrap()</code> на <code>Promise.all(...).unwrap()</code> не работает.</strong> <code>unwrap()</code> — метод на <code>AsyncThunkAction</code>, не на Promise. Пиши <code>Promise.all([p1.unwrap(), p2.unwrap()])</code>, а не <code>Promise.all([p1, p2]).unwrap()</code>.</li>
+            <li><strong>AllSettled не даёт узнать <em>какой</em> request упал без доп. информации.</strong> Массив результатов идёт в том же порядке, что и входной — но если у тебя динамический массив thunk'ов, индекса может не хватить. <em>Решение:</em> собирай <code>{name, promise}</code> и пробегайся по ним после <code>allSettled</code>, либо используй оригинальные indices.</li>
+          </ul>
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../55-asyncthunk-basic/">55 — createAsyncThunk базово</a></li>
+          <li><a href="../58-rejectwithvalue/">58 — rejectWithValue + unwrap</a></li>
+          <li><a href="../60-asyncthunk-cancellation/">60 — отмена thunk'а через .abort() + AbortSignal</a></li>
+          <li><a href="../61-requestid-race/">61 — requestId для обработки race в reducer'е</a></li>
+          <li><a href="../69-listener-patterns/">69 — listener patterns (takeLatest, debounce)</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>
