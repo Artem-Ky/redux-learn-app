@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>90 — selectFromResult — оптимизация ререндеров</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .stat-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    .stat-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+    }
+    .stat-card.good { border-left-color: var(--success); }
+    .stat-card.bad  { border-left-color: var(--accent-red); }
+    .stat-card__label { font-size: .7rem; color: var(--text-muted); text-transform: uppercase; }
+    .stat-card__val {
+      font-family: var(--font-mono);
+      font-size: 1.3rem;
+      color: var(--text-bright);
+      margin-top: 4px;
+    }
+    .post-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 70px 80px;
+      gap: 8px;
+      align-items: center;
+      padding: 4px 8px;
+      border-bottom: 1px dashed var(--border);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .post-row__id { color: var(--accent-cyan); }
+    .post-row__title { color: var(--text-bright); }
+    .post-row__likes { color: var(--accent-yellow); text-align: right; }
+    .post-row__renders {
+      font-size: .7rem;
+      color: var(--text-muted);
+      text-align: right;
+    }
+    .post-row__renders strong { color: var(--accent); }
+    .flash-render { animation: flashBlue 800ms ease-out; }
+    @keyframes flashBlue {
+      0% { background: rgba(86,156,214,.3); }
+      100% { background: transparent; }
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">90 / 106</span>
+      selectFromResult — выбираем только нужное
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../89-rtkq-transformResponse/">← Назад</a>
+      <a href="../91-rtkq-skip-options/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">100 строк · лайк одной — сколько перерендерилось?</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Слева — строки подписаны на <strong>весь <code>data</code></strong> (наивно).
+          Справа — через <strong><code>selectFromResult</code></strong>, выбирая только свой пост.
+          Жмёшь лайк — в левой колонке перерендериваются ВСЕ, в правой — только изменённая.
+        </p>
+
+        <div class="toggle-bar">
+          <button class="btn btn--accent" id="btn-like-5">+1 лайк #5</button>
+          <button class="btn" id="btn-like-50">+1 лайк #50</button>
+          <button class="btn btn--danger" id="btn-reset">сброс рендеров</button>
+        </div>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 90. selectFromResult</div>
+      <div class="theory__body">
+        <h3>Цитата — Selecting data from a query result</h3>
+        <div class="quote">
+          «Sometimes you may have a parent component that subscribes to a query, and then multiple children
+          that need to read individual items from that cached data. <strong>selectFromResult</strong> lets
+          you select specific pieces of data, and ensures that the component only re-renders when that
+          selected subset changes.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/queries#selecting-data-from-a-query-result" target="_blank">RTKQ · Queries — selectFromResult</a>
+        </div>
+        <div class="quote quote--ru">
+          «Каждый <code>useQuery</code> — это подписка. Без <code>selectFromResult</code> компонент
+          ререндерится при <em>любом</em> изменении cache entry. С <code>selectFromResult</code> — только
+          когда <em>твой кусок</em> сменил reference (проверка через shallow equality).»
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+<span class="kw">const</span> { post, isLoading } = <span class="fn">useGetPostsQuery</span>(<span class="kw">undefined</span>, {
+  <span class="fn">selectFromResult</span>: ({ data, isLoading }) =&gt; ({
+    post: data?.<span class="fn">find</span>((p) =&gt; p.id === id),
+    isLoading,
+  }),
+})
+<span class="cm">// ↑ возвращается твой объект; дефолтные поля (error, isFetching, ...) НЕ попадают — только те, что вернул сам.</span>
+        </div>
+
+        <h3>Как работает «только нужное изменилось»</h3>
+        <p>Под капотом — <code>createSelector</code> из reselect + <code>shallowEqual</code> на возвращаемый объект:</p>
+        <div class="code-block">
+<span class="cm">// упрощённая логика из buildHooks.ts</span>
+<span class="kw">const</span> selectorFactory = <span class="kw">() =&gt;</span> <span class="fn">createSelector</span>(
+  [selectQueryResult, <span class="kw">(</span>_, arg<span class="kw">)</span> =&gt; arg],
+  (result) =&gt; selectFromResult!(result),
+)
+<span class="cm">// useSelector с shallowEqual</span>
+<span class="kw">const</span> subset = <span class="fn">useSelector</span>(selectorFactory(), shallowEqual)
+<span class="cm">// ↑ только если shallow-форма subset поменялась → ререндер</span>
+        </div>
+        <p>Вместе со <strong>structural sharing</strong> RTKQ (урок 84) это даёт: refetch массива той же формы
+        → reference у items стабильны → find возвращает ту же ссылку → shallow-eq true → ререндера нет.</p>
+
+        <h3>Три типичных паттерна</h3>
+        <div class="code-block">
+<span class="cm">// ─── 1. Один item из списка ───</span>
+<span class="kw">function</span> <span class="fn">PostRow</span>({ id }) {
+  <span class="kw">const</span> { post } = <span class="fn">useGetPostsQuery</span>(<span class="kw">undefined</span>, {
+    selectFromResult: ({ data }) =&gt; ({ post: data?.<span class="fn">find</span>((p) =&gt; p.id === id) }),
+  })
+  <span class="kw">return</span> &lt;div&gt;{post?.title}&lt;/div&gt;
+}
+
+<span class="cm">// ─── 2. Вычисленное значение ───</span>
+<span class="kw">const</span> { unreadCount } = <span class="fn">useGetNotificationsQuery</span>(<span class="kw">undefined</span>, {
+  selectFromResult: ({ data }) =&gt; ({
+    unreadCount: data?.<span class="fn">filter</span>((n) =&gt; !n.read).length ?? <span class="num">0</span>,
+  }),
+})
+
+<span class="cm">// ─── 3. Normalized lookup (с entity adapter) ───</span>
+<span class="kw">const</span> { post } = <span class="fn">useGetPostsQuery</span>(<span class="kw">undefined</span>, {
+  selectFromResult: ({ data }) =&gt; ({ post: data?.entities[id] }),  <span class="cm">// O(1)</span>
+})
+        </div>
+
+        <h3>Альтернатива — <code>api.endpoints.X.select(arg)</code></h3>
+        <div class="code-block">
+<span class="cm">// для использования ВНЕ хуков (middleware, thunks, listener):</span>
+<span class="kw">const</span> selectPostsResult = api.endpoints.getPosts.<span class="fn">select</span>()
+<span class="kw">const</span> result = <span class="fn">selectPostsResult</span>(store.<span class="fn">getState</span>())
+<span class="cm">// result = { data, isLoading, isFetching, isSuccess, isError, error, status, requestId, ... }</span>
+
+<span class="cm">// можно собирать через createSelector:</span>
+<span class="kw">const</span> selectUnread = <span class="fn">createSelector</span>(
+  [api.endpoints.getNotifications.<span class="fn">select</span>()],
+  (r) =&gt; r.data?.<span class="fn">filter</span>((n) =&gt; !n.read) ?? [],
+)
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Новый объект каждый selectFromResult — shallowEqual всё равно спасёт.</strong>
+          <br><code>selectFromResult: ({ data }) =&gt; ({ x: data?.foo })</code> возвращает новый объект
+          при каждом вызове. Но shallow-eq сравнивает его <em>поля</em>. Если <code>x</code> имеет ту же ссылку —
+          ререндера нет. Но если <code>x</code> это результат <code>.filter()/.map()/.find()</code> без стабильных
+          входов — новая ссылка, ререндер. Используй структурно разделённые данные или memoized селекторы.
+
+          <br><br>
+          <strong>2. selectFromResult не уменьшает сетевой трафик.</strong>
+          <br>Это <em>только</em> оптимизация рендеров. Подписка создаётся всё равно → fetch происходит
+          как обычно. Если хочешь избежать запроса — это <code>skip</code>.
+
+          <br><br>
+          <strong>3. Если хук используется в 100 компонентах — 100 селекторов.</strong>
+          <br>Каждый <code>useQuery</code> создаёт свой инстанс селектора. Это нормально — reselect
+          делает хеш по ссылке входа, перформанс O(1) на каждый. Но не забывай: 100 подписок в
+          <code>state.api.subscriptions</code>.
+
+          <br><br>
+          <strong>4. Не вызывай dispatch внутри selectFromResult.</strong>
+          <br>Селектор вызывается в reactor'е React — side effects ломают concurrent rendering.
+          Если нужно среагировать на данные — <code>useEffect</code> по вычисленному куску.
+
+          <br><br>
+          <strong>5. selectFromResult vs getSelectors (entity adapter).</strong>
+          <br>Если в <code>data</code> лежит <code>EntityState</code> — <code>getSelectors</code>
+          возвращают <em>мемоизированные</em> селекторы с <code>weakMapMemoize</code>. Комбинация:
+          один общий entity, детали берут <code>selectById</code> через selectFromResult.
+
+          <br><br>
+          <strong>6. Вернул <code>isFetching</code> — потерял типизацию дефолта.</strong>
+          <br><code>selectFromResult</code> <em>переопределяет</em> форму возврата. Если вернул только
+          <code>{post}</code> — <code>isLoading</code> и прочие поля недоступны. Нужны — включай в возврат.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../82-rtkq-usequery-hook/">82 — useQuery</a> (полный return type).</li>
+          <li><a href="../52-entity-selectors/">52 — entity adapter selectors</a> (нормализация + selectById).</li>
+          <li><a href="../89-rtkq-transformResponse/">89 — transformResponse</a> (нормализовать один раз в cache).</li>
+          <li><a href="../41-createselector-from-rtk/">41 — createSelector</a> (мемоизация вне хуков).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/queries#selecting-data-from-a-query-result" target="_blank">RTKQ · selectFromResult</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/react/buildHooks.ts" target="_blank">buildHooks.ts (React)</a></li>
+          <li><a href="https://reselect.js.org/" target="_blank">Reselect</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

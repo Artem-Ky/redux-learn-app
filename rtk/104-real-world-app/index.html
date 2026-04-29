@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>104 — Real-world app · Books CRUD</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .app-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 900px) { .app-grid { grid-template-columns: 1fr; } }
+    .app-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .book-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 90px 90px;
+      gap: 6px;
+      align-items: center;
+      padding: 6px 8px;
+      border-bottom: 1px dashed var(--border);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .book-row:hover { background: rgba(86,156,214,.05); }
+    .book-row.selected { background: rgba(86,156,214,.12); }
+    .book-row__id { color: var(--accent-cyan); }
+    .book-row__title { color: var(--text-bright); }
+    .book-row__author { color: var(--text-secondary); }
+    .book-row__actions { text-align: right; display: flex; gap: 4px; justify-content: flex-end; }
+    .book-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      margin-bottom: 10px;
+    }
+    .book-form input {
+      padding: 5px 8px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: .8rem;
+    }
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      margin-bottom: 10px;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .filter-bar input {
+      flex: 1;
+      padding: 5px 8px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+    }
+    .detail-card {
+      padding: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">104 / 106</span>
+      Real-world · Books CRUD
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../103a-quiz-final/">← 🎯 квиз</a>
+      <a href="../105-rtk-pitfalls-cheatsheet/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">createSlice (UI) + RTK Query (CRUD) + listenerMiddleware (analytics)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Мини-приложение «Книги». Всё вместе: <strong>RTK Query</strong> для CRUD,
+          <strong>createSlice</strong> для локального UI-state (выделение, фильтр),
+          <strong>listenerMiddleware</strong> для analytics events (в консоль).
+        </p>
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 104. Real-world architecture</div>
+      <div class="theory__body">
+        <h3>Разделение ответственности</h3>
+        <div class="code-block">
+<span class="cm">── Client state (createSlice) ──
+   - UI state: выбранная книга id, поиск, сортировка, фильтры
+   - Непосредственно в памяти, без синхронизации с сервером
+   - Reset на logout/navigation
+
+── Server state (RTK Query) ──
+   - Книги CRUD: getBooks, getBook, addBook, updateBook, deleteBook
+   - Кеш + теги + optimistic updates
+   - Истина живёт на сервере
+
+── Side effects (listenerMiddleware) ──
+   - Analytics: каждый addBook → ga.event('book_added')
+   - Log audit на mutation fulfilled
+   - Не требует нового useEffect в каждом компоненте</span>
+        </div>
+
+        <h3>Паттерн store.ts</h3>
+        <div class="code-block">
+<span class="kw">import</span> { configureStore, createListenerMiddleware } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+<span class="kw">import</span> { booksApi } <span class="kw">from</span> <span class="str">'./booksApi'</span>
+<span class="kw">import</span> { uiSlice } <span class="kw">from</span> <span class="str">'./uiSlice'</span>
+
+<span class="kw">const</span> listener = <span class="fn">createListenerMiddleware</span>()
+
+<span class="cm">// Подписка на all mutations → analytics</span>
+listener.<span class="fn">startListening</span>({
+  matcher: <span class="fn">isAnyOf</span>(
+    booksApi.endpoints.addBook.matchFulfilled,
+    booksApi.endpoints.updateBook.matchFulfilled,
+    booksApi.endpoints.deleteBook.matchFulfilled,
+  ),
+  effect: (action, { dispatch }) =&gt; {
+    analytics.<span class="fn">track</span>(action.type, action.payload)
+  },
+})
+
+<span class="kw">export const</span> store = <span class="fn">configureStore</span>({
+  reducer: {
+    [booksApi.reducerPath]: booksApi.reducer,
+    ui: uiSlice.reducer,
+  },
+  middleware: (gdm) =&gt; <span class="fn">gdm</span>()
+    .<span class="fn">prepend</span>(listener.middleware)      <span class="cm">// 👀 listener ПЕРЕД api</span>
+    .<span class="fn">concat</span>(booksApi.middleware),
+})
+
+<span class="fn">setupListeners</span>(store.dispatch)   <span class="cm">// для refetchOnFocus</span>
+        </div>
+
+        <h3>Что даёт такая композиция</h3>
+        <ul>
+          <li><strong>RTKQ</strong> — тегами инвалидирует при любом add/update/delete. Оптимистические
+          updates — через onQueryStarted + updateQueryData.</li>
+          <li><strong>createSlice (UI)</strong> — хранит <code>selectedBookId</code>, <code>searchQuery</code>.
+          Не зависит от сервера, в reducer — чистые функции.</li>
+          <li><strong>listenerMiddleware</strong> — side effects (analytics, toast, navigate) на события.
+          Не надо пихать useEffect в каждый компонент.</li>
+          <li><strong>createEntityAdapter</strong> (опционально) — для normalized client cache поверх RTKQ,
+          если нужны O(1) lookup или sorted views.</li>
+        </ul>
+
+        <h3>Подводные камни real-world</h3>
+        <div class="warning">
+          <strong>1. Не смешивай server state в createSlice.</strong>
+          <br>Если список книг — в RTKQ, не дублируй в UI-slice. Единый источник истины.
+          Для производных (отфильтрованных, отсортированных) — селекторы с <code>createSelector</code>.
+
+          <br><br>
+          <strong>2. Auth token — в UI-slice, но не в cache.</strong>
+          <br>Token живёт в <code>auth</code> slice. RTKQ читает его через <code>prepareHeaders</code>
+          в baseQuery. На logout — <code>resetApiState</code> + clear auth slice.
+
+          <br><br>
+          <strong>3. listenerMiddleware для cross-slice action.</strong>
+          <br>Пример: при <code>auth/logout</code> → <code>resetApiState</code>. Единое место для
+          reaction-логики.
+
+          <br><br>
+          <strong>4. Optimistic updates + tags = refetch перетрёт.</strong>
+          <br>Если mutation invalidates тег, и у тебя optimistic patch — refetch после fulfilled перезапишет
+          patch. Для optimistic UI убирай invalidate, полагайся на patch + server response.
+
+          <br><br>
+          <strong>5. Навигация — храни route-state в UI slice или URL.</strong>
+          <br>React Router state vs Redux: обычно URL = source of truth для роута, Redux для UI детали.
+          Не клади полный URL в Redux.
+
+          <br><br>
+          <strong>6. Error boundary — обяательно для RTKQ.</strong>
+          <br>Ошибки в компоненте при рендере (data shape не тот) НЕ ловятся RTKQ. Error Boundary
+          на уровне feature.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../08-configure-store-basic/">08 — configureStore</a>.</li>
+          <li><a href="../28-createslice-basic/">28 — createSlice</a>.</li>
+          <li><a href="../66-listener-startlistening/">66 — listenerMiddleware</a>.</li>
+          <li><a href="../47-createentityadapter-basics/">47 — entityAdapter</a>.</li>
+          <li><a href="../85-rtkq-fetchbasequery/">85 — fetchBaseQuery + prepareHeaders</a>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux.js.org/usage/structuring-reducers/structuring-reducers" target="_blank">Redux Style Guide — Structuring</a></li>
+          <li><a href="https://redux.js.org/tutorials/essentials/part-5-async-logic" target="_blank">Redux Essentials — Async</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

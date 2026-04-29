@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>86 — Mutations</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .mut-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 14px;
+      margin-top: 10px;
+    }
+    @media (max-width: 900px) { .mut-grid { grid-template-columns: 1fr; } }
+
+    .form-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+    }
+    .form-card h4 { margin: 0 0 10px; color: var(--accent); font-size: .9rem; }
+    .form-row { margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
+    .form-row label { font-size: .78rem; color: var(--text-muted); }
+    .form-row input {
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .84rem;
+    }
+
+    .ret-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+    }
+    .ret-panel h4 { margin: 0 0 10px; color: var(--accent); font-size: .9rem; }
+    .ret-row {
+      display: grid;
+      grid-template-columns: 130px 100px 1fr;
+      gap: 8px;
+      padding: 4px 0;
+      border-bottom: 1px dashed var(--border);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .ret-row__name { color: var(--accent-cyan); }
+    .ret-row__val {
+      padding: 1px 6px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: .72rem;
+      align-self: center;
+      justify-self: start;
+    }
+    .ret-row__val.t { background: rgba(76,175,80,.2); color: var(--success); }
+    .ret-row__val.f { background: rgba(120,120,120,.18); color: var(--text-muted); }
+    .ret-row__val.e { background: rgba(244,71,71,.2); color: var(--accent-red); }
+    .ret-row__hint { color: var(--text-muted); font-size: .72rem; align-self: center; }
+
+    .posts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 10px;
+      max-height: 170px;
+      overflow: auto;
+    }
+    .post-item {
+      background: var(--bg-tertiary);
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      border-left: 2px solid var(--accent-cyan);
+    }
+
+    .trig-mon {
+      background: var(--bg-tertiary);
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      margin-top: 10px;
+    }
+    .trig-mon__row { display: flex; justify-content: space-between; padding: 2px 0; }
+    .trig-mon__key { color: var(--text-muted); }
+    .trig-mon__val { color: var(--accent-cyan); }
+    .trig-mon__val.fulfilled { color: var(--success); }
+    .trig-mon__val.pending { color: var(--accent); }
+    .trig-mon__val.rejected { color: var(--accent-red); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">86 / 106</span>
+      build.mutation — POST / PUT / DELETE: форма + trigger + return-tuple
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../85-rtkq-fetchbasequery/">← Назад</a>
+      <a href="../87-rtkq-tags-invalidation/">Далее → tags</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">useAddPostMutation() → [trigger, state]</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          В отличие от <code>useQuery</code>, мутации <strong>не запускаются автоматически</strong> при mount.
+          Hook возвращает кортеж <code>[trigger, state]</code>: <strong>trigger</strong> — это функция для
+          запуска (возвращает Promise со встроенным <code>.unwrap()</code> и <code>.abort()</code>),
+          <strong>state</strong> — то же самое, что у query (status, data, error, isLoading, isSuccess…) плюс
+          <code>originalArgs</code> / <code>reset()</code>.
+        </p>
+
+        <div class="mut-grid">
+          <div class="form-card">
+            <h4>Форма — создать пост</h4>
+            <div class="form-row">
+              <label>title</label>
+              <input id="in-title" type="text" value="RTK Query is cool">
+            </div>
+            <div class="form-row">
+              <label>body</label>
+              <input id="in-body" type="text" value="sample text">
+            </div>
+
+            <div class="btn-group" style="margin-top: 10px;">
+              <button class="btn btn--accent" id="btn-trigger">▶ addPost (trigger)</button>
+              <button class="btn btn--danger" id="btn-fail">▶ addPost + fail</button>
+              <button class="btn" id="btn-reset">reset()</button>
+            </div>
+
+            <div class="trig-mon" id="trig-mon">
+              <div class="trig-mon__row"><span class="trig-mon__key">last trigger result</span><span class="trig-mon__val">—</span></div>
+            </div>
+
+            <h4 style="margin-top: 14px;">Все посты (getPosts cache)</h4>
+            <button class="btn" id="btn-fetch-posts">▶ fetchPosts (посмотреть список)</button>
+            <div class="posts-list" id="posts-list">
+              <div style="color: var(--text-muted); font-size: .76rem; padding: 4px 10px;">— нажми «fetchPosts» —</div>
+            </div>
+          </div>
+
+          <div class="ret-panel">
+            <h4>Return tuple — useAddPostMutation() [1]</h4>
+            <div id="ret-flags"></div>
+
+            <h4 style="margin-top: 14px;">originalArgs / data / error</h4>
+            <div class="data-preview" id="ret-orig">—</div>
+            <div style="font-size: .72rem; color: var(--text-muted); margin-top: 8px;">data (fulfilled payload):</div>
+            <div class="data-preview" id="ret-data">—</div>
+            <div style="font-size: .72rem; color: var(--text-muted); margin-top: 8px;">error (rejected payload):</div>
+            <div class="data-preview" id="ret-err">—</div>
+
+            <h4 style="margin-top: 14px;">fixedCacheKey — shared mutation state</h4>
+            <p style="font-size: .76rem; color: var(--text-secondary); margin: 0 0 6px;">
+              Две кнопки ниже используют <code>fixedCacheKey: 'addPost-shared'</code>.
+              Запусти одну — state.api.mutations[&quot;addPost-shared&quot;] виден обоим.
+            </p>
+            <div class="btn-group">
+              <button class="btn" id="btn-shared-a">trigger A (shared)</button>
+              <button class="btn" id="btn-shared-b">trigger B (shared)</button>
+            </div>
+            <div class="trig-mon" id="shared-mon">
+              <div class="trig-mon__row"><span class="trig-mon__key">shared state</span><span class="trig-mon__val">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 86. Mutations</div>
+      <div class="theory__body">
+        <h3>Цитата — Mutations docs</h3>
+        <div class="quote">
+          «Mutations are used to send data updates to the server and apply the changes to the local cache.
+          Mutations can also invalidate cached data and force re-fetches. Unlike query hooks, mutation hooks
+          <strong>return a tuple</strong>: the first item is the "trigger" function, and the second item
+          contains an object with status flags, the requestId, and data from the latest invocation.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/mutations" target="_blank">RTKQ · Mutations</a>
+        </div>
+        <div class="quote quote--ru">
+          «Mutations — это POST/PUT/DELETE (любой side-effect на сервере). Hook возвращает
+          <code>[trigger, state]</code>. <code>trigger(arg)</code> стартует запрос, <code>state</code> —
+          это <code>{isLoading, isSuccess, isError, data, error, originalArgs, reset, requestId}</code>.»
+        </div>
+
+        <h3>Исходник — buildMutationHooks.ts (концептуально)</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/query/react/buildHooks.ts — упрощённо</span>
+<span class="kw">const</span> useMutation: <span class="type">UseMutation</span>&lt;...&gt; = ({ fixedCacheKey } = {}) =&gt; {
+  <span class="kw">const</span> [promise, setPromise] = <span class="fn">useState</span>&lt;<span class="type">MutationActionCreatorResult</span> | <span class="kw">undefined</span>&gt;()
+
+  <span class="kw">const</span> triggerMutation = <span class="fn">useCallback</span>((arg: <span class="type">any</span>) =&gt; {
+    <span class="kw">const</span> promise = dispatch(initiate(arg, { fixedCacheKey }))
+    <span class="fn">setPromise</span>(promise)
+    <span class="kw">return</span> promise                         <span class="cm">// 👀 Promise + .unwrap() + .reset()</span>
+  }, [dispatch, initiate, fixedCacheKey])
+
+  <span class="kw">const</span> reset = <span class="fn">useCallback</span>(() =&gt; {
+    <span class="kw">if</span> (promise) promise.<span class="fn">reset</span>()
+    <span class="fn">setPromise</span>(<span class="kw">undefined</span>)                 <span class="cm">// освобождает subscription</span>
+  }, [promise])
+
+  <span class="kw">const</span> { endpointName, data, status, isLoading, isSuccess, isError, error } =
+    <span class="fn">useSelector</span>(mutationStateSelector, shallowEqual)
+
+  <span class="kw">return</span> [triggerMutation, { ...flags, requestId, originalArgs, reset }]
+}
+        </div>
+        <p>
+          Источник: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/react/buildHooks.ts" target="_blank">react/buildHooks.ts</a>.
+          Полная версия ещё учитывает <code>fixedCacheKey</code>, unsubscribe при unmount, selectFromResult.
+        </p>
+
+        <h3>Return-объект mutation state</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem; margin: 10px 0;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="text-align: left; padding: 6px 4px; color: var(--accent);">поле</th>
+              <th style="text-align: left; padding: 6px 4px; color: var(--accent);">что значит</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 4px; font-family: var(--font-mono); color: var(--accent-cyan);">isUninitialized</td><td style="padding: 6px 4px; color: var(--text-secondary);">ещё не был вызван trigger</td></tr>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 4px; font-family: var(--font-mono); color: var(--accent-cyan);">isLoading</td><td style="padding: 6px 4px; color: var(--text-secondary);">запрос в полёте (pending). В отличие от query, тут НЕТ isFetching</td></tr>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 4px; font-family: var(--font-mono); color: var(--accent-cyan);">isSuccess / isError</td><td style="padding: 6px 4px; color: var(--text-secondary);">финальные флаги</td></tr>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 4px; font-family: var(--font-mono); color: var(--accent-cyan);">data</td><td style="padding: 6px 4px; color: var(--text-secondary);">последний fulfilled payload</td></tr>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 4px; font-family: var(--font-mono); color: var(--accent-cyan);">error</td><td style="padding: 6px 4px; color: var(--text-secondary);">FetchBaseQueryError | SerializedError</td></tr>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 4px; font-family: var(--font-mono); color: var(--accent-cyan);">originalArgs</td><td style="padding: 6px 4px; color: var(--text-secondary);">аргумент последнего вызова trigger(arg)</td></tr>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 4px; font-family: var(--font-mono); color: var(--accent-cyan);">reset()</td><td style="padding: 6px 4px; color: var(--text-secondary);">сбрасывает local hook state + unsubscribe</td></tr>
+            <tr><td style="padding: 6px 4px; font-family: var(--font-mono); color: var(--accent-cyan);">requestId</td><td style="padding: 6px 4px; color: var(--text-secondary);">nanoid — ключ в state.api.mutations</td></tr>
+          </tbody>
+        </table>
+
+        <h3>trigger() возвращает Promise с .unwrap() и .reset()</h3>
+        <div class="code-block">
+<span class="kw">const</span> [addPost] = <span class="fn">useAddPostMutation</span>()
+
+<span class="kw">async function</span> <span class="fn">onSubmit</span>() {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> result = <span class="kw">await</span> <span class="fn">addPost</span>({ title, body }).<span class="fn">unwrap</span>()
+    <span class="cm">// result — это типизированный ResultType (не весь action)</span>
+    <span class="fn">showToast</span>(<span class="str">`Created #${result.id}`</span>)
+  } <span class="kw">catch</span> (err) {
+    <span class="cm">// err — это action.error или action.payload (если rejectWithValue)</span>
+    <span class="fn">showErrorToast</span>(err)
+  }
+}
+
+<span class="cm">// Без unwrap: await addPost(...) — резолвится всегда, с { data? | error? }</span>
+        </div>
+
+        <h3>fixedCacheKey — несколько компонентов разделяют статус</h3>
+        <div class="code-block">
+<span class="cm">// ComponentA:</span>
+<span class="kw">const</span> [trigger, state] = <span class="fn">useAddPostMutation</span>({ fixedCacheKey: <span class="str">'shared-add-post'</span> })
+
+<span class="cm">// ComponentB (где-то в другом месте дерева):</span>
+<span class="kw">const</span> [, stateB] = <span class="fn">useAddPostMutation</span>({ fixedCacheKey: <span class="str">'shared-add-post'</span> })
+<span class="cm">// stateB увидит ТОТ ЖЕ isLoading / data что state в A, хотя trigger был там.</span>
+<span class="cm">// Без fixedCacheKey каждый вызов — отдельный requestId → локальный state.</span>
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. По умолчанию mutation state унмаунтится вместе с компонентом.</strong>
+          <br>Когда компонент размонтируется, useMutation делает <code>unsubscribe</code> и
+          state.api.mutations[requestId] очищается. Если хочешь, чтобы статус пережил unmount
+          (например, оптимистичная мутация и сразу навигация) — передай <code>fixedCacheKey</code>.
+
+          <br><br>
+          <strong>2. trigger() возвращает НОВЫЙ promise каждый вызов.</strong>
+          <br>Если нажать 3 раза подряд — будет 3 отдельных requestId, и только последний попадёт в
+          hook state. Предыдущие промисы остаются валидными для <code>.unwrap()</code>, но hook state
+          перезатирается. Чтобы отменять предыдущий → сам вызывай <code>promise.abort()</code>.
+
+          <br><br>
+          <strong>3. .unwrap() бросает, .then/await без unwrap — нет.</strong>
+          <br><code>await addPost(arg)</code> всегда резолвится, с <code>{data} | {error}</code> формой.
+          <code>await addPost(arg).unwrap()</code> — бросает при rejected. Выбор зависит от стиля обработки.
+
+          <br><br>
+          <strong>4. reset() очищает hook-level state, но НЕ server-side.</strong>
+          <br>Это сбрасывает isLoading/isSuccess/data обратно в isUninitialized. Запрос на сервер УЖЕ
+          прошёл (если он стартовал) — откат надо делать отдельным endpoint'ом или через optimistic updates
+          (урок 94).
+
+          <br><br>
+          <strong>5. invalidatesTags — триггер refetch, НЕ авто-update cache.</strong>
+          <br>После mutation RTKQ помечает соответствующие cache entries «stale» и вызывает refetch
+          на активных подписках. Если на cacheKey никто не подписан — refetch не произойдёт,
+          но при следующем mount он произойдёт автоматически. См. урок 87.
+
+          <br><br>
+          <strong>6. Mutation hooks — БЕЗ useFetchingRef.</strong>
+          <br>У queries есть isFetching (перезапрос для того же cacheKey), у mutations — нет: каждое
+          trigger создаёт отдельный requestId. Если нужно «идёт ли сейчас запрос» → смотри isLoading
+          либо считай активные вручную.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../82-rtkq-usequery-hook/">82 — useQuery</a> (сравни: hook vs tuple).</li>
+          <li><a href="../84-rtkq-state-shape/">84 — state.api.mutations</a> (где храните).</li>
+          <li><a href="../87-rtkq-tags-invalidation/">87 — invalidatesTags</a> (auto-refetch после mutation).</li>
+          <li><a href="../94-rtkq-optimistic/">94 — optimistic updates</a> (onQueryStarted / updateQueryData).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/mutations" target="_blank">RTKQ · Mutations</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/react/buildHooks.ts" target="_blank">buildHooks.ts source</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/created-api/hooks#usemutation" target="_blank">useMutation API reference</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

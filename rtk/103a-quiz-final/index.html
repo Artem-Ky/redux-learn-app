@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>103a — Финальный квиз · 100 вопросов</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .quiz-stats {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .quiz-stats__row {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr 1fr 1fr;
+      gap: 12px;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+    }
+    .quiz-stats__bar {
+      height: 8px;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .quiz-stats__bar-fill {
+      height: 100%;
+      transition: width 200ms;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+    }
+    .quiz-stats__num { color: var(--accent-cyan); font-weight: 600; }
+    .quiz-stats__correct { color: var(--success); font-weight: 600; }
+    .quiz-stats__wrong { color: var(--accent-red); font-weight: 600; }
+
+    .quiz-filter {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 8px 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+    }
+    .quiz-filter button {
+      padding: 4px 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      cursor: pointer;
+    }
+    .quiz-filter button.active {
+      background: var(--accent);
+      color: var(--bg-primary);
+      border-color: var(--accent);
+    }
+
+    .qsection {
+      margin: 18px 0 10px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid var(--border);
+    }
+    .qsection h3 {
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      margin: 0;
+    }
+    .qsection p {
+      color: var(--text-muted);
+      font-size: .76rem;
+      margin: 2px 0 0;
+    }
+
+    .question {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .question__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .question__n {
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: .74rem;
+    }
+    .question__type {
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: .66rem;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+    .question__type--theory { background: rgba(86,156,214,.2); color: var(--accent); }
+    .question__type--code   { background: rgba(229,192,123,.2); color: #e5c07b; }
+    .question__topic {
+      font-size: .68rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .question__text {
+      color: var(--text-bright);
+      font-size: .9rem;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+    .question__code {
+      background: var(--bg-tertiary);
+      border-left: 3px solid var(--accent-cyan);
+      padding: 8px 10px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 6px 0;
+      color: var(--text-secondary);
+    }
+    .answer {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      color: var(--text-secondary);
+      transition: background 100ms, border-color 100ms;
+      text-align: left;
+      width: 100%;
+    }
+    .answer:hover:not(:disabled) {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+    }
+    .answer:disabled { cursor: default; }
+    .answer__letter {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      background: var(--bg-panel);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-cyan);
+      font-weight: 700;
+      font-size: .8rem;
+    }
+    .answer.correct {
+      background: rgba(76,175,80,.15);
+      border-color: var(--success);
+      color: var(--text-bright);
+    }
+    .answer.correct .answer__letter { background: var(--success); color: white; }
+    .answer.wrong {
+      background: rgba(244,71,71,.15);
+      border-color: var(--accent-red);
+      color: var(--text-bright);
+    }
+    .answer.wrong .answer__letter { background: var(--accent-red); color: white; }
+    .answer.unselected-correct {
+      border-color: var(--success);
+      background: rgba(76,175,80,.05);
+    }
+
+    .explanation {
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: rgba(86,156,214,.06);
+      border-left: 3px solid var(--accent);
+      border-radius: 3px;
+      font-size: .82rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .explanation strong { color: var(--accent-cyan); }
+    .explanation code {
+      background: var(--bg-tertiary);
+      padding: 1px 4px;
+      border-radius: 2px;
+      color: var(--accent-yellow);
+      font-size: .76rem;
+    }
+
+    .final-card {
+      background: linear-gradient(180deg, var(--bg-panel), var(--bg-tertiary));
+      border: 1px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      padding: 24px;
+      text-align: center;
+      margin-top: 20px;
+    }
+    .final-card__score {
+      font-size: 3rem;
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+    .final-card__verdict {
+      color: var(--text-bright);
+      font-size: 1rem;
+      margin-top: 8px;
+    }
+    .final-card__hint {
+      color: var(--text-muted);
+      font-size: .82rem;
+      margin-top: 8px;
+    }
+    .reset-btn {
+      margin-top: 12px;
+    }
+
+    @media (max-width: 700px) {
+      .quiz-stats__row { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">103a / 106</span>
+      🎯 Финальный квиз · 100 вопросов
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../103-rtkq-vs-react-query/">← 103</a>
+      <a href="../104-real-world-app/">104 →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">100 вопросов · 50 теория + 50 кода · по всему курсу</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 8px;">
+          Вопросы охватывают <strong>configureStore</strong>, <strong>createSlice</strong>,
+          <strong>createAsyncThunk</strong>, <strong>createEntityAdapter</strong>,
+          <strong>listenerMiddleware</strong>, <strong>createSelector</strong> и весь
+          <strong>RTK Query</strong> (createApi, hooks, cache, tags, optimistic, streaming, infinite, TS).
+        </p>
+        <p style="color: var(--text-muted); font-size: .8rem; margin-bottom: 14px;">
+          Кликни ответ → сразу feedback с пояснением. Можно фильтровать по типу (теория/код).
+          Прогресс — наверху.
+        </p>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div class="theory">
+      <div class="theory__header">Как читать результат</div>
+      <div class="theory__body">
+        <ul>
+          <li><strong>90+</strong> — отлично, можешь идти проектировать архитектуру.</li>
+          <li><strong>70-89</strong> — хороший рабочий уровень. Слабые темы — повтори по уроку.</li>
+          <li><strong>50-69</strong> — middle. Ещё нужно время с практикой и docs.</li>
+          <li><strong>&lt; 50</strong> — стоит пройти курс ещё раз с практикой в IDE.</li>
+        </ul>
+        <p style="margin-top: 10px;">
+          Перепройти можно сколько угодно — кнопка «↻ Сброс» внизу. Топик ошибки → клик ссылка
+          в пояснении → урок открывается с теорией.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

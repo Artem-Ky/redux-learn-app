@@ -132,13 +132,13 @@
     <div class="hero">
       <div class="hero__title"><span>RTK</span> + RTK Query — глубокое погружение</div>
       <div class="hero__sub">
-        Курс из 106 интерактивных уроков по официальному инструменту Redux. От первой <code>configureStore</code>
+        Курс из 107 интерактивных уроков по официальному инструменту Redux. От первой <code>configureStore</code>
         до тонкостей <code>createApi</code> с tags, optimistic updates и streaming. Каждый урок —
         живой пример + теория с цитатами из <a href="https://redux-toolkit.js.org" target="_blank" style="color: var(--accent-blue-bright);">официальной документации</a>
         и фрагментами исходников <a href="https://github.com/reduxjs/redux-toolkit/tree/master/packages/toolkit/src" target="_blank" style="color: var(--accent-blue-bright);">@reduxjs/toolkit</a>.
       </div>
       <div class="hero__meta">
-        <span>Уроков: <strong>106</strong></span>
+        <span>Уроков: <strong>107</strong></span>
         <span>Секций: <strong>13</strong> (A–M)</span>
         <span>Стек: <strong>React 19 + TS + Vite</strong></span>
         <span>Версия: <strong>@reduxjs/toolkit 2.5+</strong></span>
@@ -356,44 +356,45 @@
     <!-- ============ SECTION K ============ -->
     <div class="section-title">K. RTK Query — основы <span class="section-title__count">10 уроков</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">79</div><div class="index-card__title">Что такое RTK Query</div><div class="index-card__desc">Зачем и какие фичи</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">80</div><div class="index-card__title">Первый createApi</div><div class="index-card__desc">Pokemon API endpoint</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">81</div><div class="index-card__title">Подключение к store</div><div class="index-card__desc">api.reducer + api.middleware</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">82</div><div class="index-card__title">useGetXQuery hook</div><div class="index-card__desc">data, isLoading, isFetching, refetch</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">83</div><div class="index-card__title">Cache key</div><div class="index-card__desc">serializeQueryArgs, дедупликация</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">84</div><div class="index-card__title">state.api shape</div><div class="index-card__desc">queries/mutations/subs/provided/config</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">85</div><div class="index-card__title">fetchBaseQuery</div><div class="index-card__desc">prepareHeaders, paramsSerializer, ...</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">86</div><div class="index-card__title">Mutations</div><div class="index-card__desc">useAddXMutation</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">87</div><div class="index-card__title">Tags: provides/invalidates</div><div class="index-card__desc">Auto-refetch</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">88</div><div class="index-card__title">Granular tags + LIST</div><div class="index-card__desc">{ type, id }</div></a>
+      <a href="./79-rtkq-what/" class="index-card"><div class="index-card__num">79</div><div class="index-card__title">Что такое RTK Query</div><div class="index-card__desc">7 фич + симуляции + мотивация</div></a>
+      <a href="./80-rtkq-create-api-basic/" class="index-card"><div class="index-card__num">80</div><div class="index-card__title">Первый createApi</div><div class="index-card__desc">pokeApi + mock fetchFn + initiate()</div></a>
+      <a href="./81-rtkq-store-setup/" class="index-card"><div class="index-card__num">81</div><div class="index-card__title">Подключение к store</div><div class="index-card__desc">4 варианта сборки — какой работает, какой silent-bug</div></a>
+      <a href="./82-rtkq-usequery-hook/" class="index-card"><div class="index-card__num">82</div><div class="index-card__title">useGetXQuery hook</div><div class="index-card__desc">15 return-полей live · isLoading vs isFetching · skipToken</div></a>
+      <a href="./83-rtkq-cache-key/" class="index-card"><div class="index-card__num">83</div><div class="index-card__title">cacheKey + serializeQueryArgs</div><div class="index-card__desc">Live preview · HIT vs MISS · sorted keys</div></a>
+      <a href="./84-rtkq-state-shape/" class="index-card"><div class="index-card__num">84</div><div class="index-card__title">state.api shape</div><div class="index-card__desc">queries/mutations/subs/provided/config · live tree</div></a>
+      <a href="./85-rtkq-fetchbasequery/" class="index-card"><div class="index-card__num">85</div><div class="index-card__title">fetchBaseQuery</div><div class="index-card__desc">prepareHeaders · timeout · validateStatus · 7 опций</div></a>
+      <a href="./86-rtkq-mutations/" class="index-card"><div class="index-card__num">86</div><div class="index-card__title">Mutations</div><div class="index-card__desc">useAddXMutation · [trigger, state] · fixedCacheKey</div></a>
+      <a href="./87-rtkq-tags-invalidation/" class="index-card"><div class="index-card__num">87</div><div class="index-card__title">Tags: provides/invalidates</div><div class="index-card__desc">Auto-refetch · provided.Post · live tree</div></a>
+      <a href="./88-rtkq-tags-granular/" class="index-card"><div class="index-card__num">88</div><div class="index-card__title">Granular tags + LIST</div><div class="index-card__desc">{ type, id } · точечный refetch · LIST как whole-collection</div></a>
     </div>
 
     <!-- ============ SECTION L ============ -->
-    <div class="section-title">L. RTK Query — продвинутое <span class="section-title__count">15 уроков</span></div>
+    <div class="section-title">L. RTK Query — продвинутое <span class="section-title__count">15 уроков + квиз</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">89</div><div class="index-card__title">transformResponse / Error</div><div class="index-card__desc">Преобразование данных</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">90</div><div class="index-card__title">selectFromResult</div><div class="index-card__desc">Оптимизация ререндеров</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">91</div><div class="index-card__title">skip, polling, refetch options</div><div class="index-card__desc">Все опции hook</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">92</div><div class="index-card__title">keepUnusedDataFor</div><div class="index-card__desc">Cache cleanup механизм</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">93</div><div class="index-card__title">Optimistic updates</div><div class="index-card__desc">onQueryStarted + updateQueryData</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">94</div><div class="index-card__title">Streaming (websocket)</div><div class="index-card__desc">onCacheEntryAdded</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">95</div><div class="index-card__title">Manual cache control</div><div class="index-card__desc">prefetch, upsert, patch+undo</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">96</div><div class="index-card__title">data vs currentData</div><div class="index-card__desc">isLoading vs isFetching</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">97</div><div class="index-card__title">Error handling + retry</div><div class="index-card__desc">FetchBaseQueryError</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">98</div><div class="index-card__title">Custom baseQuery</div><div class="index-card__desc">axios / graphql-request</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">99</div><div class="index-card__title">Code splitting</div><div class="index-card__desc">injectEndpoints</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">100</div><div class="index-card__title">Infinite queries</div><div class="index-card__desc">build.infiniteQuery</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">101</div><div class="index-card__title">useQuery internals</div><div class="index-card__desc">Что происходит под капотом</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">102</div><div class="index-card__title">Полная типизация RTKQ</div><div class="index-card__desc">TypedUseQueryHookResult</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">103</div><div class="index-card__title">RTKQ vs react-query / SWR</div><div class="index-card__desc">Comparison table</div></a>
+      <a href="./89-rtkq-transformResponse/" class="index-card"><div class="index-card__num">89</div><div class="index-card__title">transformResponse / Error</div><div class="index-card__desc">envelope → cache · entity adapter</div></a>
+      <a href="./90-rtkq-selectFromResult/" class="index-card"><div class="index-card__num">90</div><div class="index-card__title">selectFromResult</div><div class="index-card__desc">shallowEq · 100 строк · оптимизация</div></a>
+      <a href="./91-rtkq-skip-options/" class="index-card"><div class="index-card__num">91</div><div class="index-card__title">skip, polling, refetchOn*</div><div class="index-card__desc">все опции useQuery · skipToken</div></a>
+      <a href="./92-rtkq-keepunuseddatafor-cleanup/" class="index-card"><div class="index-card__num">92</div><div class="index-card__title">keepUnusedDataFor</div><div class="index-card__desc">refCount · таймер · cacheCollection.ts</div></a>
+      <a href="./93-rtkq-onQueryStarted-optimistic/" class="index-card"><div class="index-card__num">93</div><div class="index-card__title">Optimistic updates</div><div class="index-card__desc">onQueryStarted · updateQueryData · undo</div></a>
+      <a href="./94-rtkq-onCacheEntryAdded-streaming/" class="index-card"><div class="index-card__num">94</div><div class="index-card__title">Streaming (WebSocket)</div><div class="index-card__desc">onCacheEntryAdded · updateCachedData</div></a>
+      <a href="./95-rtkq-manual-cache/" class="index-card"><div class="index-card__num">95</div><div class="index-card__title">Manual cache · api.util</div><div class="index-card__desc">upsert · prefetch · invalidateTags · reset</div></a>
+      <a href="./96-rtkq-conditional-fetching/" class="index-card"><div class="index-card__num">96</div><div class="index-card__title">data vs currentData</div><div class="index-card__desc">isLoading vs isFetching · пагинация</div></a>
+      <a href="./97-rtkq-error-handling/" class="index-card"><div class="index-card__num">97</div><div class="index-card__title">Error handling + retry</div><div class="index-card__desc">FetchBaseQueryError · retry.fail · backoff</div></a>
+      <a href="./98-rtkq-base-query-custom/" class="index-card"><div class="index-card__num">98</div><div class="index-card__title">Custom baseQuery</div><div class="index-card__desc">axios/graphql · reauth на 401</div></a>
+      <a href="./99-rtkq-code-splitting-injectEndpoints/" class="index-card"><div class="index-card__num">99</div><div class="index-card__title">Code splitting</div><div class="index-card__desc">injectEndpoints · lazy features</div></a>
+      <a href="./100-rtkq-infinite-queries/" class="index-card"><div class="index-card__num">100</div><div class="index-card__title">Infinite queries</div><div class="index-card__desc">merge · forceRefetch · pages[]</div></a>
+      <a href="./101-rtkq-query-lifecycle-internals/" class="index-card"><div class="index-card__num">101</div><div class="index-card__title">Query lifecycle internals</div><div class="index-card__desc">7 стадий · pipeline · файлы исходников</div></a>
+      <a href="./102-rtkq-typed-and-react-hooks/" class="index-card"><div class="index-card__num">102</div><div class="index-card__title">Полная типизация RTKQ</div><div class="index-card__desc">BaseQueryFn · TypedUseQueryHookResult</div></a>
+      <a href="./103-rtkq-vs-react-query/" class="index-card"><div class="index-card__num">103</div><div class="index-card__title">RTKQ vs React Query / SWR</div><div class="index-card__desc">feature matrix · decision tree</div></a>
+      <a href="./103a-quiz-final/" class="index-card"><div class="index-card__num">103a</div><div class="index-card__title">🎯 Финальный квиз · 100 вопросов</div><div class="index-card__desc">50 теории + 50 кода · по всему RTK / RTKQ</div></a>
     </div>
 
     <!-- ============ SECTION M ============ -->
     <div class="section-title">M. Паттерны и финал <span class="section-title__count">3 урока</span></div>
     <div class="index-grid">
-      <a class="index-card index-card--soon"><div class="index-card__num">104</div><div class="index-card__title">Mini real-world app</div><div class="index-card__desc">Books: всё RTK + RTKQ вместе</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">105</div><div class="index-card__title">Топ-15 подводных камней</div><div class="index-card__desc">Cheatsheet</div></a>
-      <a class="index-card index-card--soon"><div class="index-card__num">106</div><div class="index-card__title">Куда дальше</div><div class="index-card__desc">Curated resources</div></a>
+      <a href="./104-real-world-app/" class="index-card"><div class="index-card__num">104</div><div class="index-card__title">Mini real-world · Books</div><div class="index-card__desc">RTKQ + slice + listener + selectFromResult</div></a>
+      <a href="./105-rtk-pitfalls-cheatsheet/" class="index-card"><div class="index-card__num">105</div><div class="index-card__title">Топ-15 подводных камней</div><div class="index-card__desc">cheatsheet · fix для каждого</div></a>
+      <a href="./106-curated-resources/" class="index-card"><div class="index-card__num">106</div><div class="index-card__title">Куда дальше</div><div class="index-card__desc">docs · blogs · видео · tools · финал</div></a>
     </div>
   </div>
 </body>

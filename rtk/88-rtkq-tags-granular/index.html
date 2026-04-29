@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>88 — Granular tags · { type, id } + LIST</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .mut-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+    }
+    .mut-bar label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      color: var(--text-secondary);
+    }
+    .mut-bar input[type=number] {
+      width: 58px;
+      padding: 4px 6px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: 1.1fr 1.9fr;
+      gap: 12px;
+    }
+    @media (max-width: 940px) { .board { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .panel h4 {
+      margin: 0 0 6px;
+      color: var(--accent);
+      font-size: .86rem;
+    }
+    .panel__hint {
+      font-size: .72rem;
+      color: var(--text-muted);
+      margin: 0 0 8px;
+    }
+
+    .list-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 62px;
+      gap: 6px;
+      align-items: center;
+      padding: 5px 8px;
+      border-bottom: 1px dashed var(--border);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .list-row:last-child { border-bottom: none; }
+    .list-row__id { color: var(--accent-cyan); }
+    .list-row__title { color: var(--text-bright); }
+    .list-row__tag {
+      font-size: .66rem;
+      font-style: italic;
+      color: var(--text-muted);
+      text-align: right;
+    }
+    .flash { animation: flashGreen 1.2s ease-out; }
+    @keyframes flashGreen {
+      0%   { background: rgba(76,175,80,.35); }
+      100% { background: transparent; }
+    }
+    .flash-red { animation: flashRed 1.2s ease-out; }
+    @keyframes flashRed {
+      0%   { background: rgba(244,71,71,.28); }
+      100% { background: transparent; }
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+      gap: 8px;
+    }
+    .card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      transition: border-color .2s;
+    }
+    .card--loading { border-color: var(--accent); }
+    .card__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--accent-cyan);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .card__badge {
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(86,156,214,.15);
+      color: var(--accent);
+      font-size: .64rem;
+      font-style: italic;
+    }
+    .card__badge--fetching { background: rgba(86,156,214,.35); color: var(--bg-primary); }
+    .card__title { color: var(--text-bright); margin-bottom: 4px; }
+    .card__meta {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: .7rem;
+    }
+    .card__fetches {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .counter-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 10px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+    }
+    .counter-line + .counter-line { margin-top: 4px; }
+    .counter-line strong { color: var(--accent-cyan); font-size: 1rem; }
+
+    .tree {
+      background: var(--bg-tertiary);
+      padding: 8px 10px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      max-height: 180px;
+      overflow: auto;
+      margin-top: 4px;
+    }
+    .tree__entry {
+      padding: 2px 4px;
+      border-left: 2px solid var(--accent);
+      margin: 2px 0;
+      background: rgba(86,156,214,.05);
+    }
+    .tree__entry code { color: var(--text-secondary); font-size: .66rem; }
+    .tree__name { color: var(--accent); font-weight: 600; }
+    .tree__id { color: var(--accent-cyan); }
+    .tree__id--list { color: #e5c07b; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">88 / 106</span>
+      Granular tags — <code>{ type, id }</code> и <code>'LIST'</code>
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../87-rtkq-tags-invalidation/">← Назад</a>
+      <a href="../89-rtkq-transformResponse/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">providesTags per-item · invalidatesTags точечно · 'LIST' как whole-collection</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Тег <code>'Post'</code> в виде строки = <em>всё про Post</em> — грубо.
+          Тег <code>{ type: 'Post', id: 5 }</code> = <em>конкретный пост #5</em> — точечно.
+          Тег <code>{ type: 'Post', id: 'LIST' }</code> — отдельный &laquo;bucket&raquo; для списка;
+          query списка его <em>provides</em>, мутация <em>add</em> его <em>invalidates</em> —
+          и <strong>только список</strong> перезапрашивается, 5 кэшей деталей остаются нетронутыми.
+        </p>
+
+        <div class="mut-bar">
+          <label>
+            updatePost id
+            <input id="upd-id" type="number" min="1" value="3"/>
+          </label>
+          <label>
+            new title
+            <input id="upd-title" type="text" value="updated title" style="width:140px;padding:4px 6px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-bright);border-radius:3px;font-family:var(--font-mono);font-size:.82rem;"/>
+          </label>
+          <button class="btn btn--accent" id="btn-update">▶ updatePost(id) — invalidates [{type:'Post',id}]</button>
+          <button class="btn" id="btn-add">+ addPost — invalidates [{type:'Post',id:'LIST'}]</button>
+          <button class="btn btn--danger" id="btn-nuke">✗ invalidates ['Post'] — nuke ALL</button>
+        </div>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 88. Granular tags · <code>{type,id}</code> · <code>'LIST'</code></div>
+      <div class="theory__body">
+        <h3>Цитата — Advanced Invalidation with abstract tag IDs</h3>
+        <div class="quote">
+          «Providing a tag with an <code>id</code> enables more granular control over which cached entries will
+          be invalidated. An ID can be any string or number. Tags can be <strong>further optimized</strong> by
+          using <code>'LIST'</code> as a special ID so you can invalidate the whole collection when adding a new
+          entity without re-fetching every single detail query.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/automated-refetching#advanced-invalidation-with-abstract-tag-ids" target="_blank">RTKQ · Advanced Invalidation with abstract tag IDs</a>
+        </div>
+        <div class="quote quote--ru">
+          «<strong>Гранулярность</strong> — это когда тег содержит <code>id</code>, чтобы инвалидировать
+          <em>конкретную</em> запись, а не всю коллекцию. А спецтег <code>'LIST'</code> — это
+          &laquo;маркер списка&raquo;: query списка его provides, create-мутация его invalidates →
+          ре-фетчится только список, детали не трогаются.»
+        </div>
+
+        <h3>Три уровня гранулярности</h3>
+        <div class="code-block">
+<span class="cm">// ─── уровень 1: строковый тег — грубо ───</span>
+getPosts:  { providesTags: [<span class="str">'Post'</span>] }
+updatePost:{ invalidatesTags: [<span class="str">'Post'</span>] }
+<span class="cm">// ↑ updatePost({id:5}) перезапрашивает ВСЕ кэши с тегом 'Post':</span>
+<span class="cm">//   getPosts + getPost(1) + getPost(2) + ... + getPost(10) — 11 запросов</span>
+
+<span class="cm">// ─── уровень 2: { type, id } — точечно ───</span>
+getPost(id): { providesTags: (r, e, id) =&gt; [{ type: <span class="str">'Post'</span>, id }] }
+updatePost: { invalidatesTags: (r, e, arg) =&gt; [{ type: <span class="str">'Post'</span>, id: arg.id }] }
+<span class="cm">// ↑ updatePost({id:5}) перезапрашивает ТОЛЬКО getPost(5) — 1 запрос</span>
+<span class="cm">//   Но! getPosts теперь не инвалидируется → список показывает устаревший title</span>
+
+<span class="cm">// ─── уровень 3: { type, id } + 'LIST' — смешанный ───</span>
+getPosts: {
+  providesTags: (result) =&gt; result
+    ? [
+        ...result.<span class="fn">map</span>((p) =&gt; ({ type: <span class="str">'Post'</span> <span class="kw">as const</span>, id: p.id })),
+        { type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> },                  <span class="cm">// 👀 маркер «это список»</span>
+      ]
+    : [{ type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> }],
+}
+getPost(id): { providesTags: (r, e, id) =&gt; [{ type: <span class="str">'Post'</span>, id }] }
+
+updatePost: { invalidatesTags: (r, e, arg) =&gt; [{ type: <span class="str">'Post'</span>, id: arg.id }] }
+<span class="cm">// update → getPost(id) + getPosts (потому что список тоже provides {Post,id}!) — 2 запроса</span>
+
+addPost:    { invalidatesTags: [{ type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> }] }
+<span class="cm">// add → только getPosts (который один provides 'LIST') — 1 запрос, детали нетронуты</span>
+        </div>
+
+        <h3>Что на самом деле хранится в <code>state.api.provided.tags</code></h3>
+        <div class="code-block">
+<span class="cm">// После того как загрузились getPosts + getPost(3) + getPost(5):</span>
+state.api.provided.tags = {
+  Post: {
+    <span class="str">'1'</span>:    [<span class="str">'getPosts(undefined)'</span>],                    <span class="cm">// из списка — по id=1</span>
+    <span class="str">'2'</span>:    [<span class="str">'getPosts(undefined)'</span>],
+    <span class="str">'3'</span>:    [<span class="str">'getPosts(undefined)'</span>, <span class="str">'getPost(3)'</span>],      <span class="cm">// 👀 ДВА поставщика!</span>
+    <span class="str">'4'</span>:    [<span class="str">'getPosts(undefined)'</span>],
+    <span class="str">'5'</span>:    [<span class="str">'getPosts(undefined)'</span>, <span class="str">'getPost(5)'</span>],      <span class="cm">// 👀</span>
+    <span class="str">'LIST'</span>: [<span class="str">'getPosts(undefined)'</span>],                    <span class="cm">// спецтег</span>
+  }
+}
+
+<span class="cm">// dispatch(api.util.invalidateTags([{type:'Post', id: 3}])):</span>
+<span class="cm">//   ищем tags['Post']['3'] → ['getPosts(undefined)', 'getPost(3)']</span>
+<span class="cm">//   → перезапуск обеих (если subscribed) или delete (если нет).</span>
+
+<span class="cm">// dispatch(api.util.invalidateTags([{type:'Post', id: 'LIST'}])):</span>
+<span class="cm">//   ищем tags['Post']['LIST'] → ['getPosts(undefined)']</span>
+<span class="cm">//   → перезапуск ТОЛЬКО списка, детали нетронуты.</span>
+        </div>
+
+        <h3>Источник — invalidationByTags.ts (упрощённо)</h3>
+        <div class="code-block">
+<span class="cm">// buildMiddleware/invalidationByTags.ts — handler на mutation.fulfilled/rejected</span>
+<span class="kw">function</span> <span class="fn">invalidateTags</span>(tags: <span class="type">FullTagDescription</span>&lt;<span class="type">string</span>&gt;[], api) {
+  <span class="kw">const</span> state = api.<span class="fn">getState</span>()[reducerPath]
+  <span class="kw">const</span> toInvalidate = <span class="kw">new</span> <span class="fn">Set</span>&lt;<span class="type">QueryCacheKey</span>&gt;()
+
+  <span class="kw">for</span> (<span class="kw">const</span> tag <span class="kw">of</span> tags) {
+    <span class="kw">const</span> provided = state.provided.tags[tag.type]
+    <span class="kw">if</span> (!provided) <span class="kw">continue</span>
+    <span class="kw">const</span> idBucket = tag.id !== <span class="kw">undefined</span> ? <span class="fn">String</span>(tag.id) : <span class="str">'__internal_without_id__'</span>
+    provided[idBucket]?.<span class="fn">forEach</span>((cacheKey) =&gt; toInvalidate.<span class="fn">add</span>(cacheKey)) <span class="cm">// 👀 Set — дедуп</span>
+  }
+
+  <span class="cm">// тэг БЕЗ id — «все buckets» для этого типа (edge-case)</span>
+  <span class="kw">for</span> (<span class="kw">const</span> tag <span class="kw">of</span> tags.<span class="fn">filter</span>((t) =&gt; t.id === <span class="kw">undefined</span>)) {
+    <span class="kw">const</span> provided = state.provided.tags[tag.type]
+    <span class="kw">if</span> (provided) <span class="fn">Object</span>.<span class="fn">values</span>(provided).<span class="fn">flat</span>().<span class="fn">forEach</span>((k) =&gt; toInvalidate.<span class="fn">add</span>(k))
+  }
+
+  <span class="kw">for</span> (<span class="kw">const</span> cacheKey <span class="kw">of</span> toInvalidate) {
+    <span class="kw">const</span> q = state.queries[cacheKey]
+    <span class="kw">if</span> (!q) <span class="kw">continue</span>
+    <span class="kw">if</span> (hasSubscription(cacheKey)) api.<span class="fn">dispatch</span>(<span class="fn">forceRefetch</span>(cacheKey))  <span class="cm">// refetch</span>
+    <span class="kw">else</span>                          api.<span class="fn">dispatch</span>(<span class="fn">removeQueryResult</span>({ queryCacheKey: cacheKey }))
+  }
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted);">
+          Источник полностью:
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildMiddleware/invalidationByTags.ts" target="_blank">
+            invalidationByTags.ts
+          </a>.
+          Ключевая идея — <strong>Set</strong> дедуплицирует cacheKey, если один кэш провайдит
+          несколько тегов.
+        </p>
+
+        <h3>Схема — три разных invalidatesTags</h3>
+        <div class="flow-diagram" style="padding: 10px 0;">
+          <svg viewBox="0 0 860 280" style="width: 100%; height: auto;">
+            <defs>
+              <marker id="arr88" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                <polygon points="0 0, 10 3, 0 6" fill="#888"/>
+              </marker>
+            </defs>
+            <g font-family="monospace" font-size="10.5">
+              <rect x="10" y="10" width="210" height="60" rx="5" fill="#1e2a3a" stroke="#f44747"/>
+              <text x="115" y="30" text-anchor="middle" fill="#f44747" font-weight="bold">invalidatesTags: ['Post']</text>
+              <text x="115" y="46" text-anchor="middle" fill="#888">строковый — все Post-теги</text>
+              <text x="115" y="62" text-anchor="middle" fill="#888">→ list + 5 details = 6 fetches</text>
+
+              <rect x="10" y="105" width="210" height="60" rx="5" fill="#1e2a3a" stroke="#e5c07b"/>
+              <text x="115" y="125" text-anchor="middle" fill="#e5c07b" font-weight="bold">invalidatesTags: [{type:'Post',id:3}]</text>
+              <text x="115" y="141" text-anchor="middle" fill="#888">точечный</text>
+              <text x="115" y="157" text-anchor="middle" fill="#888">→ list + getPost(3) = 2 fetches</text>
+
+              <rect x="10" y="200" width="210" height="60" rx="5" fill="#1e2a3a" stroke="#4caf50"/>
+              <text x="115" y="220" text-anchor="middle" fill="#4caf50" font-weight="bold">invalidatesTags: [{type:'Post',id:'LIST'}]</text>
+              <text x="115" y="236" text-anchor="middle" fill="#888">только спецтег LIST</text>
+              <text x="115" y="252" text-anchor="middle" fill="#888">→ только list = 1 fetch</text>
+
+              <rect x="290" y="10"  width="160" height="60" rx="5" fill="#133218" stroke="#4caf50"/>
+              <text x="370" y="32" text-anchor="middle" fill="#4caf50">getPosts — refetch</text>
+              <text x="370" y="48" text-anchor="middle" fill="#888">provides ['Post','Post:1',..,'LIST']</text>
+
+              <rect x="290" y="90" width="160" height="40" rx="5" fill="#133218" stroke="#4caf50"/>
+              <text x="370" y="115" text-anchor="middle" fill="#4caf50">getPost(1) — refetch</text>
+              <rect x="290" y="135" width="160" height="40" rx="5" fill="#133218" stroke="#4caf50"/>
+              <text x="370" y="160" text-anchor="middle" fill="#4caf50">getPost(2) — refetch</text>
+              <rect x="290" y="180" width="160" height="40" rx="5" fill="#133218" stroke="#4caf50"/>
+              <text x="370" y="205" text-anchor="middle" fill="#4caf50">getPost(3) — refetch</text>
+              <rect x="290" y="225" width="160" height="40" rx="5" fill="#133218" stroke="#4caf50"/>
+              <text x="370" y="250" text-anchor="middle" fill="#4caf50">getPost(4..N) — refetch</text>
+
+              <line x1="220" y1="40"  x2="288" y2="40"  stroke="#f44747" stroke-width="1.5" marker-end="url(#arr88)"/>
+              <line x1="220" y1="45"  x2="288" y2="110" stroke="#f44747" stroke-width="1" marker-end="url(#arr88)" stroke-dasharray="3,3"/>
+              <line x1="220" y1="50"  x2="288" y2="155" stroke="#f44747" stroke-width="1" marker-end="url(#arr88)" stroke-dasharray="3,3"/>
+              <line x1="220" y1="55"  x2="288" y2="200" stroke="#f44747" stroke-width="1" marker-end="url(#arr88)" stroke-dasharray="3,3"/>
+              <line x1="220" y1="60"  x2="288" y2="245" stroke="#f44747" stroke-width="1" marker-end="url(#arr88)" stroke-dasharray="3,3"/>
+
+              <line x1="220" y1="130" x2="288" y2="50"  stroke="#e5c07b" stroke-width="1.5" marker-end="url(#arr88)"/>
+              <line x1="220" y1="140" x2="288" y2="200" stroke="#e5c07b" stroke-width="1.5" marker-end="url(#arr88)"/>
+
+              <line x1="220" y1="230" x2="288" y2="40"  stroke="#4caf50" stroke-width="1.5" marker-end="url(#arr88)"/>
+
+              <text x="620" y="30" fill="#f44747" font-size="11" font-weight="bold">строковый 'Post' →</text>
+              <text x="620" y="46" fill="#888">    6 fetches (list + 5 details)</text>
+              <text x="620" y="62" fill="#888">    worst-case, но удобно</text>
+
+              <text x="620" y="125" fill="#e5c07b" font-size="11" font-weight="bold">{type,id:N} →</text>
+              <text x="620" y="141" fill="#888">    list (т.к. он тоже</text>
+              <text x="620" y="157" fill="#888">    provides {Post,id:N}) + getPost(N)</text>
+
+              <text x="620" y="220" fill="#4caf50" font-size="11" font-weight="bold">{type,id:'LIST'} →</text>
+              <text x="620" y="236" fill="#888">    только список</text>
+              <text x="620" y="252" fill="#888">    used при addPost</text>
+            </g>
+          </svg>
+        </div>
+
+        <h3>Паттерн «list + detail» — канонический</h3>
+        <div class="code-block">
+<span class="kw">type</span> <span class="type">PostTag</span> = { type: <span class="str">'Post'</span>; id: <span class="type">number</span> | <span class="str">'LIST'</span> }
+
+endpoints: (build) =&gt; ({
+  getPosts: build.<span class="fn">query</span>&lt;<span class="type">Post</span>[], <span class="type">void</span>&gt;({
+    query: () =&gt; <span class="str">'posts'</span>,
+    providesTags: (result) =&gt;
+      result
+        ? [
+            ...result.<span class="fn">map</span>(({ id }) =&gt; ({ type: <span class="str">'Post'</span> <span class="kw">as const</span>, id })),
+            { type: <span class="str">'Post'</span> <span class="kw">as const</span>, id: <span class="str">'LIST'</span> },      <span class="cm">// всегда есть</span>
+          ]
+        : [{ type: <span class="str">'Post'</span> <span class="kw">as const</span>, id: <span class="str">'LIST'</span> }], <span class="cm">// даже при ошибке</span>
+  }),
+  getPost: build.<span class="fn">query</span>&lt;<span class="type">Post</span>, <span class="type">number</span>&gt;({
+    query: (id) =&gt; <span class="str">`posts/</span><span class="kw">${</span>id<span class="kw">}</span><span class="str">`</span>,
+    providesTags: (_r, _e, id) =&gt; [{ type: <span class="str">'Post'</span>, id }],
+  }),
+
+  addPost: build.<span class="fn">mutation</span>&lt;<span class="type">Post</span>, <span class="type">NewPost</span>&gt;({
+    query: (body) =&gt; ({ url: <span class="str">'posts'</span>, method: <span class="str">'POST'</span>, body }),
+    invalidatesTags: [{ type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> }],  <span class="cm">// 👀 только список</span>
+  }),
+  updatePost: build.<span class="fn">mutation</span>&lt;<span class="type">Post</span>, { id: <span class="type">number</span>; patch: <span class="type">Partial</span>&lt;<span class="type">Post</span>&gt; }&gt;({
+    query: ({ id, patch }) =&gt; ({ url: <span class="str">`posts/</span><span class="kw">${</span>id<span class="kw">}</span><span class="str">`</span>, method: <span class="str">'PATCH'</span>, body: patch }),
+    invalidatesTags: (_r, _e, arg) =&gt; [{ type: <span class="str">'Post'</span>, id: arg.id }], <span class="cm">// 👀 точечно</span>
+  }),
+  deletePost: build.<span class="fn">mutation</span>&lt;<span class="type">void</span>, <span class="type">number</span>&gt;({
+    query: (id) =&gt; ({ url: <span class="str">`posts/</span><span class="kw">${</span>id<span class="kw">}</span><span class="str">`</span>, method: <span class="str">'DELETE'</span> }),
+    invalidatesTags: (_r, _e, id) =&gt; [
+      { type: <span class="str">'Post'</span>, id },                          <span class="cm">// getPost(id) → delete</span>
+      { type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> },                  <span class="cm">// список → refetch без него</span>
+    ],
+  }),
+})
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. tag.id = undefined ≠ tag.id = 'LIST'.</strong>
+          <br>Если передать <code>{type:'Post'}</code> без <code>id</code> — RTKQ кладёт его в bucket
+          <code>'__internal_without_id__'</code>. <code>{type:'Post', id:'LIST'}</code> — в bucket
+          <code>'LIST'</code>. Это два <strong>разных</strong> bucket'а. При invalidate
+          <code>{type:'Post'}</code> без id — инвалидируется <strong>вся коллекция</strong> для этого типа
+          (все buckets через <code>Object.values().flat()</code>), а не только '__internal_without_id__'
+          — будь осторожен.
+
+          <br><br>
+          <strong>2. List-query provides теги и для LIST, и для каждого элемента.</strong>
+          <br>Если просто сделать <code>providesTags: [{type:'Post',id:'LIST'}]</code> на getPosts,
+          тогда updatePost({id:5}) НЕ ре-фетчит список, и ты увидишь устаревший title в списке
+          (хотя detail обновился). Решение — <em>всегда</em> provides массив item-тегов +
+          LIST-тег (как в паттерне выше).
+
+          <br><br>
+          <strong>3. Не используй <code>as const</code> — потеряешь типизацию.</strong>
+          <br><code>{ type: 'Post' as const, id }</code> — без <code>as const</code> TS выведет
+          <code>type: string</code>, и RTKQ выдаст ошибку «tag 'Post' not in tagTypes». Пиши
+          <em>всегда</em> <code>as const</code> или используй <code>satisfies TagDescription[]</code>.
+
+          <br><br>
+          <strong>4. <code>'LIST'</code> — это просто соглашение, не ключевое слово.</strong>
+          <br>RTKQ не проверяет строку — можно писать <code>'ALL'</code>, <code>'FEED'</code>,
+          <code>'__list__'</code>. Но весь мир знает про <code>'LIST'</code> — держись стандарта.
+
+          <br><br>
+          <strong>5. Delete-мутация должна инвалидировать и item, и LIST.</strong>
+          <br>Item-тег нужен, чтобы закешированный detail-query (если пользователь его ещё смотрит)
+          пошёл за новыми данными → получит 404 → отобразит error. LIST-тег нужен, чтобы список
+          обновился без удалённого элемента. Пропустить LIST = список покажет «призрак» до следующего
+          mount.
+
+          <br><br>
+          <strong>6. invalidatesTags может быть функцией — используй, когда зависит от arg.</strong>
+          <br><code>invalidatesTags: (r, e, arg) =&gt; error ? [] : [{type:'Post', id: arg.id}]</code> —
+          при ошибке не инвалидировать ничего (deterministic behavior). Возврат пустого массива —
+          valid, invalidation просто не происходит.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../87-rtkq-tags-invalidation/">87 — провайд/инвалидация на уровне тегов</a> (базовый механизм).</li>
+          <li><a href="../84-rtkq-state-shape/">84 — state.api.provided tree</a> (где ищется bucket).</li>
+          <li><a href="../93-rtkq-onQueryStarted-optimistic/">93 — optimistic updates</a> (альтернатива: не invalidate, а сразу патчить cache).</li>
+          <li><a href="../95-rtkq-manual-cache/">95 — <code>api.util.invalidateTags</code></a> (ручная инвалидация по тем же правилам).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/automated-refetching#advanced-invalidation-with-abstract-tag-ids" target="_blank">RTKQ · Advanced Invalidation with abstract tag IDs</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildMiddleware/invalidationByTags.ts" target="_blank">invalidationByTags.ts</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/createApi#providestags" target="_blank">createApi · providesTags reference</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

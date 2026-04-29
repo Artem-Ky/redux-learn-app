@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>80 — Первый createApi</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .poke-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin: 12px 0;
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+    .poke-card__avatar {
+      width: 64px; height: 64px;
+      background: var(--bg-tertiary);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: 1.5rem;
+      color: var(--accent-cyan); font-weight: 700;
+    }
+    .poke-card__name {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+    .poke-card__stats {
+      display: flex; gap: 10px; margin-top: 6px;
+      font-size: .78rem; color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+    .poke-card__stats span b { color: var(--accent-orange); }
+    .poke-card__types {
+      display: flex; gap: 6px; margin-top: 6px;
+    }
+    .poke-card__types span {
+      padding: 2px 8px; border-radius: 10px;
+      font-size: .7rem; font-family: var(--font-mono);
+      background: rgba(86,156,214,.15); color: var(--accent);
+    }
+
+    .status-line {
+      display: flex; gap: 10px; align-items: center;
+      font-family: var(--font-mono); font-size: .82rem;
+      padding: 8px 12px; background: var(--bg-tertiary);
+      border-radius: var(--radius-sm); margin: 10px 0;
+    }
+    .flag {
+      display: inline-block;
+      padding: 2px 8px; border-radius: 10px;
+      font-size: .72rem;
+    }
+    .flag--on  { background: rgba(76,175,80,.2); color: var(--success); }
+    .flag--off { background: rgba(102,102,102,.2); color: var(--text-muted); }
+    .flag--err { background: rgba(244,71,71,.2); color: var(--accent-red); }
+
+    .endpoint-shape {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-orange);
+      padding: 10px 14px;
+      margin: 10px 0;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      color: var(--accent-orange);
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">80 / 106</span>
+      Первый createApi — endpoint + baseQuery
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../79-rtkq-what/">← Назад</a>
+      <a href="../81-rtkq-store-setup/">Далее → Store setup</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">pokeApi.endpoints.getPokemonByName — через mock fetchFn</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>createApi</code> — единственная точка описания API: baseUrl + endpoints.
+          Mock-сеть: <code>fetchFn</code> возвращает фейковый <code>Response</code> после 400мс —
+          реальных запросов нет, но всё остальное (cache, middleware, actions) — настоящее.
+        </p>
+
+        <div class="btn-group" style="margin: 10px 0;">
+          <button class="btn btn--accent" data-name="pikachu">▶ pikachu</button>
+          <button class="btn btn--accent" data-name="charizard">▶ charizard</button>
+          <button class="btn btn--accent" data-name="bulbasaur">▶ bulbasaur</button>
+          <button class="btn btn--danger" data-name="missingno">▶ missingno (404)</button>
+          <button class="btn" id="clear">reset cache view</button>
+        </div>
+
+        <div class="status-line" id="status-line">
+          <span>query:</span>
+          <code id="q-name">—</code>
+          <span id="q-loading" class="flag flag--off">isLoading</span>
+          <span id="q-fetching" class="flag flag--off">isFetching</span>
+          <span id="q-success" class="flag flag--off">isSuccess</span>
+          <span id="q-error" class="flag flag--off">isError</span>
+        </div>
+
+        <div id="poke-container"></div>
+
+        <h4 style="margin-top: 18px; color: var(--text-bright); font-size: .95rem;">endpoint-action в последнем запросе</h4>
+        <div class="endpoint-shape" id="action-shape">—</div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 80. createApi & первый endpoint</div>
+      <div class="theory__body">
+        <h3>Цитата — RTKQ Quick Start</h3>
+        <div class="quote">
+          «RTK Query is included within the installation of the core Redux Toolkit package. It is available
+          via either of the two entry points below: <code>@reduxjs/toolkit/query</code> or
+          <code>@reduxjs/toolkit/query/react</code>. <strong>The React-specific entry point includes an API that automatically
+          generates React hooks for each of your endpoints.</strong>»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/overview#installation" target="_blank">RTKQ — Installation</a>
+        </div>
+        <div class="quote quote--ru">
+          «Две точки входа. <code>/query</code> — ядро (можно использовать с vanilla JS, Angular, Vue).
+          <code>/query/react</code> — то же + <strong>авто-генерация hooks</strong> (<code>useGetXQuery</code>).»
+        </div>
+
+        <h3>Сигнатура — createApi</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/query</span>
+<span class="kw">const</span> pokeApi = <span class="fn">createApi</span>({
+  reducerPath: <span class="str">'pokeApi'</span>,                        <span class="cm">// ключ в корне rootState</span>
+  baseQuery: <span class="fn">fetchBaseQuery</span>({                     <span class="cm">// одна "функция-транспорт"</span>
+    baseUrl: <span class="str">'https://pokeapi.co/api/v2/'</span>,
+    fetchFn: mockFetch <span class="kw">as typeof</span> <span class="type">fetch</span>,        <span class="cm">// 👀 overrides global fetch — для тестов / моков</span>
+  }),
+  endpoints: (build) =&gt; ({
+    getPokemonByName: build.<span class="fn">query</span>&lt;<span class="type">PokemonDto</span>, <span class="type">string</span>&gt;({
+      query: (name) =&gt; <span class="str">`pokemon/${name}`</span>,         <span class="cm">// → pokeApi.endpoints.getPokemonByName.initiate('pikachu')</span>
+    }),
+  }),
+})
+
+<span class="kw">export const</span> { useGetPokemonByNameQuery } = pokeApi  <span class="cm">// ← в /query/react; тут мы этим не пользуемся</span>
+<span class="kw">export const</span> pokeApi  <span class="cm">// ← сам api-объект: reducer, middleware, util, endpoints</span>
+        </div>
+
+        <h3>Что возвращает createApi — расшифровка</h3>
+        <ul style="font-size: .86rem; line-height: 1.7;">
+          <li><code>api.reducer</code> — один slice-reducer под ключ <code>reducerPath</code>, надо положить в <code>configureStore({ reducer: { [api.reducerPath]: api.reducer } })</code>.</li>
+          <li><code>api.middleware</code> — middleware, которое выполняет baseQuery и управляет cache; обязательно через <code>.concat(api.middleware)</code>.</li>
+          <li><code>api.endpoints.X.initiate(arg)</code> — thunk action creator. <code>store.dispatch(...)</code> запустит запрос; возвращаемый promise имеет <code>.unsubscribe()</code>.</li>
+          <li><code>api.endpoints.X.select(arg)</code> — селектор: <code>select(arg)(state) → { data, error, status, requestId, …}</code>.</li>
+          <li><code>api.endpoints.X.matchPending / matchFulfilled / matchRejected</code> — matcher'ы (как у createAsyncThunk).</li>
+          <li><code>api.util</code> — <code>prefetch</code>, <code>invalidateTags</code>, <code>updateQueryData</code>, <code>resetApiState</code>.</li>
+          <li><code>useGetXQuery</code> — в <code>/query/react</code>: hook (позже, урок 82).</li>
+        </ul>
+
+        <h3>Как выглядят dispatched actions</h3>
+        <div class="code-block">
+<span class="cm">// 1. pending</span>
+{
+  type: <span class="str">'pokeApi/executeQuery/pending'</span>,
+  meta: {
+    arg: { endpointName: <span class="str">'getPokemonByName'</span>, originalArgs: <span class="str">'pikachu'</span>, ... },
+    requestId: <span class="str">'abc123'</span>,
+    requestStatus: <span class="str">'pending'</span>,
+  },
+}
+<span class="cm">// 2. fulfilled</span>
+{
+  type: <span class="str">'pokeApi/executeQuery/fulfilled'</span>,
+  payload: { id: <span class="num">25</span>, name: <span class="str">'pikachu'</span>, ... },
+  meta: { arg: ..., requestId: ..., requestStatus: <span class="str">'fulfilled'</span>,
+          fulfilledTimeStamp: <span class="num">1700000000000</span> },
+}
+<span class="cm">// 3. rejected (404)</span>
+{
+  type: <span class="str">'pokeApi/executeQuery/rejected'</span>,
+  payload: { status: <span class="num">404</span>, data: {...} },
+  meta: { ...rejectedWithValue: <span class="kw">true</span>, condition: <span class="kw">false</span>, aborted: <span class="kw">false</span> },
+}
+        </div>
+
+        <h3>build.query&lt;Result, Arg&gt; — типизация</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/query/endpointDefinitions.ts (упрощённо)</span>
+<span class="kw">interface</span> <span class="type">QueryDefinition</span>&lt;<span class="type">QueryArg</span>, <span class="type">BaseQuery</span>, <span class="type">TagTypes</span>, <span class="type">ResultType</span>&gt; {
+  query: (arg: <span class="type">QueryArg</span>) =&gt; <span class="type">string</span> | <span class="type">FetchArgs</span>       <span class="cm">// строка = GET url, объект = url/method/body</span>
+  transformResponse?: (r: <span class="type">any</span>) =&gt; <span class="type">ResultType</span>          <span class="cm">// урок 89</span>
+  providesTags?: <span class="type">TagTypes</span>[] | <span class="type">Function</span>               <span class="cm">// урок 87</span>
+  keepUnusedDataFor?: <span class="type">number</span>                             <span class="cm">// урок 92</span>
+  serializeQueryArgs?: (args) =&gt; <span class="type">string</span>                   <span class="cm">// урок 83</span>
+}
+        </div>
+        <p>
+          GitHub: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/endpointDefinitions.ts" target="_blank">query/endpointDefinitions.ts</a>
+        </p>
+
+        <h3>Mock-сеть (наш тестовый fetchFn)</h3>
+        <div class="code-block">
+<span class="kw">async function</span> <span class="fn">mockFetch</span>(input: <span class="type">RequestInfo</span>): <span class="type">Promise</span>&lt;<span class="type">Response</span>&gt; {
+  <span class="kw">await new</span> <span class="fn">Promise</span>((r) =&gt; <span class="fn">setTimeout</span>(r, <span class="num">400</span>))
+  <span class="kw">const</span> url = <span class="kw">typeof</span> input === <span class="str">'string'</span> ? input : (input <span class="kw">as</span> <span class="type">Request</span>).url
+  <span class="kw">const</span> name = url.<span class="fn">split</span>(<span class="str">'pokemon/'</span>)[<span class="num">1</span>]
+
+  <span class="kw">if</span> (!POKEDEX[name]) {
+    <span class="kw">return new</span> <span class="fn">Response</span>(<span class="type">JSON</span>.<span class="fn">stringify</span>({ error: <span class="str">'Not found'</span> }),
+      { status: <span class="num">404</span>, headers: { <span class="str">'content-type'</span>: <span class="str">'application/json'</span> } })
+  }
+  <span class="kw">return new</span> <span class="fn">Response</span>(<span class="type">JSON</span>.<span class="fn">stringify</span>(POKEDEX[name]),
+    { status: <span class="num">200</span>, headers: { <span class="str">'content-type'</span>: <span class="str">'application/json'</span> } })
+}
+        </div>
+        <p>
+          <code>fetchBaseQuery</code> использует глобальный <code>fetch</code>, но мы его override через
+          <code>fetchFn</code> — <a href="https://redux-toolkit.js.org/rtk-query/api/fetchBaseQuery#fetchfn" target="_blank">док</a>.
+          Полезно для: unit-тестов, SSR (node-fetch), локальной разработки без бэка.
+        </p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Импорт из правильного entry-point.</strong>
+          <br><code>import { createApi } from '@reduxjs/toolkit/query'</code> — ядро.
+          <code>@reduxjs/toolkit/query/react</code> — + авто-hooks.
+          Импортировать одновременно из обоих = два <strong>разных модуля createApi</strong>,
+          middleware из одного не увидит reducer из другого. Ошибка на ~3 часа дебага.
+
+          <br><br>
+          <strong>2. Мок через fetchFn нужно дать типу <code>as typeof fetch</code>.</strong>
+          <br><code>fetchBaseQuery</code> ожидает фетч с полной сигнатурой DOM-<code>fetch</code>;
+          наш mock типизирован проще. Каст безопасен, если мы не используем всю сигнатуру.
+
+          <br><br>
+          <strong>3. <code>query: (arg) =&gt; url</code> — возвращает строку или <code>FetchArgs</code>.</strong>
+          <br>Строка = GET с baseUrl + строка. Объект <code>{ url, method, body, params, headers }</code>
+          — для POST/PATCH + подробностей. Ошибка: вернуть <code>`${baseUrl}/posts`</code> — baseUrl
+          склеится дважды.
+
+          <br><br>
+          <strong>4. Один endpoint = один cache-тип по cacheKey от args.</strong>
+          <br>Два вызова <code>getPokemonByName('pikachu')</code> → один cache-entry;
+          <code>getPokemonByName('pikachu')</code> и <code>getPokemonByName('charizard')</code> —
+          два разных cache-entry. Как строится ключ — см. урок 83.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../79-rtkq-what/">79 — что такое RTKQ</a> (мотивация).</li>
+          <li><a href="../81-rtkq-store-setup/">81 — подключение api к store</a> (следующий шаг; без него hooks молчат).</li>
+          <li><a href="../82-rtkq-usequery-hook/">82 — useQuery hook</a> (данные + флаги).</li>
+          <li><a href="../85-rtkq-fetchbasequery/">85 — fetchBaseQuery deep dive</a> (headers, params, retry).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/createApi" target="_blank">RTKQ · createApi</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/tree/master/packages/toolkit/src/query" target="_blank">исходники query/</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/overview#create-an-api-slice" target="_blank">Quick Start — Create an API Slice</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

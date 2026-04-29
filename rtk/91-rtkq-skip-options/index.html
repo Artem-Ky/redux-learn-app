@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>91 — Query hook options · skip, polling, refetchOn*</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .opts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 880px) { .opts-grid { grid-template-columns: 1fr; } }
+    .opt {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .opt__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      color: var(--accent-cyan);
+      margin-bottom: 4px;
+    }
+    .opt__val {
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      color: var(--text-bright);
+    }
+    .opt label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .78rem;
+      color: var(--text-secondary);
+    }
+    .opt input[type=range] { flex: 1; }
+    .status-bar {
+      display: flex;
+      gap: 12px;
+      padding: 8px 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .status-bar > span { color: var(--text-muted); }
+    .status-bar strong { color: var(--accent-cyan); margin-left: 4px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">91 / 106</span>
+      Query hook options — skip / polling / refetchOn*
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../90-rtkq-selectFromResult/">← Назад</a>
+      <a href="../92-rtkq-keepunuseddatafor-cleanup/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Все опции useQuery — live</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Меняй опции — смотри эффект: счётчик fetch'ей, log DevTools. Для <strong>refetchOnFocus</strong>
+          кликни мимо вкладки и вернись. Для <strong>refetchOnReconnect</strong> — Chrome DevTools →
+          Network → Offline → Online.
+        </p>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 91. Query hook options</div>
+      <div class="theory__body">
+        <h3>Цитата — Query Hook Options</h3>
+        <div class="quote">
+          «Query hooks provide a lot of options to control their behavior. They can be passed as the
+          second argument to each query hook, or as defaults on the endpoint definition, or globally
+          via <code>createApi</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/queries#query-hook-options" target="_blank">RTKQ · Query Hook Options</a>
+        </div>
+
+        <h3>Полный список</h3>
+        <div class="code-block">
+<span class="fn">useGetXQuery</span>(arg, {
+  <span class="cm">// ─── подписка ───</span>
+  skip: <span class="kw">false</span>,                          <span class="cm">// true → запроса не будет, data=undefined</span>
+
+  <span class="cm">// ─── рефетч при mount / смене arg ───</span>
+  refetchOnMountOrArgChange: <span class="kw">false</span>,      <span class="cm">// false | true | number (секунды)</span>
+
+  <span class="cm">// ─── рефетч на window events ───</span>
+  refetchOnFocus: <span class="kw">false</span>,                <span class="cm">// при window focus</span>
+  refetchOnReconnect: <span class="kw">false</span>,            <span class="cm">// при online event</span>
+
+  <span class="cm">// ─── polling ───</span>
+  pollingInterval: <span class="num">0</span>,                   <span class="cm">// ms, 0 = выкл</span>
+  skipPollingIfUnfocused: <span class="kw">false</span>,        <span class="cm">// v2.x — не поллить вне фокуса</span>
+
+  <span class="cm">// ─── оптимизация ───</span>
+  selectFromResult: (r) =&gt; r,           <span class="cm">// см. урок 90</span>
+})
+        </div>
+
+        <h3>1. skip — не подписываться</h3>
+        <div class="code-block">
+<span class="cm">// вариант A — boolean:</span>
+<span class="kw">const</span> { data } = <span class="fn">useGetUserQuery</span>(userId, { skip: !userId })
+
+<span class="cm">// вариант B — skipToken (TS-дружелюбно, если arg не может быть undefined):</span>
+<span class="kw">import</span> { skipToken } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query'</span>
+<span class="kw">const</span> { data } = <span class="fn">useGetUserQuery</span>(userId ?? skipToken)
+
+<span class="cm">// Эффект:
+//   - cacheKey НЕ генерируется, запроса нет
+//   - подписчик НЕ регистрируется в state.api.subscriptions
+//   - data = undefined, isUninitialized = true, isLoading = false
+//   - существующий entry (от прошлого arg) остаётся до keepUnusedDataFor
+// </span>
+        </div>
+
+        <h3>2. refetchOnMountOrArgChange — три формы</h3>
+        <div class="code-block">
+<span class="cm">// false (default): mount → если entry fulfilled, берём cache, запроса НЕТ</span>
+{ refetchOnMountOrArgChange: <span class="kw">false</span> }
+
+<span class="cm">// true: ВСЕГДА рефетчим на mount (игнорируем кеш)</span>
+{ refetchOnMountOrArgChange: <span class="kw">true</span> }
+
+<span class="cm">// number — условная «свежесть»:</span>
+{ refetchOnMountOrArgChange: <span class="num">30</span> }
+<span class="cm">// рефетчим, если fulfilledTimeStamp старее 30 секунд</span>
+
+<span class="cm">// Смена arg — всегда работает одинаково: новый cacheKey → новый fetch (если нет HIT)</span>
+        </div>
+
+        <h3>3. refetchOnFocus / refetchOnReconnect</h3>
+        <div class="code-block">
+<span class="cm">// store.ts — БЕЗ ЭТОГО вызова НЕ работают:</span>
+<span class="kw">import</span> { setupListeners } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query'</span>
+<span class="fn">setupListeners</span>(store.dispatch)
+
+<span class="cm">// глобально в createApi:</span>
+<span class="fn">createApi</span>({ refetchOnFocus: <span class="kw">true</span>, refetchOnReconnect: <span class="kw">true</span>, endpoints: ... })
+
+<span class="cm">// или на хуке:</span>
+<span class="fn">useGetXQuery</span>(arg, { refetchOnFocus: <span class="kw">true</span> })
+        </div>
+        <p>Реализация (setupListeners.ts): слушает <code>window.focus</code> и <code>online</code> → dispatch'ит
+        actions <code>api/focus</code> и <code>api/online</code> → middleware для каждой подписки с включённым
+        флагом делает forceRefetch.</p>
+
+        <h3>4. pollingInterval — авто-рефетч по таймеру</h3>
+        <div class="code-block">
+{ pollingInterval: <span class="num">5000</span> }  <span class="cm">// каждые 5 секунд, пока компонент подписан</span>
+
+<span class="cm">// если несколько подписчиков с разными интервалами — побеждает МИНИМАЛЬНЫЙ</span>
+
+{ pollingInterval: <span class="num">5000</span>, skipPollingIfUnfocused: <span class="kw">true</span> }
+<span class="cm">// не долбить API, пока вкладка в фоне (экономим квоту/батарею)</span>
+        </div>
+
+        <h3>Источник — buildMiddleware/polling.ts</h3>
+        <div class="code-block">
+<span class="cm">// pollingInterval внутри — setInterval на подписке</span>
+<span class="kw">const</span> handler = () =&gt; {
+  <span class="kw">if</span> (skipPollingIfUnfocused &amp;&amp; !document.<span class="fn">hasFocus</span>()) <span class="kw">return</span>
+  api.<span class="fn">dispatch</span>(<span class="fn">refetchQuery</span>(cacheKey, { force: <span class="kw">true</span> }))
+}
+<span class="kw">const</span> timer = <span class="fn">setInterval</span>(handler, pollingInterval)
+<span class="cm">// на unsubscribe → clearInterval</span>
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Забыл setupListeners — refetchOnFocus молчит.</strong>
+          <br>Это самая частая ошибка. Листенеры не навешиваются автоматически — нужен один раз
+          <code>setupListeners(store.dispatch)</code> в <code>store.ts</code>. В SSR — передаёшь
+          <em>custom</em> <code>eventTargetForFocus</code> (см. доку).
+
+          <br><br>
+          <strong>2. skipToken ≠ undefined.</strong>
+          <br><code>useGetUserQuery(undefined)</code> — создаёт cacheKey <code>getUser(undefined)</code>
+          и делает fetch. <code>useGetUserQuery(skipToken)</code> — ничего не делает. Разница
+          критична, когда сам arg может быть <code>undefined</code>.
+
+          <br><br>
+          <strong>3. pollingInterval: 100 — убиваешь сервер.</strong>
+          <br>Polling — это брутфорс. Для реального «свежие данные как только появились» — используй
+          <code>onCacheEntryAdded</code> + WebSocket (урок 94), или server-sent events.
+
+          <br><br>
+          <strong>4. refetchOnMountOrArgChange: true — больно, если компонент переоткрывается часто.</strong>
+          <br>Каждое открытие = fetch. Если пользователь листает табы туда-сюда — куча запросов.
+          Варианты: <code>true</code> + <code>keepUnusedDataFor: 0</code> для критичных данных; или
+          <code>number</code> для компромисса.
+
+          <br><br>
+          <strong>5. Polling + скрытая вкладка = батарея/квота.</strong>
+          <br>С v2.x есть <code>skipPollingIfUnfocused</code>. Включай, если polling
+          не критичен в фоне. Без этой опции <code>setInterval</code> работает всегда.
+
+          <br><br>
+          <strong>6. Опции наследуются по цепочке.</strong>
+          <br>global (createApi) → endpoint (build.query) → hook (useGetX(arg, opts)).
+          Последний уровень побеждает. Это полезно: включил <code>refetchOnFocus: true</code> глобально,
+          на конкретном endpoint'е выключил через <code>refetchOnFocus: false</code>.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../92-rtkq-keepunuseddatafor-cleanup/">92 — keepUnusedDataFor</a> (когда cache умирает).</li>
+          <li><a href="../96-rtkq-conditional-fetching/">96 — isFetching vs isLoading</a> (как отличить кейсы).</li>
+          <li><a href="../82-rtkq-usequery-hook/">82 — useQuery</a> (полный return type).</li>
+          <li><a href="../94-rtkq-onCacheEntryAdded-streaming/">94 — streaming</a> (WS вместо polling).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/queries#query-hook-options" target="_blank">RTKQ · Query Hook Options</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/setupListeners" target="_blank">setupListeners</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/setupListeners.ts" target="_blank">setupListeners.ts</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildMiddleware/polling.ts" target="_blank">polling.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>97 — Error handling + retry</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .err-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-red);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: .8rem;
+    }
+    .ok-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--success);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: .8rem;
+    }
+    .retry-log {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      margin-top: 10px;
+      max-height: 180px;
+      overflow: auto;
+    }
+    .retry-row {
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      padding: 2px 0;
+      color: var(--text-secondary);
+    }
+    .retry-row.attempt { color: var(--warning); }
+    .retry-row.fail { color: var(--accent-red); }
+    .retry-row.ok { color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">97 / 106</span>
+      Error handling · FetchBaseQueryError + retry
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../96-rtkq-conditional-fetching/">← Назад</a>
+      <a href="../98-rtkq-base-query-custom/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">50% failure rate + retry(3) + exponential backoff</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Эндпоинт случайно падает в ~50% случаев. <code>retry(baseQuery, {maxRetries: 3})</code>
+          автоматически перезапускает с exponential backoff (100ms, 200ms, 400ms…).
+        </p>
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 97. Error handling + retry</div>
+      <div class="theory__body">
+        <h3>Цитата — Error Handling</h3>
+        <div class="quote">
+          «RTK Query provides errors as <code>FetchBaseQueryError</code> or <code>SerializedError</code>.
+          <code>FetchBaseQueryError</code> has a <code>status</code> (HTTP code or special string) and
+          <code>data</code> (parsed response body).»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/error-handling" target="_blank">RTKQ · Error Handling</a>
+        </div>
+
+        <h3>Структура ошибки</h3>
+        <div class="code-block">
+<span class="cm">// fetchBaseQuery возвращает FetchBaseQueryError:</span>
+<span class="kw">type</span> <span class="type">FetchBaseQueryError</span> =
+  | { status: <span class="type">number</span>; data: <span class="kw">unknown</span> }               <span class="cm">// HTTP 4xx/5xx</span>
+  | { status: <span class="str">'FETCH_ERROR'</span>; error: <span class="type">string</span> }         <span class="cm">// network fail</span>
+  | { status: <span class="str">'PARSING_ERROR'</span>; data: <span class="type">string</span>; ... }   <span class="cm">// invalid JSON</span>
+  | { status: <span class="str">'TIMEOUT_ERROR'</span>; error: <span class="type">string</span> }       <span class="cm">// timeout опция</span>
+  | { status: <span class="str">'CUSTOM_ERROR'</span>; error: <span class="type">string</span>; data }  <span class="cm">// validateStatus вернул false</span>
+
+<span class="cm">// Кастомный baseQuery может возвращать SerializedError — стандартный Error Redux.</span>
+        </div>
+
+        <h3>Type guard — отличить FetchBaseQueryError от SerializedError</h3>
+        <div class="code-block">
+<span class="kw">import</span> { type <span class="type">FetchBaseQueryError</span> } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query'</span>
+
+<span class="kw">function</span> <span class="fn">isFetchBaseQueryError</span>(
+  e: <span class="kw">unknown</span>,
+): e <span class="kw">is</span> <span class="type">FetchBaseQueryError</span> {
+  <span class="kw">return</span> <span class="kw">typeof</span> e === <span class="str">'object'</span> &amp;&amp; e != <span class="kw">null</span> &amp;&amp; <span class="str">'status'</span> <span class="kw">in</span> e
+}
+
+<span class="kw">const</span> { error } = <span class="fn">useGetXQuery</span>()
+<span class="kw">if</span> (<span class="fn">isFetchBaseQueryError</span>(error)) {
+  <span class="cm">// error.status — number | 'FETCH_ERROR' | ...</span>
+  <span class="cm">// error.data   — body</span>
+} <span class="kw">else</span> <span class="kw">if</span> (error) {
+  <span class="cm">// SerializedError — error.message, error.stack</span>
+}
+        </div>
+
+        <h3>retry — встроенный wrapper</h3>
+        <div class="code-block">
+<span class="kw">import</span> { retry, fetchBaseQuery } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query/react'</span>
+
+<span class="kw">const</span> baseQueryWithRetry = <span class="fn">retry</span>(
+  <span class="fn">fetchBaseQuery</span>({ baseUrl: <span class="str">'/api'</span> }),
+  { maxRetries: <span class="num">3</span> },
+)
+
+<span class="kw">const</span> api = <span class="fn">createApi</span>({
+  baseQuery: baseQueryWithRetry,
+  endpoints: (build) =&gt; ({
+    getPosts: build.<span class="fn">query</span>({
+      query: () =&gt; <span class="str">'posts'</span>,
+      <span class="cm">// переопределить на уровне endpoint'а:</span>
+      extraOptions: { maxRetries: <span class="num">5</span> },
+    }),
+  }),
+})
+        </div>
+
+        <h3>Отказаться от retry для конкретного ответа</h3>
+        <div class="code-block">
+<span class="cm">// Если 401 — нет смысла ретраить, токен не подменится сам</span>
+<span class="kw">const</span> baseQueryWithRetry = <span class="fn">retry</span>(<span class="kw">async</span> (args, api, extraOptions) =&gt; {
+  <span class="kw">const</span> result = <span class="kw">await</span> <span class="fn">rawBase</span>(args, api, extraOptions)
+  <span class="kw">if</span> (result.error?.status === <span class="num">401</span>) {
+    retry.<span class="fn">fail</span>(result.error)   <span class="cm">// 👀 bail out немедленно</span>
+  }
+  <span class="kw">return</span> result
+}, { maxRetries: <span class="num">3</span> })
+        </div>
+
+        <h3>Глобальный error logger через middleware</h3>
+        <div class="code-block">
+<span class="kw">import</span> { isRejectedWithValue } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+<span class="kw">import</span> <span class="kw">type</span> { <span class="type">Middleware</span> } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>
+
+<span class="kw">const</span> errorLogger: <span class="type">Middleware</span> = () =&gt; (next) =&gt; (action) =&gt; {
+  <span class="kw">if</span> (<span class="fn">isRejectedWithValue</span>(action)) {
+    <span class="cm">// action.payload — это error от transformErrorResponse (или raw)</span>
+    <span class="fn">toast</span>.<span class="fn">error</span>(<span class="str">`API error: </span><span class="kw">${</span>action.payload.status<span class="kw">}</span><span class="str">`</span>)
+  }
+  <span class="kw">return</span> <span class="fn">next</span>(action)
+}
+
+<span class="fn">configureStore</span>({
+  ...,
+  middleware: (gdm) =&gt; gdm().<span class="fn">concat</span>(api.middleware, errorLogger),
+})
+        </div>
+
+        <h3>Обработка в компоненте</h3>
+        <div class="code-block">
+<span class="kw">function</span> <span class="fn">Posts</span>() {
+  <span class="kw">const</span> { data, error, isLoading, refetch } = <span class="fn">useGetPostsQuery</span>()
+
+  <span class="kw">if</span> (isLoading) <span class="kw">return</span> &lt;Spinner /&gt;
+  <span class="kw">if</span> (error) {
+    <span class="kw">const</span> msg = <span class="fn">isFetchBaseQueryError</span>(error)
+      ? (error.data <span class="kw">as any</span>)?.message ?? <span class="str">`HTTP </span><span class="kw">${</span>error.status<span class="kw">}</span><span class="str">`</span>
+      : error.message ?? <span class="str">'Unknown error'</span>
+    <span class="kw">return</span> &lt;ErrorView message={msg} onRetry={refetch} /&gt;
+  }
+  <span class="kw">return</span> &lt;PostList posts={data!} /&gt;
+}
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. retry — exponential backoff с джиттером.</strong>
+          <br>Дефолтный backoff — <code>Math.random() * 2^attempt * 300ms</code> (примерно). Это ок
+          для throttling-ловли, но если тебе нужен предсказуемый — передавай свой <code>backoff</code>.
+
+          <br><br>
+          <strong>2. retry ретраит и 4xx по умолчанию.</strong>
+          <br>Это редко то что ты хочешь (404 ретраить = 3 лишних запроса за один 404). Используй
+          <code>retry.fail(error)</code> для 4xx.
+
+          <br><br>
+          <strong>3. status может быть строкой.</strong>
+          <br>Не делай <code>if (error.status &gt;= 500)</code> — сломается на <code>'FETCH_ERROR'</code>.
+          Сначала <code>typeof error.status === 'number'</code>.
+
+          <br><br>
+          <strong>4. transformErrorResponse не видит retries.</strong>
+          <br>Она применяется к <em>финальной</em> ошибке после всех retry. Если хочешь логгировать
+          промежуточные попытки — это в кастомном baseQuery.
+
+          <br><br>
+          <strong>5. Failed query хранится в cache с error, data может быть от прошлого успеха.</strong>
+          <br>Это «stale-while-error». UI решает: показывать старые данные с баннером «обновить
+          не удалось» или полностью прятать.
+
+          <br><br>
+          <strong>6. Refetch на error — делай refetch(), не меняй arg.</strong>
+          <br><code>q.refetch()</code> — семантически правильно. Менять arg (<code>setTick(t+1)</code>) —
+          хак, создаст новый cacheKey и размножит entries.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../85-rtkq-fetchbasequery/">85 — fetchBaseQuery</a> (источник FetchBaseQueryError).</li>
+          <li><a href="../89-rtkq-transformResponse/">89 — transformErrorResponse</a>.</li>
+          <li><a href="../98-rtkq-base-query-custom/">98 — custom baseQuery</a>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/error-handling" target="_blank">RTKQ · Error Handling</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/fetchBaseQuery#default-retry-behavior-with-retry" target="_blank">retry · API</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/retry.ts" target="_blank">retry.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

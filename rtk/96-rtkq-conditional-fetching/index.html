@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>96 — data vs currentData · isLoading vs isFetching</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .flag-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    .flag-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+    }
+    .flag-box h5 { color: var(--accent-cyan); margin: 0 0 6px; font-size: .82rem; }
+    .flag-line {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      padding: 2px 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .flag-line:last-child { border-bottom: none; }
+    .flag-line__key { color: var(--text-secondary); }
+    .flag-line__val { color: var(--accent-yellow); }
+    .flag-line__val.true { color: var(--success); font-weight: 600; }
+    .flag-line__val.false { color: var(--text-muted); }
+    .pager {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .82rem;
+    }
+    .post-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      margin-top: 10px;
+      min-height: 120px;
+    }
+    .post-card.fetching {
+      border-color: var(--accent);
+      position: relative;
+    }
+    .post-card.fetching::after {
+      content: 'fetching…';
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      font-size: .7rem;
+      color: var(--accent);
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">96 / 106</span>
+      data vs currentData · isLoading vs isFetching
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../95-rtkq-manual-cache/">← Назад</a>
+      <a href="../97-rtkq-error-handling/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Пагинация — смотри разницу между data/currentData в момент смены страницы</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Листай страницы. <strong>data</strong> = последний успешный ответ <em>ЛЮБОГО</em> arg.
+          <strong>currentData</strong> = последний успешный для <em>ЭТОГО</em> arg. При смене страницы
+          разница видна мгновенно.
+        </p>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 96. data/currentData · isLoading/isFetching</div>
+      <div class="theory__body">
+        <h3>Цитата — Frequently Used Query Hook Return Values</h3>
+        <div class="quote">
+          «<code>data</code> — the latest returned result regardless of hook arg, if present.
+          <br><code>currentData</code> — the latest returned result for the current hook arg, if present.
+          <br><code>isLoading</code> — true only on the very first load (no previous data for this hook).
+          <br><code>isFetching</code> — true whenever a request is in flight (including background refetch).»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/queries#frequently-used-query-hook-return-values" target="_blank">RTKQ · Query hook return values</a>
+        </div>
+
+        <h3>Разница data vs currentData на примере</h3>
+        <div class="code-block">
+<span class="cm">// Текущее состояние:
+//   - useGetPosts({page:1}) отработал успешно, cache HIT  → data=[...page1 posts]
+//   - меняем arg на {page:2} → новый cacheKey, идёт fetch</span>
+
+<span class="fn">useGetPostsQuery</span>({ page: <span class="num">2</span> })
+<span class="cm">// СРАЗУ после смены arg, пока fetch в процессе:
+//   data        = [...page1 posts]   ← «последний успех любого arg»
+//   currentData = undefined          ← «для ЭТОГО arg ещё нет»
+//   isFetching  = true
+//   isLoading   = false              ← это не «первая» загрузка, data уже был
+
+// Когда fulfilled:
+//   data        = [...page2 posts]
+//   currentData = [...page2 posts]</span>
+        </div>
+
+        <h3>UX-паттерны — что показывать</h3>
+        <div class="code-block">
+<span class="cm">// ─── A. Показывать «призрак» старых данных (смазанная пагинация) ───</span>
+<span class="kw">const</span> { data, isFetching } = <span class="fn">useGetPostsQuery</span>({ page })
+<span class="kw">return</span> (
+  &lt;div style=<span class="kw">{{</span> opacity: isFetching ? <span class="num">0.5</span> : <span class="num">1</span> <span class="kw">}}</span>&gt;
+    {data?.<span class="fn">map</span>(...)}
+  &lt;/div&gt;
+)
+
+<span class="cm">// ─── B. Чистый UX — пусто пока нет данных для ТЕКУЩЕГО arg ───</span>
+<span class="kw">const</span> { currentData, isFetching } = <span class="fn">useGetPostsQuery</span>({ page })
+<span class="kw">return</span> currentData
+  ? &lt;PostList posts={currentData} /&gt;
+  : &lt;Skeleton /&gt;
+
+<span class="cm">// ─── C. First load vs background refetch ───</span>
+<span class="kw">const</span> { data, isLoading, isFetching } = <span class="fn">useGetPostsQuery</span>()
+<span class="kw">if</span> (isLoading) <span class="kw">return</span> &lt;FullPageSpinner /&gt;       <span class="cm">// впервые</span>
+<span class="kw">if</span> (isFetching) <span class="kw">return</span> &lt;TopBarLoader /&gt;        <span class="cm">// обновление в фоне</span>
+<span class="kw">return</span> &lt;PostList posts={data!} /&gt;
+        </div>
+
+        <h3>Полная таблица 5 status-флагов</h3>
+        <div class="code-block">
+<span class="cm">│ Флаг              │ Когда true                                      │</span>
+<span class="cm">├───────────────────┼─────────────────────────────────────────────────┤</span>
+<span class="cm">│ isUninitialized   │ skip=true / нет подписки / entry удалена        │</span>
+<span class="cm">│ isLoading         │ pending + НИ РАЗУ не было data для этого hook   │</span>
+<span class="cm">│ isFetching        │ любой pending (первый fetch ИЛИ refetch)        │</span>
+<span class="cm">│ isSuccess         │ data !== undefined (даже при background refetch)│</span>
+<span class="cm">│ isError           │ rejected; data=ACCENT от прошлого fulfilled если был│</span>
+        </div>
+
+        <h3>Источник — buildHooks.ts (упрощённо)</h3>
+        <div class="code-block">
+<span class="kw">const</span> subSelector = <span class="fn">createSelector</span>(
+  [selectQueryResult, <span class="kw">(</span>_, arg<span class="kw">)</span> =&gt; arg],
+  (baseResult, queryArgs) =&gt; {
+    <span class="kw">return</span> {
+      ...baseResult,
+      <span class="cm">// currentData = data ТОЛЬКО если currentArg совпадает с sourceArg entry'и:</span>
+      currentData: queryArgs === baseResult.originalArgs ? baseResult.data : <span class="kw">undefined</span>,
+      isFetching: baseResult.status === <span class="str">'pending'</span>,
+      isLoading: baseResult.status === <span class="str">'pending'</span> &amp;&amp; baseResult.data === <span class="kw">undefined</span>,
+      isSuccess: baseResult.status === <span class="str">'fulfilled'</span>,
+      isError: baseResult.status === <span class="str">'rejected'</span>,
+    }
+  },
+)
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. isLoading — только на САМУЮ первую загрузку этого hook-инстанса.</strong>
+          <br>После первого успеха при refetch <code>isLoading=false</code>, только <code>isFetching=true</code>.
+          Это тонко: хук <em>в другом</em> компоненте, впервые смотрящий этот же query — увидит
+          <code>isLoading=false</code> сразу (HIT из чужого кеша).
+
+          <br><br>
+          <strong>2. data «застревает» от прошлого arg.</strong>
+          <br>Смена <code>page=1 → 2</code> — <code>data</code> на 400ms остаётся страницей 1. Если
+          не хочешь мигания — рисуй UI с <code>currentData</code> + skeleton.
+
+          <br><br>
+          <strong>3. isError с data !== undefined — возможно.</strong>
+          <br>Если ранее был успех, а потом refetch упал — <code>isError=true</code> и одновременно
+          <code>data</code> показывает старые данные. Решай: показывать stale data с toast, или прятать.
+
+          <br><br>
+          <strong>4. currentData=undefined при FIRST SUCCESS тоже.</strong>
+          <br>Не только «пока грузим». Проверка: <code>if (currentData) ...</code> — безопаснее чем
+          <code>if (!isLoading)</code>.
+
+          <br><br>
+          <strong>5. isUninitialized ≠ isFetching=false + data=undefined.</strong>
+          <br>Это когда skip=true или entry полностью удалена. isSuccess/isError=false, status='uninitialized'.
+          Важно чтобы не показать «ошибку» пользователю когда просто skip.
+
+          <br><br>
+          <strong>6. status vs флаги.</strong>
+          <br>Поле <code>status</code> — строка (<code>'uninitialized'|'pending'|'fulfilled'|'rejected'</code>).
+          Флаги — производные от неё. Используй status если нужна switch-логика.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../82-rtkq-usequery-hook/">82 — все поля useQuery</a>.</li>
+          <li><a href="../90-rtkq-selectFromResult/">90 — selectFromResult</a> (ограничиваем подписку).</li>
+          <li><a href="../97-rtkq-error-handling/">97 — error handling</a>.</li>
+          <li><a href="../100-rtkq-infinite-queries/">100 — infinite queries</a> (там data vs currentData критично).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/queries#frequently-used-query-hook-return-values" target="_blank">RTKQ · Query hook values</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/react/buildHooks.ts" target="_blank">buildHooks.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

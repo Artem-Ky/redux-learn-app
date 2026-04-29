@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>101 — Query lifecycle · внутренности RTKQ</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .pipeline-stage {
+      display: grid;
+      grid-template-columns: 40px 1fr 120px;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+      font-family: var(--font-mono);
+      font-size: .8rem;
+    }
+    .pipeline-stage.active {
+      border-left-color: var(--accent);
+      background: rgba(86,156,214,.1);
+      animation: stagePulse 0.6s;
+    }
+    .pipeline-stage.done { border-left-color: var(--success); }
+    @keyframes stagePulse {
+      0% { box-shadow: inset 4px 0 0 var(--accent); }
+      100% { box-shadow: inset 0 0 0 transparent; }
+    }
+    .pipeline-stage__n {
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    .pipeline-stage__name {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    .pipeline-stage__hint {
+      color: var(--text-secondary);
+      font-size: .72rem;
+      margin-top: 2px;
+    }
+    .pipeline-stage__time {
+      color: var(--accent-yellow);
+      text-align: right;
+      font-size: .76rem;
+    }
+    .tick-bar {
+      padding: 8px 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">101 / 106</span>
+      Query lifecycle · pipeline от hook до cache
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../100-rtkq-infinite-queries/">← Назад</a>
+      <a href="../102-rtkq-typed-and-react-hooks/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">7 стадий от useQuery() до возврата data</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Нажми «старт» — трассируем pipeline. Каждая стадия подсвечивается со временем. В консоли —
+          dispatched actions и внутренние события.
+        </p>
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 101. Lifecycle internals</div>
+      <div class="theory__body">
+        <h3>Полный pipeline — от <code>useQuery</code> до <code>data</code></h3>
+        <div class="code-block">
+<span class="cm">╔══════════════════════════════════════════════════════════════════╗</span>
+<span class="cm">║ 1. useGetXQuery(arg) mount — buildHooks.ts                        ║</span>
+<span class="cm">║    → serializeQueryArgs(arg) → cacheKey                           ║</span>
+<span class="cm">║    → useEffect: dispatch(endpoint.initiate(arg, {subscribe: true}))║</span>
+<span class="cm">╚══════════════════════════════════════════════════════════════════╝</span>
+                               ↓
+<span class="cm">╔══════════════════════════════════════════════════════════════════╗</span>
+<span class="cm">║ 2. initiate (thunk) — buildInitiate.ts                            ║</span>
+<span class="cm">║    → сверяем с state.api.queries[cacheKey]                        ║</span>
+<span class="cm">║    → decision: shouldFetch? (fulfilled + not stale? → NO)         ║</span>
+<span class="cm">║    → добавляем subscription (refCount++)                          ║</span>
+<span class="cm">╚══════════════════════════════════════════════════════════════════╝</span>
+                               ↓
+<span class="cm">╔══════════════════════════════════════════════════════════════════╗</span>
+<span class="cm">║ 3. (если fetch) dispatch(queryThunk.pending)                       ║</span>
+<span class="cm">║    → buildSlice reducer: state.queries[cacheKey] =                ║</span>
+<span class="cm">║        { status: 'pending', originalArgs, requestId, startedTs }  ║</span>
+<span class="cm">║    → onQueryStarted(arg, api) вызывается                          ║</span>
+<span class="cm">║    → onCacheEntryAdded(arg, api) — если entry новая                ║</span>
+<span class="cm">╚══════════════════════════════════════════════════════════════════╝</span>
+                               ↓
+<span class="cm">╔══════════════════════════════════════════════════════════════════╗</span>
+<span class="cm">║ 4. baseQuery(args, api, extraOptions) — buildThunks.ts            ║</span>
+<span class="cm">║    → fetchBaseQuery или custom                                    ║</span>
+<span class="cm">║    → { data } | { error }                                         ║</span>
+<span class="cm">╚══════════════════════════════════════════════════════════════════╝</span>
+                               ↓
+<span class="cm">╔══════════════════════════════════════════════════════════════════╗</span>
+<span class="cm">║ 5. transformResponse(response, meta, arg)                         ║</span>
+<span class="cm">║    → transformed data                                             ║</span>
+<span class="cm">╚══════════════════════════════════════════════════════════════════╝</span>
+                               ↓
+<span class="cm">╔══════════════════════════════════════════════════════════════════╗</span>
+<span class="cm">║ 6. dispatch(queryThunk.fulfilled, { payload: transformed })       ║</span>
+<span class="cm">║    → reducer: state.queries[cacheKey] = { status: 'fulfilled',   ║</span>
+<span class="cm">║        data, fulfilledTimeStamp, requestId }                      ║</span>
+<span class="cm">║    → providesTags computed → state.provided обновлён              ║</span>
+<span class="cm">║    → cacheDataLoaded.resolve(data)                                ║</span>
+<span class="cm">╚══════════════════════════════════════════════════════════════════╝</span>
+                               ↓
+<span class="cm">╔══════════════════════════════════════════════════════════════════╗</span>
+<span class="cm">║ 7. useQuery selector пере-оценивается                             ║</span>
+<span class="cm">║    → selectFromResult / shallowEqual check                        ║</span>
+<span class="cm">║    → если data changed → ререндер компонента                      ║</span>
+<span class="cm">╚══════════════════════════════════════════════════════════════════╝</span>
+        </div>
+
+        <h3>Unmount — обратный путь</h3>
+        <div class="code-block">
+<span class="cm">1. Component unmount → useEffect cleanup → promise.unsubscribe()</span>
+<span class="cm">2. Dispatch unsubscribeQueryResult → refCount--</span>
+<span class="cm">3. Если refCount === 0 → setTimeout(removeQueryResult, keepUnusedDataFor * 1000)</span>
+<span class="cm">4. Если таймер догорел → dispatch(removeQueryResult)</span>
+<span class="cm">5. Reducer: delete state.queries[cacheKey], delete state.provided.*</span>
+<span class="cm">6. cacheEntryRemoved.resolve() — твой onCacheEntryAdded продолжает → ws.close()</span>
+        </div>
+
+        <h3>Файлы исходника — где что лежит</h3>
+        <div class="code-block">
+packages/toolkit/src/query/
+├── core/
+│   ├── <span class="fn">apiState.ts</span>                   <span class="cm">// типы state</span>
+│   ├── <span class="fn">buildSlice.ts</span>                 <span class="cm">// reducers для queries/mutations/subs/provided</span>
+│   ├── <span class="fn">buildThunks.ts</span>                <span class="cm">// queryThunk/mutationThunk + transformResponse</span>
+│   ├── <span class="fn">buildInitiate.ts</span>              <span class="cm">// endpoints.X.initiate(arg) — entry point</span>
+│   ├── <span class="fn">buildSelectors.ts</span>             <span class="cm">// endpoints.X.select(arg)</span>
+│   ├── <span class="fn">buildMiddleware/</span>
+│   │   ├── cacheCollection.ts        <span class="cm">// keepUnusedDataFor таймеры</span>
+│   │   ├── cacheLifecycle.ts         <span class="cm">// cacheDataLoaded / cacheEntryRemoved promises</span>
+│   │   ├── queryLifecycle.ts         <span class="cm">// onQueryStarted</span>
+│   │   ├── invalidationByTags.ts     <span class="cm">// providesTags → invalidatesTags</span>
+│   │   ├── polling.ts                <span class="cm">// pollingInterval setInterval</span>
+│   │   └── windowEventHandling.ts    <span class="cm">// focus / online для refetchOnFocus</span>
+│   ├── <span class="fn">setupListeners.ts</span>             <span class="cm">// addEventListener('focus' / 'online')</span>
+│   └── <span class="fn">index.ts</span>                      <span class="cm">// buildCreateApi — собирает все</span>
+├── react/
+│   ├── <span class="fn">buildHooks.ts</span>                 <span class="cm">// useQuery, useMutation, usePrefetch</span>
+│   └── <span class="fn">index.ts</span>
+├── <span class="fn">createApi.ts</span>                      <span class="cm">// публичное API + reducerPath</span>
+├── <span class="fn">defaultSerializeQueryArgs.ts</span>      <span class="cm">// дефолтный serializer</span>
+└── <span class="fn">fetchBaseQuery.ts</span>                 <span class="cm">// стандартный baseQuery</span>
+        </div>
+
+        <h3>buildInitiate.ts — ключевое решение fetch vs cache</h3>
+        <div class="code-block">
+<span class="cm">// упрощённо из buildInitiate.ts</span>
+<span class="kw">const</span> <span class="fn">initiate</span> = (queryArgs, { subscribe = <span class="kw">true</span>, forceRefetch, subscriptionOptions }) =&gt;
+  (dispatch, getState) =&gt; {
+    <span class="kw">const</span> cacheKey = <span class="fn">serializeQueryArgs</span>({ endpointName, queryArgs })
+    <span class="kw">const</span> stateBefore = getState()[reducerPath].queries[cacheKey]
+
+    <span class="kw">let</span> shouldFetch =
+      stateBefore === <span class="kw">undefined</span> ||
+      stateBefore.status === <span class="str">'uninitialized'</span> ||
+      forceRefetch === <span class="kw">true</span> ||
+      (<span class="kw">typeof</span> forceRefetch === <span class="str">'number'</span> &amp;&amp;
+        stateBefore.fulfilledTimeStamp &amp;&amp;
+        (<span class="type">Date</span>.<span class="fn">now</span>() - stateBefore.fulfilledTimeStamp) / <span class="num">1000</span> &gt;= forceRefetch) ||
+      stateBefore.status === <span class="str">'rejected'</span>
+
+    <span class="kw">if</span> (shouldFetch) {
+      <span class="kw">const</span> thunk = <span class="fn">queryThunk</span>({ queryArgs, endpointName, subscribe, ... })
+      <span class="kw">return</span> <span class="fn">dispatch</span>(thunk)  <span class="cm">// запускаем fetch</span>
+    }
+
+    <span class="kw">if</span> (subscribe) {
+      <span class="fn">dispatch</span>(<span class="fn">subscribeQueryResult</span>({ queryCacheKey: cacheKey, requestId, options }))
+    }
+
+    <span class="kw">return</span> selectFromResult || selectByCache(cacheKey)  <span class="cm">// cached</span>
+  }
+        </div>
+
+        <h3>buildSlice.ts — reducer queries</h3>
+        <div class="code-block">
+<span class="cm">// упрощённо</span>
+queries: <span class="fn">createReducer</span>({}, (builder) =&gt; {
+  builder
+    .<span class="fn">addCase</span>(queryThunk.<span class="fn">pending</span>, (draft, action) =&gt; {
+      <span class="kw">const</span> { arg: { queryCacheKey, originalArgs, endpointName } } = action.meta
+      draft[queryCacheKey] = {
+        status: <span class="str">'pending'</span>,
+        endpointName,
+        originalArgs,
+        requestId: action.meta.requestId,
+        startedTimeStamp: action.meta.startedTimeStamp,
+      }
+    })
+    .<span class="fn">addCase</span>(queryThunk.<span class="fn">fulfilled</span>, (draft, action) =&gt; {
+      <span class="kw">const</span> entry = draft[action.meta.arg.queryCacheKey]
+      entry.status = <span class="str">'fulfilled'</span>
+      entry.data = action.payload
+      entry.fulfilledTimeStamp = <span class="type">Date</span>.<span class="fn">now</span>()
+    })
+    .<span class="fn">addCase</span>(queryThunk.<span class="fn">rejected</span>, (draft, action) =&gt; {
+      <span class="kw">const</span> entry = draft[action.meta.arg.queryCacheKey]
+      entry.status = <span class="str">'rejected'</span>
+      entry.error = action.payload ?? action.error
+    })
+    .<span class="fn">addCase</span>(<span class="fn">removeQueryResult</span>, (draft, action) =&gt; {
+      <span class="kw">delete</span> draft[action.payload.queryCacheKey]
+    })
+})
+        </div>
+
+        <h3>Cache reads vs writes — шпаргалка</h3>
+        <div class="code-block">
+<span class="cm">│ Событие                      │ Reads cache? │ Writes cache?  │ Network? │</span>
+<span class="cm">│ useQuery mount (HIT)          │ ✅           │ ❌             │ ❌       │</span>
+<span class="cm">│ useQuery mount (MISS)         │ ❌           │ ✅ pending→fulfilled │ ✅ │</span>
+<span class="cm">│ useQuery mount (pending HIT)  │ ✅ (дедуп)    │ ❌ (существующий)  │ ❌ │</span>
+<span class="cm">│ Смена arg (new cacheKey)      │ ✅ если HIT  │ ✅ если MISS    │ ✅       │</span>
+<span class="cm">│ refetch()                     │ ❌           │ ✅              │ ✅       │</span>
+<span class="cm">│ Mutation invalidates          │ —            │ ✅ refetch подп.│ ✅       │</span>
+<span class="cm">│ updateQueryData               │ ❌           │ ✅ (Immer patch)│ ❌       │</span>
+<span class="cm">│ upsertQueryData               │ ❌           │ ✅              │ ❌       │</span>
+<span class="cm">│ prefetch                      │ ❌           │ ✅              │ ✅*      │</span>
+<span class="cm">│ focus/reconnect + флаг        │ —            │ ✅ refetch      │ ✅       │</span>
+<span class="cm">│ pollingInterval               │ —            │ ✅ каждый tick  │ ✅       │</span>
+<span class="cm">│ resetApiState                 │ —            │ ✅ wipe         │ ❌       │</span>
+        </div>
+
+        <h3>Подводные камни понимания</h3>
+        <div class="warning">
+          <strong>1. Subscribe vs fetch — разные концепции.</strong>
+          <br>Subscribe — «я подписчик, не удаляй entry». Fetch — «запроси данные». Subscribe без
+          fetch = cache HIT. Fetch без subscribe = prefetch.
+
+          <br><br>
+          <strong>2. cacheKey — это endpoint + args, не endpoint + requestId.</strong>
+          <br>RequestId уникален на каждый fetch, cacheKey — на каждый уникальный набор args.
+          Нельзя сверять по requestId для «какой компонент заказал» — по cacheKey.
+
+          <br><br>
+          <strong>3. onQueryStarted запускается ПАРАЛЛЕЛЬНО с fetch, не после.</strong>
+          <br>Поэтому в нём можно делать optimistic update. Ждать завершения — через
+          <code>await queryFulfilled</code>.
+
+          <br><br>
+          <strong>4. cacheDataLoaded.resolve один раз — на первый fulfilled.</strong>
+          <br>Повторные fulfilled (refetch) — НЕ триггерят её снова. Это именно «первые данные в cache».
+
+          <br><br>
+          <strong>5. Двух identical-arg useQuery — два subscription, один fetch.</strong>
+          <br>Это дедупликация на уровне cacheKey. Но если один делает <code>refetch()</code>,
+          второй автоматически получит новые данные.
+
+          <br><br>
+          <strong>6. Все actions RTKQ имеют префикс <code>&#123;reducerPath&#125;/</code>.</strong>
+          <br>Default: <code>api/</code>. В middleware сверяешь по <code>type.startsWith('api/')</code>
+          или через <code>matchers</code> (<code>api.endpoints.X.matchFulfilled</code>).
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../84-rtkq-state-shape/">84 — state.api shape</a>.</li>
+          <li><a href="../92-rtkq-keepunuseddatafor-cleanup/">92 — cache cleanup</a>.</li>
+          <li><a href="../93-rtkq-onQueryStarted-optimistic/">93 — onQueryStarted</a>.</li>
+          <li><a href="../94-rtkq-onCacheEntryAdded-streaming/">94 — cacheEntryRemoved</a>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/tree/master/packages/toolkit/src/query" target="_blank">RTKQ исходники — query/</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/cache-behavior" target="_blank">RTKQ · Cache Behavior</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

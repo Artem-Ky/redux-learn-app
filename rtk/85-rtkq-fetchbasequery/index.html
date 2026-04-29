@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>85 — fetchBaseQuery</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .opt-block {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin: 10px 0;
+    }
+    .opt-block__title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .opt-block__name {
+      font-family: var(--font-mono);
+      font-size: .92rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .opt-block__desc {
+      color: var(--text-secondary);
+      font-size: .82rem;
+      margin-bottom: 8px;
+    }
+
+    .req-view {
+      background: var(--bg-tertiary);
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      margin-top: 8px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .req-view__head { color: var(--accent-cyan); margin-bottom: 4px; }
+    .req-view__key { color: var(--accent); }
+    .req-view__val { color: var(--text-secondary); }
+
+    .res-view {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .res-view__panel {
+      background: var(--bg-tertiary);
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .72rem;
+    }
+    .res-view__panel h5 { margin: 0 0 4px; color: var(--accent); font-size: .76rem; }
+    .res-view__panel.error { border-left: 2px solid var(--accent-red); }
+    .res-view__panel.success { border-left: 2px solid var(--success); }
+
+    .mini-inputs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .mini-inputs input[type=text], .mini-inputs input[type=number] {
+      padding: 4px 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      width: 90px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">85 / 106</span>
+      fetchBaseQuery — 7 опций, каждая своим примером
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../84-rtkq-state-shape/">← Назад</a>
+      <a href="../86-rtkq-mutations/">Далее → mutations</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Каждая опция fetchBaseQuery — отдельный endpoint + кнопка</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <code>fetchBaseQuery</code> — это <strong>тонкая</strong> обёртка над нативным <code>fetch</code>.
+          Его задача: унифицировать работу с <code>baseUrl</code>, JSON-сериализацию тела, query-параметры,
+          заголовки, timeout и парсинг ответа. Ниже — по одному demo-блоку на каждую опцию.
+        </p>
+
+        <div id="opts"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 85. fetchBaseQuery anatomy</div>
+      <div class="theory__body">
+        <h3>Цитата — fetchBaseQuery JSDoc</h3>
+        <div class="quote">
+          «This is a very small wrapper around <code>fetch</code> that aims to simplify requests.
+          It is not a full-blown replacement for <code>axios</code>, <code>superagent</code>, or any other
+          more heavy-weight library, but it will cover the vast majority of your needs.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/api/fetchBaseQuery" target="_blank">RTKQ · fetchBaseQuery docs</a>
+        </div>
+        <div class="quote quote--ru">
+          «<code>fetchBaseQuery</code> — маленькая обёртка над fetch. Не замена axios, но закроет 90%
+          задач: baseUrl, JSON-body, query-params, headers, timeout, parsing. Всё кастомное — через опции
+          или свой <code>baseQuery</code>.»
+        </div>
+
+        <h3>Исходник — сигнатура</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/query/fetchBaseQuery.ts — строки ~200</span>
+<span class="kw">export function</span> <span class="fn">fetchBaseQuery</span>({
+  baseUrl,
+  prepareHeaders = (x) =&gt; x,                            <span class="cm">// 👀 default: noop</span>
+  fetchFn = defaultFetchFn,                              <span class="cm">// (...args) =&gt; fetch(...args)</span>
+  paramsSerializer,                                      <span class="cm">// default: URLSearchParams</span>
+  isJsonContentType = defaultIsJsonContentType,          <span class="cm">// regex для json content-type</span>
+  jsonContentType = <span class="str">'application/json'</span>,
+  jsonReplacer,                                          <span class="cm">// 3-й arg JSON.stringify</span>
+  timeout: defaultTimeout,
+  responseHandler: globalResponseHandler,                <span class="cm">// 'json' | 'text' | (res) =&gt; ...</span>
+  validateStatus: globalValidateStatus,                  <span class="cm">// default: 200–299</span>
+  ...baseFetchOptions
+}: <span class="type">FetchBaseQueryArgs</span> = {}): <span class="type">BaseQueryFn</span>&lt;...&gt; {
+  <span class="kw">return async</span> (arg, api, extraOptions) =&gt; {
+    <span class="kw">const</span> { getState, extra, endpoint, forced, type, signal } = api
+    <span class="cm">// 1. parse arg (string → {url} | FetchArgs)</span>
+    <span class="cm">// 2. merge headers, call prepareHeaders(headers, {getState, arg, ...})</span>
+    <span class="cm">// 3. если body — plain object → JSON.stringify + content-type:application/json</span>
+    <span class="cm">// 4. если params — paramsSerializer(params) → url + '?' + query</span>
+    <span class="cm">// 5. anySignal(api.signal, timeoutSignal(timeout))</span>
+    <span class="cm">// 6. await fetchFn(url, config) → validateStatus → responseHandler</span>
+    <span class="cm">// 7. return { data } | { error: { status, data } }</span>
+  }
+}
+        </div>
+
+        <h3>Все error-формы (discriminated union)</h3>
+        <div class="code-block">
+<span class="kw">export type</span> <span class="type">FetchBaseQueryError</span> =
+  | { status: <span class="type">number</span>; data: <span class="type">unknown</span> }                                       <span class="cm">// HTTP !2xx</span>
+  | { status: <span class="str">'FETCH_ERROR'</span>;    error: <span class="type">string</span> }                          <span class="cm">// network down</span>
+  | { status: <span class="str">'PARSING_ERROR'</span>;  originalStatus: <span class="type">number</span>; data: <span class="type">string</span>; error: <span class="type">string</span> }
+  | { status: <span class="str">'TIMEOUT_ERROR'</span>;  error: <span class="type">string</span> }                          <span class="cm">// timeoutSignal сработал</span>
+  | { status: <span class="str">'CUSTOM_ERROR'</span>;   data?: <span class="type">unknown</span>; error: <span class="type">string</span> }          <span class="cm">// из своего queryFn</span>
+        </div>
+        <p style="font-size: .82rem; color: var(--text-secondary);">
+          Сравни с <code>SerializedError</code> из <code>createAsyncThunk</code> — там другая форма.
+          TS-narrowing: <code>'status' in error &amp;&amp; typeof error.status === 'number'</code> → HTTP.
+        </p>
+
+        <h3>Порядок сборки запроса</h3>
+        <div class="flow-diagram" style="padding: 16px 0;">
+          <svg viewBox="0 0 900 200" style="width: 100%; height: auto;">
+            <defs>
+              <marker id="arr85" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                <polygon points="0 0, 10 3, 0 6" fill="#888"/>
+              </marker>
+            </defs>
+            <g font-family="monospace" font-size="10">
+              <rect x="10"  y="70" width="130" height="50" rx="6" fill="#1e2a3a" stroke="#4a90e2"/>
+              <text x="75"  y="90"  text-anchor="middle" fill="#9cdcfe">baseUrl</text>
+              <text x="75"  y="108" text-anchor="middle" fill="#888">+ FetchArgs.url</text>
+
+              <rect x="160" y="70" width="130" height="50" rx="6" fill="#1e2a3a" stroke="#4a90e2"/>
+              <text x="225" y="90"  text-anchor="middle" fill="#9cdcfe">+ params</text>
+              <text x="225" y="108" text-anchor="middle" fill="#888">paramsSerializer</text>
+
+              <rect x="310" y="70" width="130" height="50" rx="6" fill="#1e2a3a" stroke="#4a90e2"/>
+              <text x="375" y="90"  text-anchor="middle" fill="#9cdcfe">headers</text>
+              <text x="375" y="108" text-anchor="middle" fill="#888">prepareHeaders(h, api)</text>
+
+              <rect x="460" y="70" width="130" height="50" rx="6" fill="#1e2a3a" stroke="#4a90e2"/>
+              <text x="525" y="90"  text-anchor="middle" fill="#9cdcfe">body</text>
+              <text x="525" y="108" text-anchor="middle" fill="#888">JSON.stringify + c-type</text>
+
+              <rect x="610" y="70" width="130" height="50" rx="6" fill="#133218" stroke="#4caf50"/>
+              <text x="675" y="90"  text-anchor="middle" fill="#4caf50">fetchFn(url,init)</text>
+              <text x="675" y="108" text-anchor="middle" fill="#888">+ signal/timeout</text>
+
+              <rect x="760" y="70" width="130" height="50" rx="6" fill="#32131a" stroke="#f44747"/>
+              <text x="825" y="88"  text-anchor="middle" fill="#f44747">validateStatus?</text>
+              <text x="825" y="104" text-anchor="middle" fill="#f44747">responseHandler</text>
+              <text x="825" y="118" text-anchor="middle" fill="#888">→ {data}|{error}</text>
+
+              <line x1="140" y1="95" x2="158" y2="95" stroke="#888" stroke-width="1.5" marker-end="url(#arr85)"/>
+              <line x1="290" y1="95" x2="308" y2="95" stroke="#888" stroke-width="1.5" marker-end="url(#arr85)"/>
+              <line x1="440" y1="95" x2="458" y2="95" stroke="#888" stroke-width="1.5" marker-end="url(#arr85)"/>
+              <line x1="590" y1="95" x2="608" y2="95" stroke="#888" stroke-width="1.5" marker-end="url(#arr85)"/>
+              <line x1="740" y1="95" x2="758" y2="95" stroke="#888" stroke-width="1.5" marker-end="url(#arr85)"/>
+            </g>
+          </svg>
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. prepareHeaders возвращает void → использовать переданный объект headers.</strong>
+          <br>Если вернул <code>undefined</code>, RTKQ использует <strong>переданный</strong> <code>headers</code>
+          (мутированный). Если вернул новый Headers — используется он. Ловушка: <code>return;</code> вместо
+          <code>return headers;</code> — работает, но не очевидно читается.
+
+          <br><br>
+          <strong>2. body = FormData / Blob / ArrayBuffer → content-type УДАЛЯЕТСЯ.</strong>
+          <br>RTKQ проверяет <code>isJsonifiable(body)</code>: если это plain-object/array/has toJSON, ставит
+          <code>content-type: application/json</code>. Иначе — удаляет content-type, чтобы браузер выставил
+          правильный <code>multipart/form-data; boundary=...</code>. Не ставь content-type вручную для FormData.
+
+          <br><br>
+          <strong>3. validateStatus default = 200–299.</strong>
+          <br>Если сервер возвращает 3xx (редирект) — fetch обычно следует по умолчанию, но если ты
+          <code>redirect: 'manual'</code>, то 3xx попадёт в <code>validateStatus</code> и вернёт
+          <code>{status: 3xx, data}</code> как error. Так же для 4xx/5xx. Переопределяй, если твой API
+          умеет status=201 с JSON body, и ты хочешь, чтобы он был ошибкой.
+
+          <br><br>
+          <strong>4. timeout: используется через anySignal.</strong>
+          <br>RTKQ комбинирует <code>api.signal</code> (abort при unsubscribe) и <code>timeoutSignal(timeout)</code>
+          в один AbortSignal. Если хоть один сработал — fetch abort → <code>{status: 'TIMEOUT_ERROR'}</code>
+          (для timeout) или silent reject (для unsubscribe abort).
+
+          <br><br>
+          <strong>5. responseHandler: 'json' (default) бросает на не-JSON ответах.</strong>
+          <br>Если endpoint иногда возвращает пустое тело (204 No Content) — <code>response.json()</code>
+          бросает SyntaxError → <code>{status: 'PARSING_ERROR'}</code>. Для таких случаев —
+          <code>responseHandler: 'content-type'</code> (смотрит заголовок) или custom
+          <code>(res) =&gt; res.text().then(t =&gt; t ? JSON.parse(t) : null)</code>.
+
+          <br><br>
+          <strong>6. paramsSerializer для массивов.</strong>
+          <br>Default (<code>URLSearchParams</code>) сериализует <code>{ids: [1,2,3]}</code> как
+          <code>ids=1&amp;ids=2&amp;ids=3</code>. Если твой сервер хочет <code>ids=1,2,3</code> или
+          <code>ids[]=1&amp;ids[]=2</code> — передай <code>paramsSerializer: (p) =&gt; qs.stringify(p)</code>.
+        </div>
+
+        <h3>Когда НЕ хватит fetchBaseQuery — переходи на свой baseQuery</h3>
+        <div class="code-block">
+<span class="cm">// axios, graphql-request, Firebase SDK — пиши свою функцию:</span>
+<span class="kw">import type</span> { <span class="type">BaseQueryFn</span> } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query'</span>
+
+<span class="kw">const</span> axiosBaseQuery =
+  ({ baseUrl }: { baseUrl: <span class="type">string</span> }): <span class="type">BaseQueryFn</span>&lt;
+    { url: <span class="type">string</span>; method: <span class="type">string</span>; data?: <span class="type">unknown</span> },
+    <span class="type">unknown</span>,
+    { status?: <span class="type">number</span>; data: <span class="type">unknown</span> }
+  &gt; =&gt;
+  <span class="kw">async</span> ({ url, method, data }) =&gt; {
+    <span class="kw">try</span> {
+      <span class="kw">const</span> res = <span class="kw">await</span> axios({ url: baseUrl + url, method, data })
+      <span class="kw">return</span> { data: res.data }
+    } <span class="kw">catch</span> (e) {
+      <span class="kw">const</span> err = e <span class="kw">as</span> <span class="type">AxiosError</span>
+      <span class="kw">return</span> { error: { status: err.response?.status, data: err.response?.data } }
+    }
+  }
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../80-rtkq-create-api-basic/">80 — createApi</a> (куда передавать baseQuery).</li>
+          <li><a href="../84-rtkq-state-shape/">84 — state.api</a> (где оседает <code>error</code>).</li>
+          <li><a href="../86-rtkq-mutations/">86 — mutations</a> (body+method используют fetchBaseQuery).</li>
+          <li><a href="../97-rtkq-custom-basequery/">97 — custom baseQuery</a> (axios/graphql-request).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/fetchBaseQuery" target="_blank">RTKQ · fetchBaseQuery</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/fetchBaseQuery.ts" target="_blank">fetchBaseQuery.ts source</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#customizing-queries-with-basequery" target="_blank">Customizing baseQuery</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

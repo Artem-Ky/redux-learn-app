@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>102 — TypeScript · RTK Query полная типизация</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .ts-example {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      margin-top: 10px;
+    }
+    .ts-example h5 { color: var(--accent-cyan); margin: 0 0 6px; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">102 / 106</span>
+      TypeScript · полная типизация RTK Query
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../101-rtkq-query-lifecycle-internals/">← Назад</a>
+      <a href="../103-rtkq-vs-react-query/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Generic параметры · typed hooks · helper types</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          RTKQ полностью типизирован: endpoints автогенерируют хуки с правильными типами
+          <code>data</code>, <code>arg</code>, <code>error</code>. Но есть helper-типы, которые
+          понадобятся в проде.
+        </p>
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 102. TypeScript полная типизация</div>
+      <div class="theory__body">
+        <h3>Базовый шаблон</h3>
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">Post</span> { id: <span class="type">number</span>; title: <span class="type">string</span> }
+<span class="kw">interface</span> <span class="type">NewPost</span> { title: <span class="type">string</span> }
+
+<span class="cm">// build.query&lt;ResultType, ArgType&gt;</span>
+<span class="cm">// build.mutation&lt;ResultType, ArgType&gt;</span>
+<span class="kw">const</span> api = <span class="fn">createApi</span>({
+  reducerPath: <span class="str">'api'</span>,
+  baseQuery: <span class="fn">fetchBaseQuery</span>({ baseUrl: <span class="str">'/api'</span> }),
+  tagTypes: [<span class="str">'Post'</span>] <span class="kw">as const</span>,      <span class="cm">// 👀 as const — для литеральных типов</span>
+  endpoints: (build) =&gt; ({
+    getPosts: build.<span class="fn">query</span>&lt;<span class="type">Post</span>[], <span class="type">void</span>&gt;({                  <span class="cm">// void = нет arg</span>
+      query: () =&gt; <span class="str">'posts'</span>,
+    }),
+    getPost: build.<span class="fn">query</span>&lt;<span class="type">Post</span>, <span class="type">number</span>&gt;({                  <span class="cm">// arg = number</span>
+      query: (id) =&gt; <span class="str">`posts/</span><span class="kw">${</span>id<span class="kw">}</span><span class="str">`</span>,
+    }),
+    addPost: build.<span class="fn">mutation</span>&lt;<span class="type">Post</span>, <span class="type">NewPost</span>&gt;({
+      query: (body) =&gt; ({ url: <span class="str">'posts'</span>, method: <span class="str">'POST'</span>, body }),
+    }),
+  }),
+})
+        </div>
+
+        <h3>Typed useAppDispatch / useAppSelector</h3>
+        <div class="code-block">
+<span class="cm">// store.ts</span>
+<span class="kw">export const</span> store = <span class="fn">configureStore</span>({
+  reducer: { [api.reducerPath]: api.reducer },
+  middleware: (gdm) =&gt; gdm().<span class="fn">concat</span>(api.middleware),
+})
+
+<span class="kw">export type</span> <span class="type">RootState</span> = <span class="type">ReturnType</span>&lt;<span class="kw">typeof</span> store.getState&gt;
+<span class="kw">export type</span> <span class="type">AppDispatch</span> = <span class="kw">typeof</span> store.dispatch
+
+<span class="cm">// hooks.ts — с withTypes (современно, v9+)</span>
+<span class="kw">import</span> { useDispatch, useSelector } <span class="kw">from</span> <span class="str">'react-redux'</span>
+
+<span class="kw">export const</span> useAppDispatch = useDispatch.<span class="fn">withTypes</span>&lt;<span class="type">AppDispatch</span>&gt;()
+<span class="kw">export const</span> useAppSelector = useSelector.<span class="fn">withTypes</span>&lt;<span class="type">RootState</span>&gt;()
+        </div>
+
+        <h3>Helper types — для обёрток и переиспользования</h3>
+        <div class="code-block">
+<span class="kw">import</span> <span class="kw">type</span> {
+  <span class="type">TypedUseQueryHookResult</span>,
+  <span class="type">TypedUseMutationResult</span>,
+  <span class="type">BaseQueryFn</span>,
+  <span class="type">EndpointBuilder</span>,
+  <span class="type">FetchBaseQueryError</span>,
+} <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query/react'</span>
+
+<span class="cm">// 1. Тип результата любого query hook</span>
+<span class="kw">type</span> <span class="type">GetPostsResult</span> = <span class="type">TypedUseQueryHookResult</span>&lt;<span class="type">Post</span>[], <span class="type">void</span>, <span class="type">BaseQueryFn</span>&gt;
+
+<span class="cm">// 2. Обёртка useQuery с общим типом</span>
+<span class="kw">function</span> <span class="fn">useSelectedPosts</span>&lt;<span class="type">T</span>&gt;(selector: (p: <span class="type">Post</span>[]) =&gt; <span class="type">T</span>): <span class="type">T</span> | <span class="kw">undefined</span> {
+  <span class="kw">const</span> { data } = api.useGetPostsQuery()
+  <span class="kw">return</span> data ? <span class="fn">selector</span>(data) : <span class="kw">undefined</span>
+}
+
+<span class="cm">// 3. Тип для mutation result</span>
+<span class="kw">type</span> <span class="type">AddPostState</span> = <span class="type">TypedUseMutationResult</span>&lt;<span class="type">Post</span>, <span class="type">NewPost</span>, <span class="type">BaseQueryFn</span>&gt;
+        </div>
+
+        <h3>Discriminated union для error</h3>
+        <div class="code-block">
+<span class="kw">import</span> <span class="kw">type</span> { <span class="type">FetchBaseQueryError</span>, <span class="type">SerializedError</span> } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query'</span>
+
+<span class="kw">function</span> <span class="fn">isFetchBaseQueryError</span>(
+  e: <span class="type">FetchBaseQueryError</span> | <span class="type">SerializedError</span> | <span class="kw">undefined</span>,
+): e <span class="kw">is</span> <span class="type">FetchBaseQueryError</span> {
+  <span class="kw">return</span> e != <span class="kw">null</span> &amp;&amp; <span class="str">'status'</span> <span class="kw">in</span> e
+}
+
+<span class="kw">const</span> { error } = api.<span class="fn">useGetPostsQuery</span>()
+<span class="kw">if</span> (<span class="fn">isFetchBaseQueryError</span>(error)) {
+  error.status   <span class="cm">// ← ts знает: number | 'FETCH_ERROR' | ...</span>
+  error.data     <span class="cm">// ← unknown, нужно cast или zod-парсинг</span>
+} <span class="kw">else if</span> (error) {
+  error.message  <span class="cm">// SerializedError — string | undefined</span>
+}
+        </div>
+
+        <h3>Кастомный baseQuery + typed error</h3>
+        <div class="code-block">
+<span class="kw">type</span> <span class="type">MyError</span> = { code: <span class="type">string</span>; message: <span class="type">string</span>; status?: <span class="type">number</span> }
+
+<span class="kw">const</span> myBaseQuery: <span class="type">BaseQueryFn</span>&lt;<span class="type">string</span>, <span class="kw">unknown</span>, <span class="type">MyError</span>&gt; = <span class="kw">async</span> (url) =&gt; {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> r = <span class="kw">await</span> <span class="fn">fetch</span>(url)
+    <span class="kw">if</span> (!r.ok) <span class="kw">return</span> { error: { code: <span class="str">'HTTP'</span>, message: r.statusText, status: r.status } }
+    <span class="kw">return</span> { data: <span class="kw">await</span> r.<span class="fn">json</span>() }
+  } <span class="kw">catch</span> (e) {
+    <span class="kw">return</span> { error: { code: <span class="str">'NETWORK'</span>, message: <span class="fn">String</span>(e) } }
+  }
+}
+
+<span class="kw">const</span> api = <span class="fn">createApi</span>({
+  baseQuery: myBaseQuery,
+  endpoints: ...
+})
+<span class="cm">// теперь error.code / .message — типизированы везде, никаких casts.</span>
+        </div>
+
+        <h3>Типизация <code>providesTags</code> / <code>invalidatesTags</code></h3>
+        <div class="code-block">
+<span class="kw">type</span> <span class="type">PostTag</span> = { type: <span class="str">'Post'</span>; id: <span class="type">number</span> | <span class="str">'LIST'</span> }
+
+getPosts: build.<span class="fn">query</span>&lt;<span class="type">Post</span>[], <span class="type">void</span>&gt;({
+  query: () =&gt; <span class="str">'posts'</span>,
+  providesTags: (result) =&gt;
+    result
+      ? [
+          ...result.<span class="fn">map</span>(({ id }) =&gt; ({ type: <span class="str">'Post'</span> <span class="kw">as const</span>, id })),  <span class="cm">// 👀 as const!</span>
+          { type: <span class="str">'Post'</span> <span class="kw">as const</span>, id: <span class="str">'LIST'</span> },
+        ]
+      : [{ type: <span class="str">'Post'</span> <span class="kw">as const</span>, id: <span class="str">'LIST'</span> }],
+})
+<span class="cm">// Без "as const" TS выведет type: string → RTKQ скажет "tag 'Post' not in tagTypes".</span>
+        </div>
+
+        <h3>Общие хуки с генериком</h3>
+        <div class="code-block">
+<span class="cm">// Базовый хук — принимает endpoint по имени</span>
+<span class="kw">function</span> <span class="fn">useEntity</span>&lt;<span class="type">T</span>&gt;(
+  selectEntity: (state: <span class="type">RootState</span>) =&gt; <span class="type">T</span> | <span class="kw">undefined</span>,
+): <span class="type">T</span> | <span class="kw">undefined</span> {
+  <span class="kw">return</span> <span class="fn">useAppSelector</span>(selectEntity)
+}
+
+<span class="cm">// Использование:</span>
+<span class="kw">const</span> post = <span class="fn">useEntity</span>((s) =&gt; api.endpoints.<span class="fn">getPost</span>.<span class="fn">select</span>(<span class="num">5</span>)(s).data)
+        </div>
+
+        <h3>enhanceEndpoints для OpenAPI codegen</h3>
+        <div class="code-block">
+<span class="cm">// generated-api.ts — создан кодогеном, тонкий wrapper</span>
+<span class="kw">import</span> { api <span class="kw">as</span> generated } <span class="kw">from</span> <span class="str">'./generated-api'</span>
+
+<span class="kw">export const</span> api = generated.<span class="fn">enhanceEndpoints</span>&lt;
+  <span class="str">'Post'</span> | <span class="str">'User'</span>
+&gt;({
+  addTagTypes: [<span class="str">'Post'</span>, <span class="str">'User'</span>],
+  endpoints: {
+    getPosts: {
+      providesTags: (r) =&gt; r
+        ? [...r.items.<span class="fn">map</span>(p =&gt; ({ type: <span class="str">'Post'</span> <span class="kw">as const</span>, id: p.id }))]
+        : [],
+    },
+  },
+})
+<span class="cm">// TS знает про все endpoints из generated + новые теги.</span>
+        </div>
+
+        <h3>Подводные камни типизации</h3>
+        <div class="warning">
+          <strong>1. <code>build.query&lt;TResult, TArg&gt;</code> — TResult ПОСЛЕ transformResponse.</strong>
+          <br>Если query возвращает <code>{data: Post[]}</code>, а transformResponse → <code>Post[]</code> —
+          писать нужно <code>build.query&lt;Post[], void&gt;</code>, не <code>{data: Post[]}</code>.
+
+          <br><br>
+          <strong>2. TagTypes без <code>as const</code> = string.</strong>
+          <br>Массив <code>['Post', 'User']</code> имеет тип <code>string[]</code>. Лучше
+          <code>['Post', 'User'] as const</code> — тогда <code>TagTypes = 'Post' | 'User'</code>
+          и IDE подскажет в providesTags.
+
+          <br><br>
+          <strong>3. <code>type</code> в providesTag без <code>as const</code> = string.</strong>
+          <br><code>{ type: 'Post', id: 5 }</code> → TS выведет <code>{type: string, id: number}</code>.
+          RTKQ скажет «tag 'Post' not in tagTypes» (потому что string ≠ 'Post').
+          Пиши <code>{ type: 'Post' as const, id }</code> или используй <code>satisfies</code>.
+
+          <br><br>
+          <strong>4. BaseQueryFn generic порядок — Args, Result, Error, ExtraOptions, Meta.</strong>
+          <br>Забудешь Error → будет <code>unknown</code>, везде cast. Пиши все 3 основных при
+          custom baseQuery: <code>BaseQueryFn&lt;Args, Result, MyError&gt;</code>.
+
+          <br><br>
+          <strong>5. <code>skipToken</code> требует специальной типизации.</strong>
+          <br>Если arg нельзя сделать optional (strict type) — <code>useGetXQuery(id ?? skipToken)</code>
+          работает, и TS не ругается. Это правильнее чем <code>useGetXQuery(id!, {skip: !id})</code>.
+
+          <br><br>
+          <strong>6. Re-export хуков vs использование через api.X.</strong>
+          <br><code>export const { useGetPostsQuery } = api</code> теряет link на api в runtime —
+          OK для TS, но в DevTools сложнее дебажить. Альтернатива: <code>api.useGetPostsQuery()</code>
+          — немного длиннее, но явно где endpoint.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../19-typed-store-and-dispatch/">19 — typed store</a>.</li>
+          <li><a href="../98-rtkq-base-query-custom/">98 — BaseQueryFn</a>.</li>
+          <li><a href="../99-rtkq-code-splitting-injectEndpoints/">99 — injectEndpoints + типы</a>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage-with-typescript" target="_blank">RTKQ · Usage with TypeScript</a></li>
+          <li><a href="https://redux-toolkit.js.org/usage/usage-with-typescript" target="_blank">RTK · Usage with TypeScript</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/endpointDefinitions.ts" target="_blank">endpointDefinitions.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

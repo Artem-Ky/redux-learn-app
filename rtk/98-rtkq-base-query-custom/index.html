@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>98 — Custom baseQuery · axios / graphql / reauth</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .custom-log {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      max-height: 200px;
+      overflow: auto;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+    }
+    .bq-row {
+      padding: 3px 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .bq-row:last-child { border-bottom: none; }
+    .bq-row.req { color: var(--accent); }
+    .bq-row.ok { color: var(--success); }
+    .bq-row.err { color: var(--accent-red); }
+    .bq-row.reauth { color: var(--warning); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">98 / 106</span>
+      Custom baseQuery · axios / graphql / reauth
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../97-rtkq-error-handling/">← Назад</a>
+      <a href="../99-rtkq-code-splitting-injectEndpoints/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Custom baseQuery с авто-reauth на 401</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Свой <code>baseQuery</code> — это функция <code>(args, api, extraOpts) → { data } | { error }</code>.
+          Здесь: обёртка над <code>fetchBaseQuery</code> с refresh-token логикой: на 401 → POST /refresh →
+          повторяет оригинальный запрос с новым токеном.
+        </p>
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 98. Custom baseQuery</div>
+      <div class="theory__body">
+        <h3>Цитата — Customizing Queries</h3>
+        <div class="quote">
+          «A <code>baseQuery</code> is just a function with the signature
+          <code>(args, api, extraOptions) =&gt; Promise&lt;{ data } | { error }&gt;</code>. You can wrap it,
+          compose with other base queries, or write your own from scratch for axios / graphql / custom
+          transports.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#customizing-queries-with-basequery" target="_blank">RTKQ · Implementing a Custom baseQuery</a>
+        </div>
+
+        <h3>Сигнатура baseQuery</h3>
+        <div class="code-block">
+<span class="kw">type</span> <span class="type">BaseQueryFn</span>&lt;
+  <span class="type">Args</span> = <span class="kw">any</span>,
+  <span class="type">Result</span> = <span class="kw">unknown</span>,
+  <span class="type">Error</span> = <span class="kw">unknown</span>,
+  <span class="type">DefinitionExtraOptions</span> = {},
+  <span class="type">Meta</span> = {},
+&gt; = (
+  args: <span class="type">Args</span>,
+  api: <span class="type">BaseQueryApi</span>,
+  extraOptions: <span class="type">DefinitionExtraOptions</span>,
+) =&gt; <span class="type">Promise</span>&lt;
+  | { data: <span class="type">Result</span>; error?: <span class="kw">undefined</span>; meta?: <span class="type">Meta</span> }
+  | { error: <span class="type">Error</span>; data?: <span class="kw">undefined</span>; meta?: <span class="type">Meta</span> }
+&gt;
+        </div>
+
+        <h3>Пример 1 — axios baseQuery</h3>
+        <div class="code-block">
+<span class="kw">import</span> axios, { type <span class="type">AxiosRequestConfig</span>, type <span class="type">AxiosError</span> } <span class="kw">from</span> <span class="str">'axios'</span>
+<span class="kw">import</span> <span class="kw">type</span> { <span class="type">BaseQueryFn</span> } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query'</span>
+
+<span class="kw">const</span> axiosBaseQuery = (
+  { baseUrl }: { baseUrl: <span class="type">string</span> } = { baseUrl: <span class="str">''</span> },
+): <span class="type">BaseQueryFn</span>&lt;
+  { url: <span class="type">string</span>; method?: <span class="type">AxiosRequestConfig</span>[<span class="str">'method'</span>]; data?: <span class="kw">unknown</span>; params?: <span class="kw">unknown</span> },
+  <span class="kw">unknown</span>,
+  { status?: <span class="type">number</span>; data?: <span class="kw">unknown</span>; message?: <span class="type">string</span> }
+&gt; =&gt; <span class="kw">async</span> ({ url, method, data, params }) =&gt; {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> r = <span class="kw">await</span> axios({ url: baseUrl + url, method, data, params })
+    <span class="kw">return</span> { data: r.data }
+  } <span class="kw">catch</span> (e) {
+    <span class="kw">const</span> err = e <span class="kw">as</span> <span class="type">AxiosError</span>
+    <span class="kw">return</span> { error: { status: err.response?.status, data: err.response?.data, message: err.message } }
+  }
+}
+
+<span class="fn">createApi</span>({ baseQuery: <span class="fn">axiosBaseQuery</span>({ baseUrl: <span class="str">'/api'</span> }), ... })
+        </div>
+
+        <h3>Пример 2 — graphql-request baseQuery</h3>
+        <div class="code-block">
+<span class="kw">import</span> { <span class="type">GraphQLClient</span>, <span class="type">ClientError</span> } <span class="kw">from</span> <span class="str">'graphql-request'</span>
+
+<span class="kw">const</span> client = <span class="kw">new</span> <span class="fn">GraphQLClient</span>(<span class="str">'/graphql'</span>)
+
+<span class="kw">const</span> graphqlBaseQuery: <span class="type">BaseQueryFn</span>&lt;
+  { document: <span class="type">string</span>; variables?: <span class="kw">object</span> }
+&gt; = <span class="kw">async</span> ({ document, variables }) =&gt; {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> data = <span class="kw">await</span> client.<span class="fn">request</span>(document, variables)
+    <span class="kw">return</span> { data }
+  } <span class="kw">catch</span> (e) {
+    <span class="kw">if</span> (e <span class="kw">instanceof</span> <span class="type">ClientError</span>) {
+      <span class="kw">return</span> { error: { status: e.response.status, data: e.response.errors } }
+    }
+    <span class="kw">return</span> { error: { status: <span class="str">'FETCH_ERROR'</span>, data: <span class="fn">String</span>(e) } }
+  }
+}
+        </div>
+
+        <h3>Пример 3 — reauth обёртка (на 401)</h3>
+        <div class="code-block">
+<span class="kw">import</span> { fetchBaseQuery } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query/react'</span>
+<span class="kw">import</span> <span class="kw">type</span> { <span class="type">BaseQueryFn</span>, <span class="type">FetchArgs</span>, <span class="type">FetchBaseQueryError</span> } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit/query'</span>
+<span class="kw">import</span> { <span class="type">Mutex</span> } <span class="kw">from</span> <span class="str">'async-mutex'</span>
+
+<span class="kw">const</span> baseQuery = <span class="fn">fetchBaseQuery</span>({
+  baseUrl: <span class="str">'/api'</span>,
+  prepareHeaders: (headers, { getState }) =&gt; {
+    <span class="kw">const</span> token = (getState() <span class="kw">as</span> <span class="type">RootState</span>).auth.token
+    <span class="kw">if</span> (token) headers.<span class="fn">set</span>(<span class="str">'Authorization'</span>, <span class="str">`Bearer </span><span class="kw">${</span>token<span class="kw">}</span><span class="str">`</span>)
+    <span class="kw">return</span> headers
+  },
+})
+
+<span class="kw">const</span> mutex = <span class="kw">new</span> <span class="fn">Mutex</span>()   <span class="cm">// защита от параллельных refresh'ей</span>
+
+<span class="kw">const</span> baseQueryWithReauth: <span class="type">BaseQueryFn</span>&lt;
+  <span class="type">string</span> | <span class="type">FetchArgs</span>, <span class="kw">unknown</span>, <span class="type">FetchBaseQueryError</span>
+&gt; = <span class="kw">async</span> (args, api, extraOptions) =&gt; {
+  <span class="kw">await</span> mutex.<span class="fn">waitForUnlock</span>()
+  <span class="kw">let</span> result = <span class="kw">await</span> <span class="fn">baseQuery</span>(args, api, extraOptions)
+
+  <span class="kw">if</span> (result.error?.status === <span class="num">401</span>) {
+    <span class="kw">if</span> (!mutex.<span class="fn">isLocked</span>()) {
+      <span class="kw">const</span> release = <span class="kw">await</span> mutex.<span class="fn">acquire</span>()
+      <span class="kw">try</span> {
+        <span class="kw">const</span> refresh = <span class="kw">await</span> <span class="fn">baseQuery</span>({ url: <span class="str">'/auth/refresh'</span>, method: <span class="str">'POST'</span> }, api, extraOptions)
+        <span class="kw">if</span> (refresh.data) {
+          api.<span class="fn">dispatch</span>(<span class="fn">setToken</span>((refresh.data <span class="kw">as any</span>).token))
+          result = <span class="kw">await</span> <span class="fn">baseQuery</span>(args, api, extraOptions)     <span class="cm">// повторяем оригинальный</span>
+        } <span class="kw">else</span> {
+          api.<span class="fn">dispatch</span>(<span class="fn">logout</span>())
+        }
+      } <span class="kw">finally</span> {
+        release()
+      }
+    } <span class="kw">else</span> {
+      <span class="kw">await</span> mutex.<span class="fn">waitForUnlock</span>()
+      result = <span class="kw">await</span> <span class="fn">baseQuery</span>(args, api, extraOptions)
+    }
+  }
+  <span class="kw">return</span> result
+}
+        </div>
+
+        <h3>BaseQueryApi — что доступно внутри</h3>
+        <div class="code-block">
+<span class="kw">interface</span> <span class="type">BaseQueryApi</span> {
+  signal: <span class="type">AbortSignal</span>            <span class="cm">// отмена через initiate.abort()</span>
+  abort: (reason?: <span class="type">string</span>) =&gt; <span class="kw">void</span>
+  dispatch: <span class="type">ThunkDispatch</span>&lt;...&gt;
+  getState: () =&gt; <span class="type">RootState</span>
+  extra: <span class="kw">unknown</span>                   <span class="cm">// твой thunk extra</span>
+  endpoint: <span class="type">string</span>                <span class="cm">// имя endpoint'а</span>
+  type: <span class="str">'query'</span> | <span class="str">'mutation'</span>
+  forced?: <span class="type">boolean</span>                <span class="cm">// true если forceRefetch</span>
+  queryCacheKey?: <span class="type">string</span>         <span class="cm">// для queries</span>
+}
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Возвращаемая структура должна быть ровно <code>{data}</code> или <code>{error}</code>.</strong>
+          <br>Не <code>{data, error}</code> оба, не голый <code>data</code>. Если оба — поведение undefined.
+          Если бросил Error — RTKQ его оборачивает сам в <code>SerializedError</code>, но лучше явно.
+
+          <br><br>
+          <strong>2. Custom baseQuery → type error становится твой тип, не FetchBaseQueryError.</strong>
+          <br>В endpoint определении, в transformErrorResponse, в component через <code>q.error</code> —
+          всё будет твой shape. Не забудь проставить generic в <code>BaseQueryFn&lt;Args, Result, Error&gt;</code>.
+
+          <br><br>
+          <strong>3. Reauth без mutex = N параллельных refresh'ей.</strong>
+          <br>Если 5 запросов одновременно вернули 401, без mutex все пятеро начнут refresh. Решение —
+          <code>async-mutex</code> или свой флаг <code>isRefreshing</code>.
+
+          <br><br>
+          <strong>4. signal нужно прокидывать в fetch/axios.</strong>
+          <br>Если не прокидываешь <code>api.signal</code> в transport — отмена через
+          <code>promise.abort()</code> не сработает.
+
+          <br><br>
+          <strong>5. Composing baseQueries — можно через replay.</strong>
+          <br><code>retry(wrapper(base), ...)</code> — wrappers можно цепочкой: reauth внутри, retry
+          снаружи. Порядок важен: retry не должен ретраить 401, иначе лупинг.
+
+          <br><br>
+          <strong>6. В custom baseQuery ты САМ ответственен за JSON parsing.</strong>
+          <br>fetchBaseQuery делает это за тебя. Кастом — ты берёшь raw Response и решаешь как парсить.
+          Не забудь про ошибки JSON.parse.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../85-rtkq-fetchbasequery/">85 — fetchBaseQuery</a> (стандартный вариант).</li>
+          <li><a href="../97-rtkq-error-handling/">97 — error handling</a>.</li>
+          <li><a href="../89-rtkq-transformResponse/">89 — transformResponse</a> (как комплементарная нормализация).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#implementing-a-custom-basequery" target="_blank">RTKQ · Custom baseQuery</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#axios-basequery" target="_blank">RTKQ · axios</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#graphql-basequery" target="_blank">RTKQ · graphql</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#automatic-re-authorization-by-extending-fetchbasequery" target="_blank">RTKQ · reauth</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

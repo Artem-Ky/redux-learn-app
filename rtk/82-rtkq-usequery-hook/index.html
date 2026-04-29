@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>82 — useQuery hook</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .hook-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 12px 0;
+    }
+    .return-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+    }
+    .return-panel h4 {
+      color: var(--text-bright);
+      font-size: .88rem;
+      margin-bottom: 8px;
+    }
+    .flag-row {
+      display: grid;
+      grid-template-columns: 130px 50px 1fr;
+      gap: 8px;
+      padding: 4px 0;
+      font-family: var(--font-mono);
+      font-size: .8rem;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+    }
+    .flag-row:last-child { border-bottom: none; }
+    .flag-row__name { color: var(--accent-cyan); }
+    .flag-row__val {
+      text-align: center;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: .74rem;
+    }
+    .flag-row__val.t  { background: rgba(76,175,80,.2); color: var(--success); }
+    .flag-row__val.f  { background: rgba(102,102,102,.2); color: var(--text-muted); }
+    .flag-row__val.e  { background: rgba(244,71,71,.2); color: var(--accent-red); }
+    .flag-row__hint { color: var(--text-muted); font-size: .72rem; }
+
+    .data-preview {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      color: var(--accent-cyan);
+      white-space: pre-wrap;
+      min-height: 60px;
+      margin-top: 10px;
+    }
+
+    .render-count {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 10px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      background: rgba(255,152,0,.15);
+      color: var(--warning);
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .status-cell {
+      background: var(--bg-tertiary);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .74rem;
+    }
+    .status-cell strong { color: var(--accent-cyan); }
+
+    .history-log {
+      background: var(--bg-panel);
+      border-left: 3px solid var(--accent-orange);
+      padding: 8px 12px;
+      max-height: 140px;
+      overflow: auto;
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      color: var(--text-secondary);
+      margin-top: 10px;
+    }
+    .history-log div { padding: 1px 0; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">82 / 106</span>
+      useGetXQuery — все return-значения hook'а
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../81-rtkq-store-setup/">← Назад</a>
+      <a href="../83-rtkq-cache-key/">Далее → cacheKey</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Hook useGetPokemonByNameQuery(name, options)</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Импорт <strong>из <code>@reduxjs/toolkit/query/react</code></strong> (именно <code>/react</code>!) — тогда
+          createApi авто-генерирует <code>useGetPokemonByNameQuery</code>. Hook возвращает ~15 полей.
+          Ниже — все они в live-режиме, плюс отдельно <em>isLoading</em> vs <em>isFetching</em> — разница важна для UX.
+        </p>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 82. useQuery return values</div>
+      <div class="theory__body">
+        <h3>Цитата — Frequently Used Query Hook Return Values</h3>
+        <div class="quote">
+          «<code>currentData</code> vs <code>data</code>: <code>data</code> is the latest returned data
+          for any arg. <code>currentData</code> is the latest returned data <strong>for the current arg</strong>.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/queries#frequently-used-query-hook-return-values" target="_blank">RTKQ — Return Values</a>
+        </div>
+        <div class="quote quote--ru">
+          «Когда аргумент меняется (ввод в инпуте) — <code>isFetching=true</code>, <code>data</code>
+          содержит СТАРЫЙ результат, <code>currentData</code> — <code>undefined</code>. Для UI паджинации
+          удобно показывать <code>data</code> (не "мигает"), для инвалидации — <code>currentData</code>.»
+        </div>
+
+        <h3>Все return-поля (из RTKQ useQuery)</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/query/react/buildHooks.ts — QueryResult</span>
+<span class="kw">interface</span> <span class="type">UseQueryHookResult</span>&lt;<span class="type">T</span>&gt; {
+  <span class="cm">// data</span>
+  data?: <span class="type">T</span>                                 <span class="cm">// 👀 остаётся старым между args</span>
+  currentData?: <span class="type">T</span>                          <span class="cm">// 👀 очищается при смене arg</span>
+  error?: <span class="type">FetchBaseQueryError</span> | <span class="type">SerializedError</span>
+
+  <span class="cm">// status flags — взаимоисключающие</span>
+  isUninitialized: <span class="type">boolean</span>                 <span class="cm">// ещё ни одного initiate</span>
+  isLoading: <span class="type">boolean</span>                       <span class="cm">// 👀 первая загрузка, data=undefined</span>
+  isFetching: <span class="type">boolean</span>                      <span class="cm">// 👀 любая загрузка, incl refetch</span>
+  isSuccess: <span class="type">boolean</span>
+  isError: <span class="type">boolean</span>
+
+  <span class="cm">// meta</span>
+  status: <span class="str">'uninitialized'</span>|<span class="str">'pending'</span>|<span class="str">'fulfilled'</span>|<span class="str">'rejected'</span>
+  requestId?: <span class="type">string</span>
+  endpointName?: <span class="type">string</span>
+  startedTimeStamp?: <span class="type">number</span>
+  fulfilledTimeStamp?: <span class="type">number</span>
+  originalArgs?: <span class="type">unknown</span>
+
+  <span class="cm">// actions</span>
+  refetch: () =&gt; <span class="type">QueryActionCreatorResult</span>    <span class="cm">// принудительный refetch</span>
+}
+        </div>
+        <p>
+          GitHub: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/react/buildHooks.ts" target="_blank">query/react/buildHooks.ts</a>
+        </p>
+
+        <h3>isLoading vs isFetching — критическая разница</h3>
+        <table class="role-table" style="width: 100%; border-collapse: collapse; font-size: .82rem;">
+          <thead>
+            <tr style="background: var(--bg-tertiary);">
+              <th style="padding: 6px 10px; text-align: left; color: var(--accent); border: 1px solid var(--border);">Ситуация</th>
+              <th style="padding: 6px 10px; text-align: center; color: var(--accent); border: 1px solid var(--border);">isLoading</th>
+              <th style="padding: 6px 10px; text-align: center; color: var(--accent); border: 1px solid var(--border);">isFetching</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">первый mount, data=undefined</td>
+              <td style="padding: 6px 10px; text-align: center; color: var(--success); border: 1px solid var(--border);">true</td>
+              <td style="padding: 6px 10px; text-align: center; color: var(--success); border: 1px solid var(--border);">true</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">refetch() / polling</td>
+              <td style="padding: 6px 10px; text-align: center; color: var(--text-muted); border: 1px solid var(--border);">false</td>
+              <td style="padding: 6px 10px; text-align: center; color: var(--success); border: 1px solid var(--border);">true</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">arg изменился (pikachu → charizard)</td>
+              <td style="padding: 6px 10px; text-align: center; color: var(--text-muted); border: 1px solid var(--border);">false</td>
+              <td style="padding: 6px 10px; text-align: center; color: var(--success); border: 1px solid var(--border);">true</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 10px; border: 1px solid var(--border);">cache HIT — данные уже есть</td>
+              <td style="padding: 6px 10px; text-align: center; color: var(--text-muted); border: 1px solid var(--border);">false</td>
+              <td style="padding: 6px 10px; text-align: center; color: var(--text-muted); border: 1px solid var(--border);">false</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>refetch() — когда вызывать руками</h3>
+        <ul style="font-size: .86rem; line-height: 1.7;">
+          <li><strong>Кнопка "Обновить"</strong> — пользователь хочет свежак.</li>
+          <li><strong>После side-effect вне RTKQ</strong> — например, websocket прислал событие "post-updated".</li>
+          <li><strong>НЕ для invalidation</strong> — если у тебя тэги, пусть мутация сама трггерит refetch через <code>invalidatesTags</code> (урок 87).</li>
+          <li><strong>Возвращает thunk</strong> — можно await'ить: <code>const r = await refetch().unwrap()</code>.</li>
+        </ul>
+
+        <h3>skip & skipToken</h3>
+        <div class="code-block">
+<span class="cm">// Условный hook: не запускать, пока нет id</span>
+<span class="kw">const</span> { data } = <span class="fn">useGetPostByIdQuery</span>(id <span class="op">??</span> <span class="fn">skipToken</span>)
+<span class="cm">// Альтернатива (хуже для TS):</span>
+<span class="kw">const</span> { data } = <span class="fn">useGetPostByIdQuery</span>(id<span class="op">!</span>, { skip: id == <span class="kw">null</span> })
+
+<span class="cm">// skipToken лучше — arg: TypeArg | SkipToken, TypeScript не будет требовать null-check.</span>
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. <code>isLoading</code> — только первая загрузка. Для спиннера используй <code>isFetching</code>.</strong>
+          <br>Если ты пишешь <code>{isLoading ? spinner : data}</code> — при смене arg данные
+          «не мигают» спиннером, пользователь видит СТАРЫЕ данные без индикации обновления.
+          Паттерн: <code>{isFetching ? spinner : null}</code> + <code>{data && &lt;List data={data} /&gt;}</code>
+          = старые данные + оверлей-спиннер сверху.
+
+          <br><br>
+          <strong>2. <code>data</code> vs <code>currentData</code>.</strong>
+          <br>При смене arg <code>data</code> продолжает показывать СТАРЫЙ успех (полезно для пагинации
+          «keep previous data»). <code>currentData</code> очищается в <code>undefined</code> до fulfilled
+          нового arg. Выбирай в зависимости от UX — мигание vs отсутствие мерцания.
+
+          <br><br>
+          <strong>3. <code>refetch</code> не меняет cache key.</strong>
+          <br>Это «принудительный reload того же cacheKey». Если у тебя 5 подписчиков на один key —
+          все увидят новые данные. Не путать с <code>forceRefetch</code>-опцией endpoint.
+
+          <br><br>
+          <strong>4. hook возвращает новый объект каждый рендер, но внутренние ссылки стабильны.</strong>
+          <br>Нельзя делать <code>useEffect([{hook}])</code> — будет бесконечный цикл. Надо
+          <code>useEffect([data, isFetching])</code>. Если нужна derived-память — <code>selectFromResult</code>
+          (урок 90).
+
+          <br><br>
+          <strong>5. import из <code>/query/react</code>.</strong>
+          <br>Если импортировать из <code>/query</code> — hooks не будут сгенерированы. Повторяется из урока 80,
+          но это типовая ошибка.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../80-rtkq-create-api-basic/">80 — createApi</a>.</li>
+          <li><a href="../81-rtkq-store-setup/">81 — store setup</a> (без middleware hook завис).</li>
+          <li><a href="../83-rtkq-cache-key/">83 — cache key и serializeQueryArgs</a>.</li>
+          <li><a href="../90-rtkq-selectFromResult/">90 — selectFromResult</a> (оптимизация ререндеров).</li>
+          <li><a href="../96-rtkq-conditional-fetching/">96 — data vs currentData</a> углублённо.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/queries#performing-queries-with-react-hooks" target="_blank">Queries — React Hooks</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/created-api/hooks#usequery" target="_blank">API Reference — useQuery</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/created-api/hooks#skiptoken" target="_blank">skipToken</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>93 — Optimistic updates · onQueryStarted + updateQueryData</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .todo-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 100px 80px;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 4px;
+      font-family: var(--font-mono);
+      font-size: .8rem;
+    }
+    .todo-row.pending { border-left: 3px solid var(--warning); opacity: 0.8; }
+    .todo-row.success { border-left: 3px solid var(--success); }
+    .todo-row.reverted { border-left: 3px solid var(--accent-red); animation: shake 0.4s; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+    .todo-row__id { color: var(--accent-cyan); }
+    .todo-row__title { color: var(--text-bright); }
+    .todo-row__status {
+      font-size: .68rem;
+      padding: 2px 6px;
+      border-radius: 3px;
+      text-align: center;
+    }
+    .todo-row__status.p { background: rgba(255,152,0,.2); color: var(--warning); }
+    .todo-row__status.s { background: rgba(76,175,80,.2); color: var(--success); }
+    .todo-row__status.r { background: rgba(244,71,71,.2); color: var(--accent-red); }
+    .fail-toggle {
+      padding: 8px 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">93 / 106</span>
+      Optimistic updates — onQueryStarted + updateQueryData
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../92-rtkq-keepunuseddatafor-cleanup/">← Назад</a>
+      <a href="../94-rtkq-onCacheEntryAdded-streaming/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Кеш обновляется ДО ответа сервера · rollback при ошибке</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Жми «toggle» — галочка ставится <em>мгновенно</em>, UI не ждёт 600ms RTT. Если сервер упадёт
+          (<code>failNext</code> вкл) — галочка откатывается через <code>patchResult.undo()</code>.
+        </p>
+
+        <div class="fail-toggle">
+          <label style="display: flex; gap: 6px; align-items: center;">
+            <input type="checkbox" id="fail-next"/>
+            <span>✗ следующий PATCH вернёт 500 (чтобы увидеть rollback)</span>
+          </label>
+        </div>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 93. Optimistic updates</div>
+      <div class="theory__body">
+        <h3>Цитата — Optimistic Updates</h3>
+        <div class="quote">
+          «Optimistic updates... update the cache immediately when a request begins (within
+          <code>onQueryStarted</code>), and roll back the cache update if the request fails.
+          The <code>updateQueryData</code> thunk action creator returns a <code>patchResult</code>
+          with an <code>.undo()</code> method.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/optimistic-updates" target="_blank">RTKQ · Optimistic Updates</a>
+        </div>
+        <div class="quote quote--ru">
+          «Идея: <em>верим</em>, что сервер ответит «ок», и меняем UI сразу. Если сервер вернёт ошибку —
+          откатываем. Пользователь видит <strong>мгновенный</strong> отклик вместо спиннера на 300ms.»
+        </div>
+
+        <h3>Канонический паттерн</h3>
+        <div class="code-block">
+updateTodo: build.<span class="fn">mutation</span>&lt;<span class="type">Todo</span>, { id: <span class="type">number</span>; patch: <span class="type">Partial</span>&lt;<span class="type">Todo</span>&gt; }&gt;({
+  query: ({ id, patch }) =&gt; ({ url: <span class="str">`todos/</span><span class="kw">${</span>id<span class="kw">}</span><span class="str">`</span>, method: <span class="str">'PATCH'</span>, body: patch }),
+
+  <span class="cm">// 🟢 онлайн-апдейт — вызывается КОГДА mutation только стартовала</span>
+  <span class="kw">async</span> <span class="fn">onQueryStarted</span>({ id, patch }, { dispatch, queryFulfilled }) {
+    <span class="cm">// 1. Патчим cache — меняем draft через Immer</span>
+    <span class="kw">const</span> patchResult = <span class="fn">dispatch</span>(
+      api.util.<span class="fn">updateQueryData</span>(<span class="str">'getTodos'</span>, <span class="kw">undefined</span>, (draft) =&gt; {
+        <span class="kw">const</span> todo = draft.<span class="fn">find</span>((t) =&gt; t.id === id)
+        <span class="kw">if</span> (todo) <span class="fn">Object</span>.<span class="fn">assign</span>(todo, patch)
+      }),
+    )
+
+    <span class="cm">// 2. Ждём результат сервера</span>
+    <span class="kw">try</span> {
+      <span class="kw">await</span> queryFulfilled
+      <span class="cm">// сервер вернул — cache уже в нужном состоянии, ничего не делаем</span>
+    } <span class="kw">catch</span> {
+      <span class="cm">// 3. Rollback — inverse patches, cache откатился к тому что было</span>
+      patchResult.<span class="fn">undo</span>()
+    }
+  },
+}),
+        </div>
+
+        <h3>onQueryStarted — жизненный цикл</h3>
+        <div class="code-block">
+<span class="cm">// вызывается для queries И mutations</span>
+<span class="fn">onQueryStarted</span>(arg, api: <span class="type">MutationLifecycleApi</span>) {
+  <span class="kw">const</span> {
+    dispatch,
+    getState,
+    extra,
+    requestId,
+    queryFulfilled,   <span class="cm">// Promise<T> — resolves при fulfilled, rejects при error</span>
+    getCacheEntry,    <span class="cm">// снимок cache entry</span>
+  } = api
+
+  <span class="cm">// любая async-логика:</span>
+  <span class="cm">// - оптимистические патчи</span>
+  <span class="cm">// - pessimistic (ждать → patch после fulfilled)</span>
+  <span class="cm">// - side-effects (toast, navigate, analytics)</span>
+}
+        </div>
+
+        <h3>Pessimistic update (тоже валидный паттерн)</h3>
+        <div class="code-block">
+<span class="cm">// иногда лучше ДОЖДАТЬСЯ сервера (если нужен id из ответа)</span>
+<span class="kw">async</span> <span class="fn">onQueryStarted</span>(arg, { dispatch, queryFulfilled }) {
+  <span class="kw">try</span> {
+    <span class="kw">const</span> { data: created } = <span class="kw">await</span> queryFulfilled
+    <span class="fn">dispatch</span>(
+      api.util.<span class="fn">updateQueryData</span>(<span class="str">'getTodos'</span>, <span class="kw">undefined</span>, (draft) =&gt; {
+        draft.<span class="fn">push</span>(created)  <span class="cm">// push с уже настоящим id</span>
+      }),
+    )
+  } <span class="kw">catch</span> { <span class="cm">/* тост «не удалось создать» */</span> }
+}
+        </div>
+
+        <h3>updateQueryData — сигнатура</h3>
+        <div class="code-block">
+api.util.<span class="fn">updateQueryData</span>(
+  endpointName: <span class="type">string</span>,
+  args: <span class="type">ArgType</span>,
+  updateRecipe: (draft: <span class="type">Draft</span>&lt;<span class="type">T</span>&gt;) =&gt; <span class="kw">void</span> | <span class="type">T</span>,
+)
+<span class="cm">// returns:</span>
+{
+  undo: () =&gt; <span class="kw">void</span>,              <span class="cm">// откат через inverse patches</span>
+  patches: <span class="type">Patch</span>[],              <span class="cm">// RFC 6902</span>
+  inversePatches: <span class="type">Patch</span>[],
+}
+<span class="cm">// Внутри — Immer produce с патчами. Если entry не существует — NOOP.</span>
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. updateQueryData не работает, если entry нет в cache.</strong>
+          <br>Патч применяется только к существующей entry. Если никто ещё не подписан на
+          <code>getTodos</code> — <code>updateQueryData</code> ничего не сделает. Используй
+          <code>upsertQueryData</code> или сначала делай <code>prefetch</code>.
+
+          <br><br>
+          <strong>2. Несколько последовательных optimistic patches — каждый нужно undo отдельно.</strong>
+          <br>Если пользователь жмёт кнопку дважды подряд, и первый запрос упал — надо undo'ить
+          именно его <code>patchResult</code>. Храни их в Map по requestId.
+
+          <br><br>
+          <strong>3. <code>patchResult.undo()</code> применяет inversePatches как новый patch.</strong>
+          <br>То есть между optimistic patch и undo могли быть ДРУГИЕ изменения (инвалидация
+          успела перезагрузить данные). Undo откатит только ТВОЙ патч поверх нового состояния.
+          Обычно это OK, но если сервер успел ответить invalidate → данные актуальные →
+          undo даст странный результат. Рассмотри <code>getCacheEntry</code> для логики.
+
+          <br><br>
+          <strong>4. Если mutation invalidates тег — refetch перетрёт оптимистичный патч.</strong>
+          <br>Порядок: onQueryStarted patch → mutation fulfilled → invalidatesTags → refetch → data
+          сервера перезапишет. Для optimistic UI часто отключают invalidatesTags на этой
+          mutation и полагаются только на optimistic patch.
+
+          <br><br>
+          <strong>5. queryFulfilled бросает rejection со спец структурой.</strong>
+          <br><code>await queryFulfilled</code> при ошибке бросает <code>{ error, meta, isUnhandledError }</code>
+          — это НЕ стандартный Error. Не полагайся на <code>err.message</code>.
+
+          <br><br>
+          <strong>6. onQueryStarted для queries — редко.</strong>
+          <br>Это хук для <em>mutations</em> в 99% случаев. Для queries полезен только для логов/
+          analytics. Если в query — не забудь, что он вызывается на КАЖДЫЙ dispatch
+          <code>initiate</code>, включая refetch.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../86-rtkq-mutations/">86 — mutations basics</a>.</li>
+          <li><a href="../95-rtkq-manual-cache/">95 — updateQueryData / upsertQueryData детально</a>.</li>
+          <li><a href="../94-rtkq-onCacheEntryAdded-streaming/">94 — onCacheEntryAdded</a> (другой lifecycle hook).</li>
+          <li><a href="../87-rtkq-tags-invalidation/">87 — invalidation</a> (альтернатива optimistic).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/optimistic-updates" target="_blank">RTKQ · Optimistic Updates</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/created-api/endpoints#onquerystarted" target="_blank">Endpoint · onQueryStarted</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildSlice.ts" target="_blank">buildSlice.ts (updateQueryData)</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

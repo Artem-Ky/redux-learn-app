@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>87 — Tags · provides / invalidates</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .board {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 14px;
+      margin-top: 10px;
+    }
+    @media (max-width: 900px) { .board { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    .panel h4 { margin: 0 0 8px; color: var(--accent); font-size: .9rem; }
+
+    .post {
+      display: grid;
+      grid-template-columns: 48px 1fr 90px;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 10px;
+      border-bottom: 1px dashed var(--border);
+      font-family: var(--font-mono);
+      font-size: .82rem;
+    }
+    .post.fresh { animation: freshFlash 1s ease-out; }
+    @keyframes freshFlash {
+      0%   { background: rgba(76,175,80,.22); }
+      100% { background: transparent; }
+    }
+    .post__id { color: var(--accent-cyan); }
+    .post__title { color: var(--text-bright); }
+    .post__tag {
+      font-size: .7rem;
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: right;
+    }
+
+    .tags-tree {
+      background: var(--bg-tertiary);
+      padding: 10px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      margin-top: 8px;
+    }
+    .tag-entry {
+      padding: 3px 6px;
+      border-left: 2px solid var(--accent);
+      margin: 3px 0;
+      background: rgba(86,156,214,.07);
+    }
+    .tag-entry.invalidating {
+      border-left-color: var(--accent-red);
+      background: rgba(244,71,71,.12);
+      animation: inv 1.2s ease-out;
+    }
+    @keyframes inv {
+      0%   { background: rgba(244,71,71,.3); }
+      100% { background: rgba(244,71,71,.05); }
+    }
+    .tag-entry__name { color: var(--accent); font-weight: 600; }
+    .tag-entry__keys { color: var(--text-secondary); margin-left: 6px; font-size: .72rem; }
+
+    .action-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 8px 0;
+    }
+    .action-bar input[type=text] {
+      flex: 1;
+      min-width: 120px;
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .82rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">87 / 106</span>
+      Tags — как mutation автоматически обновляет query
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../86-rtkq-mutations/">← Назад</a>
+      <a href="../88-rtkq-tags-granular/">Далее → granular tags</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">tagTypes → providesTags → invalidatesTags → refetch</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          Теги — это <strong>именованные cache-зависимости</strong>. Query <em>предоставляет</em> теги
+          (<code>providesTags: ['Post']</code>), mutation <em>инвалидирует</em> теги
+          (<code>invalidatesTags: ['Post']</code>). RTKQ строит обратный индекс
+          <code>state.api.provided['Post']</code> и после mutation автоматически перезапускает
+          все query, которые висят на этих тегах.
+        </p>
+
+        <div class="board">
+          <div class="panel">
+            <h4>Список постов — getPosts (providesTags: ['Post'])</h4>
+            <div id="posts"></div>
+
+            <h4 style="margin-top: 14px;">Создать пост — addPost (invalidatesTags: ['Post'])</h4>
+            <div class="action-bar">
+              <input id="new-title" type="text" value="новая заметка" />
+              <button class="btn btn--accent" id="btn-add">+ addPost</button>
+            </div>
+
+            <h4 style="margin-top: 14px;">Смена категории (сторонняя mutation без invalidate)</h4>
+            <p style="font-size: .76rem; color: var(--text-muted); margin: 0 0 6px;">
+              noopMutation — выполняется на сервере, но НЕ указывает invalidatesTags. Список не обновится.
+            </p>
+            <button class="btn" id="btn-noop">▶ noopMutation</button>
+          </div>
+
+          <div class="panel">
+            <h4>state.api.provided (live)</h4>
+            <p style="font-size: .76rem; color: var(--text-muted); margin: 0 0 6px;">
+              Обратный индекс: тег → массив cacheKey, который его предоставил. После invalidate
+              RTKQ по этому индексу находит, какие query перезапустить.
+            </p>
+            <div class="tags-tree" id="provided-tree">—</div>
+
+            <h4 style="margin-top: 14px;">Последовательность actions</h4>
+            <p style="font-size: .76rem; color: var(--text-muted); margin: 0 0 6px;">
+              Внутри ConsolePanel ниже — фильтруй по <code>api/</code>. После addPost/fulfilled
+              увидишь <code>api/invalidateTags</code> → <code>api/getPosts/pending</code> → fulfilled.
+            </p>
+
+            <h4 style="margin-top: 14px;">Render-count getPosts</h4>
+            <p style="font-size: .76rem; color: var(--text-secondary); margin: 0 0 6px;">
+              Каждый раз, когда <code>getPosts</code> фулфилится (начальный fetch или авто-refetch),
+              счётчик растёт. Если нажать <strong>noopMutation</strong> — счётчик не меняется.
+            </p>
+            <div style="font-family: var(--font-mono); color: var(--accent-cyan); font-size: 1.3rem;">
+              fetches: <span id="fetch-count">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 87. Tags · providesTags · invalidatesTags</div>
+      <div class="theory__body">
+        <h3>Цитата — Automated Re-fetching</h3>
+        <div class="quote">
+          «RTK Query uses an abstraction called <strong>tags</strong>. A tag is just a name that you can
+          give to a specific collection of data to control the caching and re-fetching behavior for queries
+          dependent on that data. When a mutation is triggered that "invalidates" a tag, any query that
+          "provides" that tag will be re-fetched, if subscribed to the cache.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/automated-refetching" target="_blank">RTKQ · Automated Re-fetching</a>
+        </div>
+        <div class="quote quote--ru">
+          «Тег — это <strong>имя-маркер</strong>. Query его <em>предоставляет</em>, mutation —
+          <em>инвалидирует</em>. RTKQ автоматически ре-фетчит только те запросы, которые подписаны
+          на тот же тег. Это замена ручному &quot;dispatch refresh после создания&quot;.»
+        </div>
+
+        <h3>Три шага настройки</h3>
+        <div class="code-block">
+<span class="cm">// 1. объявить tagTypes в createApi</span>
+<span class="kw">const</span> api = <span class="fn">createApi</span>({
+  reducerPath: <span class="str">'api'</span>,
+  baseQuery: <span class="fn">fetchBaseQuery</span>({ baseUrl: <span class="str">'/'</span> }),
+  tagTypes: [<span class="str">'Post'</span>],                               <span class="cm">// 👀 белый список тегов</span>
+  endpoints: (build) =&gt; ({
+    <span class="cm">// 2. query — providesTags</span>
+    getPosts: build.<span class="fn">query</span>&lt;<span class="type">Post</span>[], <span class="type">void</span>&gt;({
+      query: () =&gt; <span class="str">'posts'</span>,
+      providesTags: [<span class="str">'Post'</span>],                      <span class="cm">// 👀 «я предоставляю Post»</span>
+    }),
+    <span class="cm">// 3. mutation — invalidatesTags</span>
+    addPost: build.<span class="fn">mutation</span>&lt;<span class="type">Post</span>, <span class="type">NewPost</span>&gt;({
+      query: (body) =&gt; ({ url: <span class="str">'posts'</span>, method: <span class="str">'POST'</span>, body }),
+      invalidatesTags: [<span class="str">'Post'</span>],                   <span class="cm">// 👀 «я ломаю все Post-кэши»</span>
+    }),
+  }),
+})
+        </div>
+
+        <h3>Что хранится в state.api.provided</h3>
+        <div class="code-block">
+<span class="cm">// apiState.ts — тип InvalidationState</span>
+<span class="kw">export type</span> <span class="type">InvalidationState</span>&lt;TagTypes&gt; = {
+  tags: { [_ <span class="kw">in</span> <span class="type">TagTypes</span>]: { [id: <span class="type">string | number</span>]: <span class="type">QueryCacheKey</span>[] } }
+  keys: <span class="type">Record</span>&lt;<span class="type">QueryCacheKey</span>, <span class="type">FullTagDescription</span>&lt;<span class="type">any</span>&gt;[]&gt;
+}
+
+<span class="cm">// После getPosts.fulfilled с providesTags:['Post']:</span>
+state.api.provided = {
+  tags: {
+    Post: {
+      <span class="str">'__internal_without_id__'</span>: [<span class="str">'getPosts(undefined)'</span>]    <span class="cm">// string-tag → bucket '__internal'</span>
+    }
+  },
+  keys: {
+    <span class="str">'getPosts(undefined)'</span>: [{ type: <span class="str">'Post'</span> }]
+  }
+}
+        </div>
+
+        <h3>Алгоритм invalidation</h3>
+        <div class="flow-diagram" style="padding: 16px 0;">
+          <svg viewBox="0 0 800 180" style="width: 100%; height: auto;">
+            <defs>
+              <marker id="arr87" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                <polygon points="0 0, 10 3, 0 6" fill="#888"/>
+              </marker>
+            </defs>
+            <g font-family="monospace" font-size="11">
+              <rect x="10"  y="66" width="140" height="50" rx="6" fill="#1e2a3a" stroke="#4a90e2"/>
+              <text x="80"  y="87"  text-anchor="middle" fill="#9cdcfe">addPost.fulfilled</text>
+              <text x="80"  y="103" text-anchor="middle" fill="#888">invalidatesTags: ['Post']</text>
+
+              <rect x="180" y="66" width="160" height="50" rx="6" fill="#1e2a3a" stroke="#4a90e2"/>
+              <text x="260" y="87"  text-anchor="middle" fill="#9cdcfe">calculateProvidedBy</text>
+              <text x="260" y="103" text-anchor="middle" fill="#888">собирает cacheKeys</text>
+
+              <rect x="370" y="66" width="160" height="50" rx="6" fill="#1e2a3a" stroke="#4a90e2"/>
+              <text x="450" y="87"  text-anchor="middle" fill="#9cdcfe">invalidation middleware</text>
+              <text x="450" y="103" text-anchor="middle" fill="#888">проверяет subscribed</text>
+
+              <rect x="560" y="10" width="160" height="50" rx="6" fill="#133218" stroke="#4caf50"/>
+              <text x="640" y="30"  text-anchor="middle" fill="#4caf50">subscribed → refetch</text>
+              <text x="640" y="46"  text-anchor="middle" fill="#888">dispatch initiate(forced)</text>
+
+              <rect x="560" y="125" width="160" height="50" rx="6" fill="#32131a" stroke="#f44747"/>
+              <text x="640" y="146" text-anchor="middle" fill="#f44747">не subscribed → delete</text>
+              <text x="640" y="162" text-anchor="middle" fill="#888">removeQueryResult</text>
+
+              <line x1="150" y1="91" x2="178" y2="91" stroke="#888" stroke-width="1.5" marker-end="url(#arr87)"/>
+              <line x1="340" y1="91" x2="368" y2="91" stroke="#888" stroke-width="1.5" marker-end="url(#arr87)"/>
+              <line x1="530" y1="78" x2="558" y2="35" stroke="#4caf50" stroke-width="1.5" marker-end="url(#arr87)"/>
+              <line x1="530" y1="105" x2="558" y2="150" stroke="#f44747" stroke-width="1.5" marker-end="url(#arr87)"/>
+            </g>
+          </svg>
+        </div>
+        <p style="font-size: .82rem; color: var(--text-secondary);">
+          Ключевой файл: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildMiddleware/invalidationByTags.ts" target="_blank">invalidationByTags.ts</a>.
+          Там реализована логика «найти cacheKeys для tags → refetch / remove».
+        </p>
+
+        <h3>providesTags — функция result/error/arg</h3>
+        <div class="code-block">
+<span class="cm">// Динамические теги — по каждому элементу отдельно:</span>
+getPosts: build.<span class="fn">query</span>&lt;<span class="type">Post</span>[], <span class="type">void</span>&gt;({
+  query: () =&gt; <span class="str">'posts'</span>,
+  providesTags: (result, error, arg) =&gt;
+    result
+      ? [
+          ...result.<span class="fn">map</span>((p) =&gt; ({ type: <span class="str">'Post'</span> <span class="kw">as const</span>, id: p.id })),
+          { type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> },                    <span class="cm">// 👀 спецтег для &laquo;списка&raquo;</span>
+        ]
+      : [{ type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> }],
+})
+
+<span class="cm">// Гранулярные invalidates:</span>
+updatePost: build.<span class="fn">mutation</span>&lt;..., { id: <span class="type">number</span>; ... }&gt;({
+  query: ...,
+  invalidatesTags: (result, error, arg) =&gt; [{ type: <span class="str">'Post'</span>, id: arg.id }],
+}),
+<span class="cm">// → ре-фетчится ТОЛЬКО getPost({id}) с тем же id, список НЕ ломается.</span>
+        </div>
+        <p style="font-size: .82rem;">Детально про <code>{type, id}</code> и <code>'LIST'</code> — урок <a href="../88-rtkq-tags-granular/">88</a>.</p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. tagTypes — белый список. Используешь тег не из списка → TS ошибка + runtime warning.</strong>
+          <br>RTKQ не позволяет случайно «изобрести» тег. Забыл добавить в <code>tagTypes</code> — TS
+          подскажет сразу. Это удобно для рефакторинга.
+
+          <br><br>
+          <strong>2. invalidation срабатывает только для SUBSCRIBED queries.</strong>
+          <br>Если на <code>getPosts(undefined)</code> сейчас нет активной подписки (никто не useQuery),
+          после mutation RTKQ просто <code>delete queries['getPosts(undefined)']</code>. При следующем
+          mount hook увидит, что cache пустой → сделает запрос. Это экономит сеть, но иногда сбивает:
+          «почему UI не обновляется» → проверь, что компонент с useQuery реально в дереве.
+
+          <br><br>
+          <strong>3. invalidatesTags может быть функцией, которая получает result/error/arg.</strong>
+          <br>Если мутация не удалась — теги могут быть другие (или пустой массив — чтобы не инвалидировать).
+          Типичный паттерн: <code>invalidatesTags: (result, error) =&gt; error ? [] : ['Post']</code>.
+
+          <br><br>
+          <strong>4. Вызов invalidatesTags = один action «api/invalidateTags».</strong>
+          <br>Даже если tags[] содержит 10 элементов — это ОДНА запись в DevTools. Но под капотом
+          middleware может задиспатчить несколько <code>getX/pending</code> + <code>remove</code>.
+          Отладка: смотри на action <code>api/invalidateTags</code> и его payload.
+
+          <br><br>
+          <strong>5. api.util.invalidateTags(['Post']) — ручной способ.</strong>
+          <br>Можно инвалидировать вне мутации: <code>dispatch(api.util.invalidateTags([{type:'Post', id:5}]))</code>.
+          Полезно для WebSocket-push обновлений или «pull-to-refresh».
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../84-rtkq-state-shape/">84 — state.api.provided</a> (где хранится индекс).</li>
+          <li><a href="../86-rtkq-mutations/">86 — mutations</a> (где пишут invalidatesTags).</li>
+          <li><a href="../88-rtkq-tags-granular/">88 — granular tags</a> (<code>{type, id}</code>).</li>
+          <li><a href="../94-rtkq-optimistic/">94 — optimistic updates</a> (альтернатива invalidate + refetch).</li>
+          <li><a href="../99-rtkq-websocket-push/">99 — WebSocket push</a> (использует <code>util.invalidateTags</code>).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/automated-refetching" target="_blank">RTKQ · Automated Re-fetching</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildMiddleware/invalidationByTags.ts" target="_blank">invalidationByTags.ts</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/createApi#providestags" target="_blank">createApi · providesTags reference</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

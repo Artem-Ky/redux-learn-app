@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>100 — build.infiniteQuery</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .feed {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      max-height: 400px;
+      overflow: auto;
+    }
+    .feed-item {
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      background: var(--bg-tertiary);
+      border-left: 3px solid var(--accent);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .feed-item__pg {
+      font-size: .68rem;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+    .page-sep {
+      text-align: center;
+      font-size: .7rem;
+      color: var(--text-muted);
+      padding: 8px 0;
+      border-bottom: 2px dashed var(--border);
+      border-top: 2px dashed var(--border);
+      margin: 6px 0;
+      font-family: var(--font-mono);
+    }
+    .cache-snap {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">100 / 106</span>
+      build.infiniteQuery — лента бесконечной подгрузкой
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../99-rtkq-code-splitting-injectEndpoints/">← Назад</a>
+      <a href="../101-rtkq-query-lifecycle-internals/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Одна cache entry · pages[] · fetchNextPage / fetchPreviousPage</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          <code>build.infiniteQuery</code> — специальный endpoint с <code>initialPageParam</code>,
+          <code>getNextPageParam</code>, <code>getPreviousPageParam</code>. Все страницы живут в
+          <em>одной</em> cache entry как массив <code>pages[]</code>.
+        </p>
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 100. build.infiniteQuery</div>
+      <div class="theory__body">
+        <h3>Цитата — Infinite Queries</h3>
+        <div class="quote">
+          «Infinite queries allow you to fetch data in pages and manage pagination state as part of
+          the cached entry. You define <code>initialPageParam</code>, how to compute the next/previous
+          page param from the latest response, and optionally a maximum number of pages to retain.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/infinite-queries" target="_blank">RTKQ · Infinite Queries</a>
+        </div>
+
+        <h3>Полное определение endpoint'а</h3>
+        <div class="code-block">
+getFeed: build.<span class="fn">infiniteQuery</span>&lt;<span class="type">Post</span>[], <span class="type">void</span>, <span class="type">number</span>&gt;({
+  <span class="cm">// query принимает { queryArg, pageParam }:</span>
+  query: ({ pageParam }) =&gt; <span class="str">`feed?page=</span><span class="kw">${</span>pageParam<span class="kw">}</span><span class="str">`</span>,
+
+  infiniteQueryOptions: {
+    initialPageParam: <span class="num">1</span>,
+
+    <span class="cm">// computed на основе ПОСЛЕДНЕЙ загруженной страницы</span>
+    <span class="fn">getNextPageParam</span>: (lastPage, allPages, lastPageParam, allPageParams) =&gt; {
+      <span class="cm">// вернуть следующий pageParam, или undefined если страниц нет</span>
+      <span class="kw">return</span> lastPage.length &gt; <span class="num">0</span> ? lastPageParam + <span class="num">1</span> : <span class="kw">undefined</span>
+    },
+
+    <span class="cm">// опционально — для "загрузить назад" (редко нужно)</span>
+    <span class="fn">getPreviousPageParam</span>: (firstPage, allPages, firstPageParam) =&gt; {
+      <span class="kw">return</span> firstPageParam &gt; <span class="num">1</span> ? firstPageParam - <span class="num">1</span> : <span class="kw">undefined</span>
+    },
+
+    <span class="cm">// опционально — сколько страниц держать в памяти</span>
+    maxPages: <span class="num">5</span>,
+  },
+}),
+        </div>
+
+        <h3>Что возвращает useInfiniteQuery</h3>
+        <div class="code-block">
+<span class="kw">const</span> {
+  data,              <span class="cm">// { pages: Post[][], pageParams: number[] }</span>
+  currentData,       <span class="cm">// то же, но для текущего arg</span>
+  fetchNextPage,     <span class="cm">// () =&gt; void</span>
+  fetchPreviousPage,
+  hasNextPage,       <span class="cm">// boolean</span>
+  hasPreviousPage,
+  isFetchingNextPage,
+  isFetchingPreviousPage,
+  isLoading,         <span class="cm">// первая страница</span>
+  isFetching,        <span class="cm">// любая загрузка</span>
+  refetch,
+  isUninitialized,
+} = <span class="fn">useGetFeedInfiniteQuery</span>()
+        </div>
+
+        <h3>Структура данных в cache</h3>
+        <div class="code-block">
+<span class="cm">// state.api.queries['getFeed(undefined)'].data:</span>
+{
+  pages: [
+    [{ id: <span class="num">1</span>, ... }, { id: <span class="num">2</span>, ... }],    <span class="cm">// страница 1</span>
+    [{ id: <span class="num">3</span>, ... }, { id: <span class="num">4</span>, ... }],    <span class="cm">// страница 2</span>
+    [{ id: <span class="num">5</span>, ... }, { id: <span class="num">6</span>, ... }],    <span class="cm">// страница 3</span>
+  ],
+  pageParams: [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>],
+}
+
+<span class="cm">// Плоский массив — ручное flatMap в UI:</span>
+<span class="kw">const</span> allPosts = data?.pages.<span class="fn">flat</span>() ?? []
+        </div>
+
+        <h3>Под капотом — как оно реализовано</h3>
+        <p>
+          <code>build.infiniteQuery</code> — это <strong>сахар над <code>build.query</code></strong>
+          с кастомными <code>serializeQueryArgs</code> (один ключ на все страницы),
+          <code>merge</code> (добавляет страницу в массив), <code>forceRefetch</code> (по смене pageParam).
+          До v2.x это паттерн собирали вручную (см. урок 83, пример 2).
+        </p>
+
+        <h3>Курсор-пагинация (вместо номеров страниц)</h3>
+        <div class="code-block">
+<span class="cm">// если API отдаёт cursor-based pagination:</span>
+getMessages: build.<span class="fn">infiniteQuery</span>&lt;
+  { items: <span class="type">Msg</span>[]; nextCursor: <span class="type">string</span> | <span class="kw">null</span> },
+  <span class="type">void</span>,
+  <span class="type">string</span> | <span class="kw">null</span>
+&gt;({
+  query: ({ pageParam }) =&gt; <span class="str">`messages?cursor=</span><span class="kw">${</span>pageParam ?? <span class="str">''</span><span class="kw">}</span><span class="str">`</span>,
+  infiniteQueryOptions: {
+    initialPageParam: <span class="kw">null</span>,
+    getNextPageParam: (lastPage) =&gt; lastPage.nextCursor,
+  },
+}),
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. <code>data.pages</code> — это массив массивов, не плоский.</strong>
+          <br>Для рендера обычно <code>data.pages.flat()</code> или <code>data.pages.flatMap(...)</code>.
+          Не забывай key в React: <code>{`page-${pageParams[i]}-item-${item.id}`}</code> или проходи
+          через <code>allPosts.map</code> с <code>item.id</code>.
+
+          <br><br>
+          <strong>2. getNextPageParam возвращает undefined → hasNextPage=false.</strong>
+          <br>Это сигнал «конец данных». Не возвращай <code>null</code> (будет truthy для cursor-кейса,
+          где null — валидный cursor) в неподходящем месте.
+
+          <br><br>
+          <strong>3. maxPages + fetchNext = циклическая память.</strong>
+          <br>С <code>maxPages: 5</code> старые страницы удаляются при подгрузке новых. Скроллишь назад —
+          опять подгрузка. Без <code>getPreviousPageParam</code> это сломается.
+
+          <br><br>
+          <strong>4. refetch() на infiniteQuery — перезапрашивает ВСЕ страницы.</strong>
+          <br>И именно через тот же <code>pageParam</code> массив, что был в cache. Это дорого —
+          думай, нужен ли refetch или достаточно invalidate + fetchNextPage заново.
+
+          <br><br>
+          <strong>5. Инвалидация через теги — reset на page 1.</strong>
+          <br>Когда mutation invalidates тег, entry пере-fetch'ится со стартовым pageParam, все
+          загруженные страницы сбрасываются. UX: пользователь теряет скролл.
+
+          <br><br>
+          <strong>6. initialPageParam должен быть serializable.</strong>
+          <br>Нельзя передать <code>Symbol</code> или <code>Date</code> — serializability middleware
+          будет ругаться. Строки/числа/null — OK.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../83-rtkq-cache-key/">83 — serializeQueryArgs</a> (как сделать вручную до v2).</li>
+          <li><a href="../96-rtkq-conditional-fetching/">96 — data vs currentData</a> (важно при смене arg).</li>
+          <li><a href="../87-rtkq-tags-invalidation/">87 — tags</a> (инвалидация vs reset).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/infinite-queries" target="_blank">RTKQ · Infinite Queries</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/createApi#build-infinitequery" target="_blank">build.infiniteQuery reference</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

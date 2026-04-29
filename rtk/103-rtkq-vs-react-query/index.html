@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>103 — RTKQ vs React Query vs SWR</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .compare-table th,
+    .compare-table td {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    .compare-table th {
+      background: var(--bg-tertiary);
+      color: var(--accent-cyan);
+    }
+    .compare-table td.feature {
+      background: var(--bg-panel);
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .yes { color: var(--success); font-weight: 600; }
+    .no  { color: var(--text-muted); }
+    .partial { color: var(--warning); }
+    .verdict-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin-top: 10px;
+    }
+    .verdict-card h5 { color: var(--accent-cyan); margin: 0 0 6px; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">103 / 106</span>
+      RTKQ vs React Query vs SWR
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../102-rtkq-typed-and-react-hooks/">← Назад</a>
+      <a href="../103a-quiz-final/">Далее → 🎯 квиз</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Feature matrix · когда что выбрать</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Все три — data fetching библиотеки с кешем, инвалидацией, dedup, refetchOnFocus. Но у каждой
+          свои акценты. Ниже — сравнение + рекомендация.
+        </p>
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 103. Сравнение RTKQ / React Query / SWR</div>
+      <div class="theory__body">
+        <h3>Цитата — RTKQ Comparison</h3>
+        <div class="quote">
+          «RTK Query is tightly integrated with Redux. If you already use Redux, it's a natural extension.
+          If you don't have Redux in your project, React Query is a more lightweight alternative.
+          SWR is the lightest, focused on simple GET caching with a Vercel/Next.js flavor.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/comparison" target="_blank">RTKQ · Comparison</a>
+        </div>
+
+        <h3>Feature matrix</h3>
+        <div class="code-block">
+<span class="cm">│ Feature                         │ RTKQ       │ React Query │ SWR       │</span>
+<span class="cm">├─────────────────────────────────┼────────────┼─────────────┼───────────┤</span>
+<span class="cm">│ Integration with Redux          │ ✅ native   │ нет         │ нет       │</span>
+<span class="cm">│ Bundle (minified)               │ ~17kb*     │ ~14kb       │ ~4kb      │</span>
+<span class="cm">│ Auto-generated hooks            │ ✅          │ ❌ (сам)    │ ❌ (сам)  │</span>
+<span class="cm">│ Queries + mutations             │ ✅ единый   │ ✅          │ только GET│</span>
+<span class="cm">│ Tag-based invalidation          │ ✅ built-in │ queryKey    │ manual    │</span>
+<span class="cm">│ Optimistic updates              │ ✅          │ ✅          │ ✅         │</span>
+<span class="cm">│ Streaming (WS/SSE integration)  │ ✅          │ external    │ external  │</span>
+<span class="cm">│ Infinite queries                │ ✅          │ ✅          │ useSWRInf │</span>
+<span class="cm">│ Prefetch                        │ ✅          │ ✅          │ ✅         │</span>
+<span class="cm">│ Code splitting of endpoints     │ ✅          │ ручная      │ ручная    │</span>
+<span class="cm">│ SSR support                     │ ✅          │ ✅          │ ✅         │</span>
+<span class="cm">│ DevTools                        │ Redux DT   │ RQ DT       │ n/a       │</span>
+<span class="cm">│ Normalized cache                │ через adapt│ manual      │ ❌        │</span>
+<span class="cm">│ Polling                         │ ✅          │ ✅          │ refreshInt│</span>
+<span class="cm">│ refetchOnFocus / reconnect      │ ✅ opt-in   │ ✅ default  │ ✅ default│</span>
+<span class="cm">│ TypeScript                      │ ✅ excellent│ ✅          │ ✅         │</span>
+<span class="cm">│ Transport-agnostic (axios/gql)  │ ✅ custom bQ│ ✅ fn       │ ✅ fetcher│</span>
+<span class="cm">│ Middleware ecosystem            │ ✅ (Redux) │ ❌         │ ❌         │</span>
+<span class="cm">│ Persist to localStorage         │ redux-persist│ плагин   │ плагин    │</span>
+
+<span class="cm">* с установленным @reduxjs/toolkit; если RTK уже есть — RTKQ бесплатный.</span>
+        </div>
+
+        <h3>Архитектурные различия</h3>
+        <div class="code-block">
+<span class="cm">── RTKQ ──</span>
+Cache лежит в Redux store (state.api.queries).
+Reducer-based, DevTools time-travel, middleware chain.
+Паттерн: api.endpoints.X.initiate(arg) → thunk → baseQuery → reducer update.
+
+<span class="cm">── React Query ──</span>
+Cache — свой QueryClient (отдельное хранилище, не Redux).
+Queries идентифицируются по queryKey: unknown[] (массив).
+Паттерн: queryClient.fetchQuery({ queryKey, queryFn }) → in-memory cache.
+
+<span class="cm">── SWR ──</span>
+Cache — Map в useSWRConfig() контексте.
+Фокус на simplicity: key = URL строка, fetcher = () =&gt; fetch(url).json().
+Паттерн: useSWR(key, fetcher) → stale-while-revalidate — сразу stale + обновляем.
+        </div>
+
+        <h3>Когда что выбрать — decision tree</h3>
+        <div class="code-block">
+У тебя уже есть Redux?
+├── ДА → <span class="str">RTKQ</span>. Дополнительный бандл почти 0, единый store, DevTools.
+└── НЕТ:
+    Нужен ли Redux для client-state (complex UI state)?
+    ├── ДА → установи RTK → <span class="str">RTKQ</span>.
+    └── НЕТ:
+        Тебе нужно больше чем fetch (WS, GraphQL, custom transport)?
+        ├── ДА → <span class="str">React Query</span> (или RTKQ).
+        └── НЕТ:
+            Next.js / Vercel?
+            ├── ДА → <span class="str">SWR</span> (из коробки, vercel-friendly).
+            └── НЕТ → <span class="str">React Query</span> (стандарт индустрии).
+
+Специальные кейсы:
+- Нужна normalized cache + entity adapter → <span class="str">RTKQ</span>.
+- Нужен super-low bundle → <span class="str">SWR</span>.
+- Нужен DevTools с time-travel → <span class="str">RTKQ</span>.
+- Работаете как команда на React без Redux → <span class="str">React Query</span>.
+        </div>
+
+        <h3>Равноценные концепты</h3>
+        <div class="code-block">
+<span class="cm">│ RTKQ                      │ React Query           │ SWR              │</span>
+<span class="cm">│ cacheKey (string)          │ queryKey (array)      │ key (string)     │</span>
+<span class="cm">│ keepUnusedDataFor: 60      │ gcTime: 300000        │ dedupingInterval │</span>
+<span class="cm">│ refetchOnMountOrArgChange  │ staleTime / refetchOn │ revalidateIfStale│</span>
+<span class="cm">│ providesTags/invalidatesTgs│ invalidateQueries(key)│ mutate(key)      │</span>
+<span class="cm">│ onQueryStarted             │ onMutate              │ (нет прямого)    │</span>
+<span class="cm">│ onCacheEntryAdded          │ onMount hook          │ (нет)            │</span>
+<span class="cm">│ api.util.updateQueryData   │ queryClient.setQueryD.│ mutate(key, data)│</span>
+<span class="cm">│ api.util.prefetch          │ prefetchQuery         │ preload(key, f)  │</span>
+<span class="cm">│ transformResponse          │ select                │ (нет — в компе)  │</span>
+<span class="cm">│ selectFromResult           │ select               │ (нет — в компе)  │</span>
+        </div>
+
+        <h3>Плюсы RTKQ (итого)</h3>
+        <ul>
+          <li>Единый store с UI state — нет двух источников истины.</li>
+          <li>DevTools с time-travel (React Query DT отдельная, SWR нет).</li>
+          <li>Tag-based инвалидация семантически понятнее queryKey-based.</li>
+          <li>TypeScript inference для endpoints лучший в классе.</li>
+          <li>Code splitting endpoints через <code>injectEndpoints</code>.</li>
+        </ul>
+
+        <h3>Минусы RTKQ</h3>
+        <ul>
+          <li>Бандл больше чем SWR (~17kb vs 4kb).</li>
+          <li>Требует Redux (хоть и один раз настроенный) — лишний learning curve без RTK.</li>
+          <li>Нет «stale-while-revalidate» по дефолту — данные протухают только через
+          <code>refetchOnMountOrArgChange: N</code> или invalidation.</li>
+          <li>Кэш плоский (queries Map), normalized — вручную через <code>createEntityAdapter</code>.</li>
+          <li>Меньше community плагинов чем у React Query.</li>
+        </ul>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../79-rtkq-what/">79 — что такое RTKQ</a>.</li>
+          <li><a href="../78-when-not-to-use-rtk/">78 — когда НЕ использовать RTK</a>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/comparison" target="_blank">RTKQ · Comparison</a></li>
+          <li><a href="https://tanstack.com/query/latest/docs/framework/react/comparison" target="_blank">React Query · Comparison</a></li>
+          <li><a href="https://swr.vercel.app/" target="_blank">SWR</a></li>
+          <li><a href="https://tkdodo.eu/blog/thinking-in-react-query" target="_blank">Thinking in React Query — TkDodo</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

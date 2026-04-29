@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>92 — keepUnusedDataFor — cache cleanup</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .sub-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+    }
+    .sub-row__id { color: var(--accent-cyan); }
+    .sub-row__status {
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: .72rem;
+    }
+    .sub-row__status.mounted { background: rgba(76,175,80,.2); color: var(--success); }
+    .sub-row__status.unmounted { background: rgba(244,71,71,.2); color: var(--accent-red); }
+    .cache-box {
+      margin-top: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .cache-row {
+      display: grid;
+      grid-template-columns: 1fr 80px 80px 100px;
+      gap: 8px;
+      align-items: center;
+      padding: 4px 0;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      border-bottom: 1px dashed var(--border);
+    }
+    .timer-bar {
+      margin-top: 4px;
+      height: 4px;
+      background: var(--bg-tertiary);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .timer-bar__fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-red));
+      transition: width 100ms linear;
+    }
+    .kd-slider-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+    }
+    .kd-slider-row input[type=range] { flex: 1; }
+    .kd-slider-row label { font-family: var(--font-mono); font-size: .82rem; color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">92 / 106</span>
+      keepUnusedDataFor — сколько cache живёт после отписки
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../91-rtkq-skip-options/">← Назад</a>
+      <a href="../93-rtkq-onQueryStarted-optimistic/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">refCount → 0 → таймер → removeQueryResult</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Это <strong>не TTL данных</strong>, а «сколько entry живёт после того, как все подписчики отпишутся».
+          Mount/unmount компоненты → смотри refCount → кеш исчезает через N секунд.
+        </p>
+
+        <div class="kd-slider-row">
+          <label>keepUnusedDataFor (sec):</label>
+          <input id="kd-slider" type="range" min="1" max="30" value="5"/>
+          <span id="kd-val" style="font-family: var(--font-mono); color: var(--accent-cyan);">5</span>
+        </div>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 92. keepUnusedDataFor</div>
+      <div class="theory__body">
+        <h3>Цитата — createApi · keepUnusedDataFor</h3>
+        <div class="quote">
+          «Defaults to <code>60</code> (seconds). The amount of time (in seconds) that the data should
+          remain in the cache <strong>after</strong> the last subscriber has unsubscribed.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/api/createApi#keepunuseddatafor" target="_blank">RTKQ · keepUnusedDataFor</a>
+        </div>
+        <div class="quote quote--ru">
+          «Это <strong>не</strong> «срок годности данных». Это «сколько entry доживёт <em>после</em> того,
+          как все подписчики отвалятся». Пока хоть один <code>useQuery</code> на экране — данные живут
+          <em>бесконечно</em>, никто их не протухает.»
+        </div>
+
+        <h3>Механика — 3 сцены</h3>
+        <div class="code-block">
+<span class="cm">// 📍 Сцена 1: первый mount</span>
+<span class="fn">useGetPostsQuery</span>() <span class="cm">// в App</span>
+<span class="cm">// → state.api.queries['getPosts(undefined)'] = { status: 'pending' → 'fulfilled', data: [...] }</span>
+<span class="cm">// → subscriptions['getPosts(undefined)'] = { 'req-1': {...} }  ← refCount = 1</span>
+
+<span class="cm">// 📍 Сцена 2: второй mount (другой компонент, тот же query)</span>
+<span class="fn">useGetPostsQuery</span>() <span class="cm">// в List</span>
+<span class="cm">// → subscriptions[...] = { 'req-1': {...}, 'req-2': {...} }  ← refCount = 2</span>
+<span class="cm">// → data берём ИЗ КЭША, fetch НЕ идёт</span>
+
+<span class="cm">// 📍 Сцена 3: все unmount</span>
+<span class="cm">// Unmount App → refCount = 1, таймер НЕ стартует</span>
+<span class="cm">// Unmount List → refCount = 0</span>
+<span class="cm">// → setTimeout(removeQueryResult, keepUnusedDataFor * 1000)</span>
+
+<span class="cm">// Если НОВЫЙ mount до истечения — clearTimeout, entry жива дальше</span>
+<span class="cm">// Если таймер догорел — delete state.api.queries[cacheKey]</span>
+        </div>
+
+        <h3>Источник — cacheCollection.ts</h3>
+        <div class="code-block">
+<span class="cm">// упрощённо из buildMiddleware/cacheCollection.ts</span>
+<span class="kw">const</span> currentTimeouts = <span class="kw">new</span> <span class="fn">Map</span>&lt;<span class="type">QueryCacheKey</span>, <span class="type">TimeoutId</span>&gt;()
+
+<span class="kw">function</span> <span class="fn">handleUnsubscribe</span>(queryCacheKey: <span class="type">QueryCacheKey</span>) {
+  <span class="kw">const</span> subs = state.subscriptions[queryCacheKey]
+  <span class="kw">if</span> (!subs || <span class="fn">Object</span>.<span class="fn">keys</span>(subs).length === <span class="num">0</span>) {
+    <span class="kw">const</span> endpointDef = endpointDefinitions[state.queries[queryCacheKey]?.endpointName]
+    <span class="kw">const</span> keep = endpointDef?.keepUnusedDataFor ?? config.keepUnusedDataFor
+    currentTimeouts.<span class="fn">set</span>(
+      queryCacheKey,
+      <span class="fn">setTimeout</span>(() =&gt; {
+        api.<span class="fn">dispatch</span>(<span class="fn">removeQueryResult</span>({ queryCacheKey }))
+        currentTimeouts.<span class="fn">delete</span>(queryCacheKey)
+      }, keep * <span class="num">1000</span>),
+    )
+  }
+}
+
+<span class="kw">function</span> <span class="fn">handleSubscribe</span>(queryCacheKey: <span class="type">QueryCacheKey</span>) {
+  <span class="kw">const</span> t = currentTimeouts.<span class="fn">get</span>(queryCacheKey)
+  <span class="kw">if</span> (t) { <span class="fn">clearTimeout</span>(t); currentTimeouts.<span class="fn">delete</span>(queryCacheKey) }  <span class="cm">// 👀 спасли entry</span>
+}
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted);">
+          GitHub:
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildMiddleware/cacheCollection.ts" target="_blank">cacheCollection.ts</a>
+        </p>
+
+        <h3>Где задать</h3>
+        <div class="code-block">
+<span class="cm">// глобально:</span>
+<span class="fn">createApi</span>({
+  keepUnusedDataFor: <span class="num">60</span>,   <span class="cm">// default, секунды</span>
+  endpoints: ...
+})
+
+<span class="cm">// per-endpoint (приоритет):</span>
+getPokemon: build.<span class="fn">query</span>({
+  query: (name) =&gt; <span class="str">`pokemon/</span><span class="kw">${</span>name<span class="kw">}</span><span class="str">`</span>,
+  keepUnusedDataFor: <span class="num">300</span>,   <span class="cm">// 5 минут для покемонов</span>
+})
+
+<span class="cm">// крайние значения:</span>
+keepUnusedDataFor: <span class="num">0</span>         <span class="cm">// удалять сразу в следующем тике (≈ 4ms)</span>
+keepUnusedDataFor: <span class="type">Infinity</span>  <span class="cm">// держать до resetApiState()</span>
+        </div>
+
+        <h3>Зачем дефолт именно 60</h3>
+        <p>
+          Типичный UX: пользователь листает таб → возвращается через минуту → хочет мгновенный ответ.
+          60 секунд — баланс «не захламлять память» vs «не дёргать сеть попусту». Для критичных данных
+          (курс валют) — уменьшай до 5-10. Для редко меняющегося (список стран) — ставь <code>Infinity</code>.
+        </p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. keepUnusedDataFor ≠ «данные свежие N секунд».</strong>
+          <br>Пока компонент подписан, RTKQ НЕ протухает данные сам. Держишь страницу час —
+          час смотришь те же данные (если не было invalidate / refetch / polling).
+
+          <br><br>
+          <strong>2. keepUnusedDataFor: 0 — ловушка для последовательных рендеров.</strong>
+          <br>Unmount компонента → микротик → entry удалена → новый mount → fetch. Если у тебя
+          навигация туда-сюда (tabs), каждый клик = запрос. Лучше 1-5 секунд.
+
+          <br><br>
+          <strong>3. Infinity не освобождает память при logout.</strong>
+          <br>Нужен <code>dispatch(api.util.resetApiState())</code> на logout явно — иначе
+          данные прошлого юзера останутся в store.
+
+          <br><br>
+          <strong>4. Не работает для <code>invalidateTags</code> без подписчиков.</strong>
+          <br>Mutation инвалидировала тег, но подписчиков нет → entry помечена «невалид», но
+          <em>не удаляется</em>. Умрёт только по keepUnusedDataFor таймеру. Следующий mount
+          увидит «невалид» → пойдёт fetch заново.
+
+          <br><br>
+          <strong>5. Per-endpoint keepUnusedDataFor перекрывает глобальный.</strong>
+          <br>Global=300, endpoint=5 → для этого endpoint'а 5, не 305. Иерархия:
+          endpoint &gt; global. Нет «наследования» — только override.
+
+          <br><br>
+          <strong>6. Таймер НЕ переживает <code>resetApiState</code>.</strong>
+          <br>Reset очищает всё, включая pending timeouts. Новый fetch начнёт всё сначала.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../84-rtkq-state-shape/">84 — state.api.subscriptions</a> (где считается refCount).</li>
+          <li><a href="../91-rtkq-skip-options/">91 — refetchOnMountOrArgChange</a> (когда refetch при mount).</li>
+          <li><a href="../95-rtkq-manual-cache/">95 — resetApiState, prefetch</a> (ручное управление).</li>
+          <li><a href="../101-rtkq-query-lifecycle-internals/">101 — lifecycle internals</a> (полный путь запроса).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/createApi#keepunuseddatafor" target="_blank">RTKQ · keepUnusedDataFor</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildMiddleware/cacheCollection.ts" target="_blank">cacheCollection.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

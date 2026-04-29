@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>84 — state.api shape</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .tree-root {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      color: var(--text-bright);
+    }
+    .tree-branch {
+      border-left: 2px solid var(--border);
+      margin-left: 10px;
+      padding-left: 12px;
+      margin-top: 2px;
+    }
+    .tree-branch.highlight {
+      border-left-color: var(--accent-cyan);
+      animation: flash .9s ease-out;
+    }
+    @keyframes flash {
+      0%   { background: rgba(0,180,200,.28); }
+      100% { background: transparent; }
+    }
+    .tree-key {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .tree-subkey {
+      color: var(--accent-cyan);
+    }
+    .tree-val {
+      color: var(--text-secondary);
+    }
+    .tree-type {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .tree-comment {
+      color: var(--text-muted);
+      font-size: .72rem;
+      margin-left: 6px;
+    }
+
+    .two-cols {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 14px;
+    }
+    .control-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    .control-panel h4 {
+      margin: 0 0 8px;
+      font-size: .82rem;
+      color: var(--accent);
+    }
+    .mini-row {
+      display: flex;
+      gap: 6px;
+      margin: 6px 0;
+      flex-wrap: wrap;
+    }
+    .mini-row input {
+      padding: 4px 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      width: 80px;
+    }
+
+    .field-legend {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 4px 10px;
+      margin-top: 10px;
+      font-size: .76rem;
+    }
+    .field-legend__name {
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+    .field-legend__desc {
+      color: var(--text-secondary);
+    }
+
+    .counter-pill {
+      display: inline-block;
+      padding: 1px 8px;
+      background: rgba(86,156,214,.18);
+      color: var(--accent);
+      border-radius: 10px;
+      font-size: .72rem;
+      margin-left: 6px;
+    }
+
+    .entry-detail {
+      background: var(--bg-tertiary);
+      padding: 6px 8px;
+      margin-top: 4px;
+      border-radius: var(--radius-sm);
+      font-size: .72rem;
+    }
+    .entry-detail__row {
+      display: flex;
+      justify-content: space-between;
+      padding: 1px 0;
+    }
+    .entry-detail__label { color: var(--text-muted); }
+    .entry-detail__value { color: var(--accent-cyan); }
+    .entry-detail__value.fulfilled { color: var(--success); }
+    .entry-detail__value.pending { color: var(--accent); }
+    .entry-detail__value.rejected { color: var(--accent-red); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">84 / 106</span>
+      state.api — пять под-state'ов, из которых RTKQ живёт
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../83-rtkq-cache-key/">← Назад</a>
+      <a href="../85-rtkq-fetchbasequery/">Далее → fetchBaseQuery</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">state.api.{queries, mutations, provided, subscriptions, config}</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          RTKQ хранит всё в одном reducerPath (по умолчанию <code>api</code>). Внутри ровно 5 полей,
+          каждое управляется своим маленьким createSlice. Жми кнопки — дерево слева перерисовывается
+          по <code>store.subscribe</code>, и ты видишь, какие поля меняются от каждого действия.
+        </p>
+
+        <div class="two-cols">
+          <div>
+            <h4 style="color: var(--text-bright); font-size: .92rem; margin: 6px 0;">state.api (live)</h4>
+            <div class="tree-root" id="state-tree">—</div>
+          </div>
+
+          <div>
+            <div class="control-panel">
+              <h4>queries · build.query</h4>
+              <div class="mini-row">
+                <input id="q-id" type="number" value="1" min="1" max="5">
+                <button class="btn btn--accent" id="q-fetch">▶ fetchPost</button>
+                <button class="btn" id="q-refetch">↻ refetch(1)</button>
+                <button class="btn" id="q-unsub">unsubscribe(1)</button>
+              </div>
+            </div>
+
+            <div class="control-panel" style="margin-top: 10px;">
+              <h4>mutations · build.mutation</h4>
+              <div class="mini-row">
+                <input id="m-title" type="text" value="Hello" style="width: 130px;">
+                <button class="btn btn--accent" id="m-send">▶ addPost</button>
+              </div>
+            </div>
+
+            <div class="control-panel" style="margin-top: 10px;">
+              <h4>provided · tagTypes</h4>
+              <p style="font-size: .72rem; color: var(--text-muted); margin: 0 0 6px;">
+                getPost → providesTags: [{ type: 'Post', id }], addPost → invalidatesTags: ['Post']
+              </p>
+            </div>
+
+            <div class="control-panel" style="margin-top: 10px;">
+              <h4>config · setupListeners / resetApiState</h4>
+              <div class="mini-row">
+                <button class="btn" id="focus-on">onFocus</button>
+                <button class="btn" id="offline">onOffline</button>
+                <button class="btn btn--danger" id="reset">resetApiState</button>
+              </div>
+            </div>
+
+            <div class="field-legend">
+              <div class="field-legend__name">queries</div>
+              <div class="field-legend__desc">{ [cacheKey]: { status, data, error, requestId, endpointName, ts } }</div>
+              <div class="field-legend__name">mutations</div>
+              <div class="field-legend__desc">{ [requestId]: { status, data, error, endpointName, ts } }</div>
+              <div class="field-legend__name">provided</div>
+              <div class="field-legend__desc">{ tags: { Post: { 1: [cacheKeys] } }, keys: { cacheKey: tags[] } }</div>
+              <div class="field-legend__name">subscriptions</div>
+              <div class="field-legend__desc">{ [cacheKey]: { [requestId]: {pollingInterval, ...} } }</div>
+              <div class="field-legend__name">config</div>
+              <div class="field-legend__desc">{ online, focused, keepUnusedDataFor, middlewareRegistered, refetchOn... }</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 84. Анатомия state.api</div>
+      <div class="theory__body">
+        <h3>Цитата — Usage with TypeScript</h3>
+        <div class="quote">
+          «RTK Query uses a single "API slice" per base API. Under the hood, this slice is actually
+          composed of <strong>five separate sub-slices</strong>, combined via <code>combineReducers</code>:
+          queries, mutations, provided, subscriptions, and config.»
+          <br>— RTK source, <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildSlice.ts" target="_blank">buildSlice.ts</a>
+        </div>
+        <div class="quote quote--ru">
+          «Один api-slice внутри — это <strong>combineReducers из 5 мини-slice'ов</strong>.
+          Ты никогда не пишешь их руками, но понимать, какое поле за что отвечает — полезно
+          для отладки, для селекторов и для <code>extraReducers</code>, которые слушают api-actions.»
+        </div>
+
+        <h3>Исходник — combineReducers в buildSlice.ts</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/query/core/buildSlice.ts — строки ~712</span>
+<span class="kw">const</span> combinedReducer = <span class="fn">combineReducers</span>({
+  queries:        querySlice.reducer,        <span class="cm">// { [cacheKey]: QuerySubState }</span>
+  mutations:      mutationSlice.reducer,     <span class="cm">// { [requestId]: MutationSubState }</span>
+  provided:       invalidationSlice.reducer, <span class="cm">// tagTypes → cacheKeys</span>
+  subscriptions:  internalSubscriptionsSlice.reducer,
+  config:         configSlice.reducer,       <span class="cm">// online, focused, keepUnusedDataFor, ...</span>
+})
+
+<span class="kw">const</span> reducer: <span class="kw">typeof</span> combinedReducer = (state, action) =&gt;
+  <span class="fn">combinedReducer</span>(resetApiState.<span class="fn">match</span>(action) ? <span class="kw">undefined</span> : state, action)
+<span class="cm">// 👀 api.util.resetApiState() = state=undefined → combineReducers пересоздаёт всё initialState</span>
+        </div>
+
+        <h3>Исходник — типы под-state'ов (apiState.ts)</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/query/core/apiState.ts</span>
+<span class="kw">export type</span> <span class="type">CombinedState</span>&lt;D, E, ReducerPath&gt; = {
+  queries:       <span class="type">QueryState</span>&lt;D&gt;          <span class="cm">// { [cacheKey]: QuerySubState | undefined }</span>
+  mutations:     <span class="type">MutationState</span>&lt;D&gt;       <span class="cm">// { [requestId]: MutationSubState | undefined }</span>
+  provided:      <span class="type">InvalidationState</span>&lt;E&gt;
+  subscriptions: <span class="type">SubscriptionState</span>      <span class="cm">// { [cacheKey]: Subscribers | undefined }</span>
+  config:        <span class="type">ConfigState</span>&lt;ReducerPath&gt;
+}
+
+<span class="kw">export type</span> <span class="type">InvalidationState</span>&lt;TagTypes&gt; = {
+  tags: { [_ <span class="kw">in</span> <span class="type">TagTypes</span>]: { [id: <span class="type">string | number</span>]: <span class="type">QueryCacheKey</span>[] } }
+  keys: <span class="type">Record</span>&lt;<span class="type">QueryCacheKey</span>, <span class="type">FullTagDescription</span>&lt;<span class="type">any</span>&gt;[]&gt;
+}
+
+<span class="kw">export type</span> <span class="type">ConfigState</span>&lt;ReducerPath&gt; = {
+  reducerPath:           <span class="type">ReducerPath</span>
+  online:                <span class="type">boolean</span>
+  focused:               <span class="type">boolean</span>
+  middlewareRegistered:  <span class="type">boolean | 'conflict'</span>
+  keepUnusedDataFor:     <span class="type">number</span>            <span class="cm">// default 60 (секунд)</span>
+  invalidationBehavior:  <span class="str">'delayed' | 'immediately'</span>
+  refetchOnMountOrArgChange: <span class="type">boolean | number</span>
+  refetchOnReconnect:    <span class="type">boolean</span>
+  refetchOnFocus:        <span class="type">boolean</span>
+}
+        </div>
+
+        <h3>Схема жизненного цикла cache-entry</h3>
+        <div class="flow-diagram" style="padding: 16px 0;">
+          <svg viewBox="0 0 800 250" style="width: 100%; height: auto;">
+            <defs>
+              <marker id="arr84" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                <polygon points="0 0, 10 3, 0 6" fill="#888"/>
+              </marker>
+            </defs>
+            <rect x="10"  y="100" width="130" height="56" rx="8" fill="#1e2a3a" stroke="#4a90e2"/>
+            <text x="75"  y="128" text-anchor="middle" fill="#9cdcfe" font-family="monospace" font-size="12">initiate(arg)</text>
+            <text x="75"  y="145" text-anchor="middle" fill="#888" font-size="10">hook mount</text>
+
+            <rect x="170" y="100" width="130" height="56" rx="8" fill="#1e2a3a" stroke="#4a90e2"/>
+            <text x="235" y="122" text-anchor="middle" fill="#9cdcfe" font-family="monospace" font-size="12">queries[key]</text>
+            <text x="235" y="138" text-anchor="middle" fill="#dcb67a" font-family="monospace" font-size="11">= pending</text>
+            <text x="235" y="152" text-anchor="middle" fill="#888" font-size="10">+ subscriptions[key]</text>
+
+            <rect x="330" y="40"  width="130" height="56" rx="8" fill="#133218" stroke="#4caf50"/>
+            <text x="395" y="62"  text-anchor="middle" fill="#4caf50" font-family="monospace" font-size="12">queries[key]</text>
+            <text x="395" y="78"  text-anchor="middle" fill="#4caf50" font-family="monospace" font-size="11">= fulfilled</text>
+            <text x="395" y="92"  text-anchor="middle" fill="#888" font-size="10">+ provided[tag][id]</text>
+
+            <rect x="330" y="160" width="130" height="56" rx="8" fill="#32131a" stroke="#f44747"/>
+            <text x="395" y="182" text-anchor="middle" fill="#f44747" font-family="monospace" font-size="12">queries[key]</text>
+            <text x="395" y="198" text-anchor="middle" fill="#f44747" font-family="monospace" font-size="11">= rejected</text>
+            <text x="395" y="212" text-anchor="middle" fill="#888" font-size="10">error: SerializedError</text>
+
+            <rect x="490" y="100" width="130" height="56" rx="8" fill="#1e2a3a" stroke="#4a90e2"/>
+            <text x="555" y="122" text-anchor="middle" fill="#9cdcfe" font-family="monospace" font-size="12">unsubscribe</text>
+            <text x="555" y="138" text-anchor="middle" fill="#888" font-size="10">→ subs[key] = {}</text>
+            <text x="555" y="152" text-anchor="middle" fill="#888" font-size="10">timer: keepUnusedDataFor</text>
+
+            <rect x="650" y="100" width="130" height="56" rx="8" fill="#32131a" stroke="#f44747"/>
+            <text x="715" y="122" text-anchor="middle" fill="#f44747" font-family="monospace" font-size="12">removeQueryResult</text>
+            <text x="715" y="140" text-anchor="middle" fill="#888" font-size="10">delete queries[key]</text>
+
+            <line x1="140" y1="128" x2="168" y2="128" stroke="#888" stroke-width="1.5" marker-end="url(#arr84)"/>
+            <line x1="300" y1="118" x2="328" y2="76"  stroke="#4caf50" stroke-width="1.5" marker-end="url(#arr84)"/>
+            <line x1="300" y1="140" x2="328" y2="186" stroke="#f44747" stroke-width="1.5" marker-end="url(#arr84)"/>
+            <line x1="460" y1="76"  x2="488" y2="120" stroke="#888" stroke-width="1.5" marker-end="url(#arr84)"/>
+            <line x1="460" y1="186" x2="488" y2="140" stroke="#888" stroke-width="1.5" marker-end="url(#arr84)"/>
+            <line x1="620" y1="128" x2="648" y2="128" stroke="#888" stroke-width="1.5" marker-end="url(#arr84)"/>
+          </svg>
+        </div>
+
+        <h3>Где поля вообще — и когда на них смотреть</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: .82rem; margin: 10px 0;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="text-align: left; padding: 6px 4px; color: var(--accent);">под-state</th>
+              <th style="text-align: left; padding: 6px 4px; color: var(--accent);">индекс</th>
+              <th style="text-align: left; padding: 6px 4px; color: var(--accent);">когда смотреть</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 6px 4px; color: var(--accent-cyan); font-family: var(--font-mono);">queries</td>
+              <td style="padding: 6px 4px; font-family: var(--font-mono); font-size: .78rem;">cacheKey</td>
+              <td style="padding: 6px 4px; color: var(--text-secondary);">видеть, что закэшировано; проверять status pending/fulfilled/rejected</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 6px 4px; color: var(--accent-cyan); font-family: var(--font-mono);">mutations</td>
+              <td style="padding: 6px 4px; font-family: var(--font-mono); font-size: .78rem;">requestId (или fixedCacheKey)</td>
+              <td style="padding: 6px 4px; color: var(--text-secondary);">отслеживать прогресс mutation; <code>fixedCacheKey</code> = чтобы несколько компонентов делили одну mutation</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 6px 4px; color: var(--accent-cyan); font-family: var(--font-mono);">provided</td>
+              <td style="padding: 6px 4px; font-family: var(--font-mono); font-size: .78rem;">{ tags, keys }</td>
+              <td style="padding: 6px 4px; color: var(--text-secondary);">дебаг invalidations; обратный индекс «тег → cacheKeys»</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 6px 4px; color: var(--accent-cyan); font-family: var(--font-mono);">subscriptions</td>
+              <td style="padding: 6px 4px; font-family: var(--font-mono); font-size: .78rem;">cacheKey → requestId → options</td>
+              <td style="padding: 6px 4px; color: var(--text-secondary);">refCount живых подписчиков; после последнего unsubscribe запускается keepUnusedDataFor таймер</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 4px; color: var(--accent-cyan); font-family: var(--font-mono);">config</td>
+              <td style="padding: 6px 4px; font-family: var(--font-mono); font-size: .78rem;">—</td>
+              <td style="padding: 6px 4px; color: var(--text-secondary);"><code>online/focused</code> от setupListeners; <code>middlewareRegistered</code> — отладка «забыл concat»</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. subscriptions НЕ входит в DevTools state по умолчанию.</strong>
+          <br>Начиная с RTK 2.x, <code>internalSubscriptionsSlice</code> не попадает в Redux DevTools state-снимки —
+          это сделано, чтобы time-travel не пытался восстановить «живые подписки». Если хочешь увидеть
+          реальные subscribers — бери <code>store.getState().api.subscriptions</code> напрямую (как в этом демо)
+          или используй <code>api.internalActions.subscriptionsUpdated</code>.
+
+          <br><br>
+          <strong>2. mutations индексируются по requestId, не по arg.</strong>
+          <br>Повторный <code>addPost({title})</code> с тем же telom создаёт новую запись с новым requestId.
+          Если хочешь «один общий статус mutation» для нескольких компонентов — передавай
+          <code>fixedCacheKey: 'addPost'</code> в <code>.initiate(arg, { fixedCacheKey })</code>.
+
+          <br><br>
+          <strong>3. provided.keys и provided.tags — денормализованные обе стороны.</strong>
+          <br>RTKQ хранит ОБА индекса: tag → cacheKeys (для invalidate) и cacheKey → tags (для cleanup
+          при удалении cache entry). Если напрямую мутировать только одну сторону через
+          <code>extraReducers</code> — сломаешь invalidation.
+
+          <br><br>
+          <strong>4. config.middlewareRegistered = false → silent bug.</strong>
+          <br>Если забыл <code>concat(api.middleware)</code>, в dev-режиме появится warning, но в prod —
+          просто тишина. Запросы будут висеть в <code>pending</code> вечно. Проверяй это поле в
+          integration-тестах (см. урок 81).
+
+          <br><br>
+          <strong>5. resetApiState() — reducer=undefined, НЕ clear каждого slice по отдельности.</strong>
+          <br>В обработке action <code>{type: 'api/resetApiState'}</code> RTKQ передаёт
+          <code>state=undefined</code> в <code>combineReducers</code> → каждый sub-slice возвращает свой
+          initialState. Это значит: текущие запросы в <code>queries</code> исчезают, но РЕАЛЬНЫЕ HTTP-запросы
+          (AbortController) отдельно не abortятся. Используй <code>initiate().unsubscribe()</code> перед reset.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../82-rtkq-usequery-hook/">82 — useQuery</a> (читает <code>queries[key]</code>).</li>
+          <li><a href="../83-rtkq-cache-key/">83 — cacheKey</a> (ключ для <code>queries</code>).</li>
+          <li><a href="../85-rtkq-fetchbasequery/">85 — fetchBaseQuery</a> (что попадает в <code>data/error</code>).</li>
+          <li><a href="../86-rtkq-mutations/">86 — mutations</a> (детально про <code>mutations</code>).</li>
+          <li><a href="../87-rtkq-tags-invalidation/">87 — tags</a> (детально про <code>provided</code>).</li>
+          <li><a href="../92-rtkq-keepunuseddatafor-cleanup/">92 — keepUnusedDataFor</a> (<code>config.keepUnusedDataFor</code>).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildSlice.ts" target="_blank">buildSlice.ts — 6 createSlice + combineReducers</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/apiState.ts" target="_blank">apiState.ts — типы CombinedState, QuerySubState, ConfigState</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/examples" target="_blank">RTK Query — Examples</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

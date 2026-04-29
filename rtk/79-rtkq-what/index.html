@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>79 — Что такое RTK Query</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 14px 0;
+    }
+    .feature-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .feature-card__title {
+      color: var(--text-bright);
+      font-weight: 600;
+      font-size: .94rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .feature-card__icon {
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+      font-size: .8rem;
+      min-width: 26px;
+      text-align: center;
+    }
+    .feature-card__problem {
+      font-size: .8rem;
+      color: var(--accent-red);
+      font-family: var(--font-mono);
+    }
+    .feature-card__solution {
+      font-size: .82rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .feature-card__run {
+      align-self: flex-start;
+      margin-top: auto;
+    }
+
+    .role-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .82rem;
+      margin: 14px 0;
+    }
+    .role-table th,
+    .role-table td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .role-table th {
+      background: var(--bg-tertiary);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: .74rem;
+      text-transform: uppercase;
+    }
+    .role-table td.tool {
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .role-table td.yes { color: var(--success); }
+    .role-table td.no  { color: var(--accent-red); }
+
+    .stat-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .stat-tile {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .stat-tile__label {
+      font-size: .7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .stat-tile__value {
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .flow-svg {
+      width: 100%;
+      max-width: 780px;
+      margin: 14px auto;
+      display: block;
+    }
+    .flow-svg text { font-family: var(--font-mono); font-size: 11px; fill: var(--text-bright); }
+    .flow-svg .box { fill: var(--bg-panel); stroke: var(--border); }
+    .flow-svg .box-hit { fill: rgba(76,175,80,.15); stroke: var(--success); }
+    .flow-svg .box-miss { fill: rgba(244,71,71,.10); stroke: var(--accent-red); }
+    .flow-svg .arrow { stroke: var(--text-muted); fill: none; marker-end: url(#arrowend79); }
+    .flow-svg .label-hit { fill: var(--success); }
+    .flow-svg .label-miss { fill: var(--accent-red); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">79 / 106</span>
+      RTK Query — мотивация и 7 фич
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../78-when-not-to-use-rtk/">← Назад</a>
+      <a href="../80-rtkq-create-api-basic/">Далее → createApi</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Что даёт RTK Query поверх store + thunk'ов</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          RTK Query — это <strong>data-fetching + cache layer</strong>, а не state manager. Он решает
+          проблемы, которые ты иначе пишешь руками вокруг <code>createAsyncThunk</code>: loading-флаги,
+          дедупликация, TTL, refetch on focus, polling, optimistic updates. Ниже — 7 фич; клик «Показать»
+          запускает симуляцию в консоли и обновляет счётчики.
+        </p>
+
+        <div class="stat-bar">
+          <div class="stat-tile">
+            <div class="stat-tile__label">Network calls (naive)</div>
+            <div class="stat-tile__value" id="stat-naive">0</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-tile__label">Network calls (RTKQ)</div>
+            <div class="stat-tile__value" id="stat-rtkq">0</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-tile__label">Subscribers</div>
+            <div class="stat-tile__value" id="stat-subs">0</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-tile__label">Cache entries</div>
+            <div class="stat-tile__value" id="stat-cache">0</div>
+          </div>
+        </div>
+
+        <div class="feature-grid" id="feature-grid"></div>
+
+        <div class="btn-group" style="margin-top: 12px;">
+          <button class="btn" id="reset-all">reset всех счётчиков</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 79. RTK Query: мотивация</div>
+      <div class="theory__body">
+        <h3>Цитата — RTKQ Overview</h3>
+        <div class="quote">
+          «Web applications normally need to fetch data from a server in order to display it.
+          <strong>Data fetching and caching is really a different set of concerns than state management.</strong>
+          While you can use a state management library like Redux to cache data, the use cases are
+          different enough that it's worth using tools that are purpose-built for the data fetching use case.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/overview#motivation" target="_blank">RTK Query Overview — Motivation</a>
+        </div>
+        <div class="quote quote--ru">
+          «Fetching и кэширование данных — <strong>другой класс задач</strong>, чем state management.
+          Даже если ты можешь засунуть кэш в Redux, специализированный инструмент удобнее.»
+        </div>
+
+        <h3>RTKQ ≠ Redux. Разграничение зон</h3>
+        <table class="role-table">
+          <thead>
+            <tr>
+              <th>Что храним</th>
+              <th>Redux / RTK slice</th>
+              <th>RTK Query</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>UI-state: открытые модалки, фильтры, форма</td>
+              <td class="yes">✓ да</td>
+              <td class="no">нет</td>
+            </tr>
+            <tr>
+              <td>Auth-токен, role, текущий user</td>
+              <td class="yes">✓ да (client state)</td>
+              <td class="no">нет</td>
+            </tr>
+            <tr>
+              <td>Серверные данные: посты, юзеры, товары</td>
+              <td class="no">не надо</td>
+              <td class="yes">✓ да (server cache)</td>
+            </tr>
+            <tr>
+              <td>Loading / error / last-fetched флаги</td>
+              <td class="no">надоест писать руками</td>
+              <td class="yes">✓ авто</td>
+            </tr>
+            <tr>
+              <td>Dedup, TTL, refetch-on-focus, polling</td>
+              <td class="no">писать руками = не тривиально</td>
+              <td class="yes">✓ встроено</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Что делает RTKQ под капотом — схема</h3>
+        <svg class="flow-svg" viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrowend79" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#888"/>
+            </marker>
+          </defs>
+          <rect class="box" x="20" y="80" width="130" height="54" rx="6"/>
+          <text x="85" y="104" text-anchor="middle">useQuery(arg)</text>
+          <text x="85" y="120" text-anchor="middle" fill="#888">component mount</text>
+
+          <rect class="box" x="180" y="80" width="130" height="54" rx="6"/>
+          <text x="245" y="104" text-anchor="middle">serializeQueryArgs</text>
+          <text x="245" y="120" text-anchor="middle" fill="#888">→ cacheKey</text>
+
+          <rect class="box" x="340" y="80" width="130" height="54" rx="6"/>
+          <text x="405" y="104" text-anchor="middle">state.api.queries</text>
+          <text x="405" y="120" text-anchor="middle" fill="#888">cacheKey in?</text>
+
+          <rect class="box box-hit" x="500" y="20" width="200" height="54" rx="6"/>
+          <text x="600" y="44" text-anchor="middle" class="label-hit">HIT — return cached</text>
+          <text x="600" y="60" text-anchor="middle" fill="#888">no network call</text>
+
+          <rect class="box box-miss" x="500" y="140" width="200" height="54" rx="6"/>
+          <text x="600" y="164" text-anchor="middle" class="label-miss">MISS — fetch → cache</text>
+          <text x="600" y="180" text-anchor="middle" fill="#888">pending → fulfilled</text>
+
+          <path class="arrow" d="M150,107 L178,107"/>
+          <path class="arrow" d="M310,107 L338,107"/>
+          <path class="arrow" d="M470,97 L498,47"/>
+          <path class="arrow" d="M470,117 L498,167"/>
+        </svg>
+
+        <h3>Что будет в уроках 80–88 (секция K)</h3>
+        <ul style="font-size: .86rem; line-height: 1.65;">
+          <li><a href="../80-rtkq-create-api-basic/">80</a> — <code>createApi</code> и первый endpoint (+ mock через <code>fetchFn</code>).</li>
+          <li><a href="../81-rtkq-store-setup/">81</a> — подключение к store: <code>api.reducer</code> + <code>api.middleware</code>.</li>
+          <li><a href="../82-rtkq-usequery-hook/">82</a> — useQuery hook, все return-поля (data/error/isLoading/isFetching/…)</li>
+          <li><a href="../83-rtkq-cache-key/">83</a> — cache key и <code>serializeQueryArgs</code>.</li>
+          <li><a href="../84-rtkq-state-shape/">84</a> — внутренняя структура <code>state.api</code> (queries/mutations/subscriptions/provided/config).</li>
+          <li><a href="../85-rtkq-fetchbasequery/">85</a> — <code>fetchBaseQuery</code> deep dive: prepareHeaders, paramsSerializer, …</li>
+          <li><a href="../86-rtkq-mutations/">86</a> — <code>build.mutation</code> и useMutation hook.</li>
+          <li><a href="../87-rtkq-tags-invalidation/">87</a> — tags: providesTags / invalidatesTags → авто-refetch.</li>
+          <li><a href="../88-rtkq-tags-granular/">88</a> — granular tags <code>{ type, id }</code> + <code>LIST</code>.</li>
+        </ul>
+
+        <h3>Фрагмент — что такое createApi (превью к уроку 80)</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/query — упрощённо</span>
+<span class="kw">const</span> api = <span class="fn">createApi</span>({
+  reducerPath: <span class="str">'api'</span>,                      <span class="cm">// куда в state.* ляжет slice</span>
+  baseQuery: <span class="fn">fetchBaseQuery</span>({ baseUrl: <span class="str">'/'</span> }),
+  tagTypes: [<span class="str">'Post'</span>, <span class="str">'User'</span>],             <span class="cm">// для авто-инвалидации</span>
+  endpoints: (build) =&gt; ({
+    getPosts: build.<span class="fn">query</span>&lt;<span class="type">Post</span>[], <span class="kw">void</span>&gt;({
+      query: () =&gt; <span class="str">'/posts'</span>,
+      providesTags: [<span class="str">'Post'</span>],
+    }),
+    addPost: build.<span class="fn">mutation</span>&lt;<span class="type">Post</span>, <span class="type">NewPost</span>&gt;({
+      query: (body) =&gt; ({ url: <span class="str">'/posts'</span>, method: <span class="str">'POST'</span>, body }),
+      invalidatesTags: [<span class="str">'Post'</span>],              <span class="cm">// 👀 сломает кэш getPosts → он перефетчится</span>
+    }),
+  }),
+})
+
+<span class="kw">export const</span> { useGetPostsQuery, useAddPostMutation } = api
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. RTK Query — НЕ замена Redux.</strong>
+          <br>Если у тебя нет сервера — RTKQ не нужен. UI-state (модалки, фильтры, тема, auth-state) всё
+          равно живёт в обычных slices. Правильная ментальная модель: <strong>RTKQ — это «клиентская
+          обёртка над твоим REST/GraphQL API»</strong>, а Redux — это «все остальные данные приложения».
+
+          <br><br>
+          <strong>2. Не пиши свой кэш поверх createAsyncThunk.</strong>
+          <br>Dedup (два компонента подписались на одни данные → один запрос), TTL (через сколько
+          выкидывать из кэша после отписки последнего подписчика), refetch-on-focus, refetch-on-reconnect,
+          polling — всё это <em>нетривиальные</em> механики. В RTKQ они работают «из коробки» в 4 строках
+          конфигурации. Если пишешь сам — готовься к багам race-condition'ов.
+
+          <br><br>
+          <strong>3. Обычно один <code>createApi</code> на весь проект.</strong>
+          <br>Если у тебя два разных API (основной REST + отдельный сервис аналитики), их можно
+          объединить в одном <code>createApi</code> через разные <code>baseQuery</code> внутри endpoint'ов.
+          Два <code>createApi</code> — это две независимые <code>tagTypes</code>-вселенные: инвалидация
+          из одного не увидит другое. См. урок 99 (injectEndpoints) для масштабирования.
+
+          <br><br>
+          <strong>4. RTKQ требует подключения <code>api.middleware</code>.</strong>
+          <br>Без него hooks отрендерят <code>isLoading=true</code> навсегда — middleware отвечает за
+          выполнение baseQuery. Типичный баг новичка; пример в уроке 81.
+        </div>
+
+        <h3>Bundle size — цитата из доки</h3>
+        <div class="quote">
+          «RTK Query adds a fixed one-time amount to your app's bundle size. Since RTK Query builds on
+          top of Redux Toolkit and React-Redux, the added size varies depending on whether you are already
+          using those. <strong>The estimated sizes are ~17 kB for RTK Query and ~19 kB for RTK Query + React.</strong>»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/overview#bundle-size" target="_blank">RTK Query — Bundle Size</a>
+        </div>
+        <div class="quote quote--ru">
+          «~17 кБ ядро + ~19 кБ с React-биндингами. <strong>Фиксированный</strong> оверхед — дальше не
+          растёт от количества endpoint'ов, потому что все они описываются через один общий builder.»
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../54-asyncthunk-why/">54 — Зачем createAsyncThunk</a> (то, что RTKQ делает за тебя + больше).</li>
+          <li><a href="../76-side-by-side-todos-async/">76 — Todos: manual thunk vs createAsyncThunk vs RTK Query</a> (side-by-side build.query).</li>
+          <li><a href="../78-when-not-to-use-rtk/">78 — когда НЕ брать RTK / RTKQ</a>.</li>
+          <li><a href="../80-rtkq-create-api-basic/">80 — первый createApi и useGetPokemonQuery</a>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/overview" target="_blank">RTK Query — Overview</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/comparison" target="_blank">Comparison with React Query / SWR / Apollo</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/tree/master/packages/toolkit/src/query" target="_blank">packages/toolkit/src/query/ (исходники)</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

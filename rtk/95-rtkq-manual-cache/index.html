@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>95 — Manual cache · updateQueryData / upsert / prefetch / resetApiState</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .action-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .action-card h5 {
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      margin: 0 0 6px;
+    }
+    .action-card p {
+      font-size: .74rem;
+      color: var(--text-secondary);
+      margin: 0 0 8px;
+    }
+    .products {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .product {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .product__id { color: var(--accent-cyan); font-size: .72rem; }
+    .product__title { color: var(--text-bright); font-weight: 600; margin: 2px 0; }
+    .product__price { color: var(--accent-yellow); transition: color 200ms; }
+
+    /* visual feedback animations */
+    .product.flash-price { animation: pulsePrice 1s ease-out; }
+    @keyframes pulsePrice {
+      0%   { background: rgba(229,192,123,.35); transform: scale(1.05); box-shadow: 0 0 12px rgba(229,192,123,.6); }
+      100% { background: var(--bg-panel); transform: scale(1); box-shadow: none; }
+    }
+    .product.flash-spawn { animation: spawnIn 0.6s ease-out; }
+    @keyframes spawnIn {
+      0%   { transform: scale(0); opacity: 0; background: rgba(76,175,80,.4); }
+      60%  { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(1); background: var(--bg-panel); }
+    }
+    .product.flash-refetch { animation: refetchPulse 1.4s ease-out; }
+    @keyframes refetchPulse {
+      0%   { background: rgba(86,156,214,.3); border-color: var(--accent); }
+      100% { background: var(--bg-panel); border-color: var(--border); }
+    }
+    .product.flash-undo { animation: undoSweep 0.8s ease-out; }
+    @keyframes undoSweep {
+      0%   { background: rgba(206,134,120,.35); transform: translateX(-6px); }
+      50%  { transform: translateX(6px); }
+      100% { background: var(--bg-panel); transform: translateX(0); }
+    }
+    .product.flash-nuke { animation: nukeOut 0.5s ease-out forwards; }
+    @keyframes nukeOut {
+      0%   { transform: scale(1); opacity: 1; background: rgba(244,71,71,.4); }
+      100% { transform: scale(0.7); opacity: 0; }
+    }
+
+    /* cache table */
+    .cache-table {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+    }
+    .cache-table h5 {
+      color: var(--accent-cyan);
+      font-size: .82rem;
+      margin: 0 0 8px;
+    }
+    .cache-row {
+      display: grid;
+      grid-template-columns: 1fr 100px 100px;
+      gap: 10px;
+      align-items: center;
+      padding: 4px 6px;
+      border-bottom: 1px dashed var(--border);
+    }
+    .cache-row:last-child { border-bottom: none; }
+    .cache-row.flash { animation: cacheFlash 1s ease-out; }
+    @keyframes cacheFlash {
+      0%   { background: rgba(76,175,80,.25); }
+      100% { background: transparent; }
+    }
+    .cache-row__key { color: var(--accent-cyan); }
+    .cache-row__status {
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: .68rem;
+      text-align: center;
+    }
+    .cache-row__status.fulfilled { background: rgba(76,175,80,.2); color: var(--success); }
+    .cache-row__status.pending   { background: rgba(86,156,214,.2); color: var(--accent); }
+    .cache-row__status.rejected  { background: rgba(244,71,71,.2); color: var(--accent-red); }
+    .cache-row__age {
+      color: var(--text-muted);
+      font-size: .72rem;
+      text-align: right;
+    }
+    .stat-num {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+    .stat-num.bump { animation: numBump 0.4s; }
+    @keyframes numBump {
+      0%   { transform: scale(1.4); color: var(--success); }
+      100% { transform: scale(1); color: var(--accent-cyan); }
+    }
+    .reset-banner {
+      animation: resetFlash 1.2s;
+    }
+    @keyframes resetFlash {
+      0%   { background: rgba(244,71,71,.3); }
+      100% { background: transparent; }
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">95 / 106</span>
+      Manual cache · api.util
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../94-rtkq-onCacheEntryAdded-streaming/">← Назад</a>
+      <a href="../96-rtkq-conditional-fetching/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">5 утилит api.util — когда тегов недостаточно</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Все 5 способов вмешаться в кеш вручную — без mutation, без сетевого запроса (кроме prefetch).
+        </p>
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 95. Manual cache updates</div>
+      <div class="theory__body">
+        <h3>Цитата — Manual Cache Updates</h3>
+        <div class="quote">
+          «<code>updateQueryData</code>, <code>upsertQueryData</code>, <code>prefetch</code>,
+          <code>invalidateTags</code> and <code>resetApiState</code> are the thunk action creators for
+          manually interacting with the cache without tying that behavior to a mutation.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/api/created-api/api-slice-utils" target="_blank">RTKQ · api.util reference</a>
+        </div>
+
+        <h3>1. updateQueryData — патч Immer-рецептом</h3>
+        <div class="code-block">
+<span class="fn">dispatch</span>(
+  api.util.<span class="fn">updateQueryData</span>(<span class="str">'getProducts'</span>, <span class="kw">undefined</span>, (draft) =&gt; {
+    <span class="kw">const</span> item = draft.<span class="fn">find</span>((p) =&gt; p.id === <span class="num">3</span>)
+    <span class="kw">if</span> (item) item.price *= <span class="num">0.9</span>    <span class="cm">// -10% скидка</span>
+  }),
+)
+<span class="cm">// возвращает { undo, patches, inversePatches }
+// сеть НЕ трогается. Если entry не существует — noop. Compatible с optimistic updates.</span>
+        </div>
+
+        <h3>2. upsertQueryData — вставить/перезаписать</h3>
+        <div class="code-block">
+<span class="cm">// ситуация: юзер кликнул на товар, у нас уже его данные из списка → кладём в cache getProduct(id)</span>
+<span class="kw">const</span> product = { id: <span class="num">5</span>, title: <span class="str">'Phone'</span>, price: <span class="num">999</span> }
+<span class="fn">dispatch</span>(
+  api.util.<span class="fn">upsertQueryData</span>(<span class="str">'getProduct'</span>, <span class="num">5</span>, product),
+)
+<span class="cm">// entry создана/перезаписана: status='fulfilled', data=product, fulfilledTimeStamp=Date.now()
+// useGetProductQuery(5) тут же вернёт HIT без сети.</span>
+        </div>
+
+        <h3>3. prefetch — превентивный fetch</h3>
+        <div class="code-block">
+<span class="cm">// вариант A — через хук (React):</span>
+<span class="kw">const</span> prefetchProduct = <span class="fn">usePrefetch</span>(<span class="str">'getProduct'</span>)
+&lt;Link onMouseEnter=<span class="kw">{()</span> =&gt; <span class="fn">prefetchProduct</span>(5)<span class="kw">}</span> /&gt;
+
+<span class="cm">// вариант B — через dispatch:</span>
+<span class="fn">dispatch</span>(api.util.<span class="fn">prefetch</span>(<span class="str">'getProduct'</span>, <span class="num">5</span>, { force: <span class="kw">false</span>, ifOlderThan: <span class="num">30</span> }))
+<span class="cm">// опции:
+//   force: true — всегда fetch
+//   ifOlderThan: 30 — fetch только если кеш старше 30s
+//   subscribe: false (дефолт для prefetch) — НЕ держим подписчика
+// Значит: через keepUnusedDataFor данные умрут, если никто не подпишется.</span>
+        </div>
+
+        <h3>4. invalidateTags — ручная инвалидация</h3>
+        <div class="code-block">
+<span class="fn">dispatch</span>(api.util.<span class="fn">invalidateTags</span>([<span class="str">'Product'</span>]))
+<span class="fn">dispatch</span>(api.util.<span class="fn">invalidateTags</span>([{ type: <span class="str">'Product'</span>, id: <span class="num">3</span> }]))
+<span class="cm">// эквивалент invalidatesTags в mutation — но триггерится кодом:
+//   - websocket сообщил что цены обновились → invalidateTags(['Product'])
+//   - пользователь нажал "Обновить" — invalidateTags([{type:'Product', id: 'LIST'}])</span>
+        </div>
+
+        <h3>5. resetApiState — nuke всё</h3>
+        <div class="code-block">
+<span class="cm">// logout сценарий:</span>
+<span class="kw">function</span> <span class="fn">onLogout</span>() {
+  store.<span class="fn">dispatch</span>(api.util.<span class="fn">resetApiState</span>())
+  <span class="cm">// очищает queries, mutations, subscriptions, provided — ВСЁ, что под api.reducerPath</span>
+  <span class="cm">// ⚠ НЕ чистит НЕ-api slices — если в другом slice лежит производное — чисти отдельно</span>
+}
+        </div>
+
+        <h3>Таблица: что и когда использовать</h3>
+        <div class="code-block">
+<span class="cm">│ Сценарий                               │ Утилита           │ Идёт в сеть? │</span>
+<span class="cm">├────────────────────────────────────────┼───────────────────┼──────────────┤</span>
+<span class="cm">│ Apply optimistic patch                 │ updateQueryData   │ нет          │</span>
+<span class="cm">│ Данные пришли из другого источника     │ upsertQueryData   │ нет          │</span>
+<span class="cm">│ Ссылка/наведение — ускорить переход    │ prefetch          │ да (или нет) │</span>
+<span class="cm">│ Внешний сигнал о смене данных          │ invalidateTags    │ зависит      │</span>
+<span class="cm">│ Logout / смена юзера                   │ resetApiState     │ нет          │</span>
+<span class="cm">│ Ручной fetch без хука                  │ endpoints.X.init. │ да           │</span>
+        </div>
+
+        <h3>Источник — buildSlice.ts (updateQueryData)</h3>
+        <div class="code-block">
+<span class="cm">// упрощённо — как RTKQ применяет рецепт</span>
+<span class="fn">updateQueryData</span>: (endpointName, args, updateRecipe) =&gt; (dispatch, getState) =&gt; {
+  <span class="kw">const</span> endpoint = api.endpoints[endpointName]
+  <span class="kw">const</span> cacheKey = <span class="fn">endpoint</span>.internalActions.querySubState.<span class="fn">match</span>(state, endpointName, args)
+
+  <span class="kw">let</span> inversePatches: <span class="type">Patch</span>[] = []
+  <span class="kw">const</span> [patched, patches] = <span class="fn">produceWithPatches</span>(
+    getState()[reducerPath].queries[cacheKey].data,
+    updateRecipe,
+  )
+  <span class="cm">// диспатчим action, reducer заменяет data на patched</span>
+  <span class="fn">dispatch</span>({ type: <span class="str">'api/mutateData'</span>, payload: { endpointName, args, patches } })
+  <span class="kw">return</span> { patches, inversePatches, undo: () =&gt; <span class="fn">dispatch</span>({ ..., patches: inversePatches }) }
+}
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. updateQueryData noop, если entry не существует.</strong>
+          <br>Самая частая ошибка. Если компонент с <code>useGetProductsQuery</code> не примонтирован —
+          <code>updateQueryData('getProducts', ...)</code> ничего не сделает. Проверяй через
+          <code>api.endpoints.X.select(arg)(state).status === 'fulfilled'</code> или используй upsertQueryData.
+
+          <br><br>
+          <strong>2. upsertQueryData не вызывает onCacheEntryAdded.</strong>
+          <br>Это «искусственная» entry, она создаётся напрямую в state. Если твой onCacheEntryAdded
+          должен открыть WS — это не сработает при upsert. Workaround: dispatch endpoints.X.initiate(arg)
+          для реальной подписки.
+
+          <br><br>
+          <strong>3. prefetch без subscribe — данные умрут через keepUnusedDataFor.</strong>
+          <br>Для «hover предзагрузки» это OK (60s достаточно для клика). Но если prefetch'ишь на
+          старте app — без подписчика cache умрёт через минуту.
+
+          <br><br>
+          <strong>4. resetApiState может сломать UI если компоненты всё ещё смотрят.</strong>
+          <br>Сразу после reset все <code>useQuery</code> вернут <code>data === undefined</code>,
+          <code>status === 'uninitialized'</code>. Если компоненты это не обрабатывают — краш.
+          Resetай на logout, когда unmount всего app.
+
+          <br><br>
+          <strong>5. invalidateTags не работает если middleware не подключен.</strong>
+          <br>api.util действия — thunks, проходят через redux-thunk. Но инвалидация — через api.middleware.
+          Если забыл <code>.concat(api.middleware)</code> — всё ломается.
+
+          <br><br>
+          <strong>6. updateQueryData и TS — endpointName должен быть литеральным.</strong>
+          <br><code>const name = 'getProducts'; updateQueryData(name, ...)</code> ← TS потеряет
+          type inference для args. Используй string literal напрямую или <code>as const</code>.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../93-rtkq-onQueryStarted-optimistic/">93 — optimistic с updateQueryData</a>.</li>
+          <li><a href="../87-rtkq-tags-invalidation/">87 — invalidateTags через mutation</a>.</li>
+          <li><a href="../99-rtkq-code-splitting-injectEndpoints/">99 — injectEndpoints</a>.</li>
+          <li><a href="../94-rtkq-onCacheEntryAdded-streaming/">94 — streaming updates</a>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/created-api/api-slice-utils" target="_blank">RTKQ · api.util</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/manual-cache-updates" target="_blank">RTKQ · Manual Cache Updates</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildSlice.ts" target="_blank">buildSlice.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

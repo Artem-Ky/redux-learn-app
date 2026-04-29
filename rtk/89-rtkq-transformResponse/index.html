@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>89 — transformResponse / transformErrorResponse</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .split-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 880px) { .split-cols { grid-template-columns: 1fr; } }
+    .raw-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-orange);
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      max-height: 260px;
+      overflow: auto;
+      white-space: pre-wrap;
+      color: var(--text-secondary);
+    }
+    .transformed-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--success);
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      max-height: 260px;
+      overflow: auto;
+      white-space: pre-wrap;
+      color: var(--text-bright);
+    }
+    .box-title {
+      font-size: .75rem;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .toggle-bar {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+    .arrow {
+      text-align: center;
+      color: var(--accent);
+      font-size: 1.5rem;
+      padding: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">89 / 106</span>
+      transformResponse — нормализация ответа до cache
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../88-rtkq-tags-granular/">← Назад</a>
+      <a href="../90-rtkq-selectFromResult/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Raw API response ↔ то, что попадает в cache</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Бэкенд отдаёт «обёрнутый» ответ <code>{ data: [...], meta: {...} }</code>. Мы через
+          <code>transformResponse</code> разворачиваем и сразу нормализуем в <code>{ ids, entities }</code>
+          через <code>createEntityAdapter</code>. В кеш попадает <strong>уже готовая</strong> структура.
+        </p>
+
+        <div class="toggle-bar">
+          <button class="btn btn--accent" id="btn-fetch">▶ Перезапросить</button>
+          <button class="btn" id="btn-err">✗ Сымитировать 500 (transformError)</button>
+        </div>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 89. transformResponse / transformErrorResponse</div>
+      <div class="theory__body">
+        <h3>Цитата — Customizing Queries</h3>
+        <div class="quote">
+          «<code>transformResponse</code> is given the full response, and should return a value to be cached.
+          <br>Where successful queries are stored in the cache with this value, failed queries pass their result
+          through <code>transformErrorResponse</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#customizing-query-responses-with-transformresponse" target="_blank">RTKQ · Customizing Query Responses</a>
+        </div>
+        <div class="quote quote--ru">
+          «<strong>transformResponse</strong> — <em>последний шанс</em> поменять данные до того, как они
+          упадут в <code>state.api.queries[cacheKey].data</code>. Выполняется один раз на успешный ответ,
+          результат мемоизируется в кеше.»
+        </div>
+
+        <h3>Сигнатура</h3>
+        <div class="code-block">
+getPosts: build.<span class="fn">query</span>&lt;<span class="type">EntityState</span>&lt;<span class="type">Post</span>&gt;, <span class="type">void</span>&gt;({
+  query: () =&gt; <span class="str">'posts'</span>,
+  <span class="cm">// response — сырой ответ baseQuery, meta — headers/status, arg — то, что передали в query</span>
+  <span class="fn">transformResponse</span>: (response: <span class="type">ApiEnvelope</span>&lt;<span class="type">Post</span>[]&gt;, meta, arg) =&gt; {
+    <span class="kw">return</span> postsAdapter.<span class="fn">setAll</span>(postsAdapter.<span class="fn">getInitialState</span>(), response.data)
+  },
+  <span class="fn">transformErrorResponse</span>: (error: <span class="type">FetchBaseQueryError</span>, meta, arg) =&gt; {
+    <span class="kw">return</span> { code: error.status, message: (error.data <span class="kw">as any</span>)?.message ?? <span class="str">'unknown'</span> }
+  },
+}),
+        </div>
+
+        <h3>Типичные применения</h3>
+        <div class="code-block">
+<span class="cm">// ─── 1. Разворачивание envelope ───</span>
+<span class="fn">transformResponse</span>: (r: { data: <span class="type">Post</span>[]; meta: <span class="type">Meta</span> }) =&gt; r.data,
+
+<span class="cm">// ─── 2. Нормализация через entity adapter ───</span>
+<span class="kw">const</span> adapter = <span class="fn">createEntityAdapter</span>&lt;<span class="type">Post</span>&gt;()
+<span class="fn">transformResponse</span>: (r: <span class="type">Post</span>[]) =&gt;
+  adapter.<span class="fn">setAll</span>(adapter.<span class="fn">getInitialState</span>(), r),
+<span class="cm">// cache.data = { ids: [1,2,3], entities: { 1:..., 2:... } } — O(1) lookup</span>
+
+<span class="cm">// ─── 3. Фильтрация/сортировка на клиенте ───</span>
+<span class="fn">transformResponse</span>: (r: <span class="type">Post</span>[]) =&gt;
+  r.<span class="fn">filter</span>(p =&gt; !p.draft).<span class="fn">sort</span>((a, b) =&gt; b.createdAt - a.createdAt),
+
+<span class="cm">// ─── 4. Обогащение производными полями ───</span>
+<span class="fn">transformResponse</span>: (r: <span class="type">Post</span>[]) =&gt;
+  r.<span class="fn">map</span>(p =&gt; ({ ...p, summary: p.body.<span class="fn">slice</span>(0, 100) })),
+
+<span class="cm">// ─── 5. Объединение данных с мета ───</span>
+<span class="fn">transformResponse</span>: (r: <span class="type">Post</span>[], meta) =&gt; ({
+  items: r,
+  total: <span class="type">Number</span>(meta?.response?.headers.<span class="fn">get</span>(<span class="str">'x-total-count'</span>) ?? r.length),
+}),
+        </div>
+
+        <h3>Почему transformResponse — правильное место для нормализации</h3>
+        <p>
+          Альтернативы — нормализовать в компоненте (<code>useMemo</code>) или в <code>selectFromResult</code>.
+          Оба варианта <strong>перезапускают преобразование на каждом рендере</strong>. А
+          <code>transformResponse</code> выполняется <em>один раз</em> на fulfilled-action, результат сохраняется
+          в store. При всех дальнейших чтениях — та же ссылка на нормализованную структуру (structural sharing
+          работает).
+        </p>
+
+        <h3>Источник — buildThunks.ts</h3>
+        <div class="code-block">
+<span class="cm">// упрощённо из buildThunks.ts — как вызывается transformResponse</span>
+<span class="kw">const</span> transformResponse = endpointDefinition.transformResponse ?? defaultTransformResponse
+<span class="kw">const</span> transformed = <span class="kw">await</span> <span class="fn">transformResponse</span>(result.data, result.meta, arg.originalArgs)
+<span class="kw">return</span> { ...result, data: transformed }
+<span class="cm">// ↑ результат летит в queryThunk.fulfilled → buildSlice записывает transformed в state.api.queries[key].data</span>
+        </div>
+        <p style="font-size: .78rem; color: var(--text-muted);">
+          GitHub:
+          <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildThunks.ts" target="_blank">buildThunks.ts</a>.
+          <code>defaultTransformResponse</code> — identity, просто возвращает data как есть.
+        </p>
+
+        <h3>transformErrorResponse — аналогично, но для ошибок</h3>
+        <div class="code-block">
+<span class="fn">transformErrorResponse</span>: (error: <span class="type">FetchBaseQueryError</span>, meta, arg) =&gt; {
+  <span class="cm">// нормализация ошибки в единый формат:</span>
+  <span class="kw">if</span> (error.status === <span class="str">'FETCH_ERROR'</span>) <span class="kw">return</span> { code: <span class="str">'network'</span>, message: <span class="str">'Нет сети'</span> }
+  <span class="kw">if</span> (error.status === <span class="num">401</span>)         <span class="kw">return</span> { code: <span class="str">'auth'</span>,    message: <span class="str">'Авторизуйтесь'</span> }
+  <span class="kw">return</span> { code: error.status, message: (error.data <span class="kw">as any</span>)?.message ?? <span class="str">'unknown'</span> }
+}
+<span class="cm">// ↑ теперь action.payload.error имеет форму { code, message } — единая структура на весь app</span>
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Async в transformResponse — можно, но осторожно.</strong>
+          <br>Функция <code>async</code> поддерживается. RTKQ <em>await</em>-ит результат. Но помни: время
+          трансформации складывается со временем fetch → UI ждёт дольше. Для тяжёлых трансформаций
+          лучше делать синхронно, а тяжёлые вычисления — мемоизировать селекторами.
+
+          <br><br>
+          <strong>2. НЕ использовать <code>transformResponse</code> для derived data, зависящих от arg.</strong>
+          <br>Трансформация выполняется один раз на fetch — если зависит от аргумента,
+          который меняется без рефетча (например, UI-фильтр) — используй <em>селектор</em>, не trans.
+
+          <br><br>
+          <strong>3. Возврат mutating nested structure ломает structural sharing.</strong>
+          <br>Если каждый вызов создаёт новые ссылки на items, даже если данные те же — RTKQ не увидит
+          идентичности и перерендерит подписчиков. Внутри трансформации используй адаптер или immer.
+
+          <br><br>
+          <strong>4. <code>meta</code> может быть undefined.</strong>
+          <br>Кастомный <code>baseQuery</code> может не передавать meta. Не полагайся на <code>meta!.response</code> —
+          используй optional chaining.
+
+          <br><br>
+          <strong>5. Типизация: возвращаемый тип = тип cache.</strong>
+          <br><code>build.query&lt;TResult, TArg&gt;</code> — <code>TResult</code> это <em>после</em> трансформации.
+          Если пишешь <code>build.query&lt;Post[], void&gt;</code> но <code>transformResponse</code> возвращает
+          <code>EntityState&lt;Post&gt;</code> — ошибка типов. Всегда согласовывай.
+
+          <br><br>
+          <strong>6. В компоненте <code>data</code> — результат трансформации, не raw.</strong>
+          <br><code>const { data } = useGetPostsQuery()</code> — это уже <code>EntityState</code>, а не envelope.
+          Доступ к raw-ответу из компонента не предусмотрен (кешируется только transformed).
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../47-createentityadapter-basics/">47 — createEntityAdapter</a> (для нормализации).</li>
+          <li><a href="../97-rtkq-error-handling/">97 — error handling</a> (единый формат ошибок).</li>
+          <li><a href="../90-rtkq-selectFromResult/">90 — selectFromResult</a> (когда трансформировать поздно).</li>
+          <li><a href="../98-rtkq-base-query-custom/">98 — custom baseQuery</a> (трансформация на уровне transport).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#customizing-query-responses-with-transformresponse" target="_blank">RTKQ · transformResponse</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/core/buildThunks.ts" target="_blank">buildThunks.ts</a></li>
+          <li><a href="https://redux-toolkit.js.org/api/createEntityAdapter" target="_blank">createEntityAdapter reference</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

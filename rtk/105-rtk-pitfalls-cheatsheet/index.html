@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>105 — Топ-15 подводных камней RTK · cheatsheet</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .pit-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-red);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      margin-bottom: 10px;
+    }
+    .pit-card h4 {
+      color: var(--accent-red);
+      font-size: .92rem;
+      margin: 0 0 6px;
+      font-family: var(--font-mono);
+    }
+    .pit-card p { color: var(--text-secondary); font-size: .82rem; margin: 4px 0; line-height: 1.5; }
+    .pit-card code {
+      background: var(--bg-tertiary);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--accent-cyan);
+      font-size: .78rem;
+    }
+    .pit-card .fix {
+      margin-top: 6px;
+      padding: 6px 10px;
+      background: rgba(76,175,80,.05);
+      border-left: 2px solid var(--success);
+      font-size: .78rem;
+    }
+    .pit-card .fix strong { color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">105 / 106</span>
+      Топ-15 подводных камней RTK + RTK Query
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../104-real-world-app/">← Назад</a>
+      <a href="../106-curated-resources/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">15 реальных ошибок из продакшена — что ломает, как чинить</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px;">
+          Список собран из issues redux-toolkit репо, моих код-ревью и опыта. Порядок — по частоте.
+        </p>
+
+        <div class="pit-card">
+          <h4>1. <code>dispatch(actionCreator)</code> вместо <code>dispatch(actionCreator())</code></h4>
+          <p>Забыл вызов — передаёшь САМУ функцию. <code>actionCreatorInvariantMiddleware</code> в dev
+          это ловит и варнит, но в prod — молчит. State не обновляется, бага час ищется.</p>
+          <div class="fix"><strong>Fix:</strong> <code>dispatch(increment())</code>. Всегда вызывай с скобками.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>2. Мутация в reducer возвращающем значение</h4>
+          <p><code>(state) =&gt; { state.count++; return state.count; }</code> — Immer ругается:
+          «you can either mutate the draft OR return a new value, not both».</p>
+          <div class="fix"><strong>Fix:</strong> или только мутируй (<code>state.count++</code>), или только возвращай
+          (<code>return { ...state, count: state.count + 1 }</code>). Нельзя совмещать.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>3. non-serializable в state (Date, Map, class instance)</h4>
+          <p><code>serializableStateInvariantMiddleware</code> ловит: «non-serializable value was detected».
+          DevTools time-travel ломается.</p>
+          <div class="fix"><strong>Fix:</strong> храни строку ISO (<code>new Date().toISOString()</code>) или
+          number (<code>Date.now()</code>). Для <code>Map/Set</code> — конвертируй в объект/массив, или
+          добавь в <code>ignoredPaths</code>.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>4. <code>extraReducers</code> в объект-форме (deprecated)</h4>
+          <p>Старый синтаксис <code>extraReducers: { [action.type]: reducer }</code> — удалён в RTK 2.x
+          для TypeScript. Теперь только builder callback.</p>
+          <div class="fix"><strong>Fix:</strong> <code>extraReducers: (builder) =&gt; builder.addCase(action, reducer)</code>.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>5. Shallow update в <code>entityAdapter.updateOne</code> с nested</h4>
+          <p><code>updateOne({ id, changes: { profile: { name: 'X' } } })</code> — <code>age</code> в profile
+          потеряется (shallow merge).</p>
+          <div class="fix"><strong>Fix:</strong> делай полный <code>profile</code> или пиши свой reducer:
+          <code>state.entities[id].profile.name = 'X'</code> (Immer draft).</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>6. Несколько <code>createApi</code> в одном проекте</h4>
+          <p>Каждый createApi — отдельный reducer, отдельный middleware, отдельные теги. Tags одного api
+          НЕ инвалидируют queries другого. Создаётся путаница.</p>
+          <div class="fix"><strong>Fix:</strong> один тонкий root createApi + <code>injectEndpoints</code>
+          в feature-модулях. См. урок 99.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>7. <code>keepUnusedDataFor: 0</code> — ловушка для tabs</h4>
+          <p>Переключаешь вкладку → unmount → entry умирает мгновенно → возврат → fetch. За 1 минуту
+          активного переключения — 30 запросов.</p>
+          <div class="fix"><strong>Fix:</strong> 5-10 секунд достаточно. Или держи «высшую» подписку
+          на уровне layout компонента (он не анмаунтится).</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>8. Забытый <code>setupListeners</code></h4>
+          <p><code>refetchOnFocus</code> / <code>refetchOnReconnect</code> не работают молча — нет ошибки,
+          просто не триггерится.</p>
+          <div class="fix"><strong>Fix:</strong> в store.ts один раз: <code>setupListeners(store.dispatch)</code>
+          после <code>configureStore</code>.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>9. <code>serializeQueryArgs</code> с нестабильными объектами в args</h4>
+          <p><code>useGetPosts({ filter: new Date() })</code> — каждый рендер новый Date → новый cacheKey →
+          бесконечный fetch. В DevTools видны 100+ entries.</p>
+          <div class="fix"><strong>Fix:</strong> нормализуй args в примитив (<code>date.toISOString()</code>)
+          или оберни в <code>useMemo</code>. Или кастомный <code>serializeQueryArgs</code>.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>10. Забытый <code>as const</code> в tag / payload</h4>
+          <p><code>{ type: 'Post', id: 5 }</code> — TS выведет <code>type: string</code>, RTKQ скажет
+          «tag 'Post' not in tagTypes».</p>
+          <div class="fix"><strong>Fix:</strong> <code>{ type: 'Post' as const, id: 5 }</code> или
+          <code>tagTypes: ['Post'] as const</code>.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>11. Забытый <code>prepare</code> для <code>Date.now()</code> / nanoid</h4>
+          <p>Генерация id / timestamp в reducer — нарушает чистоту. Два dispatch с теми же args
+          дадут разный state. Time-travel ломается.</p>
+          <div class="fix"><strong>Fix:</strong> используй <code>prepare</code> callback:
+          <code>addTodo: { reducer, prepare: (text) =&gt; ({ payload: { id: nanoid(), text, createdAt: Date.now() } }) }</code>.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>12. Двойной импорт <code>createApi</code> из разных entry points</h4>
+          <p><code>import { createApi } from '@reduxjs/toolkit/query'</code> (без хуков) vs
+          <code>from '@reduxjs/toolkit/query/react'</code> (с хуками). Разные versions API в одном проекте
+          → middleware conflict.</p>
+          <div class="fix"><strong>Fix:</strong> в React-проекте всегда импортируй из
+          <code>@reduxjs/toolkit/query/react</code>. Одинаково везде.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>13. <code>useSelector</code> на огромный объект без shallowEqual</h4>
+          <p><code>useSelector(state => state.api.queries)</code> — ререндерится на любое изменение
+          любой cache entry. Тормозит всё приложение.</p>
+          <div class="fix"><strong>Fix:</strong> <code>useSelector(selectSpecific, shallowEqual)</code>
+          или <code>selectFromResult</code> в хуке (см. урок 90).</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>14. Возврат draft из reducer</h4>
+          <p><code>(state) =&gt; { state.foo = 1; return state }</code> — Immer считает что ты вернул
+          draft = это плохой паттерн, warn в dev.</p>
+          <div class="fix"><strong>Fix:</strong> ничего не возвращай если мутируешь:
+          <code>(state) =&gt; { state.foo = 1 }</code>. Либо <code>return { ...state, foo: 1 }</code>
+          без мутаций.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>15. <code>console.log(state)</code> в reducer вместо <code>current()</code></h4>
+          <p>Лог покажет Immer Proxy со странной нотацией — не понятно что происходит.</p>
+          <div class="fix"><strong>Fix:</strong>
+          <code>import { current } from '@reduxjs/toolkit'; console.log(current(state))</code>.
+          Для состояния <em>до</em> мутаций — <code>original(state)</code>.</div>
+        </div>
+
+        <h3 style="color: var(--accent-cyan); font-family: var(--font-mono); margin-top: 24px;">
+          Специфичные для RTK Query:
+        </h3>
+
+        <div class="pit-card">
+          <h4>16. <code>updateQueryData</code> — noop если нет entry</h4>
+          <p>Optimistic update не применяется — компонент с <code>useGetX</code> не смонтирован.</p>
+          <div class="fix"><strong>Fix:</strong> проверь через <code>api.endpoints.X.select(arg)(state).status === 'fulfilled'</code>
+          или используй <code>upsertQueryData</code>.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>17. Tags invalidation без подписчиков — ленивая</h4>
+          <p>Mutation инвалидировала, но компонента со списком нет → refetch НЕ произойдёт. Следующий
+          mount увидит «старые + invalid» → рефетч при открытии.</p>
+          <div class="fix"><strong>Fix:</strong> это осознанный выбор RTKQ. Если нужна мгновенная
+          реакция — <code>api.util.updateQueryData</code> руками.</div>
+        </div>
+
+        <div class="pit-card">
+          <h4>18. <code>isLoading</code> vs <code>isFetching</code> путаница</h4>
+          <p>Показываешь <code>if (isLoading) &lt;Spinner /&gt;</code> — при refetch'е спиннер не
+          появляется (это isFetching).</p>
+          <div class="fix"><strong>Fix:</strong> <code>isLoading</code> — только первая загрузка.
+          <code>isFetching</code> — любая. Для спиннера на refetch используй <code>isFetching</code>.
+          См. урок 96.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 105. Cheatsheet ссылок</div>
+      <div class="theory__body">
+        <h3>Топ ресурсов — решение подводных камней</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/usage/immer-reducers" target="_blank">Writing Reducers with Immer</a> — камни 2, 14</li>
+          <li><a href="https://redux-toolkit.js.org/api/serializabilityMiddleware" target="_blank">Serializable Middleware</a> — камень 3</li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#customizing-query-hook-behavior" target="_blank">serializeQueryArgs</a> — камень 9</li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage-with-typescript" target="_blank">TS Usage</a> — камень 10</li>
+          <li><a href="https://redux-toolkit.js.org/api/createAction#prepare" target="_blank">prepare callback</a> — камень 11</li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/setupListeners" target="_blank">setupListeners</a> — камень 8</li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/manual-cache-updates" target="_blank">Manual Cache</a> — камни 16, 17</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

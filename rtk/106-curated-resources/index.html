@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>106 — Куда дальше · curated resources</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .res-section {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+    .res-section h3 {
+      color: var(--accent-cyan);
+      font-size: 1rem;
+      margin: 0 0 10px;
+      font-family: var(--font-mono);
+    }
+    .res-link {
+      display: block;
+      padding: 6px 10px;
+      margin-bottom: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .res-link:hover { background: var(--bg-hover); }
+    .res-link__title {
+      color: var(--accent-yellow);
+      font-weight: 600;
+      font-family: var(--font-mono);
+      font-size: .85rem;
+    }
+    .res-link__desc {
+      color: var(--text-secondary);
+      font-size: .76rem;
+      margin-top: 2px;
+    }
+    .res-link__type {
+      font-size: .68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-left: 8px;
+    }
+    .final-card {
+      background: linear-gradient(180deg, var(--bg-panel), var(--bg-tertiary));
+      border: 1px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      text-align: center;
+      margin-top: 20px;
+    }
+    .final-card h2 {
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      margin: 0 0 10px;
+    }
+    .final-card p { color: var(--text-secondary); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">106 / 106</span>
+      Куда дальше — curated resources (финал курса)
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../105-rtk-pitfalls-cheatsheet/">← Назад</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Курс окончен — что дальше читать, смотреть, пробовать</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px;">
+          Подборка ресурсов, которые реально двигают вперёд. Порядок — от базы к продвинутому.
+        </p>
+
+        <div class="res-section">
+          <h3>📚 Официальная документация</h3>
+          <a class="res-link" href="https://redux-toolkit.js.org/" target="_blank">
+            <span class="res-link__title">Redux Toolkit docs</span>
+            <span class="res-link__type">[docs]</span>
+            <div class="res-link__desc">Главный источник истины. Начинай с Getting Started и API reference.</div>
+          </a>
+          <a class="res-link" href="https://redux-toolkit.js.org/rtk-query/overview" target="_blank">
+            <span class="res-link__title">RTK Query docs</span>
+            <span class="res-link__type">[docs]</span>
+            <div class="res-link__desc">Отдельный раздел — всё про queries, mutations, caching, tags.</div>
+          </a>
+          <a class="res-link" href="https://redux.js.org/tutorials/essentials/part-1-overview-concepts" target="_blank">
+            <span class="res-link__title">Redux Essentials Tutorial</span>
+            <span class="res-link__type">[tutorial]</span>
+            <div class="res-link__desc">Официальный туториал — 8 частей, практика с todos → full-stack. Современный, на RTK.</div>
+          </a>
+          <a class="res-link" href="https://redux.js.org/style-guide/" target="_blank">
+            <span class="res-link__title">Redux Style Guide</span>
+            <span class="res-link__type">[docs]</span>
+            <div class="res-link__desc">Правила: что рекомендуется, что необязательно. Читать целиком — 30 минут.</div>
+          </a>
+        </div>
+
+        <div class="res-section">
+          <h3>🔧 Исходники и внутренности</h3>
+          <a class="res-link" href="https://github.com/reduxjs/redux-toolkit/tree/master/packages/toolkit/src" target="_blank">
+            <span class="res-link__title">redux-toolkit — src/</span>
+            <span class="res-link__type">[source]</span>
+            <div class="res-link__desc">Реальный код. createSlice, configureStore, createAsyncThunk, RTK Query — всё тут.</div>
+          </a>
+          <a class="res-link" href="https://github.com/reduxjs/redux-toolkit/tree/master/packages/toolkit/src/query/core" target="_blank">
+            <span class="res-link__title">RTK Query core/</span>
+            <span class="res-link__type">[source]</span>
+            <div class="res-link__desc">buildSlice, buildInitiate, buildMiddleware — смотри чтобы понять lifecycle.</div>
+          </a>
+          <a class="res-link" href="https://github.com/immerjs/immer" target="_blank">
+            <span class="res-link__title">Immer</span>
+            <span class="res-link__type">[library]</span>
+            <div class="res-link__desc">Встроен в RTK. Понимание proxies и patches поможет глубже копать.</div>
+          </a>
+          <a class="res-link" href="https://github.com/reduxjs/reselect" target="_blank">
+            <span class="res-link__title">Reselect</span>
+            <span class="res-link__type">[library]</span>
+            <div class="res-link__desc">createSelector, weakMapMemoize. Основа мемоизации.</div>
+          </a>
+        </div>
+
+        <div class="res-section">
+          <h3>✍️ Блоги / статьи (глубоко)</h3>
+          <a class="res-link" href="https://blog.isquaredsoftware.com/" target="_blank">
+            <span class="res-link__title">Mark Erikson's blog (isquaredsoftware)</span>
+            <span class="res-link__type">[blog]</span>
+            <div class="res-link__desc">Мейнтейнер Redux. Пишет о решениях архитектуры, RTK history, best practices.</div>
+          </a>
+          <a class="res-link" href="https://tkdodo.eu/blog/practical-react-query" target="_blank">
+            <span class="res-link__title">Thinking in React Query — TkDodo</span>
+            <span class="res-link__type">[blog]</span>
+            <div class="res-link__desc">Для React Query, но 80% идей применимы к RTKQ — ментальные модели data-fetching.</div>
+          </a>
+          <a class="res-link" href="https://redux-toolkit.js.org/usage/migrating-rtk-2" target="_blank">
+            <span class="res-link__title">Migrating to RTK 2.0</span>
+            <span class="res-link__type">[docs]</span>
+            <div class="res-link__desc">Что изменилось в RTK 2.x — breaking changes, autobatch, combineSlices.</div>
+          </a>
+        </div>
+
+        <div class="res-section">
+          <h3>🎥 Курсы / видео</h3>
+          <a class="res-link" href="https://egghead.io/courses/rtk-query-basics-query-endpoints-data-flow-and-typescript-57ea3c43" target="_blank">
+            <span class="res-link__title">RTK Query Basics — Egghead (Lenz Weber)</span>
+            <span class="res-link__type">[course]</span>
+            <div class="res-link__desc">От мейнтейнера RTK Query. Бесплатный, ~1 час. Query endpoints, data flow, TS.</div>
+          </a>
+          <a class="res-link" href="https://www.youtube.com/@MarkErikson/videos" target="_blank">
+            <span class="res-link__title">Mark Erikson — YouTube (conf talks)</span>
+            <span class="res-link__type">[video]</span>
+            <div class="res-link__desc">«Why Redux Toolkit is How To Use Redux Today», архитектурные доклады.</div>
+          </a>
+          <a class="res-link" href="https://www.youtube.com/playlist?list=PLQ_IRFkDInv_tVL_tloQoCvvLINzPAXvy" target="_blank">
+            <span class="res-link__title">Redux Essentials — YouTube playlist</span>
+            <span class="res-link__type">[video]</span>
+            <div class="res-link__desc">Видео-версия официального туториала. Для тех кому удобнее смотреть.</div>
+          </a>
+        </div>
+
+        <div class="res-section">
+          <h3>🛠 Инструменты</h3>
+          <a class="res-link" href="https://github.com/reduxjs/redux-devtools" target="_blank">
+            <span class="res-link__title">Redux DevTools (extension)</span>
+            <span class="res-link__type">[tool]</span>
+            <div class="res-link__desc">Chrome/Firefox расширение. Time-travel debugging, dispatch из DT, jump, skip.</div>
+          </a>
+          <a class="res-link" href="https://redux-toolkit.js.org/rtk-query/usage/code-generation" target="_blank">
+            <span class="res-link__title">@rtk-query/codegen-openapi</span>
+            <span class="res-link__type">[tool]</span>
+            <div class="res-link__desc">Генерация endpoints из OpenAPI / Swagger. Экономит часы boilerplate.</div>
+          </a>
+          <a class="res-link" href="https://redux-toolkit.js.org/rtk-query/usage/code-generation#rtk-query-graphql-codegen-plugin" target="_blank">
+            <span class="res-link__title">@graphql-codegen/typescript-rtk-query</span>
+            <span class="res-link__type">[tool]</span>
+            <div class="res-link__desc">Кодогенерация из GraphQL schema → typed RTKQ endpoints.</div>
+          </a>
+        </div>
+
+        <div class="res-section">
+          <h3>💬 Сообщество</h3>
+          <a class="res-link" href="https://www.reddit.com/r/reactjs/" target="_blank">
+            <span class="res-link__title">r/reactjs</span>
+            <span class="res-link__type">[forum]</span>
+            <div class="res-link__desc">Обсуждения RTK, проблемы архитектуры. Mark Erikson часто отвечает сам.</div>
+          </a>
+          <a class="res-link" href="https://discord.com/invite/reactiflux" target="_blank">
+            <span class="res-link__title">Reactiflux Discord</span>
+            <span class="res-link__type">[chat]</span>
+            <div class="res-link__desc">Каналы #redux, #react — быстрые вопросы, live help.</div>
+          </a>
+          <a class="res-link" href="https://github.com/reduxjs/redux-toolkit/issues" target="_blank">
+            <span class="res-link__title">RTK GitHub Issues</span>
+            <span class="res-link__type">[repo]</span>
+            <div class="res-link__desc">Читай closed — 90% твоих проблем уже решены. Issues — хроника багов и features.</div>
+          </a>
+        </div>
+
+        <div class="res-section">
+          <h3>📖 Связанные темы (углубление)</h3>
+          <a class="res-link" href="https://tanstack.com/query/latest" target="_blank">
+            <span class="res-link__title">TanStack Query (React Query)</span>
+            <span class="res-link__type">[alt]</span>
+            <div class="res-link__desc">Альтернатива RTKQ для проектов без Redux. Полезно сравнить API.</div>
+          </a>
+          <a class="res-link" href="https://swr.vercel.app/" target="_blank">
+            <span class="res-link__title">SWR</span>
+            <span class="res-link__type">[alt]</span>
+            <div class="res-link__desc">Минималистичная альтернатива. Vercel / Next.js friendly.</div>
+          </a>
+          <a class="res-link" href="https://xstate.js.org/" target="_blank">
+            <span class="res-link__title">XState</span>
+            <span class="res-link__type">[related]</span>
+            <div class="res-link__desc">Когда Redux — overkill: state machines для сложной UI-логики.</div>
+          </a>
+          <a class="res-link" href="https://jotai.org/" target="_blank">
+            <span class="res-link__title">Jotai / Zustand</span>
+            <span class="res-link__type">[alt]</span>
+            <div class="res-link__desc">Лёгкие state-libs без boilerplate. Для простых проектов.</div>
+          </a>
+        </div>
+
+        <div class="final-card">
+          <h2>🎓 Курс завершён</h2>
+          <p style="max-width: 600px; margin: 0 auto;">
+            106 уроков · от <code>configureStore</code> до infinite queries и streaming.
+            Теперь у тебя полная картина <strong>Redux Toolkit + RTK Query</strong> — хватит на любой
+            production-проект.
+          </p>
+          <p style="margin-top: 14px; color: var(--text-muted);">
+            Следующий шаг — построй свой микро-проект, который бы использовал всё из этого курса.
+            Books CRUD (урок 104) — хороший старт для расширения.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="theory">
+      <div class="theory__header">Итоги курса</div>
+      <div class="theory__body">
+        <h3>Что ты теперь умеешь</h3>
+        <ul>
+          <li>Настраивать <code>configureStore</code> с middleware и enhancers — и понимать, что каждый делает.</li>
+          <li>Писать <code>createSlice</code> во всех формах (basic, prepare, extraReducers, creator callback).</li>
+          <li>Использовать <code>createAsyncThunk</code> с thunkAPI, rejectWithValue, condition, signal.</li>
+          <li>Нормализовать state через <code>createEntityAdapter</code>.</li>
+          <li>Писать реактивную логику через <code>listenerMiddleware</code>.</li>
+          <li>Строить типизированный data fetching на <strong>RTK Query</strong> с тегами, optimistic updates,
+          streaming, infinite queries, code splitting.</li>
+          <li>Отлаживать через Redux DevTools, понимать внутренности (cacheKey, state.api, lifecycle).</li>
+          <li>Избегать топ-15 подводных камней (урок 105).</li>
+        </ul>
+
+        <h3>Благодарности</h3>
+        <p>Курс основан на:</p>
+        <ul>
+          <li>Официальной доке <code>@reduxjs/toolkit</code>.</li>
+          <li>Исходниках репо (commit master на момент написания).</li>
+          <li>Статьях Mark Erikson и TkDodo.</li>
+          <li>Реальном опыте продакшен-проектов.</li>
+        </ul>
+
+        <h3>Возвращайся сюда</h3>
+        <p>Все 106 уроков — интерактивные. Демо работают оффлайн (mock-сеть). Открывай урок, когда
+        что-то забыл — быстрее чем снова гуглить доку.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

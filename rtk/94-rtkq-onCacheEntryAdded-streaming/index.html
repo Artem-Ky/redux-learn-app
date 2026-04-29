@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>94 — Streaming updates · onCacheEntryAdded (WebSocket)</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .chat {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      max-height: 320px;
+      overflow: auto;
+    }
+    .msg {
+      padding: 6px 10px;
+      margin-bottom: 4px;
+      background: var(--bg-tertiary);
+      border-left: 3px solid var(--accent);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: .8rem;
+      animation: slideIn 0.3s;
+    }
+    .msg.me { border-left-color: var(--success); }
+    .msg.server { border-left-color: var(--accent-cyan); }
+    @keyframes slideIn {
+      from { transform: translateY(-8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .msg__head {
+      display: flex;
+      justify-content: space-between;
+      font-size: .7rem;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+    .msg__user { color: var(--accent-yellow); }
+    .send-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .send-bar input {
+      flex: 1;
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+    }
+    .ws-status {
+      padding: 6px 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .ws-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .ws-indicator.open { background: var(--success); animation: pulse 2s infinite; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(76,175,80,0.7); }
+      50% { box-shadow: 0 0 0 6px rgba(76,175,80,0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">94 / 106</span>
+      Streaming updates · onCacheEntryAdded + WebSocket
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../93-rtkq-onQueryStarted-optimistic/">← Назад</a>
+      <a href="../95-rtkq-manual-cache/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">WebSocket → updateCachedData → компоненты ререндерятся</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          <code>onCacheEntryAdded</code> открывает <em>долгоживущий канал</em> (WS, SSE, GraphQL sub)
+          привязанный к жизни cache entry. Сервер (мок) сам шлёт новые сообщения каждые 2 секунды.
+        </p>
+
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 94. onCacheEntryAdded + streaming</div>
+      <div class="theory__body">
+        <h3>Цитата — Streaming Updates</h3>
+        <div class="quote">
+          «<code>onCacheEntryAdded</code> is called when a new cache entry is added to the cache.
+          It can be used to set up a long-lived connection (WebSocket, Server-Sent Events) and
+          feed updates to the cache via <code>updateCachedData</code>, cleanly tied to the entry's
+          lifecycle.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/streaming-updates" target="_blank">RTKQ · Streaming Updates</a>
+        </div>
+        <div class="quote quote--ru">
+          «Когда первый подписчик появился → <code>onCacheEntryAdded</code> запустится. Закрывай
+          WS в <code>cacheEntryRemoved</code> — это момент когда последний подписчик отпал и
+          keepUnusedDataFor догорел. Никакой ручной жизни соединения.»
+        </div>
+
+        <h3>Канонический паттерн — чат через WS</h3>
+        <div class="code-block">
+getMessages: build.<span class="fn">query</span>&lt;<span class="type">Message</span>[], <span class="type">string</span>&gt;({
+  query: (channelId) =&gt; <span class="str">`messages/</span><span class="kw">${</span>channelId<span class="kw">}</span><span class="str">`</span>,  <span class="cm">// initial history</span>
+
+  <span class="kw">async</span> <span class="fn">onCacheEntryAdded</span>(
+    channelId,
+    { updateCachedData, cacheDataLoaded, cacheEntryRemoved },
+  ) {
+    <span class="kw">const</span> ws = <span class="kw">new</span> <span class="fn">WebSocket</span>(<span class="str">`wss://api/chat/</span><span class="kw">${</span>channelId<span class="kw">}</span><span class="str">`</span>)
+
+    <span class="kw">try</span> {
+      <span class="cm">// 1. Ждём первый fulfilled (initial history загружена в cache)</span>
+      <span class="kw">await</span> cacheDataLoaded
+
+      <span class="cm">// 2. Подписываемся на сообщения</span>
+      <span class="kw">const</span> listener = (event: <span class="type">MessageEvent</span>) =&gt; {
+        <span class="kw">const</span> msg: <span class="type">Message</span> = <span class="type">JSON</span>.<span class="fn">parse</span>(event.data)
+        <span class="fn">updateCachedData</span>((draft) =&gt; {
+          draft.<span class="fn">push</span>(msg)
+        })
+      }
+      ws.<span class="fn">addEventListener</span>(<span class="str">'message'</span>, listener)
+    } <span class="kw">catch</span> { <span class="cm">/* cacheDataLoaded rejected — игнорим */</span> }
+
+    <span class="cm">// 3. Ждём пока entry «умрёт» (последний подписчик + keepUnusedDataFor догорел)</span>
+    <span class="kw">await</span> cacheEntryRemoved
+    ws.<span class="fn">close</span>()
+  },
+}),
+        </div>
+
+        <h3>4 объекта из <code>MutationCacheLifecycleApi</code></h3>
+        <div class="code-block">
+<span class="kw">async</span> <span class="fn">onCacheEntryAdded</span>(arg, api) {
+  <span class="kw">const</span> {
+    <span class="cm">// тот же `dispatch` и `getState`, что в thunks</span>
+    dispatch,
+    getState,
+
+    <span class="cm">// Immer-рецепт для cached data</span>
+    updateCachedData: (recipe: (draft) =&gt; <span class="kw">void</span>) =&gt; <span class="kw">void</span>,
+
+    <span class="cm">// Promise — resolves когда cache.data впервые получил значение (fulfilled)</span>
+    cacheDataLoaded: <span class="type">Promise</span>&lt;{ data: <span class="type">T</span>, meta }&gt;,
+
+    <span class="cm">// Promise — resolves когда entry будет удалена (после keepUnusedDataFor)</span>
+    cacheEntryRemoved: <span class="type">Promise</span>&lt;<span class="kw">void</span>&gt;,
+
+    <span class="cm">// снимок текущей entry</span>
+    getCacheEntry: () =&gt; <span class="type">QueryResultSelectorResult</span>,
+  } = api
+}
+        </div>
+
+        <h3>Альтернатива — SSE</h3>
+        <div class="code-block">
+<span class="kw">async</span> <span class="fn">onCacheEntryAdded</span>(arg, { updateCachedData, cacheDataLoaded, cacheEntryRemoved }) {
+  <span class="kw">const</span> es = <span class="kw">new</span> <span class="fn">EventSource</span>(<span class="str">'/stream/prices'</span>)
+
+  <span class="kw">try</span> {
+    <span class="kw">await</span> cacheDataLoaded
+    es.<span class="fn">addEventListener</span>(<span class="str">'price'</span>, (e) =&gt; {
+      <span class="kw">const</span> tick = <span class="type">JSON</span>.<span class="fn">parse</span>(e.data)
+      <span class="fn">updateCachedData</span>((draft) =&gt; { draft[tick.symbol] = tick.price })
+    })
+  } <span class="kw">catch</span> {}
+
+  <span class="kw">await</span> cacheEntryRemoved
+  es.<span class="fn">close</span>()
+}
+        </div>
+
+        <h3>Полный цикл от mount до cleanup</h3>
+        <div class="code-block">
+<span class="cm">// 1. Первый useGetMessagesQuery → subscription created → cache entry added</span>
+<span class="cm">//    → RTKQ вызывает onCacheEntryAdded(arg, api)</span>
+
+<span class="cm">// 2. Initial fetch запускается параллельно → fulfilled</span>
+<span class="cm">//    → cacheDataLoaded.resolve(data)</span>
+
+<span class="cm">// 3. Твой код: new WebSocket() → подписываешься на WS.onmessage</span>
+<span class="cm">//    → каждое сообщение → updateCachedData((draft) => draft.push(msg))</span>
+
+<span class="cm">// 4. Все подписчики отписались → refCount=0 → стартует keepUnusedDataFor</span>
+<span class="cm">//    таймер → removeQueryResult → cacheEntryRemoved.resolve()</span>
+
+<span class="cm">// 5. Твой код после await: ws.close() → GC</span>
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. onCacheEntryAdded вызывается ОДИН раз на создание entry.</strong>
+          <br>Не на каждый subscribe, не на refetch. Если entry уже есть — не вызовется.
+          Если ты в ней читаешь <code>getState</code> — снимок только на момент создания.
+
+          <br><br>
+          <strong>2. Обязательно закрывай ресурс в cacheEntryRemoved.</strong>
+          <br>Иначе WebSocket будет жить, даже когда компонент давно unmount'ился. Classic leak.
+
+          <br><br>
+          <strong>3. cacheDataLoaded может REJECT.</strong>
+          <br>Если initial fetch упал — <code>await cacheDataLoaded</code> бросит. Оберни в
+          try/catch иначе код после await не выполнится.
+
+          <br><br>
+          <strong>4. updateCachedData — Immer-рецепт, не replace data.</strong>
+          <br>Внутри мутируй <code>draft</code>. Если хочешь полностью заменить — делай
+          <code>draft.splice(0); draft.push(...newArr)</code> или возвращай новый массив
+          (как в createReducer).
+
+          <br><br>
+          <strong>5. Не забудь про CORS/origin для WS в моках.</strong>
+          <br>Mock-WS через in-memory EventTarget (как в этом демо) — OK для dev. В проде —
+          ws:// vs wss:// + heartbeat + reconnect.
+
+          <br><br>
+          <strong>6. Streaming != polling.</strong>
+          <br>WS/SSE — серверный push, минимум latency, бесконечно открытое соединение.
+          Polling — клиент сам тыкает сервер с интервалом. Если сервер не умеет WS — polling
+          через <code>pollingInterval</code> (урок 91).
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../91-rtkq-skip-options/">91 — pollingInterval</a> (альтернатива push).</li>
+          <li><a href="../93-rtkq-onQueryStarted-optimistic/">93 — onQueryStarted</a> (другой lifecycle hook).</li>
+          <li><a href="../92-rtkq-keepunuseddatafor-cleanup/">92 — cacheEntryRemoved когда</a>.</li>
+          <li><a href="../101-rtkq-query-lifecycle-internals/">101 — полный lifecycle</a>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/streaming-updates" target="_blank">RTKQ · Streaming Updates</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/created-api/endpoints#oncacheentryadded" target="_blank">Endpoint · onCacheEntryAdded</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

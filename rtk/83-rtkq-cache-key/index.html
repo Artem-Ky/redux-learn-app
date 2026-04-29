@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>83 — cacheKey + serializeQueryArgs</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .key-preview {
+      background: var(--bg-panel);
+      border-left: 3px solid var(--accent-cyan);
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      color: var(--accent-cyan);
+      white-space: pre-wrap;
+      margin: 10px 0;
+    }
+
+    .cache-entry {
+      display: grid;
+      grid-template-columns: 1fr 80px 80px;
+      gap: 10px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      align-items: center;
+    }
+    .cache-entry.new { background: rgba(76,175,80,.08); }
+    .cache-entry.hit { animation: hitFlash 1.1s ease-out; }
+    .cache-entry.miss { animation: missFlash 1.1s ease-out; }
+    @keyframes hitFlash {
+      0%   { background: rgba(76,175,80,.40); box-shadow: inset 3px 0 0 var(--success); }
+      100% { background: transparent; box-shadow: none; }
+    }
+    @keyframes missFlash {
+      0%   { background: rgba(229,192,123,.40); box-shadow: inset 3px 0 0 #e5c07b; }
+      100% { background: transparent; box-shadow: none; }
+    }
+    .cache-entry__key { color: var(--accent-cyan); word-break: break-all; }
+    .cache-entry__status {
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: .72rem;
+      text-align: center;
+    }
+    .cache-entry__status.pending { background: rgba(86,156,214,.2); color: var(--accent); }
+    .cache-entry__status.fulfilled { background: rgba(76,175,80,.2); color: var(--success); }
+    .cache-entry__status.rejected { background: rgba(244,71,71,.2); color: var(--accent-red); }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 1fr 100px;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0;
+    }
+    .input-row label { font-size: .85rem; color: var(--text-secondary); }
+    .input-row input, .input-row select {
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .82rem;
+    }
+
+    .endpoint-sel {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .endpoint-sel button {
+      flex: 1;
+    }
+
+    .cache-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      margin: 10px 0;
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    .result-banner {
+      margin: 10px 0;
+      padding: 10px 14px;
+      background: var(--bg-panel);
+      border-left: 4px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      color: var(--text-secondary);
+      display: grid;
+      grid-template-columns: 100px 1fr 120px;
+      gap: 10px;
+      align-items: center;
+      transition: border-color .25s, background .25s;
+    }
+    .result-banner.hit  { border-left-color: var(--success);    background: rgba(76,175,80,.10); }
+    .result-banner.miss { border-left-color: #e5c07b;           background: rgba(229,192,123,.12); }
+    .result-banner.err  { border-left-color: var(--accent-red); background: rgba(244,71,71,.10); }
+    .result-banner__badge {
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: .05em;
+      padding: 6px 0;
+      border-radius: 4px;
+      font-size: .86rem;
+      background: var(--bg-tertiary);
+      color: var(--text-muted);
+    }
+    .result-banner.hit  .result-banner__badge { background: rgba(76,175,80,.22);  color: var(--success); }
+    .result-banner.miss .result-banner__badge { background: rgba(229,192,123,.22); color: #e5c07b; }
+    .result-banner.err  .result-banner__badge { background: rgba(244,71,71,.22);  color: var(--accent-red); }
+    .result-banner__key { color: var(--accent-cyan); word-break: break-all; font-size: .78rem; }
+    .result-banner__timing { text-align: right; color: var(--text-muted); font-size: .76rem; }
+    .result-banner__timing strong { color: var(--text-bright); font-size: .86rem; }
+
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .stat {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+    .stat__label { font-size: .68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
+    .stat__value { font-size: 1.3rem; font-weight: 700; margin-top: 2px; }
+    .stat--dispatch .stat__value { color: var(--text-bright); }
+    .stat--hit      .stat__value { color: var(--success); }
+    .stat--miss     .stat__value { color: #e5c07b; }
+    .stat--network  .stat__value { color: var(--accent-cyan); }
+
+    .history {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      max-height: 180px;
+      overflow: auto;
+      margin: 10px 0;
+    }
+    .history-row {
+      display: grid;
+      grid-template-columns: 60px 60px 1fr 70px;
+      gap: 8px;
+      padding: 3px 6px;
+      border-bottom: 1px dashed var(--border);
+      font-family: var(--font-mono);
+      font-size: .74rem;
+      align-items: center;
+    }
+    .history-row:last-child { border-bottom: none; }
+    .history-row__num { color: var(--text-muted); text-align: right; }
+    .history-row__tag {
+      text-align: center;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: .66rem;
+      font-weight: 700;
+    }
+    .history-row__tag.hit  { background: rgba(76,175,80,.2);  color: var(--success); }
+    .history-row__tag.miss { background: rgba(229,192,123,.2); color: #e5c07b; }
+    .history-row__tag.err  { background: rgba(244,71,71,.2);  color: var(--accent-red); }
+    .history-row__key { color: var(--accent-cyan); word-break: break-all; }
+    .history-row__ms { color: var(--text-muted); text-align: right; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">83 / 106</span>
+      cacheKey — как RTKQ выбирает, кэшировать или сходить в сеть
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../82-rtkq-usequery-hook/">← Назад</a>
+      <a href="../84-rtkq-state-shape/">Далее → state.api shape</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">serializeQueryArgs → cacheKey → state.api.queries[cacheKey]</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem;">
+          <strong>cacheKey</strong> = <code>endpointName + '(' + serializedArgs + ')'</code>.
+          По умолчанию args сериализуются через <code>JSON.stringify</code> с <em>отсортированными ключами</em>.
+          Одинаковые args по значению → один cacheKey → один network call. Поиграй с аргументами ниже —
+          и смотри, когда появляется новая строка в cache, а когда реюзается старая.
+        </p>
+
+        <div class="endpoint-sel">
+          <button class="btn btn--accent" data-endpoint="getUserById">▶ getUserById(id: number)</button>
+          <button class="btn btn--accent" data-endpoint="searchUsers">▶ searchUsers({query, page, sortBy})</button>
+          <button class="btn" id="reset-cache">reset cache</button>
+        </div>
+
+        <div id="endpoint-form"></div>
+
+        <h4 style="color: var(--text-bright); font-size: .92rem; margin: 16px 0 6px;">
+          Будущий cacheKey (до dispatch)
+        </h4>
+        <div class="key-preview" id="preview-key">—</div>
+
+        <h4 style="color: var(--text-bright); font-size: .92rem; margin: 16px 0 6px;">
+          Последний dispatch
+        </h4>
+        <div class="result-banner" id="result-banner">
+          <div class="result-banner__badge" id="result-badge">IDLE</div>
+          <div class="result-banner__key" id="result-key">— нажми ▶ dispatch —</div>
+          <div class="result-banner__timing" id="result-timing"></div>
+        </div>
+
+        <div class="stats-bar">
+          <div class="stat stat--dispatch">
+            <div class="stat__label">dispatches</div>
+            <div class="stat__value" id="stat-dispatch">0</div>
+          </div>
+          <div class="stat stat--hit">
+            <div class="stat__label">cache hit</div>
+            <div class="stat__value" id="stat-hit">0</div>
+          </div>
+          <div class="stat stat--miss">
+            <div class="stat__label">cache miss</div>
+            <div class="stat__value" id="stat-miss">0</div>
+          </div>
+          <div class="stat stat--network">
+            <div class="stat__label">network fetch</div>
+            <div class="stat__value" id="stat-network">0</div>
+          </div>
+        </div>
+
+        <h4 style="color: var(--text-bright); font-size: .92rem; margin: 12px 0 6px;">
+          История диспатчей (последние 10)
+        </h4>
+        <div class="history" id="history">
+          <div style="color: var(--text-muted); font-size: .76rem;">— пусто —</div>
+        </div>
+
+        <h4 style="color: var(--text-bright); font-size: .92rem; margin: 16px 0 6px;">
+          state.api.queries (cache entries)
+        </h4>
+        <div class="cache-box">
+          <div class="cache-entry" style="font-weight: 600; border-bottom: 2px solid var(--border);">
+            <span>cacheKey</span>
+            <span>status</span>
+            <span>subs</span>
+          </div>
+          <div id="cache-list">
+            <div class="cache-entry"><span style="color: var(--text-muted);">— пусто —</span><span></span><span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 83. cacheKey и serializeQueryArgs</div>
+      <div class="theory__body">
+        <h3>Цитата — Customizing Queries</h3>
+        <div class="quote">
+          «Each endpoint has a concept of a <strong>cacheKey</strong>, which is by default derived from
+          a combination of the endpoint name and a serialized form of the query arguments. RTK Query
+          uses this cacheKey to determine whether to perform a fresh request or return cached data.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/api/createApi#serializequeryargs" target="_blank">RTKQ — serializeQueryArgs</a>
+        </div>
+        <div class="quote quote--ru">
+          «Ключ кэша — это <strong>endpointName + сериализованные args</strong>. По этому ключу RTKQ решает:
+          вернуть из кэша или идти в сеть.»
+        </div>
+
+        <h3>Исходник — defaultSerializeQueryArgs</h3>
+        <div class="code-block">
+<span class="cm">// @reduxjs/toolkit/src/query/defaultSerializeQueryArgs.ts</span>
+<span class="kw">export const</span> <span class="fn">defaultSerializeQueryArgs</span>: <span class="type">SerializeQueryArgs</span>&lt;<span class="type">any</span>&gt; = ({
+  endpointName,
+  queryArgs,
+}) =&gt; {
+  <span class="kw">let</span> serialized = <span class="str">''</span>
+  <span class="kw">const</span> cached = cache?.<span class="fn">get</span>(queryArgs)
+
+  <span class="kw">if</span> (<span class="kw">typeof</span> cached === <span class="str">'string'</span>) {
+    serialized = cached
+  } <span class="kw">else</span> {
+    <span class="kw">const</span> stringified = <span class="type">JSON</span>.<span class="fn">stringify</span>(queryArgs, (_, value) =&gt;
+      <span class="fn">isPlainObject</span>(value)
+        ? <span class="type">Object</span>.<span class="fn">keys</span>(value)
+            .<span class="fn">sort</span>()                             <span class="cm">// 👀 сортировка ключей объекта</span>
+            .<span class="fn">reduce</span>&lt;<span class="type">any</span>&gt;((acc, key) =&gt; {
+              acc[key] = (value <span class="kw">as any</span>)[key]
+              <span class="kw">return</span> acc
+            }, {})
+        : value,
+    )
+    <span class="kw">if</span> (<span class="fn">isPlainObject</span>(queryArgs)) cache?.<span class="fn">set</span>(queryArgs, stringified)
+    serialized = stringified
+  }
+  <span class="kw">return</span> <span class="str">`${endpointName}(${serialized})`</span>                 <span class="cm">// 👀 финальный формат</span>
+}
+        </div>
+        <p>
+          GitHub: <a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/defaultSerializeQueryArgs.ts" target="_blank">defaultSerializeQueryArgs.ts</a>
+        </p>
+
+        <h3>Примеры cacheKey</h3>
+        <div class="code-block">
+<span class="cm">// Примитив:</span>
+<span class="fn">useGetPokemonByNameQuery</span>(<span class="str">'pikachu'</span>)
+<span class="cm">// → cacheKey = getPokemonByName("pikachu")</span>
+
+<span class="cm">// Объект — ключи сортируются:</span>
+<span class="fn">useSearchUsersQuery</span>({ page: <span class="num">1</span>, query: <span class="str">'ann'</span>, sortBy: <span class="str">'name'</span> })
+<span class="fn">useSearchUsersQuery</span>({ sortBy: <span class="str">'name'</span>, page: <span class="num">1</span>, query: <span class="str">'ann'</span> })
+<span class="cm">// → ОДИН cacheKey: searchUsers({"page":1,"query":"ann","sortBy":"name"})</span>
+
+<span class="cm">// Разные значения — разные ключи:</span>
+<span class="fn">useSearchUsersQuery</span>({ page: <span class="num">1</span>, query: <span class="str">'ann'</span> })
+<span class="fn">useSearchUsersQuery</span>({ page: <span class="num">2</span>, query: <span class="str">'ann'</span> })
+<span class="cm">// → ДВА cacheKey, два запроса, два cache-entry</span>
+
+<span class="cm">// void / undefined:</span>
+<span class="fn">useGetAllPokemonsQuery</span>()
+<span class="cm">// → cacheKey = getAllPokemons(undefined) — один для всех "безаргументных"</span>
+        </div>
+
+        <h3>Кастомный serializeQueryArgs — когда менять</h3>
+        <div class="code-block">
+<span class="cm">// Пример 1 — игнорим "transient" фильтры (UI-only):</span>
+getPosts: build.<span class="fn">query</span>&lt;<span class="type">Post</span>[], <span class="type">GetPostsArgs</span>&gt;({
+  query: (args) =&gt; ({ url: <span class="str">'posts'</span>, params: args }),
+  serializeQueryArgs: ({ endpointName, queryArgs }) =&gt; {
+    <span class="kw">const</span> { <span class="prop">_localSort</span>, ...keep } = queryArgs
+    <span class="kw">return</span> <span class="str">`${endpointName}(${JSON.stringify(keep)})`</span>
+  },
+})
+
+<span class="cm">// Пример 2 — один общий cache (пагинация в памяти):</span>
+getInfiniteFeed: build.<span class="fn">query</span>&lt;<span class="type">Feed</span>, { page: <span class="type">number</span> }&gt;({
+  query: ({ page }) =&gt; <span class="str">`feed?page=${page}`</span>,
+  serializeQueryArgs: ({ endpointName }) =&gt; endpointName,  <span class="cm">// 👀 единственный ключ</span>
+  merge: (current, incoming) =&gt; { current.items.<span class="fn">push</span>(...incoming.items) },
+  forceRefetch: ({ currentArg, previousArg }) =&gt; currentArg?.page !== previousArg?.page,
+})
+        </div>
+        <p>Пример 2 — это, по сути, основа <code>build.infiniteQuery</code> (урок 100).</p>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. Новый объект каждый рендер → бесполезно, но НЕ ломает cache.</strong>
+          <br><code>useGetX({ foo: 'bar' })</code> в компоненте каждый рендер создаёт новый объект-аргумент.
+          Но RTKQ сначала сериализует (строка одинаковая) и только потом сверяет с кэшем — поэтому
+          реально cache reuse работает. <strong>Но</strong>: <code>useQuery</code> hooks внутри делают
+          <code>useMemo</code> по референсу args → при reference-change происходит лишний job по
+          re-subscribe. Паттерн: оборачивать args в <code>useMemo</code> или держать на верхнем уровне.
+
+          <br><br>
+          <strong>2. Непримитивные / не-plain-object args.</strong>
+          <br><code>Date</code>, <code>Map</code>, <code>class instance</code> — не-plain. Их
+          <code>JSON.stringify</code> не сортирует (функция sort-reviver работает только для plain-object).
+          Один и тот же <code>new Date('2024-01-01')</code> в двух рендерах → одинаковая строка, но
+          <strong>НЕ передавай экзотики</strong>: serializability middleware тоже ругнётся.
+
+          <br><br>
+          <strong>3. Порядок массивов ВАЖЕН.</strong>
+          <br><code>searchUsers({ ids: [1, 2] })</code> и <code>searchUsers({ ids: [2, 1] })</code> —
+          два разных cacheKey. Если логически один и тот же запрос — передавай <em>отсортированный</em>
+          массив или пиши свой <code>serializeQueryArgs</code>.
+
+          <br><br>
+          <strong>4. skipToken ≠ args.</strong>
+          <br>Когда <code>arg === skipToken</code>, cache НЕ создаётся (запроса не было). cacheKey
+          не генерируется. <code>data</code> остаётся от последнего реального arg.
+
+          <br><br>
+          <strong>5. Вложенные объекты — сортируются рекурсивно?</strong>
+          <br>Да, reviver применяется к каждому plain-object рекурсивно (через JSON.stringify).
+          Но если у тебя <code>{ filter: new URLSearchParams(...) }</code> — <em>внутрь</em> reviver не зайдёт
+          (не plain).
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../80-rtkq-create-api-basic/">80 — создание api</a>.</li>
+          <li><a href="../82-rtkq-usequery-hook/">82 — useQuery</a> (cacheKey меняется при смене arg).</li>
+          <li><a href="../84-rtkq-state-shape/">84 — state.api shape</a> (где хранятся cache entries).</li>
+          <li><a href="../92-rtkq-keepunuseddatafor-cleanup/">92 — keepUnusedDataFor</a> (TTL для cache entry).</li>
+          <li><a href="../100-rtkq-infinite-queries/">100 — infinite queries</a> (custom serializeQueryArgs + merge).</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/createApi#serializequeryargs" target="_blank">createApi · serializeQueryArgs</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/defaultSerializeQueryArgs.ts" target="_blank">defaultSerializeQueryArgs.ts</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/customizing-queries#customizing-query-responses-with-transformresponse" target="_blank">Customizing Queries</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>

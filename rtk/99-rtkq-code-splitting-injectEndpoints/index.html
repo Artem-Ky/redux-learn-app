@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>99 — injectEndpoints · code splitting</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    .feature-bar {
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+    }
+    .feature-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      min-height: 100px;
+    }
+    .injected-list {
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      margin-top: 6px;
+    }
+    .injected-list__item {
+      padding: 2px 0;
+      color: var(--accent-cyan);
+    }
+    .injected-list__item.new {
+      color: var(--success);
+      animation: flashGreen 1.2s;
+    }
+    @keyframes flashGreen {
+      0%   { background: rgba(76,175,80,.3); }
+      100% { background: transparent; }
+    }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <div class="site-header__title">
+      <span class="num">99 / 106</span>
+      injectEndpoints · Code splitting
+    </div>
+    <nav class="site-header__nav">
+      <a href="../">Все уроки</a>
+      <a href="../98-rtkq-base-query-custom/">← Назад</a>
+      <a href="../100-rtkq-infinite-queries/">Далее →</a>
+    </nav>
+  </div>
+
+  <div class="page">
+    <div class="demo-section">
+      <div class="demo-section__header">Динамическое расширение api — endpoints из chunks</div>
+      <div class="demo-section__body">
+        <p style="color: var(--text-secondary); font-size: .88rem; margin-bottom: 10px;">
+          Стартуем с пустого <code>createApi</code>. Жми «загрузить feature» — динамический
+          <code>import()</code> модуля, который вызывает <code>api.injectEndpoints(...)</code>.
+          В <code>api.endpoints</code> появляются новые записи, хуки становятся доступны.
+        </p>
+        <div id="react-root"></div>
+      </div>
+    </div>
+
+    <div id="devtools-container"></div>
+    <div id="console-container"></div>
+
+    <div class="theory">
+      <div class="theory__header">Теория — 99. injectEndpoints + code splitting</div>
+      <div class="theory__body">
+        <h3>Цитата — Code Splitting</h3>
+        <div class="quote">
+          «<code>injectEndpoints</code> accepts a collection of endpoints, adds them to the API slice, and
+          returns the same API with updated types, so you can use the newly-added endpoints.
+          <strong>Any endpoint added using <code>injectEndpoints</code> will stay in the cache</strong>
+          unless explicitly removed via <code>initial: overrideExisting</code>.»
+          <br>— <a href="https://redux-toolkit.js.org/rtk-query/usage/code-splitting" target="_blank">RTKQ · Code Splitting</a>
+        </div>
+
+        <h3>Паттерн — тонкий root-api + feature modules</h3>
+        <div class="code-block">
+<span class="cm">// src/store/api.ts — общий root (без endpoints)</span>
+<span class="kw">export const</span> api = <span class="fn">createApi</span>({
+  reducerPath: <span class="str">'api'</span>,
+  baseQuery: <span class="fn">fetchBaseQuery</span>({ baseUrl: <span class="str">'/api'</span> }),
+  tagTypes: [<span class="str">'Post'</span>, <span class="str">'User'</span>, <span class="str">'Comment'</span>],   <span class="cm">// 👀 ВСЕ возможные теги тут</span>
+  endpoints: () =&gt; ({}),                       <span class="cm">// пусто</span>
+})
+        </div>
+
+        <div class="code-block">
+<span class="cm">// src/features/posts/postsApi.ts — feature module</span>
+<span class="kw">import</span> { api } <span class="kw">from</span> <span class="str">'../../store/api'</span>
+
+<span class="kw">export const</span> postsApi = api.<span class="fn">injectEndpoints</span>({
+  endpoints: (build) =&gt; ({
+    getPosts: build.<span class="fn">query</span>&lt;<span class="type">Post</span>[], <span class="type">void</span>&gt;({
+      query: () =&gt; <span class="str">'posts'</span>,
+      providesTags: [{ type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> }],
+    }),
+    addPost: build.<span class="fn">mutation</span>&lt;<span class="type">Post</span>, <span class="type">NewPost</span>&gt;({
+      query: (body) =&gt; ({ url: <span class="str">'posts'</span>, method: <span class="str">'POST'</span>, body }),
+      invalidatesTags: [{ type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> }],
+    }),
+  }),
+  overrideExisting: <span class="kw">false</span>,    <span class="cm">// дефолт — warn если endpoint уже был</span>
+})
+
+<span class="kw">export const</span> { useGetPostsQuery, useAddPostMutation } = postsApi
+        </div>
+
+        <div class="code-block">
+<span class="cm">// src/features/posts/PostsPage.tsx — ленивый модуль</span>
+<span class="kw">const</span> PostsPage = <span class="fn">lazy</span>(() =&gt; <span class="fn">import</span>(<span class="str">'./features/posts/PostsPage'</span>))
+
+<span class="cm">// При первом рендере PostsPage:
+// 1. Vite/webpack загружает chunk features/posts/*
+// 2. Executing модуль — вызывается api.injectEndpoints(...)
+// 3. В store появляются новые reducer-пути (если endpoint был с injectInto кастомной slice'и)
+// 4. Хуки работают.</span>
+        </div>
+
+        <h3>Эффект на бандл</h3>
+        <p>Без split: root bundle тащит все endpoints + transport + utils. С split: root имеет только
+        <code>createApi({ endpoints: () =&gt; ({}) })</code> — это ~3kb. Остальное — по мере надобности.</p>
+
+        <h3>Enhanced api — расширить сгенерированное из OpenAPI</h3>
+        <div class="code-block">
+<span class="cm">// если используешь @rtk-query/codegen-openapi — он генерит "пустые" endpoints.
+// Ты дополняешь тегами и transformResponse через enhanceEndpoints:</span>
+
+<span class="kw">import</span> { api <span class="kw">as</span> generatedApi } <span class="kw">from</span> <span class="str">'./generated/api'</span>
+
+<span class="kw">export const</span> api = generatedApi.<span class="fn">enhanceEndpoints</span>({
+  addTagTypes: [<span class="str">'Post'</span>, <span class="str">'User'</span>],
+  endpoints: {
+    getPosts: {
+      providesTags: [{ type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> }],
+      transformResponse: (r: { items: <span class="type">Post</span>[] }) =&gt; r.items,
+    },
+    addPost: {
+      invalidatesTags: [{ type: <span class="str">'Post'</span>, id: <span class="str">'LIST'</span> }],
+    },
+  },
+})
+        </div>
+
+        <h3>Источник — buildCreateApi.ts</h3>
+        <div class="code-block">
+<span class="cm">// упрощённо из createApi:</span>
+<span class="kw">const</span> api = {
+  reducerPath, reducer, middleware, endpoints: {},
+
+  <span class="fn">injectEndpoints</span>({ endpoints, overrideExisting = <span class="kw">false</span> }) {
+    <span class="kw">const</span> newDefs = <span class="fn">endpoints</span>(builder)
+    <span class="kw">for</span> (<span class="kw">const</span> [name, def] <span class="kw">of</span> <span class="fn">Object</span>.<span class="fn">entries</span>(newDefs)) {
+      <span class="kw">if</span> (api.endpoints[name] &amp;&amp; !overrideExisting) {
+        <span class="kw">if</span> (__DEV__) <span class="fn">console</span>.<span class="fn">warn</span>(<span class="str">`Endpoint </span><span class="kw">${</span>name<span class="kw">}</span><span class="str"> already exists`</span>)
+        <span class="kw">continue</span>
+      }
+      api.endpoints[name] = <span class="fn">buildEndpoint</span>(def)
+    }
+    <span class="kw">return</span> api   <span class="cm">// тот же объект — можно деструктурировать хуки</span>
+  },
+}
+        </div>
+
+        <h3>Подводные камни</h3>
+        <div class="warning">
+          <strong>1. tagTypes нужно объявить В ROOT createApi.</strong>
+          <br>Если в injectEndpoints используешь тег <code>'Post'</code>, а в root <code>tagTypes</code> его
+          нет — RTKQ выдаст warning. Объявляй ВСЕ теги заранее в root или используй
+          <code>addTagTypes</code> при enhanceEndpoints.
+
+          <br><br>
+          <strong>2. Endpoint навсегда остаётся в api после inject.</strong>
+          <br>Нет механизма «unload feature» — endpoint продолжает занимать место в <code>api.endpoints</code>.
+          Это не утечка данных (cache умирает по keepUnusedDataFor), но TS типы и middleware остаются.
+
+          <br><br>
+          <strong>3. overrideExisting: false → silent skip в продакшене.</strong>
+          <br>В prod warning не логируется, endpoint просто не добавляется. Если у тебя два модуля
+          вызывают inject одного имени — второй проиграет. Для hot-reload поставь
+          <code>overrideExisting: true</code> или <code>'throw'</code>.
+
+          <br><br>
+          <strong>4. useGetXQuery типизируется ТОЛЬКО из injectEndpoints return.</strong>
+          <br><code>import { useGetPostsQuery } from './postsApi'</code> — работает.
+          <code>api.useGetPostsQuery</code> (корневой) — вернёт <code>undefined</code>, потому что
+          тип root api не знает про inject'нутые endpoints.
+
+          <br><br>
+          <strong>5. initialState reducer не перестраивается.</strong>
+          <br>injectEndpoints НЕ меняет shape state (в отличие от <code>combineSlices.inject</code>).
+          Он добавляет только endpoints definitions и hooks. State.api структура та же.
+
+          <br><br>
+          <strong>6. Если root createApi импортируется из каждого feature — дубли.</strong>
+          <br>Держи root в одном файле (<code>store/api.ts</code>), из features импортируй ЕГО, не
+          создавай новые createApi. Иначе будет несколько reducerPath.
+        </div>
+
+        <h3>Связанные уроки</h3>
+        <ul>
+          <li><a href="../80-rtkq-create-api-basic/">80 — createApi basic</a>.</li>
+          <li><a href="../35-combineslices-lazy/">35 — combineSlices lazy</a> (похожий паттерн для slices).</li>
+          <li><a href="../102-rtkq-typed-and-react-hooks/">102 — TS типизация</a>.</li>
+        </ul>
+
+        <h3>Источники</h3>
+        <ul>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/usage/code-splitting" target="_blank">RTKQ · Code Splitting</a></li>
+          <li><a href="https://redux-toolkit.js.org/rtk-query/api/created-api/code-splitting#enhanceendpoints" target="_blank">enhanceEndpoints</a></li>
+          <li><a href="https://github.com/reduxjs/redux-toolkit/blob/master/packages/toolkit/src/query/createApi.ts" target="_blank">createApi.ts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.tsx"></script>
+</body>
+</html>
